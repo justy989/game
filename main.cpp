@@ -117,25 +117,20 @@ void destroy(TileMap_t* tilemap){
      memset(tilemap, 0, sizeof(*tilemap));
 }
 
-bool collide_with_wall(float x, float y, float dx, float dy, F32 wall, F32 lower_bound, F32 upper_bound, F32* time_min)
-{
-     // x = pos.x + dx * t
-     // (x - pos.x) / dx = t
-     // when y is in range of the tile
-     if(fabs(dx) > FLT_EPSILON){
-          F32 time_of_collision = (wall - x) / dx;
+Vec_t collide_circle_with_line(Vec_t circle_center, F32 circle_radius, Vec_t a, Vec_t b){
+     // move data we care about to the origin
+     Vec_t c = circle_center - a;
+     Vec_t l = b - a;
+     Vec_t closest_point_on_l_to_c = vec_project_onto(c, l);
+     Vec_t collision_to_c = closest_point_on_l_to_c - c;
 
-          if(time_of_collision > 0.0f && time_of_collision < *time_min){
-               F32 y_collision = y + dy * time_of_collision;
-
-               if(y_collision >= lower_bound && y_collision <= upper_bound){
-                    *time_min = MAXIMUM(0.0f, time_of_collision - FLT_EPSILON);
-                    return true;
-               }
-          }
+     if(vec_magnitude(collision_to_c) < circle_radius){
+          // find edge of circle in that direction
+          Vec_t edge_of_circle = vec_normalize(collision_to_c) * circle_radius;
+          return collision_to_c - edge_of_circle;
      }
 
-     return false;
+     return vec_zero();
 }
 
 using namespace std::chrono;
@@ -196,8 +191,10 @@ int main(){
      Vec_t vel = vec_zero();
      Vec_t accel = vec_zero();
 
-     Vec_t line_0 {0.6f, 0.5f};
-     Vec_t line_1 {0.5f, 0.7f};
+     Vec_t line_0 {0.3f, 0.5f};
+     Vec_t line_1 {0.5f, 0.5f};
+     Vec_t line_2 {0.3f, 0.8f};
+     Vec_t line_3 {0.3f, 0.5f};
 
      bool left_pressed = false;
      bool right_pressed = false;
@@ -210,7 +207,6 @@ int main(){
      F32 player_radius = 8.0f / 256.0f;
      F32 block_size = 16.0f / 256.0f;
      F32 half_block_size = block_size * 0.5f;
-     bool collision = false;
 
      while(!quit){
           current_time = system_clock::now();
@@ -296,25 +292,10 @@ int main(){
 
                // collision with line
                {
-                    // move data we care about to the origin
-                    Vec_t p = pos - line_0;
-                    Vec_t v = line_1 - line_0;
-                    Vec_t v_closest = vec_project_onto(p, v);
-
-                    F32 distance = vec_magnitude(v_closest - p);
-                    if(distance < player_radius){
-                         // find edge of circle in that direction
-                         Vec_t col = v_closest - p;
-                         Vec_t edge = vec_normalize(col) * player_radius;
-
-                         // remove diff from pos_delta
-                         Vec_t diff = (edge - col);
-                         pos_delta -= diff;
-
-                         collision = true;
-                    }else{
-                         collision = false;
-                    }
+                    Vec_t speculative_pos = pos + pos_delta;
+                    pos_delta += collide_circle_with_line(speculative_pos, player_radius, line_0, line_1);
+                    pos_delta += collide_circle_with_line(speculative_pos, player_radius, line_1, line_2);
+                    pos_delta += collide_circle_with_line(speculative_pos, player_radius, line_2, line_3);
                }
 
                pos += pos_delta;
@@ -324,11 +305,7 @@ int main(){
 
           // player circle
           glBegin(GL_TRIANGLE_FAN);
-          if(collision){
-               glColor3f(0.0f, 0.0f, 1.0f);
-          }else{
-               glColor3f(1.0f, 1.0f, 1.0f);
-          }
+          glColor3f(1.0f, 1.0f, 1.0f);
 
           glVertex2f(pos.x, pos.y);
           glVertex2f(pos.x + player_radius, pos.y);
@@ -367,6 +344,10 @@ int main(){
           glColor3f(1.0f, 0.0f, 0.0f);
           glVertex2f(line_0.x, line_0.y);
           glVertex2f(line_1.x, line_1.y);
+          glVertex2f(line_1.x, line_1.y);
+          glVertex2f(line_2.x, line_2.y);
+          glVertex2f(line_2.x, line_2.y);
+          glVertex2f(line_3.x, line_3.y);
           glEnd();
 
           SDL_GL_SwapWindow(window);
