@@ -2,12 +2,25 @@
 #include <chrono>
 #include <cstdint>
 #include <cfloat>
+#include <cassert>
 
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_opengl.h>
 
+#define SWAP(a, b) {auto c = a; a = b; b = c;}
+
 #define MAXIMUM(a, b)((a > b) ? (a) : (b))
 #define MINIMUM(a, b)((a < b) ? (a) : (b))
+
+#define CLAMP(var, minimum, maximum) \
+     if(var < minimum){              \
+          var = minimum;             \
+     }else if(var > maximum){        \
+          var = maximum;             \
+     }
+
+// evil-genius quality right herr
+#define CASE_ENUM_RET_STR(e) case e: return #e;
 
 typedef int8_t  S8;
 typedef int16_t S16;
@@ -21,6 +34,177 @@ typedef uint64_t U64;
 
 typedef float  F32;
 typedef double F64;
+
+enum Direction_t : U8{
+     DIR_LEFT = 0,
+     DIR_UP = 1,
+     DIR_RIGHT = 2,
+     DIR_DOWN = 3,
+     DIR_COUNT = 4,
+};
+
+enum DirectionMask_t : U8{
+     DM_NONE = 0,
+     DM_LEFT = 1,
+     DM_UP = 2,
+     DM_RIGHT = 4,
+     DM_DOWN = 8,
+     DM_ALL = 15,
+};
+
+// 0  none
+// 1  left
+// 2  up
+// 3  left | up
+// 4  right
+// 5  right | left
+// 6  right | up
+// 7  right | left | up
+// 8  down
+// 9  down | left
+// 10 down | up
+// 11 down | left | up
+// 12 down | right
+// 13 down | right | left
+// 14 down | right | up
+// 15 down | left | up | right
+
+DirectionMask_t g_direction_mask_conversion[] = {
+     DM_LEFT,
+     DM_UP,
+     DM_RIGHT,
+     DM_DOWN,
+     DM_NONE,
+};
+
+bool direction_in_mask(DirectionMask_t mask, Direction_t dir)
+{
+     if(g_direction_mask_conversion[dir] & mask){
+          return true;
+     }
+
+     return false;
+}
+
+DirectionMask_t direction_to_direction_mask(Direction_t dir)
+{
+     assert(dir <= DIR_COUNT);
+     return g_direction_mask_conversion[dir];
+}
+
+DirectionMask_t direction_mask_add(DirectionMask_t a, DirectionMask_t b)
+{
+     return (DirectionMask_t)(a | b); // C++ makes this annoying
+}
+
+DirectionMask_t direction_mask_add(DirectionMask_t a, int b)
+{
+     return (DirectionMask_t)(a | b); // C++ makes this annoying
+}
+
+DirectionMask_t direction_mask_add(DirectionMask_t mask, Direction_t dir)
+{
+     return (DirectionMask_t)(mask | direction_to_direction_mask(dir)); // C++ makes this annoying
+}
+
+DirectionMask_t direction_mask_remove(DirectionMask_t a, DirectionMask_t b)
+{
+     return (DirectionMask_t)(a & ~b); // C++ makes this annoying
+}
+
+DirectionMask_t direction_mask_remove(DirectionMask_t a, int b)
+{
+     return (DirectionMask_t)(a & ~b); // C++ makes this annoying
+}
+
+DirectionMask_t direction_mask_remove(DirectionMask_t mask, Direction_t dir)
+{
+     return (DirectionMask_t)(mask & ~direction_to_direction_mask(dir)); // C++ makes this annoying
+}
+
+Direction_t direction_opposite(Direction_t dir){return (Direction_t)(((int)(dir) + 2) % DIR_COUNT);}
+bool direction_is_horizontal(Direction_t dir){return dir == DIR_LEFT || dir == DIR_RIGHT;}
+
+U8 direction_rotations_between(Direction_t a, Direction_t b)
+{
+     if(a < b){
+          return ((int)(a) + DIR_COUNT) - (int)(b);
+     }
+
+     return (int)(a) - (int)(b);
+}
+
+Direction_t direction_rotate_clockwise(Direction_t dir)
+{
+     U8 rot = (U8)(dir) + 1;
+     rot %= DIR_COUNT;
+     return (Direction_t)(rot);
+}
+
+Direction_t direction_rotate_clockwise(Direction_t dir, U8 times)
+{
+     for(U8 i = 0; i < times; ++i){
+          dir = direction_rotate_clockwise(dir);
+     }
+
+     return dir;
+}
+
+DirectionMask_t direction_mask_rotate_clockwise(DirectionMask_t mask)
+{
+     // TODO: could probably just shift?
+     S8 rot = DM_NONE;
+
+     if(mask & DM_LEFT) rot |= DM_UP;
+     if(mask & DM_UP) rot |= DM_RIGHT;
+     if(mask & DM_RIGHT) rot |= DM_DOWN;
+     if(mask & DM_DOWN) rot |= DM_LEFT;
+
+     return (DirectionMask_t)(rot);
+}
+
+DirectionMask_t direction_mask_flip_horizontal(DirectionMask_t mask)
+{
+     S8 flip = DM_NONE;
+
+     if(mask & DM_LEFT) flip |= DM_RIGHT;
+     if(mask & DM_RIGHT) flip |= DM_LEFT;
+
+     // keep the vertical components the same
+     if(mask & DM_UP) flip |= DM_UP;
+     if(mask & DM_DOWN) flip |= DM_DOWN;
+
+     return (DirectionMask_t)(flip);
+}
+
+DirectionMask_t direction_mask_flip_vertical(DirectionMask_t mask)
+{
+     S8 flip = DM_NONE;
+
+     if(mask & DM_UP) flip |= DM_DOWN;
+     if(mask & DM_DOWN) flip |= DM_UP;
+
+     // keep the horizontal components the same
+     if(mask & DM_LEFT) flip |= DM_LEFT;
+     if(mask & DM_RIGHT) flip |= DM_RIGHT;
+
+     return (DirectionMask_t)(flip);
+}
+
+const char* direction_to_string(Direction_t dir)
+{
+     switch(dir){
+     default:
+          break;
+     CASE_ENUM_RET_STR(DIR_LEFT)
+     CASE_ENUM_RET_STR(DIR_UP)
+     CASE_ENUM_RET_STR(DIR_RIGHT)
+     CASE_ENUM_RET_STR(DIR_DOWN)
+     CASE_ENUM_RET_STR(DIR_COUNT)
+     }
+
+     return "DIR_UNKNOWN";
+}
 
 struct Vec_t{
      F32 x;
@@ -74,6 +258,44 @@ Vec_t vec_project_onto(Vec_t a, Vec_t b){
 
      // find the closest point
      return b_normal * along_b;
+}
+
+struct Pixel_t{
+     S16 x;
+     S16 y;
+};
+
+Pixel_t operator+(Pixel_t a, Pixel_t b)
+{
+     Pixel_t p;
+     p.x = a.x + b.x;
+     p.y = a.y + b.y;
+     return p;
+}
+
+Pixel_t operator-(Pixel_t a, Pixel_t b)
+{
+     Pixel_t p;
+     p.x = a.x - b.x;
+     p.y = a.y - b.y;
+     return p;
+}
+
+void operator+=(Pixel_t& a, Pixel_t b)
+{
+     a.x += b.x;
+     a.y += b.y;
+}
+
+void operator-=(Pixel_t& a, Pixel_t b)
+{
+     a.x -= b.x;
+     a.y -= b.y;
+}
+
+bool operator!=(Pixel_t& a, Pixel_t b)
+{
+     return (a.x != b.x || a.y != b.y);
 }
 
 enum TileFlag_t{
@@ -161,7 +383,7 @@ int main(){
      glViewport(0, 0, window_width, window_height);
      glMatrixMode(GL_PROJECTION);
      glLoadIdentity();
-     glOrtho(-1.0, 1.0, -1.0, 1.0, -1.0, 1.0);
+     glOrtho(0.0, 1.0, 0.0, 1.0, 0.0, 1.0);
      glMatrixMode(GL_MODELVIEW);
      glLoadIdentity();
      glEnable(GL_BLEND);
@@ -290,6 +512,7 @@ int main(){
                     vel = vec_normalize(vel) * movement_speed;
                }
 
+#if 0
                // collision with line
                {
                     Vec_t speculative_pos = pos + pos_delta;
@@ -297,6 +520,8 @@ int main(){
                     pos_delta += collide_circle_with_line(speculative_pos, player_radius, line_1, line_2);
                     pos_delta += collide_circle_with_line(speculative_pos, player_radius, line_2, line_3);
                }
+#endif
+               // figure out tiles that are close by
 
                pos += pos_delta;
           }
