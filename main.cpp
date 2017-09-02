@@ -59,6 +59,64 @@ void vec_move  (Vec_t* v, float dx, float dy) {v->x += dx; v->y += dy;}
 void vec_move_x(Vec_t* v, float dx)           {v->x += dx;}
 void vec_move_y(Vec_t* v, float dy)           {v->y += dy;}
 
+Vec_t vec_project_onto(Vec_t a, Vec_t b){
+     // find the perpendicular vector
+     Vec_t b_normal = vec_normalize(b);
+     F32 along_b = vec_dot(a, b_normal);
+
+     // clamp dot
+     F32 b_magnitude = vec_magnitude(b);
+     if(along_b < 0.0f){
+          along_b = 0.0f;
+     }else if(along_b > b_magnitude){
+          along_b = b_magnitude;
+     }
+
+     // find the closest point
+     return b_normal * along_b;
+}
+
+enum TileFlag_t{
+     TILE_FLAG_ICED = 1,
+     TILE_FLAG_CHECKPOINT = 2,
+};
+
+struct Tile_t{
+     U8 id;
+     U8 light;
+     U8 flags;
+};
+
+struct TileMap_t{
+     S16 width;
+     S16 height;
+     Tile_t** tiles;
+};
+
+bool init(TileMap_t* tilemap, S16 width, S16 height){
+     tilemap->tiles = (Tile_t**)calloc(height, sizeof(*tilemap->tiles));
+     if(!tilemap->tiles) return false;
+
+     for(S16 i = 0; i < height; i++){
+          tilemap->tiles[i] = (Tile_t*)calloc(width, sizeof(*tilemap->tiles[i]));
+          if(!tilemap->tiles[i]) return false;
+     }
+
+     tilemap->width = width;
+     tilemap->height = height;
+
+     return true;
+}
+
+void destroy(TileMap_t* tilemap){
+     for(S16 i = 0; i < tilemap->height; i++){
+          free(tilemap->tiles[i]);
+     }
+
+     free(tilemap->tiles);
+     memset(tilemap, 0, sizeof(*tilemap));
+}
+
 bool collide_with_wall(float x, float y, float dx, float dy, F32 wall, F32 lower_bound, F32 upper_bound, F32* time_min)
 {
      // x = pos.x + dx * t
@@ -115,15 +173,31 @@ int main(){
      glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
      glBlendEquation(GL_FUNC_ADD);
 
+     TileMap_t tilemap;
+     {
+          init(&tilemap, 16, 18);
+
+          for(U16 i = 0; i < tilemap.width; i++){
+               tilemap.tiles[0][i].id = 1;
+               tilemap.tiles[tilemap.height - 1][i].id = 1;
+          }
+
+          for(U16 i = 0; i < tilemap.height; i++){
+               tilemap.tiles[i][0].id = 1;
+               tilemap.tiles[i][tilemap.width - 1].id = 1;
+          }
+     }
+
      bool quit = false;
 
      Vec_t user_movement = {};
 
-     Vec_t pos = vec_zero();
+     Vec_t pos {0.3f, 0.3f};
      Vec_t vel = vec_zero();
      Vec_t accel = vec_zero();
 
-     Vec_t block_pos {0.5f, 0.5f};
+     Vec_t line_0 {0.6f, 0.5f};
+     Vec_t line_1 {0.5f, 0.7f};
 
      bool left_pressed = false;
      bool right_pressed = false;
@@ -133,13 +207,10 @@ int main(){
      auto last_time = system_clock::now();
      auto current_time = last_time;
 
-     float player_width = 16.0f / 256.0f;
-     float player_height = player_width;
-     float half_player_width = player_width * 0.5f;
-     float half_player_height = player_height * 0.5f;
-
-     float half_block_width = half_player_width;
-     float half_block_height = half_player_width;
+     F32 player_radius = 8.0f / 256.0f;
+     F32 block_size = 16.0f / 256.0f;
+     F32 half_block_size = block_size * 0.5f;
+     bool collision = false;
 
      while(!quit){
           current_time = system_clock::now();
@@ -223,34 +294,26 @@ int main(){
                     vel = vec_normalize(vel) * movement_speed;
                }
 
-               if(fabs(vec_magnitude(pos - block_pos)) < 2.0f * (half_player_height + half_block_height)){
-                    for(int c = 0; c < 4; ++c){
-                         // player block collision
-                         float collision_dt = 1.0f;
-                         float left = block_pos.x - (half_block_width + half_player_width);
-                         float right = block_pos.x + (half_block_width + half_player_width);
-                         float bottom = block_pos.y - (half_block_height + half_player_height);
-                         float top = block_pos.y + (half_block_height + half_player_height);
-                         Vec_t wall_normal = vec_zero();
+               // collision with line
+               {
+                    // move data we care about to the origin
+                    Vec_t p = pos - line_0;
+                    Vec_t v = line_1 - line_0;
+                    Vec_t v_closest = vec_project_onto(p, v);
 
-                         if(collide_with_wall(pos.x, pos.y, pos_delta.x, pos_delta.y, left, bottom, top, &collision_dt)){
-                              wall_normal = vec_left();
-                         }
+                    F32 distance = vec_magnitude(v_closest - p);
+                    if(distance < player_radius){
+                         // find edge of circle in that direction
+                         Vec_t col = v_closest - p;
+                         Vec_t edge = vec_normalize(col) * player_radius;
 
-                         if(collide_with_wall(pos.x, pos.y, pos_delta.x, pos_delta.y, right, bottom, top, &collision_dt)){
-                              wall_normal = vec_right();
-                         }
+                         // remove diff from pos_delta
+                         Vec_t diff = (edge - col);
+                         pos_delta -= diff;
 
-                         if(collide_with_wall(pos.y, pos.x, pos_delta.y, pos_delta.x, bottom, left, right, &collision_dt)){
-                              wall_normal = vec_down();
-                         }
-
-                         if(collide_with_wall(pos.y, pos.x, pos_delta.y, pos_delta.x, top, left, right, &collision_dt)){
-                              wall_normal = vec_up();
-                         }
-
-                         vel -= (wall_normal * vec_dot(vel, wall_normal));
-                         pos_delta -= (wall_normal * vec_dot(pos_delta, wall_normal));
+                         collision = true;
+                    }else{
+                         collision = false;
                     }
                }
 
@@ -258,24 +321,58 @@ int main(){
           }
 
           glClear(GL_COLOR_BUFFER_BIT);
-          glBegin(GL_QUADS);
-          glColor3f(1.0f, 1.0f, 1.0f);
-          glVertex2f(-half_player_width + pos.x, -half_player_height + pos.y);
-          glVertex2f(-half_player_width + pos.x,  half_player_height + pos.y);
-          glVertex2f( half_player_width + pos.x,  half_player_height + pos.y);
-          glVertex2f( half_player_width + pos.x, -half_player_height + pos.y);
+
+          // player circle
+          glBegin(GL_TRIANGLE_FAN);
+          if(collision){
+               glColor3f(0.0f, 0.0f, 1.0f);
+          }else{
+               glColor3f(1.0f, 1.0f, 1.0f);
+          }
+
+          glVertex2f(pos.x, pos.y);
+          glVertex2f(pos.x + player_radius, pos.y);
+          S32 segments = 32;
+          F32 delta = 3.14159f * 2.0f / (F32)(segments);
+          F32 angle = 0.0f  + delta;
+          for(S32 i = 0; i <= segments; i++){
+               F32 dx = cos(angle) * player_radius;
+               F32 dy = sin(angle) * player_radius;
+
+               glVertex2f(pos.x + dx, pos.y + dy);
+
+               angle += delta;
+          }
+          glVertex2f(pos.x + player_radius, pos.y);
           glEnd();
 
+          // tilemap
           glBegin(GL_QUADS);
           glColor3f(0.0f, 1.0f, 1.0f);
-          glVertex2f(-half_block_width + block_pos.x, -half_block_height + block_pos.y);
-          glVertex2f(-half_block_width + block_pos.x,  half_block_height + block_pos.y);
-          glVertex2f( half_block_width + block_pos.x,  half_block_height + block_pos.y);
-          glVertex2f( half_block_width + block_pos.x, -half_block_height + block_pos.y);
+          for(U16 y = 0; y < tilemap.height; y++){
+               for(U16 x = 0; x < tilemap.width; x++){
+                    if(tilemap.tiles[y][x].id){
+                         Vec_t tile_pos {(F32)(x) / (F32)(tilemap.width), (F32)(y) / (F32)(tilemap.height)};
+                         glVertex2f(-half_block_size + tile_pos.x, -half_block_size + tile_pos.y);
+                         glVertex2f(-half_block_size + tile_pos.x,  half_block_size + tile_pos.y);
+                         glVertex2f( half_block_size + tile_pos.x,  half_block_size + tile_pos.y);
+                         glVertex2f( half_block_size + tile_pos.x, -half_block_size + tile_pos.y);
+                    }
+               }
+          }
+          glEnd();
+
+          // collision line
+          glBegin(GL_LINES);
+          glColor3f(1.0f, 0.0f, 0.0f);
+          glVertex2f(line_0.x, line_0.y);
+          glVertex2f(line_1.x, line_1.y);
           glEnd();
 
           SDL_GL_SwapWindow(window);
      }
+
+     destroy(&tilemap);
 
      SDL_GL_DeleteContext(opengl_context);
      SDL_DestroyWindow(window);
