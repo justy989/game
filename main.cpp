@@ -22,6 +22,12 @@
 // evil-genius quality right herr
 #define CASE_ENUM_RET_STR(e) case e: return #e;
 
+#define PIXEL_SIZE .00367647f
+#define TILE_SIZE (16.0f / 272.0f)
+#define HALF_TILE_SIZE (TILE_SIZE_IN_PIXELS * 0.5f)
+#define TILE_SIZE_IN_PIXELS 16
+#define HALF_TILE_SIZE_IN_PIXELS 8
+
 typedef int8_t  S8;
 typedef int16_t S16;
 typedef int32_t S32;
@@ -77,8 +83,7 @@ DirectionMask_t g_direction_mask_conversion[] = {
      DM_NONE,
 };
 
-bool direction_in_mask(DirectionMask_t mask, Direction_t dir)
-{
+bool direction_in_mask(DirectionMask_t mask, Direction_t dir){
      if(g_direction_mask_conversion[dir] & mask){
           return true;
      }
@@ -86,47 +91,39 @@ bool direction_in_mask(DirectionMask_t mask, Direction_t dir)
      return false;
 }
 
-DirectionMask_t direction_to_direction_mask(Direction_t dir)
-{
+DirectionMask_t direction_to_direction_mask(Direction_t dir){
      assert(dir <= DIR_COUNT);
      return g_direction_mask_conversion[dir];
 }
 
-DirectionMask_t direction_mask_add(DirectionMask_t a, DirectionMask_t b)
-{
+DirectionMask_t direction_mask_add(DirectionMask_t a, DirectionMask_t b){
      return (DirectionMask_t)(a | b); // C++ makes this annoying
 }
 
-DirectionMask_t direction_mask_add(DirectionMask_t a, int b)
-{
+DirectionMask_t direction_mask_add(DirectionMask_t a, int b){
      return (DirectionMask_t)(a | b); // C++ makes this annoying
 }
 
-DirectionMask_t direction_mask_add(DirectionMask_t mask, Direction_t dir)
-{
+DirectionMask_t direction_mask_add(DirectionMask_t mask, Direction_t dir){
      return (DirectionMask_t)(mask | direction_to_direction_mask(dir)); // C++ makes this annoying
 }
 
-DirectionMask_t direction_mask_remove(DirectionMask_t a, DirectionMask_t b)
-{
+DirectionMask_t direction_mask_remove(DirectionMask_t a, DirectionMask_t b){
      return (DirectionMask_t)(a & ~b); // C++ makes this annoying
 }
 
-DirectionMask_t direction_mask_remove(DirectionMask_t a, int b)
-{
+DirectionMask_t direction_mask_remove(DirectionMask_t a, int b){
      return (DirectionMask_t)(a & ~b); // C++ makes this annoying
 }
 
-DirectionMask_t direction_mask_remove(DirectionMask_t mask, Direction_t dir)
-{
+DirectionMask_t direction_mask_remove(DirectionMask_t mask, Direction_t dir){
      return (DirectionMask_t)(mask & ~direction_to_direction_mask(dir)); // C++ makes this annoying
 }
 
 Direction_t direction_opposite(Direction_t dir){return (Direction_t)(((int)(dir) + 2) % DIR_COUNT);}
 bool direction_is_horizontal(Direction_t dir){return dir == DIR_LEFT || dir == DIR_RIGHT;}
 
-U8 direction_rotations_between(Direction_t a, Direction_t b)
-{
+U8 direction_rotations_between(Direction_t a, Direction_t b){
      if(a < b){
           return ((int)(a) + DIR_COUNT) - (int)(b);
      }
@@ -134,15 +131,13 @@ U8 direction_rotations_between(Direction_t a, Direction_t b)
      return (int)(a) - (int)(b);
 }
 
-Direction_t direction_rotate_clockwise(Direction_t dir)
-{
+Direction_t direction_rotate_clockwise(Direction_t dir){
      U8 rot = (U8)(dir) + 1;
      rot %= DIR_COUNT;
      return (Direction_t)(rot);
 }
 
-Direction_t direction_rotate_clockwise(Direction_t dir, U8 times)
-{
+Direction_t direction_rotate_clockwise(Direction_t dir, U8 times){
      for(U8 i = 0; i < times; ++i){
           dir = direction_rotate_clockwise(dir);
      }
@@ -150,8 +145,7 @@ Direction_t direction_rotate_clockwise(Direction_t dir, U8 times)
      return dir;
 }
 
-DirectionMask_t direction_mask_rotate_clockwise(DirectionMask_t mask)
-{
+DirectionMask_t direction_mask_rotate_clockwise(DirectionMask_t mask){
      // TODO: could probably just shift?
      S8 rot = DM_NONE;
 
@@ -163,8 +157,7 @@ DirectionMask_t direction_mask_rotate_clockwise(DirectionMask_t mask)
      return (DirectionMask_t)(rot);
 }
 
-DirectionMask_t direction_mask_flip_horizontal(DirectionMask_t mask)
-{
+DirectionMask_t direction_mask_flip_horizontal(DirectionMask_t mask){
      S8 flip = DM_NONE;
 
      if(mask & DM_LEFT) flip |= DM_RIGHT;
@@ -177,8 +170,7 @@ DirectionMask_t direction_mask_flip_horizontal(DirectionMask_t mask)
      return (DirectionMask_t)(flip);
 }
 
-DirectionMask_t direction_mask_flip_vertical(DirectionMask_t mask)
-{
+DirectionMask_t direction_mask_flip_vertical(DirectionMask_t mask){
      S8 flip = DM_NONE;
 
      if(mask & DM_UP) flip |= DM_DOWN;
@@ -191,8 +183,7 @@ DirectionMask_t direction_mask_flip_vertical(DirectionMask_t mask)
      return (DirectionMask_t)(flip);
 }
 
-const char* direction_to_string(Direction_t dir)
-{
+const char* direction_to_string(Direction_t dir){
      switch(dir){
      default:
           break;
@@ -225,8 +216,7 @@ float vec_dot(Vec_t a, Vec_t b){return a.x * b.x + a.y * b.y;}
 Vec_t vec_negate(Vec_t a){return Vec_t{-a.x, -a.y};}
 F32 vec_magnitude(Vec_t v){return (F32)(sqrt((v.x * v.x) + (v.y * v.y)));}
 
-Vec_t vec_normalize(Vec_t a)
-{
+Vec_t vec_normalize(Vec_t a){
      F32 length = vec_magnitude(a);
      if(length <= FLT_EPSILON) return a;
      return Vec_t{a.x / length, a.y / length};
@@ -265,42 +255,274 @@ struct Pixel_t{
      S16 y;
 };
 
-Pixel_t operator+(Pixel_t a, Pixel_t b)
-{
+Pixel_t operator+(Pixel_t a, Pixel_t b){
      Pixel_t p;
      p.x = a.x + b.x;
      p.y = a.y + b.y;
      return p;
 }
 
-Pixel_t operator-(Pixel_t a, Pixel_t b)
-{
+Pixel_t operator-(Pixel_t a, Pixel_t b){
      Pixel_t p;
      p.x = a.x - b.x;
      p.y = a.y - b.y;
      return p;
 }
 
-void operator+=(Pixel_t& a, Pixel_t b)
-{
+void operator+=(Pixel_t& a, Pixel_t b){
      a.x += b.x;
      a.y += b.y;
 }
 
-void operator-=(Pixel_t& a, Pixel_t b)
-{
+void operator-=(Pixel_t& a, Pixel_t b){
      a.x -= b.x;
      a.y -= b.y;
 }
 
-bool operator!=(Pixel_t& a, Pixel_t b)
-{
+bool operator!=(Pixel_t& a, Pixel_t b){
      return (a.x != b.x || a.y != b.y);
+}
+
+struct Coord_t{
+     S16 x;
+     S16 y;
+};
+
+Coord_t coord_zero(){return Coord_t{0, 0};}
+Coord_t coord_move(Coord_t c, Direction_t dir, S16 distance){
+     switch ( dir ) {
+     default:
+          assert(!"invalid direction");
+          break;
+     case DIR_LEFT:
+          c.x -= distance;
+          break;
+     case DIR_UP:
+          c.y += distance;
+          break;
+     case DIR_RIGHT:
+          c.x += distance;
+          break;
+     case DIR_DOWN:
+          c.y -= distance;
+          break;
+     }
+
+     return c;
+}
+
+Coord_t coord_clamp_zero_to_dim(Coord_t c, S16 width, S16 height){
+     CLAMP(c.x, 0, width);
+     CLAMP(c.y, 0, height);
+     return c;
+}
+
+Coord_t operator+(Coord_t a, Coord_t b){return Coord_t{(S16)(a.x + b.x), (S16)(a.y + b.y)};}
+Coord_t operator-(Coord_t a, Coord_t b){return Coord_t{(S16)(a.x - b.x), (S16)(a.y - b.y)};}
+
+void operator+=(Coord_t& a, Coord_t b){a.x += b.x; a.y += b.y;}
+void operator-=(Coord_t& a, Coord_t b){a.x -= b.x; a.y -= b.y;}
+
+bool operator==(Coord_t a, Coord_t b){return (a.x == b.x && a.y == b.y);}
+bool operator!=(Coord_t a, Coord_t b){return (a.x != b.x || a.y != b.y);}
+
+Coord_t operator+(Coord_t c, Direction_t dir){return coord_move(c, dir, 1);}
+Coord_t operator-(Coord_t c, Direction_t dir){return coord_move(c, direction_opposite(dir), 1);}
+void operator+=(Coord_t& c, Direction_t dir){c = coord_move(c, dir, 1);}
+void operator-=(Coord_t& c, Direction_t dir){c = coord_move(c, direction_opposite(dir), 1);}
+
+void coord_set(Coord_t* c, S16 x, S16 y){c->x = x; c->y = y;}
+void coord_move(Coord_t* c, S16 dx, S16 dy){c->x += dx; c->y += dy;}
+void coord_move_x(Coord_t* c, S16 dx){c->x += dx;};
+void coord_move_y(Coord_t* c, S16 dy){c->y += dy;}
+
+bool coord_after(Coord_t a, Coord_t b){return b.y < a.y || (b.y == a.y && b.x < a.x);}
+
+struct Position_t{
+     Pixel_t pixel;
+     S8 z;
+     Vec_t decimal;
+};
+
+Position_t pixel_position(S16 x, S16 y){
+     Position_t p;
+     p.pixel = {x, y};
+     p.decimal = {0.0f, 0.0f};
+     p.z = 0;
+     return p;
+}
+
+Position_t pixel_position(Pixel_t pixel){
+     Position_t p;
+     p.pixel = pixel;
+     p.decimal = {0.0f, 0.0f};
+     p.z = 0;
+     return p;
+}
+
+void canonicalize(Position_t* position){
+     if(position->decimal.x > PIXEL_SIZE){
+          F32 pixels = (F32)(floor(position->decimal.x / PIXEL_SIZE));
+          position->pixel.x += (S16)(pixels);
+          position->decimal.x = (F32)(fmod(position->decimal.x, PIXEL_SIZE));
+     }else if(position->decimal.x < 0.0f){
+          F32 pixels = (F32)(floor(position->decimal.x / PIXEL_SIZE));
+          position->pixel.x += (S16)(pixels);
+          position->decimal.x = (F32)(fmod(position->decimal.x, PIXEL_SIZE));
+          if(position->decimal.x < 0.0f) position->decimal.x += PIXEL_SIZE;
+          else if(position->decimal.x == -0.0f) position->decimal.x = 0.0f;
+     }
+
+     if(position->decimal.y > PIXEL_SIZE){
+          F32 pixels = (F32)(floor(position->decimal.y / PIXEL_SIZE));
+          position->pixel.y += (S16)(pixels);
+          position->decimal.y = (F32)(fmod(position->decimal.y, PIXEL_SIZE));
+     }else if(position->decimal.y < 0.0f){
+          F32 pixels = (F32)(floor(position->decimal.y / PIXEL_SIZE));
+          position->pixel.y += (S16)(pixels);
+          position->decimal.y = (F32)(fmod(position->decimal.y, PIXEL_SIZE));
+          if(position->decimal.y < 0.0f) position->decimal.y += PIXEL_SIZE;
+          else if(position->decimal.y == -0.0f) position->decimal.y = 0.0f;
+     }
+}
+
+Position_t operator+(Position_t p, Vec_t v){
+     p.decimal += v;
+     canonicalize(&p);
+     return p;
+}
+
+Position_t operator-(Position_t p, Vec_t v){
+     p.decimal -= v;
+     canonicalize(&p);
+     return p;
+}
+
+void operator+=(Position_t& p, Vec_t v){
+     p.decimal += v;
+     canonicalize(&p);
+}
+
+void operator-=(Position_t& p, Vec_t v){
+     p.decimal -= v;
+     canonicalize(&p);
+}
+
+Position_t operator+(Position_t a, Position_t b){
+     Position_t p;
+
+     p.pixel = a.pixel + b.pixel;
+     p.decimal = a.decimal + b.decimal;
+     p.z = a.z + b.z;
+
+     canonicalize(&p);
+     return p;
+}
+
+Position_t operator-(Position_t a, Position_t b){
+     Position_t p;
+
+     p.pixel = a.pixel - b.pixel;
+     p.decimal = a.decimal - b.decimal;
+     p.z = a.z - b.z;
+
+     canonicalize(&p);
+     return p;
+}
+
+void operator+=(Position_t& a, Position_t b){
+     a.pixel += b.pixel;
+     a.decimal += b.decimal;
+     canonicalize(&a);
+}
+
+void operator-=(Position_t& a, Position_t b){
+     a.pixel -= b.pixel;
+     a.decimal -= b.decimal;
+     canonicalize(&a);
+}
+
+// NOTE: only call with small positions < 1
+Position_t operator*(Position_t p, float scale){
+     float x_value = (float)(p.pixel.x) * PIXEL_SIZE + p.decimal.x;
+     x_value *= scale;
+     p.pixel.x = 0;
+     p.decimal.x = x_value;
+
+     float y_value = (float)(p.pixel.y) * PIXEL_SIZE + p.decimal.y;
+     y_value *= scale;
+     p.pixel.y = 0;
+     p.decimal.y = y_value;
+
+     canonicalize(&p);
+     return p;
+}
+
+Coord_t vec_to_coord(Vec_t v)
+{
+     Coord_t c;
+     c.x = v.x / PIXEL_SIZE / TILE_SIZE_IN_PIXELS;
+     c.y = v.y / PIXEL_SIZE / TILE_SIZE_IN_PIXELS;
+     return c;
+}
+
+Vec_t coord_to_vec(Coord_t c)
+{
+     Vec_t v;
+     v.x = (F32)(c.x * TILE_SIZE_IN_PIXELS) * PIXEL_SIZE;
+     v.y = (F32)(c.y * TILE_SIZE_IN_PIXELS) * PIXEL_SIZE;
+     return v;
+}
+
+Vec_t position_to_vec(Position_t p)
+{
+     Vec_t v;
+
+     v.x = (F32)(p.pixel.x) * PIXEL_SIZE + p.decimal.x;
+     v.y = (F32)(p.pixel.y) * PIXEL_SIZE + p.decimal.y;
+
+     return v;
+}
+
+Coord_t pixel_to_coord(Pixel_t p)
+{
+     Coord_t c;
+     c.x = p.x / TILE_SIZE_IN_PIXELS;
+     c.y = p.y / TILE_SIZE_IN_PIXELS;
+     return c;
+}
+
+Coord_t position_to_coord(Position_t p)
+{
+     assert(p.decimal.x >= 0.0f && p.decimal.y >= 0.0f);
+     return pixel_to_coord(p.pixel);
+}
+
+Pixel_t coord_to_pixel(Coord_t c)
+{
+     Pixel_t p;
+     p.x = c.x * TILE_SIZE_IN_PIXELS;
+     p.y = c.y * TILE_SIZE_IN_PIXELS;
+     return p;
+}
+
+Position_t coord_to_position_at_tile_center(Coord_t c)
+{
+     return pixel_position(coord_to_pixel(c) + Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS});
+}
+
+Position_t coord_to_position(Coord_t c)
+{
+     return pixel_position(coord_to_pixel(c));
 }
 
 enum TileFlag_t{
      TILE_FLAG_ICED = 1,
      TILE_FLAG_CHECKPOINT = 2,
+     TILE_FLAG_WIRE_LEFT = 4,
+     TILE_FLAG_WIRE_UP = 8,
+     TILE_FLAG_WIRE_RIGHT = 16,
+     TILE_FLAG_WIRE_DOWN = 32,
 };
 
 struct Tile_t{
@@ -369,14 +591,14 @@ int main(){
      }
 
      int window_width = 1280;
-     int window_height = 1280;
+     int window_height = 1024;
 
      SDL_Window* window = SDL_CreateWindow("bryte", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, window_width, window_height, SDL_WINDOW_OPENGL);
      if(!window) return 1;
 
      SDL_GLContext opengl_context = SDL_GL_CreateContext(window);
 
-     SDL_GL_SetSwapInterval(1);
+     SDL_GL_SetSwapInterval(SDL_TRUE);
      glViewport(0, 0, window_width, window_height);
      glClearColor(0.0, 0.0, 0.0, 1.0);
      glEnable(GL_TEXTURE_2D);
@@ -392,7 +614,7 @@ int main(){
 
      TileMap_t tilemap;
      {
-          init(&tilemap, 16, 18);
+          init(&tilemap, 17, 17);
 
           for(U16 i = 0; i < tilemap.width; i++){
                tilemap.tiles[0][i].id = 1;
@@ -403,6 +625,23 @@ int main(){
                tilemap.tiles[i][0].id = 1;
                tilemap.tiles[i][tilemap.width - 1].id = 1;
           }
+
+          tilemap.tiles[3][4].id = 1;
+          tilemap.tiles[4][5].id = 1;
+
+          tilemap.tiles[8][4].id = 1;
+          tilemap.tiles[8][5].id = 1;
+
+          tilemap.tiles[11][10].id = 1;
+          tilemap.tiles[12][10].id = 1;
+
+          tilemap.tiles[5][10].id = 1;
+          tilemap.tiles[7][10].id = 1;
+
+          tilemap.tiles[5][12].id = 1;
+          tilemap.tiles[7][12].id = 1;
+
+          tilemap.tiles[2][14].id = 1;
      }
 
      bool quit = false;
@@ -413,11 +652,6 @@ int main(){
      Vec_t vel = vec_zero();
      Vec_t accel = vec_zero();
 
-     Vec_t line_0 {0.3f, 0.5f};
-     Vec_t line_1 {0.5f, 0.5f};
-     Vec_t line_2 {0.3f, 0.8f};
-     Vec_t line_3 {0.3f, 0.5f};
-
      bool left_pressed = false;
      bool right_pressed = false;
      bool up_pressed = false;
@@ -426,9 +660,7 @@ int main(){
      auto last_time = system_clock::now();
      auto current_time = last_time;
 
-     F32 player_radius = 8.0f / 256.0f;
-     F32 block_size = 16.0f / 256.0f;
-     F32 half_block_size = block_size * 0.5f;
+     F32 player_radius = 8.0f / 272.0f;
 
      while(!quit){
           current_time = system_clock::now();
@@ -512,16 +744,41 @@ int main(){
                     vel = vec_normalize(vel) * movement_speed;
                }
 
-#if 0
-               // collision with line
-               {
-                    Vec_t speculative_pos = pos + pos_delta;
-                    pos_delta += collide_circle_with_line(speculative_pos, player_radius, line_0, line_1);
-                    pos_delta += collide_circle_with_line(speculative_pos, player_radius, line_1, line_2);
-                    pos_delta += collide_circle_with_line(speculative_pos, player_radius, line_2, line_3);
-               }
-#endif
                // figure out tiles that are close by
+               Coord_t coord = vec_to_coord(pos);
+               Coord_t min = coord - Coord_t{1, 1};
+               Coord_t max = coord + Coord_t{1, 1};
+
+               // clamp against the map
+               if(min.x < 0) min.x = 0;
+               if(max.x < 0) max.x = 0;
+               if(min.x >= tilemap.width) min.x = tilemap.width - 1;
+               if(max.x >= tilemap.width) max.x = tilemap.width - 1;
+
+               if(min.y < 0) min.y = 0;
+               if(max.y < 0) max.y = 0;
+               if(min.y >= tilemap.height) min.y = tilemap.height - 1;
+               if(max.y >= tilemap.height) max.y = tilemap.height - 1;
+
+               for(U16 y = min.y; y <= max.y; y++){
+                    for(U16 x = min.x; x <= max.x; x++){
+                         if(tilemap.tiles[y][x].id){
+                              Vec_t bottom_left {(F32)(x) / (F32)(tilemap.width), (F32)(y) / (F32)(tilemap.height)};
+                              Vec_t top_left {bottom_left.x, bottom_left.y + TILE_SIZE};
+                              Vec_t top_right {bottom_left.x + TILE_SIZE, bottom_left.y + TILE_SIZE};
+                              Vec_t bottom_right {bottom_left.x + TILE_SIZE, bottom_left.y};
+
+                              Vec_t speculative_pos = pos + pos_delta;
+                              pos_delta += collide_circle_with_line(speculative_pos, player_radius, bottom_left, top_left);
+                              speculative_pos = pos + pos_delta;
+                              pos_delta += collide_circle_with_line(speculative_pos, player_radius, top_left, top_right);
+                              speculative_pos = pos + pos_delta;
+                              pos_delta += collide_circle_with_line(speculative_pos, player_radius, bottom_right, top_right);
+                              speculative_pos = pos + pos_delta;
+                              pos_delta += collide_circle_with_line(speculative_pos, player_radius, bottom_left, bottom_right);
+                         }
+                    }
+               }
 
                pos += pos_delta;
           }
@@ -555,24 +812,13 @@ int main(){
                for(U16 x = 0; x < tilemap.width; x++){
                     if(tilemap.tiles[y][x].id){
                          Vec_t tile_pos {(F32)(x) / (F32)(tilemap.width), (F32)(y) / (F32)(tilemap.height)};
-                         glVertex2f(-half_block_size + tile_pos.x, -half_block_size + tile_pos.y);
-                         glVertex2f(-half_block_size + tile_pos.x,  half_block_size + tile_pos.y);
-                         glVertex2f( half_block_size + tile_pos.x,  half_block_size + tile_pos.y);
-                         glVertex2f( half_block_size + tile_pos.x, -half_block_size + tile_pos.y);
+                         glVertex2f(tile_pos.x, tile_pos.y);
+                         glVertex2f(tile_pos.x, tile_pos.y + TILE_SIZE);
+                         glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y + TILE_SIZE);
+                         glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y);
                     }
                }
           }
-          glEnd();
-
-          // collision line
-          glBegin(GL_LINES);
-          glColor3f(1.0f, 0.0f, 0.0f);
-          glVertex2f(line_0.x, line_0.y);
-          glVertex2f(line_1.x, line_1.y);
-          glVertex2f(line_1.x, line_1.y);
-          glVertex2f(line_2.x, line_2.y);
-          glVertex2f(line_2.x, line_2.y);
-          glVertex2f(line_3.x, line_3.y);
           glEnd();
 
           SDL_GL_SwapWindow(window);
