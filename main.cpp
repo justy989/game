@@ -22,11 +22,15 @@
 // evil-genius quality right herr
 #define CASE_ENUM_RET_STR(e) case e: return #e;
 
+#define ELEM_COUNT(arr) (sizeof(arr) / sizeof(arr[0]))
+
 #define PIXEL_SIZE .00367647f
 #define TILE_SIZE (16.0f / 272.0f)
-#define HALF_TILE_SIZE (TILE_SIZE_IN_PIXELS * 0.5f)
+#define HALF_TILE_SIZE (TILE_SIZE * 0.5f)
 #define TILE_SIZE_IN_PIXELS 16
 #define HALF_TILE_SIZE_IN_PIXELS 8
+
+#define ROOM_TILE_SIZE 17
 
 typedef int8_t  S8;
 typedef int16_t S16;
@@ -344,7 +348,7 @@ struct Position_t{
      Vec_t decimal;
 };
 
-Position_t pixel_position(S16 x, S16 y){
+Position_t pixel_pos(S16 x, S16 y){
      Position_t p;
      p.pixel = {x, y};
      p.decimal = {0.0f, 0.0f};
@@ -352,7 +356,7 @@ Position_t pixel_position(S16 x, S16 y){
      return p;
 }
 
-Position_t pixel_position(Pixel_t pixel){
+Position_t pixel_pos(Pixel_t pixel){
      Position_t p;
      p.pixel = pixel;
      p.decimal = {0.0f, 0.0f};
@@ -474,7 +478,7 @@ Vec_t coord_to_vec(Coord_t c)
      return v;
 }
 
-Vec_t position_to_vec(Position_t p)
+Vec_t pos_to_vec(Position_t p)
 {
      Vec_t v;
 
@@ -492,7 +496,7 @@ Coord_t pixel_to_coord(Pixel_t p)
      return c;
 }
 
-Coord_t position_to_coord(Position_t p)
+Coord_t pos_to_coord(Position_t p)
 {
      assert(p.decimal.x >= 0.0f && p.decimal.y >= 0.0f);
      return pixel_to_coord(p.pixel);
@@ -506,14 +510,74 @@ Pixel_t coord_to_pixel(Coord_t c)
      return p;
 }
 
-Position_t coord_to_position_at_tile_center(Coord_t c)
+Position_t coord_to_pos_at_tile_center(Coord_t c)
 {
-     return pixel_position(coord_to_pixel(c) + Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS});
+     return pixel_pos(coord_to_pixel(c) + Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS});
 }
 
-Position_t coord_to_position(Coord_t c)
+Position_t coord_to_pos(Coord_t c)
 {
-     return pixel_position(coord_to_pixel(c));
+     return pixel_pos(coord_to_pixel(c));
+}
+
+struct Rect_t{
+     S16 left;
+     S16 bottom;
+
+     S16 right;
+     S16 top;
+};
+
+Rect_t pixel_range(Pixel_t bottom_left, Pixel_t top_right){
+     Rect_t r {bottom_left.x, bottom_left.y, top_right.x, top_right.y};
+     return r;
+}
+
+bool pixel_in_rect(Pixel_t p, Rect_t r){
+     return (p.x > r.left && p.x < r.right &&
+             p.y > r.bottom && p.y < r.top);
+}
+
+Rect_t coord_range(Coord_t bottom_left, Coord_t top_right){
+     Rect_t r {bottom_left.x, bottom_left.y, top_right.x, top_right.y};
+     return r;
+}
+
+bool coord_in_rect(Coord_t c, Rect_t r){
+     return (c.x >= r.left && c.x <= r.right &&
+             c.y >= r.bottom && c.y <= r.top);
+}
+
+bool rect_in_rect(Rect_t a, Rect_t b){
+     Pixel_t top_left {a.left, a.top};
+     Pixel_t top_right {a.right, a.top};
+     Pixel_t bottom_left {a.left, a.bottom};
+     Pixel_t bottom_right {a.right, a.bottom};
+     Pixel_t center {(S16)(a.left + (a.right - a.left) / 2),
+                     (S16)(a.bottom + (a.top - a.bottom) / 2),};
+
+     if(pixel_in_rect(bottom_left, b)) return true;
+     if(pixel_in_rect(top_left, b)) return true;
+     if(pixel_in_rect(bottom_right, b)) return true;
+     if(pixel_in_rect(top_right, b)) return true;
+     if(pixel_in_rect(center, b)) return true;
+
+     // special case if they line up, are they sliding into each other
+     if(a.left == b.left){
+          if(a.bottom > b.bottom && a.bottom < b.top){
+               return true;
+          }else if(a.top > b.bottom && a.top < b.top){
+               return true;
+          }
+     }else if(a.top == b.top){
+          if(a.left > b.left && a.left < b.right){
+               return true;
+          }else if(a.right > b.left && a.right < b.right){
+               return true;
+          }
+     }
+
+     return false;
 }
 
 enum TileFlag_t{
@@ -612,19 +676,44 @@ int main(){
      glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
      glBlendEquation(GL_FUNC_ADD);
 
+     Rect_t rooms[2];
+
+     rooms[0].left = 0;
+     rooms[0].bottom = 0;
+     rooms[0].top = 16;
+     rooms[0].right = 16;
+
+     rooms[1].left = 17;
+     rooms[1].bottom = 5;
+     rooms[1].top = 15;
+     rooms[1].right = 27;
+
      TileMap_t tilemap;
      {
-          init(&tilemap, 17, 17);
+          init(&tilemap, 34, 17);
 
-          for(U16 i = 0; i < tilemap.width; i++){
+          for(U16 i = 0; i < 17; i++){
                tilemap.tiles[0][i].id = 1;
                tilemap.tiles[tilemap.height - 1][i].id = 1;
           }
 
+          for(U16 i = 0; i < 10; i++){
+               tilemap.tiles[5][17 + i].id = 1;
+               tilemap.tiles[15][17 + i].id = 1;
+          }
+
           for(U16 i = 0; i < tilemap.height; i++){
                tilemap.tiles[i][0].id = 1;
-               tilemap.tiles[i][tilemap.width - 1].id = 1;
+               tilemap.tiles[i][16].id = 1;
+               tilemap.tiles[i][17].id = 1;
           }
+
+          for(U16 i = 0; i < 10; i++){
+               tilemap.tiles[5 + i][27].id = 1;
+          }
+
+          tilemap.tiles[10][17].id = 0;
+          tilemap.tiles[10][16].id = 0;
 
           tilemap.tiles[3][4].id = 1;
           tilemap.tiles[4][5].id = 1;
@@ -642,13 +731,16 @@ int main(){
           tilemap.tiles[7][12].id = 1;
 
           tilemap.tiles[2][14].id = 1;
+
+          tilemap.tiles[8][22].id = 1;
+          tilemap.tiles[9][23].id = 1;
      }
 
      bool quit = false;
 
      Vec_t user_movement = {};
 
-     Vec_t pos {0.3f, 0.3f};
+     Position_t pos = coord_to_pos(Coord_t{3, 3});
      Vec_t vel = vec_zero();
      Vec_t accel = vec_zero();
 
@@ -659,6 +751,8 @@ int main(){
 
      auto last_time = system_clock::now();
      auto current_time = last_time;
+
+     Position_t camera {};
 
      F32 player_radius = 8.0f / 272.0f;
 
@@ -728,10 +822,27 @@ int main(){
 
           last_time = current_time;
 
+          // figure out what room we should focus on
+          Vec_t pos_vec = pos_to_vec(pos);
+          Position_t room_center {};
+          for(U32 i = 0; i < ELEM_COUNT(rooms); i++){
+               if(coord_in_rect(vec_to_coord(pos_vec), rooms[i])){
+                    S16 half_room_width = (rooms[i].right - rooms[i].left) / 2;
+                    S16 half_room_height = (rooms[i].top - rooms[i].bottom) / 2;
+                    Coord_t room_center_coord {(S16)(rooms[i].left + half_room_width),
+                                               (S16)(rooms[i].bottom + half_room_height)};
+                    room_center = coord_to_pos(room_center_coord);
+                    break;
+               }
+          }
+
+          Position_t camera_movement = room_center - camera;
+          camera += camera_movement * 0.05f;
+
           // player movement
           {
-               float movement_speed = 12.5f;
-               float drag = 0.6f;
+               float movement_speed = 9.5f;
+               float drag = 0.7f;
 
                user_movement = vec_normalize(user_movement);
                accel = user_movement * movement_speed;
@@ -745,36 +856,27 @@ int main(){
                }
 
                // figure out tiles that are close by
-               Coord_t coord = vec_to_coord(pos);
+               Coord_t coord = pos_to_coord(pos);
                Coord_t min = coord - Coord_t{1, 1};
                Coord_t max = coord + Coord_t{1, 1};
-
-               // clamp against the map
-               if(min.x < 0) min.x = 0;
-               if(max.x < 0) max.x = 0;
-               if(min.x >= tilemap.width) min.x = tilemap.width - 1;
-               if(max.x >= tilemap.width) max.x = tilemap.width - 1;
-
-               if(min.y < 0) min.y = 0;
-               if(max.y < 0) max.y = 0;
-               if(min.y >= tilemap.height) min.y = tilemap.height - 1;
-               if(max.y >= tilemap.height) max.y = tilemap.height - 1;
+               min = coord_clamp_zero_to_dim(min, tilemap.width - 1, tilemap.height - 1);
+               max = coord_clamp_zero_to_dim(max, tilemap.width - 1, tilemap.height - 1);
 
                for(U16 y = min.y; y <= max.y; y++){
                     for(U16 x = min.x; x <= max.x; x++){
                          if(tilemap.tiles[y][x].id){
-                              Vec_t bottom_left {(F32)(x) / (F32)(tilemap.width), (F32)(y) / (F32)(tilemap.height)};
+                              Vec_t bottom_left {(F32)(x) * TILE_SIZE, (F32)(y) * TILE_SIZE};
                               Vec_t top_left {bottom_left.x, bottom_left.y + TILE_SIZE};
                               Vec_t top_right {bottom_left.x + TILE_SIZE, bottom_left.y + TILE_SIZE};
                               Vec_t bottom_right {bottom_left.x + TILE_SIZE, bottom_left.y};
 
-                              Vec_t speculative_pos = pos + pos_delta;
+                              Vec_t speculative_pos = pos_vec + pos_delta;
                               pos_delta += collide_circle_with_line(speculative_pos, player_radius, bottom_left, top_left);
-                              speculative_pos = pos + pos_delta;
+                              speculative_pos = pos_vec + pos_delta;
                               pos_delta += collide_circle_with_line(speculative_pos, player_radius, top_left, top_right);
-                              speculative_pos = pos + pos_delta;
+                              speculative_pos = pos_vec + pos_delta;
                               pos_delta += collide_circle_with_line(speculative_pos, player_radius, bottom_right, top_right);
-                              speculative_pos = pos + pos_delta;
+                              speculative_pos = pos_vec + pos_delta;
                               pos_delta += collide_circle_with_line(speculative_pos, player_radius, bottom_left, bottom_right);
                          }
                     }
@@ -789,8 +891,12 @@ int main(){
           glBegin(GL_TRIANGLE_FAN);
           glColor3f(1.0f, 1.0f, 1.0f);
 
-          glVertex2f(pos.x, pos.y);
-          glVertex2f(pos.x + player_radius, pos.y);
+          Position_t screen_camera = camera - Vec_t{0.5f, 0.5f} + Vec_t{HALF_TILE_SIZE, HALF_TILE_SIZE};
+          Position_t player_camera_offset = pos - screen_camera;
+          pos_vec = pos_to_vec(player_camera_offset);
+
+          glVertex2f(pos_vec.x, pos_vec.y);
+          glVertex2f(pos_vec.x + player_radius, pos_vec.y);
           S32 segments = 32;
           F32 delta = 3.14159f * 2.0f / (F32)(segments);
           F32 angle = 0.0f  + delta;
@@ -798,20 +904,25 @@ int main(){
                F32 dx = cos(angle) * player_radius;
                F32 dy = sin(angle) * player_radius;
 
-               glVertex2f(pos.x + dx, pos.y + dy);
-
+               glVertex2f(pos_vec.x + dx, pos_vec.y + dy);
                angle += delta;
           }
-          glVertex2f(pos.x + player_radius, pos.y);
+          glVertex2f(pos_vec.x + player_radius, pos_vec.y);
           glEnd();
 
           // tilemap
+          Coord_t min = pos_to_coord(screen_camera);
+          Coord_t max = min + Coord_t{ROOM_TILE_SIZE, ROOM_TILE_SIZE};
+          min = coord_clamp_zero_to_dim(min, tilemap.width - 1, tilemap.height - 1);
+          max = coord_clamp_zero_to_dim(max, tilemap.width - 1, tilemap.height - 1);
+          Position_t tile_bottom_left = coord_to_pos(min);
+          Vec_t camera_offset = pos_to_vec(tile_bottom_left - screen_camera);
           glBegin(GL_QUADS);
           glColor3f(0.0f, 1.0f, 1.0f);
-          for(U16 y = 0; y < tilemap.height; y++){
-               for(U16 x = 0; x < tilemap.width; x++){
+          for(U16 y = min.y; y <= max.y; y++){
+               for(U16 x = min.x; x <= max.x; x++){
                     if(tilemap.tiles[y][x].id){
-                         Vec_t tile_pos {(F32)(x) / (F32)(tilemap.width), (F32)(y) / (F32)(tilemap.height)};
+                         Vec_t tile_pos {(F32)(x - min.x) * TILE_SIZE + camera_offset.x, (F32)(y - min.y) * TILE_SIZE + camera_offset.y};
                          glVertex2f(tile_pos.x, tile_pos.y);
                          glVertex2f(tile_pos.x, tile_pos.y + TILE_SIZE);
                          glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y + TILE_SIZE);
