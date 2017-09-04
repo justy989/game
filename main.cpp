@@ -580,6 +580,19 @@ bool rect_in_rect(Rect_t a, Rect_t b){
      return false;
 }
 
+DirectionMask_t directions_between(Coord_t a, Coord_t b){
+     Coord_t c = b - a;
+
+     DirectionMask_t mask {};
+     if(c.x < 0) mask = direction_mask_add(mask, DM_LEFT);
+     if(c.x > 0) mask = direction_mask_add(mask, DM_RIGHT);
+     if(c.y < 0) mask = direction_mask_add(mask, DM_DOWN);
+     if(c.y > 0) mask = direction_mask_add(mask, DM_UP);
+
+     return mask;
+}
+
+
 enum TileFlag_t{
      TILE_FLAG_ICED = 1,
      TILE_FLAG_CHECKPOINT = 2,
@@ -623,6 +636,13 @@ void destroy(TileMap_t* tilemap){
 
      free(tilemap->tiles);
      memset(tilemap, 0, sizeof(*tilemap));
+}
+
+Tile_t* tilemap_get_tile(TileMap_t* tilemap, Coord_t coord){
+     if(coord.x < 0 || coord.x >= tilemap->width) return NULL;
+     if(coord.y < 0 || coord.y >= tilemap->height) return NULL;
+
+     return tilemap->tiles[coord.y] + coord.x;
 }
 
 enum Element_t : U8{
@@ -717,11 +737,22 @@ const char* element_to_string(Element_t e)
 
 struct Block_t{
      Position_t pos;
+     Vec_t accel;
+     Vec_t vel;
      DirectionMask_t force;
      Element_t element;
 };
 
-Vec_t collide_circle_with_line(Vec_t circle_center, F32 circle_radius, Vec_t a, Vec_t b){
+struct Player_t{
+     Position_t pos;
+     Vec_t accel;
+     Vec_t vel;
+     Direction_t face;
+     F32 radius;
+     F32 push_time;
+};
+
+Vec_t collide_circle_with_line(Vec_t circle_center, F32 circle_radius, Vec_t a, Vec_t b, bool* collided){
      // move data we care about to the origin
      Vec_t c = circle_center - a;
      Vec_t l = b - a;
@@ -731,10 +762,139 @@ Vec_t collide_circle_with_line(Vec_t circle_center, F32 circle_radius, Vec_t a, 
      if(vec_magnitude(collision_to_c) < circle_radius){
           // find edge of circle in that direction
           Vec_t edge_of_circle = vec_normalize(collision_to_c) * circle_radius;
+          *collided = true;
           return collision_to_c - edge_of_circle;
      }
 
      return vec_zero();
+}
+
+S16 range_passes_tile_boundary(S16 a, S16 b){
+     if(a > b) SWAP(a, b);
+
+     for(S16 i = a; i <= b; i++){
+          if(i % TILE_SIZE_IN_PIXELS == 0) return i;
+     }
+
+     return 0;
+}
+
+Block_t* block_against_another_block(Block_t* block_to_check, Direction_t direction, Block_t* blocks, S16 block_count){
+     switch(direction){
+     default:
+          break;
+     case DIR_LEFT:
+          for(S16 i = 0; i < block_count; i++){
+               if((blocks[i].pos.pixel.x + TILE_SIZE_IN_PIXELS) == block_to_check->pos.pixel.x &&
+                  blocks[i].pos.pixel.y >= block_to_check->pos.pixel.y &&
+                  blocks[i].pos.pixel.y < (block_to_check->pos.pixel.y + TILE_SIZE_IN_PIXELS)){
+                    return blocks + i;
+               }
+          }
+          break;
+     case DIR_RIGHT:
+          for(S16 i = 0; i < block_count; i++){
+               if(blocks[i].pos.pixel.x == (block_to_check->pos.pixel.x + TILE_SIZE_IN_PIXELS) &&
+                  blocks[i].pos.pixel.y >= block_to_check->pos.pixel.y &&
+                  blocks[i].pos.pixel.y < (block_to_check->pos.pixel.y + TILE_SIZE_IN_PIXELS)){
+                    return blocks + i;
+               }
+          }
+          break;
+     case DIR_DOWN:
+          for(S16 i = 0; i < block_count; i++){
+               if((blocks[i].pos.pixel.y + TILE_SIZE_IN_PIXELS) == block_to_check->pos.pixel.y &&
+                  blocks[i].pos.pixel.x >= block_to_check->pos.pixel.x &&
+                  blocks[i].pos.pixel.x < (block_to_check->pos.pixel.x + TILE_SIZE_IN_PIXELS)){
+                    return blocks + i;
+               }
+          }
+          break;
+     case DIR_UP:
+          for(S16 i = 0; i < block_count; i++){
+               if(blocks[i].pos.pixel.y == (block_to_check->pos.pixel.y + TILE_SIZE_IN_PIXELS) &&
+                  blocks[i].pos.pixel.x >= block_to_check->pos.pixel.x &&
+                  blocks[i].pos.pixel.x < (block_to_check->pos.pixel.x + TILE_SIZE_IN_PIXELS)){
+                    return blocks + i;
+               }
+          }
+          break;
+     }
+
+     return nullptr;
+}
+
+Tile_t* block_against_solid_tile(Block_t* block_to_check, Direction_t direction, TileMap_t* tilemap){
+     switch(direction){
+     default:
+          break;
+     case DIR_LEFT:
+     {
+          Pixel_t tile_pixel = block_to_check->pos.pixel;
+          tile_pixel.x--;
+
+          // check bottom corner
+          Coord_t tile_coord = pixel_to_coord(tile_pixel);
+          Tile_t* tile = tilemap_get_tile(tilemap, tile_coord);
+          if(tile && tile->id) return tile;
+
+          // check top corner
+          tile_pixel.y += (TILE_SIZE_IN_PIXELS - 1);
+          tile_coord = pixel_to_coord(tile_pixel);
+          tile = tilemap_get_tile(tilemap, tile_coord);
+          if(tile && tile->id) return tile;
+     } break;
+     case DIR_RIGHT:
+     {
+          Pixel_t tile_pixel = block_to_check->pos.pixel;
+          tile_pixel.x += TILE_SIZE_IN_PIXELS;
+
+          // check bottom corner
+          Coord_t tile_coord = pixel_to_coord(tile_pixel);
+          Tile_t* tile = tilemap_get_tile(tilemap, tile_coord);
+          if(tile && tile->id) return tile;
+
+          // check top corner
+          tile_pixel.y += (TILE_SIZE_IN_PIXELS - 1);
+          tile_coord = pixel_to_coord(tile_pixel);
+          tile = tilemap_get_tile(tilemap, tile_coord);
+          if(tile && tile->id) return tile;
+     } break;
+     case DIR_DOWN:
+     {
+          Pixel_t tile_pixel = block_to_check->pos.pixel;
+          tile_pixel.y--;
+
+          // check left corner
+          Coord_t tile_coord = pixel_to_coord(tile_pixel);
+          Tile_t* tile = tilemap_get_tile(tilemap, tile_coord);
+          if(tile && tile->id) return tile;
+
+          // check right corner
+          tile_pixel.x += (TILE_SIZE_IN_PIXELS - 1);
+          tile_coord = pixel_to_coord(tile_pixel);
+          tile = tilemap_get_tile(tilemap, tile_coord);
+          if(tile && tile->id) return tile;
+     } break;
+     case DIR_UP:
+     {
+          Pixel_t tile_pixel = block_to_check->pos.pixel;
+          tile_pixel.y += TILE_SIZE_IN_PIXELS;
+
+          // check left corner
+          Coord_t tile_coord = pixel_to_coord(tile_pixel);
+          Tile_t* tile = tilemap_get_tile(tilemap, tile_coord);
+          if(tile && tile->id) return tile;
+
+          // check right corner
+          tile_pixel.x += (TILE_SIZE_IN_PIXELS - 1);
+          tile_coord = pixel_to_coord(tile_pixel);
+          tile = tilemap_get_tile(tilemap, tile_coord);
+          if(tile && tile->id) return tile;
+     } break;
+     }
+
+     return nullptr;
 }
 
 using namespace std::chrono;
@@ -789,6 +949,10 @@ int main(){
 
      blocks[0].pos = coord_to_pos(Coord_t{6, 6});
      blocks[1].pos = coord_to_pos(Coord_t{6, 2});
+     blocks[0].vel = vec_zero();
+     blocks[1].vel = vec_zero();
+     blocks[0].accel = vec_zero();
+     blocks[1].accel = vec_zero();
 
      TileMap_t tilemap;
      {
@@ -842,9 +1006,8 @@ int main(){
 
      Vec_t user_movement = {};
 
-     Position_t pos = coord_to_pos(Coord_t{3, 3});
-     Vec_t vel = vec_zero();
-     Vec_t accel = vec_zero();
+     Player_t player {};
+     player.pos = coord_to_pos(Coord_t{3, 3});
 
      bool left_pressed = false;
      bool right_pressed = false;
@@ -856,7 +1019,7 @@ int main(){
 
      Position_t camera {};
 
-     F32 player_radius = 8.0f / 272.0f;
+     player.radius = 8.0f / 272.0f;
 
      while(!quit){
           current_time = system_clock::now();
@@ -879,15 +1042,19 @@ int main(){
                          break;
                     case SDL_SCANCODE_LEFT:
                          left_pressed = true;
+                         player.face = DIR_LEFT;
                          break;
                     case SDL_SCANCODE_RIGHT:
                          right_pressed = true;
+                         player.face = DIR_RIGHT;
                          break;
                     case SDL_SCANCODE_UP:
                          up_pressed = true;
+                         player.face = DIR_UP;
                          break;
                     case SDL_SCANCODE_DOWN:
                          down_pressed = true;
+                         player.face = DIR_DOWN;
                          break;
                     }
                     break;
@@ -925,7 +1092,7 @@ int main(){
           last_time = current_time;
 
           // figure out what room we should focus on
-          Vec_t pos_vec = pos_to_vec(pos);
+          Vec_t pos_vec = pos_to_vec(player.pos);
           Position_t room_center {};
           for(U32 i = 0; i < ELEM_COUNT(rooms); i++){
                if(coord_in_rect(vec_to_coord(pos_vec), rooms[i])){
@@ -941,48 +1108,84 @@ int main(){
           Position_t camera_movement = room_center - camera;
           camera += camera_movement * 0.05f;
 
+          float movement_speed = 9.5f;
+          float drag = 0.7f;
+
+          // block movement
+          for(U16 i = 0; i < block_count; i++){
+               Vec_t pos_delta = (blocks[i].accel * dt * dt * 0.5f) + (blocks[i].vel * dt);
+               blocks[i].vel += blocks[i].accel * dt;
+               blocks[i].vel *= drag;
+
+               Position_t pre_move = blocks[i].pos;
+               blocks[i].pos += pos_delta;
+
+               if(pre_move.pixel.x % TILE_SIZE_IN_PIXELS != 0){
+                    S16 boundary = range_passes_tile_boundary(pre_move.pixel.x, blocks[i].pos.pixel.x);
+                    if(boundary){
+                         blocks[i].pos.pixel.x = boundary;
+                         blocks[i].pos.decimal.x = 0.0f;
+                         blocks[i].vel.x = 0.0f;
+                         blocks[i].accel.x = 0.0f;
+                    }
+               }
+
+               if(pre_move.pixel.y % TILE_SIZE_IN_PIXELS != 0){
+                    S16 boundary = range_passes_tile_boundary(pre_move.pixel.y, blocks[i].pos.pixel.y);
+                    if(boundary){
+                         blocks[i].pos.pixel.y = boundary;
+                         blocks[i].pos.decimal.y = 0.0f;
+                         blocks[i].vel.y = 0.0f;
+                         blocks[i].accel.y = 0.0f;
+                    }
+               }
+          }
+
           // player movement
           {
-               float movement_speed = 9.5f;
-               float drag = 0.7f;
-
                user_movement = vec_normalize(user_movement);
-               accel = user_movement * movement_speed;
+               player.accel = user_movement * movement_speed;
 
-               Vec_t pos_delta = (accel * dt * dt * 0.5f) + (vel * dt);
-               vel += accel * dt;
-               vel *= drag;
+               Vec_t pos_delta = (player.accel * dt * dt * 0.5f) + (player.vel * dt);
+               player.vel += player.accel * dt;
+               player.vel *= drag;
 
-               if(fabs(vec_magnitude(vel)) > movement_speed){
-                    vel = vec_normalize(vel) * movement_speed;
+               if(fabs(vec_magnitude(player.vel)) > movement_speed){
+                    player.vel = vec_normalize(player.vel) * movement_speed;
                }
 
                // figure out tiles that are close by
-               Coord_t coord = pos_to_coord(pos);
+               Coord_t coord = pos_to_coord(player.pos);
                Coord_t min = coord - Coord_t{1, 1};
                Coord_t max = coord + Coord_t{1, 1};
                min = coord_clamp_zero_to_dim(min, tilemap.width - 1, tilemap.height - 1);
                max = coord_clamp_zero_to_dim(max, tilemap.width - 1, tilemap.height - 1);
 
+               bool collide_with_tile = false;
+
                for(S16 y = min.y; y <= max.y; y++){
                     for(S16 x = min.x; x <= max.x; x++){
                          if(tilemap.tiles[y][x].id){
-                              Position_t relative = coord_to_pos(Coord_t{x, y}) - pos;
+                              Position_t relative = coord_to_pos(Coord_t{x, y}) - player.pos;
                               Vec_t bottom_left = pos_to_vec(relative);
                               Vec_t top_left {bottom_left.x, bottom_left.y + TILE_SIZE};
                               Vec_t top_right {bottom_left.x + TILE_SIZE, bottom_left.y + TILE_SIZE};
                               Vec_t bottom_right {bottom_left.x + TILE_SIZE, bottom_left.y};
 
-                              pos_delta += collide_circle_with_line(pos_delta, player_radius, bottom_left, top_left);
-                              pos_delta += collide_circle_with_line(pos_delta, player_radius, top_left, top_right);
-                              pos_delta += collide_circle_with_line(pos_delta, player_radius, bottom_right, top_right);
-                              pos_delta += collide_circle_with_line(pos_delta, player_radius, bottom_left, bottom_right);
+                              pos_delta += collide_circle_with_line(pos_delta, player.radius, bottom_left, top_left, &collide_with_tile);
+                              pos_delta += collide_circle_with_line(pos_delta, player.radius, top_left, top_right, &collide_with_tile);
+                              pos_delta += collide_circle_with_line(pos_delta, player.radius, bottom_right, top_right, &collide_with_tile);
+                              pos_delta += collide_circle_with_line(pos_delta, player.radius, bottom_left, bottom_right, &collide_with_tile);
                          }
                     }
                }
 
+               Block_t* block_to_push = nullptr;
+
                for(U16 i = 0; i < block_count; i++){
-                    Position_t relative = blocks[i].pos - pos;
+                    bool collide_with_block = false;
+
+                    Position_t relative = blocks[i].pos - player.pos;
                     Vec_t bottom_left = pos_to_vec(relative);
                     if(vec_magnitude(bottom_left) > (2 * TILE_SIZE)) continue;
 
@@ -990,38 +1193,98 @@ int main(){
                     Vec_t top_right {bottom_left.x + TILE_SIZE, bottom_left.y + TILE_SIZE};
                     Vec_t bottom_right {bottom_left.x + TILE_SIZE, bottom_left.y};
 
-                    pos_delta += collide_circle_with_line(pos_delta, player_radius, bottom_left, top_left);
-                    pos_delta += collide_circle_with_line(pos_delta, player_radius, top_left, top_right);
-                    pos_delta += collide_circle_with_line(pos_delta, player_radius, bottom_right, top_right);
-                    pos_delta += collide_circle_with_line(pos_delta, player_radius, bottom_left, bottom_right);
+                    pos_delta += collide_circle_with_line(pos_delta, player.radius, bottom_left, top_left, &collide_with_block);
+                    pos_delta += collide_circle_with_line(pos_delta, player.radius, top_left, top_right, &collide_with_block);
+                    pos_delta += collide_circle_with_line(pos_delta, player.radius, bottom_right, top_right, &collide_with_block);
+                    pos_delta += collide_circle_with_line(pos_delta, player.radius, bottom_left, bottom_right, &collide_with_block);
+
+                    if(collide_with_block){
+                         auto directions_between_player_and_block = directions_between(pos_to_coord(player.pos), pos_to_coord(blocks[i].pos));
+                         if(direction_in_mask(directions_between_player_and_block, player.face)){
+                              block_to_push = blocks + i;
+                         }
+                    }
                }
 
-               pos += pos_delta;
+               if(block_to_push){
+                    player.push_time += dt;
+
+                    if(player.push_time > 0.5f){
+                         player.push_time = 0;
+
+                         // can we push the block? Is it against another block or against a wall?
+                         if(!block_against_another_block(block_to_push, player.face, blocks, block_count) &&
+                            !block_against_solid_tile(block_to_push, player.face, &tilemap)){
+                              switch(player.face){
+                              default:
+                                   break;
+                              case DIR_LEFT:
+                                   block_to_push->accel = Vec_t{-1.0f, 0.0f};
+                                   break;
+                              case DIR_RIGHT:
+                                   block_to_push->accel = Vec_t{1.0f, 0.0f};
+                                   break;
+                              case DIR_DOWN:
+                                   block_to_push->accel = Vec_t{0.0f, -1.0f};
+                                   break;
+                              case DIR_UP:
+                                   block_to_push->accel = Vec_t{0.0f, 1.0f};
+                                   break;
+                              }
+
+                              block_to_push->accel *= movement_speed;
+                         }
+                    }
+               }else{
+                    player.push_time = 0;
+               }
+
+               player.pos += pos_delta;
           }
 
           glClear(GL_COLOR_BUFFER_BIT);
 
           // player circle
-          glBegin(GL_TRIANGLE_FAN);
-          glColor3f(1.0f, 1.0f, 1.0f);
-
           Position_t screen_camera = camera - Vec_t{0.5f, 0.5f} + Vec_t{HALF_TILE_SIZE, HALF_TILE_SIZE};
-          Position_t player_camera_offset = pos - screen_camera;
+          Position_t player_camera_offset = player.pos - screen_camera;
           pos_vec = pos_to_vec(player_camera_offset);
 
+          glBegin(GL_TRIANGLE_FAN);
+          glColor3f(1.0f, 1.0f, 1.0f);
           glVertex2f(pos_vec.x, pos_vec.y);
-          glVertex2f(pos_vec.x + player_radius, pos_vec.y);
+          glVertex2f(pos_vec.x + player.radius, pos_vec.y);
           S32 segments = 32;
           F32 delta = 3.14159f * 2.0f / (F32)(segments);
           F32 angle = 0.0f  + delta;
           for(S32 i = 0; i <= segments; i++){
-               F32 dx = cos(angle) * player_radius;
-               F32 dy = sin(angle) * player_radius;
+               F32 dx = cos(angle) * player.radius;
+               F32 dy = sin(angle) * player.radius;
 
                glVertex2f(pos_vec.x + dx, pos_vec.y + dy);
                angle += delta;
           }
-          glVertex2f(pos_vec.x + player_radius, pos_vec.y);
+          glVertex2f(pos_vec.x + player.radius, pos_vec.y);
+          glEnd();
+
+          glBegin(GL_LINES);
+          glColor3f(1.0f, 0.0f, 0.0f);
+          glVertex2f(pos_vec.x, pos_vec.y);
+          switch(player.face){
+          default:
+               break;
+          case DIR_LEFT:
+               glVertex2f(pos_vec.x - player.radius, pos_vec.y);
+               break;
+          case DIR_RIGHT:
+               glVertex2f(pos_vec.x + player.radius, pos_vec.y);
+               break;
+          case DIR_DOWN:
+               glVertex2f(pos_vec.x, pos_vec.y - player.radius);
+               break;
+          case DIR_UP:
+               glVertex2f(pos_vec.x, pos_vec.y + player.radius);
+               break;
+          }
           glEnd();
 
           // tilemap
