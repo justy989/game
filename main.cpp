@@ -625,6 +625,102 @@ void destroy(TileMap_t* tilemap){
      memset(tilemap, 0, sizeof(*tilemap));
 }
 
+enum Element_t : U8{
+     ELEMENT_NONE,
+     ELEMENT_FIRE,
+     ELEMENT_ICE,
+     ELEMENT_ONLY_ICED,
+     ELEMENT_COUNT
+};
+
+Element_t transition_element(Element_t a, Element_t b)
+{
+     Element_t e = ELEMENT_NONE;
+
+     switch(a){
+     default:
+          break;
+     case ELEMENT_NONE:
+          switch(b){
+          default:
+          case ELEMENT_NONE:
+               break;
+          case ELEMENT_FIRE:
+               e = ELEMENT_FIRE;
+               break;
+          case ELEMENT_ICE:
+               e = ELEMENT_ICE;
+               break;
+          }
+          break;
+     case ELEMENT_FIRE:
+          switch(b){
+          default:
+          case ELEMENT_NONE:
+          case ELEMENT_FIRE:
+               e = ELEMENT_FIRE;
+               break;
+          case ELEMENT_ICE:
+               e = ELEMENT_NONE;
+               break;
+          }
+          break;
+     case ELEMENT_ICE:
+          switch(b){
+          default:
+          case ELEMENT_NONE:
+          case ELEMENT_ICE:
+               e = ELEMENT_ICE;
+               break;
+          case ELEMENT_FIRE:
+               e = ELEMENT_NONE;
+               break;
+          }
+          break;
+     case ELEMENT_ONLY_ICED:
+          switch(b){
+          default:
+          case ELEMENT_NONE:
+               break;
+          case ELEMENT_ICE:
+               e = ELEMENT_ICE;
+               break;
+          case ELEMENT_FIRE:
+               e = ELEMENT_FIRE;
+               break;
+          }
+          break;
+     }
+
+     return e;
+}
+
+Element_t next_element(Element_t e)
+{
+     int i = (int)(e) + 1;
+     return (Element_t)( i % ELEMENT_COUNT );
+}
+
+const char* element_to_string(Element_t e)
+{
+     switch(e){
+     default:
+          break;
+     CASE_ENUM_RET_STR(ELEMENT_NONE);
+     CASE_ENUM_RET_STR(ELEMENT_FIRE);
+     CASE_ENUM_RET_STR(ELEMENT_ICE);
+     CASE_ENUM_RET_STR(ELEMENT_COUNT);
+     }
+
+     return "ELEMENT_UNKNOWN";
+}
+
+struct Block_t{
+     Position_t pos;
+     DirectionMask_t force;
+     Element_t element;
+};
+
 Vec_t collide_circle_with_line(Vec_t circle_center, F32 circle_radius, Vec_t a, Vec_t b){
      // move data we care about to the origin
      Vec_t c = circle_center - a;
@@ -687,6 +783,12 @@ int main(){
      rooms[1].bottom = 5;
      rooms[1].top = 15;
      rooms[1].right = 27;
+
+     const int block_count = 2;
+     Block_t blocks[block_count];
+
+     blocks[0].pos = coord_to_pos(Coord_t{6, 6});
+     blocks[1].pos = coord_to_pos(Coord_t{6, 2});
 
      TileMap_t tilemap;
      {
@@ -862,24 +964,36 @@ int main(){
                min = coord_clamp_zero_to_dim(min, tilemap.width - 1, tilemap.height - 1);
                max = coord_clamp_zero_to_dim(max, tilemap.width - 1, tilemap.height - 1);
 
-               for(U16 y = min.y; y <= max.y; y++){
-                    for(U16 x = min.x; x <= max.x; x++){
+               for(S16 y = min.y; y <= max.y; y++){
+                    for(S16 x = min.x; x <= max.x; x++){
                          if(tilemap.tiles[y][x].id){
-                              Vec_t bottom_left {(F32)(x) * TILE_SIZE, (F32)(y) * TILE_SIZE};
+                              Position_t relative = coord_to_pos(Coord_t{x, y}) - pos;
+                              Vec_t bottom_left = pos_to_vec(relative);
                               Vec_t top_left {bottom_left.x, bottom_left.y + TILE_SIZE};
                               Vec_t top_right {bottom_left.x + TILE_SIZE, bottom_left.y + TILE_SIZE};
                               Vec_t bottom_right {bottom_left.x + TILE_SIZE, bottom_left.y};
 
-                              Vec_t speculative_pos = pos_vec + pos_delta;
-                              pos_delta += collide_circle_with_line(speculative_pos, player_radius, bottom_left, top_left);
-                              speculative_pos = pos_vec + pos_delta;
-                              pos_delta += collide_circle_with_line(speculative_pos, player_radius, top_left, top_right);
-                              speculative_pos = pos_vec + pos_delta;
-                              pos_delta += collide_circle_with_line(speculative_pos, player_radius, bottom_right, top_right);
-                              speculative_pos = pos_vec + pos_delta;
-                              pos_delta += collide_circle_with_line(speculative_pos, player_radius, bottom_left, bottom_right);
+                              pos_delta += collide_circle_with_line(pos_delta, player_radius, bottom_left, top_left);
+                              pos_delta += collide_circle_with_line(pos_delta, player_radius, top_left, top_right);
+                              pos_delta += collide_circle_with_line(pos_delta, player_radius, bottom_right, top_right);
+                              pos_delta += collide_circle_with_line(pos_delta, player_radius, bottom_left, bottom_right);
                          }
                     }
+               }
+
+               for(U16 i = 0; i < block_count; i++){
+                    Position_t relative = blocks[i].pos - pos;
+                    Vec_t bottom_left = pos_to_vec(relative);
+                    if(vec_magnitude(bottom_left) > (2 * TILE_SIZE)) continue;
+
+                    Vec_t top_left {bottom_left.x, bottom_left.y + TILE_SIZE};
+                    Vec_t top_right {bottom_left.x + TILE_SIZE, bottom_left.y + TILE_SIZE};
+                    Vec_t bottom_right {bottom_left.x + TILE_SIZE, bottom_left.y};
+
+                    pos_delta += collide_circle_with_line(pos_delta, player_radius, bottom_left, top_left);
+                    pos_delta += collide_circle_with_line(pos_delta, player_radius, top_left, top_right);
+                    pos_delta += collide_circle_with_line(pos_delta, player_radius, bottom_right, top_right);
+                    pos_delta += collide_circle_with_line(pos_delta, player_radius, bottom_left, bottom_right);
                }
 
                pos += pos_delta;
@@ -929,6 +1043,19 @@ int main(){
                          glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y);
                     }
                }
+          }
+          glEnd();
+
+          // block
+          glBegin(GL_QUADS);
+          glColor3f(1.0f, 1.0f, 0.0f);
+          for(U16 i = 0; i < block_count; i++){
+               Position_t block_camera_offset = blocks[i].pos - screen_camera;
+               pos_vec = pos_to_vec(block_camera_offset);
+               glVertex2f(pos_vec.x, pos_vec.y);
+               glVertex2f(pos_vec.x, pos_vec.y + TILE_SIZE);
+               glVertex2f(pos_vec.x + TILE_SIZE, pos_vec.y + TILE_SIZE);
+               glVertex2f(pos_vec.x + TILE_SIZE, pos_vec.y);
           }
           glEnd();
 
