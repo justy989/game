@@ -1,49 +1,13 @@
 #include <iostream>
 #include <chrono>
-#include <cstdint>
 #include <cfloat>
 #include <cassert>
 
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_opengl.h>
 
-#define SWAP(a, b) {auto c = a; a = b; b = c;}
-
-#define MAXIMUM(a, b)((a > b) ? (a) : (b))
-#define MINIMUM(a, b)((a < b) ? (a) : (b))
-
-#define CLAMP(var, minimum, maximum) \
-     if(var < minimum){              \
-          var = minimum;             \
-     }else if(var > maximum){        \
-          var = maximum;             \
-     }
-
-// evil-genius quality right herr
-#define CASE_ENUM_RET_STR(e) case e: return #e;
-
-#define ELEM_COUNT(arr) (sizeof(arr) / sizeof(arr[0]))
-
-#define PIXEL_SIZE .00367647f
-#define TILE_SIZE (16.0f / 272.0f)
-#define HALF_TILE_SIZE (TILE_SIZE * 0.5f)
-#define TILE_SIZE_IN_PIXELS 16
-#define HALF_TILE_SIZE_IN_PIXELS 8
-
-#define ROOM_TILE_SIZE 17
-
-typedef int8_t  S8;
-typedef int16_t S16;
-typedef int32_t S32;
-typedef int64_t S64;
-
-typedef uint8_t  U8;
-typedef uint16_t U16;
-typedef uint32_t U32;
-typedef uint64_t U64;
-
-typedef float  F32;
-typedef double F64;
+#include "defines.h"
+#include "bitmap.h"
 
 enum Direction_t : U8{
      DIR_LEFT = 0,
@@ -1108,8 +1072,8 @@ int main(){
           Position_t camera_movement = room_center - camera;
           camera += camera_movement * 0.05f;
 
-          float movement_speed = 9.5f;
-          float drag = 0.7f;
+          float movement_speed = 7.5f;
+          float drag = 0.65f;
 
           // block movement
           for(U16 i = 0; i < block_count; i++){
@@ -1198,7 +1162,7 @@ int main(){
                     pos_delta += collide_circle_with_line(pos_delta, player.radius, bottom_right, top_right, &collide_with_block);
                     pos_delta += collide_circle_with_line(pos_delta, player.radius, bottom_left, bottom_right, &collide_with_block);
 
-                    if(collide_with_block){
+                    if(collide_with_block && vec_magnitude(user_movement) > 0.0f){
                          auto directions_between_player_and_block = directions_between(pos_to_coord(player.pos), pos_to_coord(blocks[i].pos));
                          if(direction_in_mask(directions_between_player_and_block, player.face)){
                               block_to_push = blocks + i;
@@ -1209,7 +1173,7 @@ int main(){
                if(block_to_push){
                     player.push_time += dt;
 
-                    if(player.push_time > 0.5f){
+                    if(player.push_time > 0.15f){
                          player.push_time = 0;
 
                          // can we push the block? Is it against another block or against a wall?

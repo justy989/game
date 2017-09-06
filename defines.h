@@ -1,0 +1,27 @@
+#pragma once
+
+#define SWAP(a, b) {auto c = a; a = b; b = c;}
+
+#define MAXIMUM(a, b)((a > b) ? (a) : (b))
+#define MINIMUM(a, b)((a < b) ? (a) : (b))
+
+#define CLAMP(var, minimum, maximum) \
+     if(var < minimum){              \
+          var = minimum;             \
+     }else if(var > maximum){        \
+          var = maximum;             \
+     }
+
+// evil-genius quality right herr
+#define CASE_ENUM_RET_STR(e) case e: return #e;
+
+#define ELEM_COUNT(arr) (sizeof(arr) / sizeof(arr[0]))
+
+#define PIXEL_SIZE .00367647f
+#define TILE_SIZE (16.0f / 272.0f)
+#define HALF_TILE_SIZE (TILE_SIZE * 0.5f)
+#define TILE_SIZE_IN_PIXELS 16
+#define HALF_TILE_SIZE_IN_PIXELS 8
+
+#define ROOM_TILE_SIZE 17
+
