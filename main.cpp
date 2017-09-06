@@ -6,6 +6,7 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_opengl.h>
 
+#include "log.h"
 #include "defines.h"
 #include "bitmap.h"
 
@@ -707,6 +708,9 @@ struct Block_t{
      Element_t element;
 };
 
+#define PLAYER_WALK_DELAY 0.15f
+#define PLAYER_IDLE_SPEED 0.0025f
+
 struct Player_t{
      Position_t pos;
      Vec_t accel;
@@ -714,6 +718,9 @@ struct Player_t{
      Direction_t face;
      F32 radius;
      F32 push_time;
+     S8 walk_frame;
+     S8 walk_frame_delta;
+     F32 walk_frame_time;
 };
 
 Vec_t collide_circle_with_line(Vec_t circle_center, F32 circle_radius, Vec_t a, Vec_t b, bool* collided){
@@ -861,9 +868,59 @@ Tile_t* block_against_solid_tile(Block_t* block_to_check, Direction_t direction,
      return nullptr;
 }
 
+GLuint create_texture_from_bitmap(AlphaBitmap_t* bitmap){
+     GLuint texture = 0;
+
+     glGenTextures(1, &texture);
+
+     glBindTexture(GL_TEXTURE_2D, texture);
+
+     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, bitmap->width, bitmap->height, 0,  GL_RGBA, GL_UNSIGNED_BYTE, bitmap->pixels);
+
+     return texture;
+}
+
+GLuint transparent_texture_from_file(const char* filepath){
+     Bitmap_t bitmap = bitmap_load_from_file(filepath);
+     if(bitmap.raw.byte_count == 0) return 0;
+     AlphaBitmap_t alpha_bitmap = bitmap_to_alpha_bitmap(&bitmap, BitmapPixel_t{255, 0, 255});
+     return create_texture_from_bitmap(&alpha_bitmap);
+}
+
+#define THEME_FRAMES_WIDE 16
+#define THEME_FRAMES_TALL 32
+#define THEME_FRAME_WIDTH 0.0625f
+#define THEME_FRAME_HEIGHT 0.03125f
+
+Vec_t theme_frame(S16 x, S16 y){
+     y = (THEME_FRAMES_TALL - 1) - y;
+     return Vec_t{(F32)(x) * THEME_FRAME_WIDTH, (F32)(y) * THEME_FRAME_HEIGHT};
+}
+
+#define PLAYER_FRAME_WIDTH 0.25f
+#define PLAYER_FRAME_HEIGHT 0.03125f
+#define PLAYER_FRAMES_WIDE 4
+#define PLAYER_FRAMES_TALL 32
+
+Vec_t player_frame(S8 x, S8 y){
+     y = (PLAYER_FRAMES_TALL - 1) - y;
+     return Vec_t{(F32)(x) * PLAYER_FRAME_WIDTH, (F32)(y) * PLAYER_FRAME_HEIGHT};
+}
+
 using namespace std::chrono;
 
 int main(){
+     const char* log_path = "bryte.log";
+     if(!Log_t::create(log_path)){
+          fprintf(stderr, "failed to create log file: '%s'\n", log_path);
+          return -1;
+     }
+
      if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER) != 0){
           return 1;
      }
@@ -895,6 +952,11 @@ int main(){
      glEnable(GL_BLEND);
      glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
      glBlendEquation(GL_FUNC_ADD);
+
+     GLuint theme_texture = transparent_texture_from_file("theme.bmp");
+     if(theme_texture == 0) return 1;
+     GLuint player_texture = transparent_texture_from_file("player.bmp");
+     if(player_texture == 0) return 1;
 
      Rect_t rooms[2];
 
@@ -972,6 +1034,7 @@ int main(){
 
      Player_t player {};
      player.pos = coord_to_pos(Coord_t{3, 3});
+     player.walk_frame_delta = 1;
 
      bool left_pressed = false;
      bool right_pressed = false;
@@ -983,7 +1046,7 @@ int main(){
 
      Position_t camera {};
 
-     player.radius = 8.0f / 272.0f;
+     player.radius = 3.5f / 272.0f;
 
      while(!quit){
           current_time = system_clock::now();
@@ -991,6 +1054,8 @@ int main(){
           F64 dt = (F64)(elapsed_seconds.count());
 
           if(dt < 0.0166666f) continue;
+
+          last_time = current_time;
 
           SDL_Event sdl_event;
           while(SDL_PollEvent(&sdl_event)){
@@ -1053,7 +1118,26 @@ int main(){
           if(up_pressed) user_movement += Vec_t{0, 1};
           if(down_pressed) user_movement += Vec_t{0, -1};
 
-          last_time = current_time;
+          if(!left_pressed && !right_pressed && !up_pressed && !down_pressed){
+               player.walk_frame = 1;
+          }else{
+               player.walk_frame_time += dt;
+
+               if(player.walk_frame_time > PLAYER_WALK_DELAY){
+                    if(vec_magnitude(player.vel) > PLAYER_IDLE_SPEED){
+                         player.walk_frame_time = 0.0f;
+
+                         player.walk_frame += player.walk_frame_delta;
+                         if(player.walk_frame > 2 || player.walk_frame < 0){
+                              player.walk_frame = 1;
+                              player.walk_frame_delta = -player.walk_frame_delta;
+                         }
+                    }else{
+                         player.walk_frame = 1;
+                         player.walk_frame_time = 0.0f;
+                    }
+               }
+          }
 
           // figure out what room we should focus on
           Vec_t pos_vec = pos_to_vec(player.pos);
@@ -1119,13 +1203,12 @@ int main(){
                }
 
                // figure out tiles that are close by
+               bool collide_with_tile = false;
                Coord_t coord = pos_to_coord(player.pos);
                Coord_t min = coord - Coord_t{1, 1};
                Coord_t max = coord + Coord_t{1, 1};
                min = coord_clamp_zero_to_dim(min, tilemap.width - 1, tilemap.height - 1);
                max = coord_clamp_zero_to_dim(max, tilemap.width - 1, tilemap.height - 1);
-
-               bool collide_with_tile = false;
 
                for(S16 y = min.y; y <= max.y; y++){
                     for(S16 x = min.x; x <= max.x; x++){
@@ -1208,11 +1291,66 @@ int main(){
 
           glClear(GL_COLOR_BUFFER_BIT);
 
-          // player circle
           Position_t screen_camera = camera - Vec_t{0.5f, 0.5f} + Vec_t{HALF_TILE_SIZE, HALF_TILE_SIZE};
+
+          // tilemap
+          Coord_t min = pos_to_coord(screen_camera);
+          Coord_t max = min + Coord_t{ROOM_TILE_SIZE, ROOM_TILE_SIZE};
+          min = coord_clamp_zero_to_dim(min, tilemap.width - 1, tilemap.height - 1);
+          max = coord_clamp_zero_to_dim(max, tilemap.width - 1, tilemap.height - 1);
+          Position_t tile_bottom_left = coord_to_pos(min);
+          Vec_t camera_offset = pos_to_vec(tile_bottom_left - screen_camera);
+          Vec_t tex_vec;
+          Vec_t floor_tex_vec = theme_frame(0, 25);
+          Vec_t solid_tex_vec = theme_frame(0, 1);
+          glBindTexture(GL_TEXTURE_2D, theme_texture);
+          glBegin(GL_QUADS);
+          glColor3f(1.0f, 1.0f, 1.0f);
+          for(U16 y = min.y; y <= max.y; y++){
+               for(U16 x = min.x; x <= max.x; x++){
+                    if(tilemap.tiles[y][x].id){
+                         tex_vec = solid_tex_vec;
+                    }else{
+                         tex_vec = floor_tex_vec;
+                    }
+
+                    Vec_t tile_pos {(F32)(x - min.x) * TILE_SIZE + camera_offset.x,
+                                    (F32)(y - min.y) * TILE_SIZE + camera_offset.y};
+
+                    glTexCoord2f(tex_vec.x, tex_vec.y);
+                    glVertex2f(tile_pos.x, tile_pos.y);
+                    glTexCoord2f(tex_vec.x, tex_vec.y + THEME_FRAME_HEIGHT);
+                    glVertex2f(tile_pos.x, tile_pos.y + TILE_SIZE);
+                    glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y + THEME_FRAME_HEIGHT);
+                    glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y + TILE_SIZE);
+                    glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y);
+                    glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y);
+               }
+          }
+          glEnd();
+
+          // block
+          tex_vec = theme_frame(0, 6);
+          glBegin(GL_QUADS);
+          for(U16 i = 0; i < block_count; i++){
+               Position_t block_camera_offset = blocks[i].pos - screen_camera;
+               pos_vec = pos_to_vec(block_camera_offset);
+               glTexCoord2f(tex_vec.x, tex_vec.y);
+               glVertex2f(pos_vec.x, pos_vec.y);
+               glTexCoord2f(tex_vec.x, tex_vec.y + THEME_FRAME_HEIGHT);
+               glVertex2f(pos_vec.x, pos_vec.y + TILE_SIZE);
+               glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y + THEME_FRAME_HEIGHT);
+               glVertex2f(pos_vec.x + TILE_SIZE, pos_vec.y + TILE_SIZE);
+               glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y);
+               glVertex2f(pos_vec.x + TILE_SIZE, pos_vec.y);
+          }
+          glEnd();
+
+          // player circle
           Position_t player_camera_offset = player.pos - screen_camera;
           pos_vec = pos_to_vec(player_camera_offset);
 
+          glBindTexture(GL_TEXTURE_2D, 0);
           glBegin(GL_TRIANGLE_FAN);
           glColor3f(1.0f, 1.0f, 1.0f);
           glVertex2f(pos_vec.x, pos_vec.y);
@@ -1230,70 +1368,36 @@ int main(){
           glVertex2f(pos_vec.x + player.radius, pos_vec.y);
           glEnd();
 
-          glBegin(GL_LINES);
-          glColor3f(1.0f, 0.0f, 0.0f);
-          glVertex2f(pos_vec.x, pos_vec.y);
-          switch(player.face){
-          default:
-               break;
-          case DIR_LEFT:
-               glVertex2f(pos_vec.x - player.radius, pos_vec.y);
-               break;
-          case DIR_RIGHT:
-               glVertex2f(pos_vec.x + player.radius, pos_vec.y);
-               break;
-          case DIR_DOWN:
-               glVertex2f(pos_vec.x, pos_vec.y - player.radius);
-               break;
-          case DIR_UP:
-               glVertex2f(pos_vec.x, pos_vec.y + player.radius);
-               break;
-          }
+          tex_vec = player_frame(player.walk_frame, player.face);
+
+          pos_vec.y += (5.0f * PIXEL_SIZE);
+          glBindTexture(GL_TEXTURE_2D, player_texture);
+          glBegin(GL_QUADS);
+          glColor3f(1.0f, 1.0f, 1.0f);
+          glTexCoord2f(tex_vec.x, tex_vec.y);
+          glVertex2f(pos_vec.x - HALF_TILE_SIZE, pos_vec.y - HALF_TILE_SIZE);
+          glTexCoord2f(tex_vec.x, tex_vec.y + PLAYER_FRAME_HEIGHT);
+          glVertex2f(pos_vec.x - HALF_TILE_SIZE, pos_vec.y + HALF_TILE_SIZE);
+          glTexCoord2f(tex_vec.x + PLAYER_FRAME_WIDTH, tex_vec.y + PLAYER_FRAME_HEIGHT);
+          glVertex2f(pos_vec.x + HALF_TILE_SIZE, pos_vec.y + HALF_TILE_SIZE);
+          glTexCoord2f(tex_vec.x + PLAYER_FRAME_WIDTH, tex_vec.y);
+          glVertex2f(pos_vec.x + HALF_TILE_SIZE, pos_vec.y - HALF_TILE_SIZE);
           glEnd();
 
-          // tilemap
-          Coord_t min = pos_to_coord(screen_camera);
-          Coord_t max = min + Coord_t{ROOM_TILE_SIZE, ROOM_TILE_SIZE};
-          min = coord_clamp_zero_to_dim(min, tilemap.width - 1, tilemap.height - 1);
-          max = coord_clamp_zero_to_dim(max, tilemap.width - 1, tilemap.height - 1);
-          Position_t tile_bottom_left = coord_to_pos(min);
-          Vec_t camera_offset = pos_to_vec(tile_bottom_left - screen_camera);
-          glBegin(GL_QUADS);
-          glColor3f(0.0f, 1.0f, 1.0f);
-          for(U16 y = min.y; y <= max.y; y++){
-               for(U16 x = min.x; x <= max.x; x++){
-                    if(tilemap.tiles[y][x].id){
-                         Vec_t tile_pos {(F32)(x - min.x) * TILE_SIZE + camera_offset.x, (F32)(y - min.y) * TILE_SIZE + camera_offset.y};
-                         glVertex2f(tile_pos.x, tile_pos.y);
-                         glVertex2f(tile_pos.x, tile_pos.y + TILE_SIZE);
-                         glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y + TILE_SIZE);
-                         glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y);
-                    }
-               }
-          }
-          glEnd();
-
-          // block
-          glBegin(GL_QUADS);
-          glColor3f(1.0f, 1.0f, 0.0f);
-          for(U16 i = 0; i < block_count; i++){
-               Position_t block_camera_offset = blocks[i].pos - screen_camera;
-               pos_vec = pos_to_vec(block_camera_offset);
-               glVertex2f(pos_vec.x, pos_vec.y);
-               glVertex2f(pos_vec.x, pos_vec.y + TILE_SIZE);
-               glVertex2f(pos_vec.x + TILE_SIZE, pos_vec.y + TILE_SIZE);
-               glVertex2f(pos_vec.x + TILE_SIZE, pos_vec.y);
-          }
-          glEnd();
 
           SDL_GL_SwapWindow(window);
      }
 
      destroy(&tilemap);
 
+     glDeleteTextures(1, &theme_texture);
+     glDeleteTextures(1, &player_texture);
+
      SDL_GL_DeleteContext(opengl_context);
      SDL_DestroyWindow(window);
      SDL_Quit();
+
+     Log_t::destroy();
 
      return 0;
 }

@@ -1,4 +1,4 @@
 #!/bin/bash
 set -x
-rm -f game
+rm -f game bryte.log
 
