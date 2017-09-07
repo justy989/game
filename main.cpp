@@ -499,8 +499,8 @@ Rect_t pixel_range(Pixel_t bottom_left, Pixel_t top_right){
 }
 
 bool pixel_in_rect(Pixel_t p, Rect_t r){
-     return (p.x > r.left && p.x < r.right &&
-             p.y > r.bottom && p.y < r.top);
+     return (p.x >= r.left && p.x <= r.right &&
+             p.y >= r.bottom && p.y <= r.top);
 }
 
 Rect_t coord_range(Coord_t bottom_left, Coord_t top_right){
@@ -569,6 +569,7 @@ DirectionMask_t directions_between(Pixel_t a, Pixel_t b){
      return mask;
 }
 
+// TODO: consider reversing the output of this function
 Direction_t relative_quadrant(Pixel_t a, Pixel_t b){
      Pixel_t c = b - a;
 
@@ -834,14 +835,14 @@ Block_t* block_against_another_block(Block_t* block_to_check, Direction_t direct
 Block_t* block_inside_another_block(Block_t* block_to_check, Block_t* blocks, S16 block_count){
      // TODO: need more complicated function to detect this
      Rect_t rect = {block_to_check->pos.pixel.x, block_to_check->pos.pixel.y,
-                    (S16)(block_to_check->pos.pixel.x + TILE_SIZE_IN_PIXELS),
-                    (S16)(block_to_check->pos.pixel.y + TILE_SIZE_IN_PIXELS)};
+                    (S16)(block_to_check->pos.pixel.x + TILE_SIZE_IN_PIXELS - 1),
+                    (S16)(block_to_check->pos.pixel.y + TILE_SIZE_IN_PIXELS - 1)};
      for(S16 i = 0; i < block_count; i++){
           if(blocks + i == block_to_check) continue;
 
-          Pixel_t top_left {blocks[i].pos.pixel.x, (S16)(blocks[i].pos.pixel.y + TILE_SIZE_IN_PIXELS)};
-          Pixel_t top_right {(S16)(blocks[i].pos.pixel.x + TILE_SIZE_IN_PIXELS), (S16)(blocks[i].pos.pixel.y + TILE_SIZE_IN_PIXELS)};
-          Pixel_t bottom_right {(S16)(blocks[i].pos.pixel.x + TILE_SIZE_IN_PIXELS), blocks[i].pos.pixel.y};
+          Pixel_t top_left {blocks[i].pos.pixel.x, (S16)(blocks[i].pos.pixel.y + TILE_SIZE_IN_PIXELS - 1)};
+          Pixel_t top_right {(S16)(blocks[i].pos.pixel.x + TILE_SIZE_IN_PIXELS - 1), (S16)(blocks[i].pos.pixel.y + TILE_SIZE_IN_PIXELS - 1)};
+          Pixel_t bottom_right {(S16)(blocks[i].pos.pixel.x + TILE_SIZE_IN_PIXELS - 1), blocks[i].pos.pixel.y};
 
           if(pixel_in_rect(blocks[i].pos.pixel, rect) ||
              pixel_in_rect(top_left, rect) ||
@@ -1259,6 +1260,41 @@ int main(){
                bool stop_on_boundary_x = false;
                bool stop_on_boundary_y = false;
 
+               Block_t* inside_block = nullptr;
+
+               while((inside_block = block_inside_another_block(blocks + i, blocks, block_count))){
+                    auto quadrant = relative_quadrant(blocks[i].pos.pixel, inside_block->pos.pixel);
+
+                    switch(quadrant){
+                    default:
+                         break;
+                    case DIR_LEFT:
+                         blocks[i].pos.pixel.x = inside_block->pos.pixel.x + TILE_SIZE_IN_PIXELS;
+                         blocks[i].pos.decimal.x = 0.0f;
+                         blocks[i].vel.x = 0.0f;
+                         blocks[i].accel.x = 0.0f;
+                         break;
+                    case DIR_RIGHT:
+                         blocks[i].pos.pixel.x = inside_block->pos.pixel.x - TILE_SIZE_IN_PIXELS;
+                         blocks[i].pos.decimal.x = 0.0f;
+                         blocks[i].vel.x = 0.0f;
+                         blocks[i].accel.x = 0.0f;
+                         break;
+                    case DIR_DOWN:
+                         blocks[i].pos.pixel.y = inside_block->pos.pixel.y + TILE_SIZE_IN_PIXELS;
+                         blocks[i].pos.decimal.y = 0.0f;
+                         blocks[i].vel.y = 0.0f;
+                         blocks[i].accel.y = 0.0f;
+                         break;
+                    case DIR_UP:
+                         blocks[i].pos.pixel.y = inside_block->pos.pixel.y - TILE_SIZE_IN_PIXELS;
+                         blocks[i].pos.decimal.y = 0.0f;
+                         blocks[i].vel.y = 0.0f;
+                         blocks[i].accel.y = 0.0f;
+                         break;
+                    }
+               }
+
                if(blocks + i == last_block_pushed){
                     // get the current coord
                     Pixel_t center = blocks[i].pos.pixel + Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS};
@@ -1280,10 +1316,6 @@ int main(){
                     if(blocks[i].vel.y > 0.0f){
                          Coord_t check = coord + Coord_t{0, 1};
                          if(tilemap_is_solid(&tilemap, check)){
-                              stop_on_boundary_y = true;
-                         }
-
-                         if(block_inside_another_block(blocks + i, blocks, block_count)){
                               stop_on_boundary_y = true;
                          }
                     }else if(blocks[i].vel.y < 0.0f){
@@ -1425,16 +1457,16 @@ int main(){
                               default:
                                    break;
                               case DIR_LEFT:
-                                   block_to_push->accel.x = -movement_speed * 0.7f;
+                                   block_to_push->accel.x = -movement_speed * 0.99f;
                                    break;
                               case DIR_RIGHT:
-                                   block_to_push->accel.x = movement_speed * 0.7f;
+                                   block_to_push->accel.x = movement_speed * 0.99f;
                                    break;
                               case DIR_DOWN:
-                                   block_to_push->accel.y = -movement_speed * 0.7f;
+                                   block_to_push->accel.y = -movement_speed * 0.99f;
                                    break;
                               case DIR_UP:
-                                   block_to_push->accel.y = movement_speed * 0.7f;
+                                   block_to_push->accel.y = movement_speed * 0.99f;
                                    break;
                               }
 
@@ -1496,10 +1528,10 @@ int main(){
                pos_vec = pos_to_vec(block_camera_offset);
                glTexCoord2f(tex_vec.x, tex_vec.y);
                glVertex2f(pos_vec.x, pos_vec.y);
-               glTexCoord2f(tex_vec.x, tex_vec.y + THEME_FRAME_HEIGHT);
-               glVertex2f(pos_vec.x, pos_vec.y + TILE_SIZE);
-               glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y + THEME_FRAME_HEIGHT);
-               glVertex2f(pos_vec.x + TILE_SIZE, pos_vec.y + TILE_SIZE);
+               glTexCoord2f(tex_vec.x, tex_vec.y + 2.0f * THEME_FRAME_HEIGHT);
+               glVertex2f(pos_vec.x, pos_vec.y + 2.0f * TILE_SIZE);
+               glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y + 2.0f * THEME_FRAME_HEIGHT);
+               glVertex2f(pos_vec.x + TILE_SIZE, pos_vec.y + 2.0f * TILE_SIZE);
                glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y);
                glVertex2f(pos_vec.x + TILE_SIZE, pos_vec.y);
           }
@@ -1516,8 +1548,6 @@ int main(){
           }else{
                glColor3f(1.0f, 1.0f, 1.0f);
           }
-          //glVertex2f(pos_vec.x, pos_vec.y);
-          //glVertex2f(pos_vec.x + player.radius, pos_vec.y);
           Vec_t prev_vec {pos_vec.x + player.radius, pos_vec.y};
           S32 segments = 32;
           F32 delta = 3.14159f * 2.0f / (F32)(segments);
@@ -1532,7 +1562,6 @@ int main(){
                prev_vec.y = pos_vec.y + dy;
                angle += delta;
           }
-          //glVertex2f(pos_vec.x + player.radius, pos_vec.y);
           glEnd();
 
           S8 player_frame_y = player.face;
