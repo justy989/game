@@ -569,6 +569,18 @@ DirectionMask_t directions_between(Pixel_t a, Pixel_t b){
      return mask;
 }
 
+Direction_t relative_quadrant(Pixel_t a, Pixel_t b){
+     Pixel_t c = b - a;
+
+     if(abs(c.x) > abs(c.y)){
+          if(c.x > 0) return DIR_RIGHT;
+          return DIR_LEFT;
+     }
+
+     if(c.y > 0) return DIR_UP;
+     return DIR_DOWN;
+}
+
 enum TileFlag_t{
      TILE_FLAG_ICED = 1,
      TILE_FLAG_CHECKPOINT = 2,
@@ -619,6 +631,12 @@ Tile_t* tilemap_get_tile(TileMap_t* tilemap, Coord_t coord){
      if(coord.y < 0 || coord.y >= tilemap->height) return NULL;
 
      return tilemap->tiles[coord.y] + coord.x;
+}
+
+bool tilemap_is_solid(TileMap_t* tilemap, Coord_t coord){
+     Tile_t* tile = tilemap_get_tile(tilemap, coord);
+     if(!tile) return false;
+     return tile->id;
 }
 
 enum Element_t : U8{
@@ -717,6 +735,7 @@ struct Block_t{
      Vec_t vel;
      DirectionMask_t force;
      Element_t element;
+     Pixel_t push_start;
 };
 
 #define PLAYER_WALK_DELAY 0.15f
@@ -751,11 +770,17 @@ Vec_t collide_circle_with_line(Vec_t circle_center, F32 circle_radius, Vec_t a, 
      return vec_zero();
 }
 
-S16 range_passes_tile_boundary(S16 a, S16 b){
-     if(a > b) SWAP(a, b);
+S16 range_passes_tile_boundary(S16 a, S16 b, S16 ignore){
+     if(a == b) return 0;
+     if(a > b){
+          if((b % TILE_SIZE_IN_PIXELS) == 0) return 0;
+          SWAP(a, b);
+     }
 
      for(S16 i = a; i <= b; i++){
-          if(i % TILE_SIZE_IN_PIXELS == 0) return i;
+          if((i % TILE_SIZE_IN_PIXELS) == 0 && i != ignore){
+               return i;
+          }
      }
 
      return 0;
@@ -801,6 +826,29 @@ Block_t* block_against_another_block(Block_t* block_to_check, Direction_t direct
                }
           }
           break;
+     }
+
+     return nullptr;
+}
+
+Block_t* block_inside_another_block(Block_t* block_to_check, Block_t* blocks, S16 block_count){
+     // TODO: need more complicated function to detect this
+     Rect_t rect = {block_to_check->pos.pixel.x, block_to_check->pos.pixel.y,
+                    (S16)(block_to_check->pos.pixel.x + TILE_SIZE_IN_PIXELS),
+                    (S16)(block_to_check->pos.pixel.y + TILE_SIZE_IN_PIXELS)};
+     for(S16 i = 0; i < block_count; i++){
+          if(blocks + i == block_to_check) continue;
+
+          Pixel_t top_left {blocks[i].pos.pixel.x, (S16)(blocks[i].pos.pixel.y + TILE_SIZE_IN_PIXELS)};
+          Pixel_t top_right {(S16)(blocks[i].pos.pixel.x + TILE_SIZE_IN_PIXELS), (S16)(blocks[i].pos.pixel.y + TILE_SIZE_IN_PIXELS)};
+          Pixel_t bottom_right {(S16)(blocks[i].pos.pixel.x + TILE_SIZE_IN_PIXELS), blocks[i].pos.pixel.y};
+
+          if(pixel_in_rect(blocks[i].pos.pixel, rect) ||
+             pixel_in_rect(top_left, rect) ||
+             pixel_in_rect(top_right, rect) ||
+             pixel_in_rect(bottom_right, rect)){
+               return blocks + i;
+          }
      }
 
      return nullptr;
@@ -1057,6 +1105,9 @@ int main(){
 
      Position_t camera {};
 
+     Block_t* last_block_pushed = nullptr;
+     Block_t* block_to_push = nullptr;
+
      player.radius = 3.5f / 272.0f;
 
      while(!quit){
@@ -1067,6 +1118,9 @@ int main(){
           if(dt < 0.0166666f) continue;
 
           last_time = current_time;
+
+          last_block_pushed = block_to_push;
+          block_to_push = nullptr;
 
           bool reface = false;
 
@@ -1188,8 +1242,8 @@ int main(){
           Position_t camera_movement = room_center - camera;
           camera += camera_movement * 0.05f;
 
-          float movement_speed = 6.5f;
-          float drag = 0.65f;
+          float movement_speed = 5.5f;
+          float drag = 0.625f;
 
           // block movement
           for(U16 i = 0; i < block_count; i++){
@@ -1197,31 +1251,73 @@ int main(){
                blocks[i].vel += blocks[i].accel * dt;
                blocks[i].vel *= drag;
 
+               // TODO: blocks with velocity need to be checked against other blocks
+
                Position_t pre_move = blocks[i].pos;
                blocks[i].pos += pos_delta;
 
-               if(pre_move.pixel.x % TILE_SIZE_IN_PIXELS != 0){
-                    S16 boundary = range_passes_tile_boundary(pre_move.pixel.x, blocks[i].pos.pixel.x);
-                    if(boundary){
-                         blocks[i].pos.pixel.x = boundary;
+               bool stop_on_boundary_x = false;
+               bool stop_on_boundary_y = false;
+
+               if(blocks + i == last_block_pushed){
+                    // get the current coord
+                    Pixel_t center = blocks[i].pos.pixel + Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS};
+                    Coord_t coord = pixel_to_coord(center);
+
+                    // check for adjacent walls
+                    if(blocks[i].vel.x > 0.0f){
+                         Coord_t check = coord + Coord_t{1, 0};
+                         if(tilemap_is_solid(&tilemap, check)){
+                              stop_on_boundary_x = true;
+                         }
+                    }else if(blocks[i].vel.x < 0.0f){
+                         Coord_t check = coord + Coord_t{-1, 0};
+                         if(tilemap_is_solid(&tilemap, check)){
+                              stop_on_boundary_x = true;
+                         }
+                    }
+
+                    if(blocks[i].vel.y > 0.0f){
+                         Coord_t check = coord + Coord_t{0, 1};
+                         if(tilemap_is_solid(&tilemap, check)){
+                              stop_on_boundary_y = true;
+                         }
+
+                         if(block_inside_another_block(blocks + i, blocks, block_count)){
+                              stop_on_boundary_y = true;
+                         }
+                    }else if(blocks[i].vel.y < 0.0f){
+                         Coord_t check = coord + Coord_t{0, -1};
+                         if(tilemap_is_solid(&tilemap, check)){
+                              stop_on_boundary_y = true;
+                         }
+                    }
+               }else{
+                    stop_on_boundary_x = true;
+                    stop_on_boundary_y = true;
+               }
+
+               if(stop_on_boundary_x){
+                    // stop on tile boundaries separately for each axis
+                    S16 boundary_x = range_passes_tile_boundary(pre_move.pixel.x, blocks[i].pos.pixel.x, blocks[i].push_start.x);
+                    if(boundary_x){
+                         blocks[i].pos.pixel.x = boundary_x;
                          blocks[i].pos.decimal.x = 0.0f;
                          blocks[i].vel.x = 0.0f;
                          blocks[i].accel.x = 0.0f;
                     }
                }
 
-               if(pre_move.pixel.y % TILE_SIZE_IN_PIXELS != 0){
-                    S16 boundary = range_passes_tile_boundary(pre_move.pixel.y, blocks[i].pos.pixel.y);
-                    if(boundary){
-                         blocks[i].pos.pixel.y = boundary;
+               if(stop_on_boundary_y){
+                    S16 boundary_y = range_passes_tile_boundary(pre_move.pixel.y, blocks[i].pos.pixel.y, blocks[i].push_start.y);
+                    if(boundary_y){
+                         blocks[i].pos.pixel.y = boundary_y;
                          blocks[i].pos.decimal.y = 0.0f;
                          blocks[i].vel.y = 0.0f;
                          blocks[i].accel.y = 0.0f;
                     }
                }
           }
-
-          Block_t* block_to_push = nullptr;
 
           // player movement
           {
@@ -1293,8 +1389,6 @@ int main(){
                     }
                }
 
-               // Block_t* block_to_push = nullptr;
-
                for(U16 i = 0; i < block_count; i++){
                     bool collide_with_block = false;
 
@@ -1312,8 +1406,10 @@ int main(){
                     pos_delta += collide_circle_with_line(pos_delta, player.radius, bottom_right, top_right, &collide_with_block);
 
                     if(collide_with_block){
-                         auto directions_between_player_and_block = directions_between(player.pos.pixel, blocks[i].pos.pixel);
-                         if(direction_in_mask(directions_between_player_and_block, player.face)){
+                         auto player_quadrant = relative_quadrant(player.pos.pixel, blocks[i].pos.pixel +
+                                                                  Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS});
+                         if(player_quadrant == player.face &&
+                            (user_movement.x != 0.0f || user_movement.y != 0.0f)){ // also check that the player is actually pushing against the block
                               block_to_push = blocks + i;
                          }
                     }
@@ -1321,7 +1417,7 @@ int main(){
 
                if(block_to_push){
                     player.push_time += dt;
-                    if(player.push_time > 0.15f){ // TODO: #define
+                    if(player.push_time > 0.2f){ // TODO: #define
                          // can we push the block? Is it against another block or against a wall?
                          if(!block_against_another_block(block_to_push, player.face, blocks, block_count) &&
                             !block_against_solid_tile(block_to_push, player.face, &tilemap)){
@@ -1341,6 +1437,8 @@ int main(){
                                    block_to_push->accel.y = movement_speed * 0.7f;
                                    break;
                               }
+
+                              block_to_push->push_start = block_to_push->pos.pixel;
                          }
                     }
                }else{
