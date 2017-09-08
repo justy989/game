@@ -640,6 +640,12 @@ bool tilemap_is_solid(TileMap_t* tilemap, Coord_t coord){
      return tile->id;
 }
 
+bool tilemap_is_iced(TileMap_t* tilemap, Coord_t coord){
+     Tile_t* tile = tilemap_get_tile(tilemap, coord);
+     if(!tile) return false;
+     return (tile->flags & TILE_FLAG_ICED);
+}
+
 enum Element_t : U8{
      ELEMENT_NONE,
      ELEMENT_FIRE,
@@ -730,15 +736,7 @@ const char* element_to_string(Element_t e)
      return "ELEMENT_UNKNOWN";
 }
 
-struct Block_t{
-     Position_t pos;
-     Vec_t accel;
-     Vec_t vel;
-     DirectionMask_t force;
-     Element_t element;
-     Pixel_t push_start;
-};
-
+#define PLAYER_SPEED 5.5f
 #define PLAYER_WALK_DELAY 0.15f
 #define PLAYER_IDLE_SPEED 0.0025f
 
@@ -754,37 +752,22 @@ struct Player_t{
      F32 walk_frame_time;
 };
 
-Vec_t collide_circle_with_line(Vec_t circle_center, F32 circle_radius, Vec_t a, Vec_t b, bool* collided){
-     // move data we care about to the origin
-     Vec_t c = circle_center - a;
-     Vec_t l = b - a;
-     Vec_t closest_point_on_l_to_c = vec_project_onto(c, l);
-     Vec_t collision_to_c = closest_point_on_l_to_c - c;
+struct Block_t{
+     Position_t pos;
+     Vec_t accel;
+     Vec_t vel;
+     DirectionMask_t force;
+     Element_t element;
+     Pixel_t push_start;
+};
 
-     if(vec_magnitude(collision_to_c) < circle_radius){
-          // find edge of circle in that direction
-          Vec_t edge_of_circle = vec_normalize(collision_to_c) * circle_radius;
-          *collided = true;
-          return collision_to_c - edge_of_circle;
-     }
-
-     return vec_zero();
+Coord_t block_coord(Block_t* block){
+     Pixel_t center = block->pos.pixel + Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS};
+     return pixel_to_coord(center);
 }
 
-S16 range_passes_tile_boundary(S16 a, S16 b, S16 ignore){
-     if(a == b) return 0;
-     if(a > b){
-          if((b % TILE_SIZE_IN_PIXELS) == 0) return 0;
-          SWAP(a, b);
-     }
-
-     for(S16 i = a; i <= b; i++){
-          if((i % TILE_SIZE_IN_PIXELS) == 0 && i != ignore){
-               return i;
-          }
-     }
-
-     return 0;
+bool block_on_ice(Block_t* block, TileMap_t* tilemap){
+     return tilemap_is_iced(tilemap, block_coord(block));
 }
 
 Block_t* block_against_another_block(Block_t* block_to_check, Direction_t direction, Block_t* blocks, S16 block_count){
@@ -928,6 +911,71 @@ Tile_t* block_against_solid_tile(Block_t* block_to_check, Direction_t direction,
      return nullptr;
 }
 
+void block_push(Block_t* block, Direction_t direction, TileMap_t* tilemap, Block_t* blocks, S16 block_count, bool pushed_by_player){
+     Block_t* against_block = block_against_another_block(block, direction, blocks, block_count);
+     if(against_block){
+          if(!pushed_by_player && block_on_ice(against_block, tilemap)){
+               block_push(against_block, direction, tilemap, blocks, block_count, false);
+          }
+
+          return;
+     }
+
+     if(block_against_solid_tile(block, direction, tilemap)) return;
+
+     switch(direction){
+     default:
+          break;
+     case DIR_LEFT:
+          block->accel.x = -PLAYER_SPEED * 0.99f;
+          break;
+     case DIR_RIGHT:
+          block->accel.x = PLAYER_SPEED * 0.99f;
+          break;
+     case DIR_DOWN:
+          block->accel.y = -PLAYER_SPEED * 0.99f;
+          break;
+     case DIR_UP:
+          block->accel.y = PLAYER_SPEED * 0.99f;
+          break;
+     }
+
+     block->push_start = block->pos.pixel;
+}
+
+Vec_t collide_circle_with_line(Vec_t circle_center, F32 circle_radius, Vec_t a, Vec_t b, bool* collided){
+     // move data we care about to the origin
+     Vec_t c = circle_center - a;
+     Vec_t l = b - a;
+     Vec_t closest_point_on_l_to_c = vec_project_onto(c, l);
+     Vec_t collision_to_c = closest_point_on_l_to_c - c;
+
+     if(vec_magnitude(collision_to_c) < circle_radius){
+          // find edge of circle in that direction
+          Vec_t edge_of_circle = vec_normalize(collision_to_c) * circle_radius;
+          *collided = true;
+          return collision_to_c - edge_of_circle;
+     }
+
+     return vec_zero();
+}
+
+S16 range_passes_tile_boundary(S16 a, S16 b, S16 ignore){
+     if(a == b) return 0;
+     if(a > b){
+          if((b % TILE_SIZE_IN_PIXELS) == 0) return 0;
+          SWAP(a, b);
+     }
+
+     for(S16 i = a; i <= b; i++){
+          if((i % TILE_SIZE_IN_PIXELS) == 0 && i != ignore){
+               return i;
+          }
+     }
+
+     return 0;
+}
+
 GLuint create_texture_from_bitmap(AlphaBitmap_t* bitmap){
      GLuint texture = 0;
 
@@ -1030,15 +1078,18 @@ int main(){
      rooms[1].top = 15;
      rooms[1].right = 27;
 
-     const int block_count = 2;
+     const int block_count = 3;
      Block_t blocks[block_count];
 
      blocks[0].pos = coord_to_pos(Coord_t{6, 6});
      blocks[1].pos = coord_to_pos(Coord_t{6, 2});
+     blocks[2].pos = coord_to_pos(Coord_t{8, 8});
      blocks[0].vel = vec_zero();
      blocks[1].vel = vec_zero();
+     blocks[2].vel = vec_zero();
      blocks[0].accel = vec_zero();
      blocks[1].accel = vec_zero();
+     blocks[2].accel = vec_zero();
 
      TileMap_t tilemap;
      {
@@ -1086,6 +1137,16 @@ int main(){
 
           tilemap.tiles[8][22].id = 1;
           tilemap.tiles[9][23].id = 1;
+
+          tilemap.tiles[8][6].flags |= TILE_FLAG_ICED;
+          tilemap.tiles[9][6].flags |= TILE_FLAG_ICED;
+          tilemap.tiles[10][6].flags |= TILE_FLAG_ICED;
+          tilemap.tiles[8][7].flags |= TILE_FLAG_ICED;
+          tilemap.tiles[9][7].flags |= TILE_FLAG_ICED;
+          tilemap.tiles[10][7].flags |= TILE_FLAG_ICED;
+          tilemap.tiles[8][8].flags |= TILE_FLAG_ICED;
+          tilemap.tiles[9][8].flags |= TILE_FLAG_ICED;
+          tilemap.tiles[10][8].flags |= TILE_FLAG_ICED;
      }
 
      bool quit = false;
@@ -1243,7 +1304,6 @@ int main(){
           Position_t camera_movement = room_center - camera;
           camera += camera_movement * 0.05f;
 
-          float movement_speed = 5.5f;
           float drag = 0.625f;
 
           // block movement
@@ -1293,38 +1353,42 @@ int main(){
                          blocks[i].accel.y = 0.0f;
                          break;
                     }
+
+                    if(block_on_ice(inside_block, &tilemap)){
+                         block_push(inside_block, quadrant, &tilemap, blocks, block_count, false);
+                    }
                }
 
-               if(blocks + i == last_block_pushed){
-                    // get the current coord
-                    Pixel_t center = blocks[i].pos.pixel + Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS};
-                    Coord_t coord = pixel_to_coord(center);
+               // get the current coord of the center of the block
+               Pixel_t center = blocks[i].pos.pixel + Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS};
+               Coord_t coord = pixel_to_coord(center);
 
-                    // check for adjacent walls
-                    if(blocks[i].vel.x > 0.0f){
-                         Coord_t check = coord + Coord_t{1, 0};
-                         if(tilemap_is_solid(&tilemap, check)){
-                              stop_on_boundary_x = true;
-                         }
-                    }else if(blocks[i].vel.x < 0.0f){
-                         Coord_t check = coord + Coord_t{-1, 0};
-                         if(tilemap_is_solid(&tilemap, check)){
-                              stop_on_boundary_x = true;
-                         }
+               // check for adjacent walls
+               if(blocks[i].vel.x > 0.0f){
+                    Coord_t check = coord + Coord_t{1, 0};
+                    if(tilemap_is_solid(&tilemap, check)){
+                         stop_on_boundary_x = true;
                     }
+               }else if(blocks[i].vel.x < 0.0f){
+                    Coord_t check = coord + Coord_t{-1, 0};
+                    if(tilemap_is_solid(&tilemap, check)){
+                         stop_on_boundary_x = true;
+                    }
+               }
 
-                    if(blocks[i].vel.y > 0.0f){
-                         Coord_t check = coord + Coord_t{0, 1};
-                         if(tilemap_is_solid(&tilemap, check)){
-                              stop_on_boundary_y = true;
-                         }
-                    }else if(blocks[i].vel.y < 0.0f){
-                         Coord_t check = coord + Coord_t{0, -1};
-                         if(tilemap_is_solid(&tilemap, check)){
-                              stop_on_boundary_y = true;
-                         }
+               if(blocks[i].vel.y > 0.0f){
+                    Coord_t check = coord + Coord_t{0, 1};
+                    if(tilemap_is_solid(&tilemap, check)){
+                         stop_on_boundary_y = true;
                     }
-               }else{
+               }else if(blocks[i].vel.y < 0.0f){
+                    Coord_t check = coord + Coord_t{0, -1};
+                    if(tilemap_is_solid(&tilemap, check)){
+                         stop_on_boundary_y = true;
+                    }
+               }
+
+               if(blocks + i != last_block_pushed && !tilemap_is_iced(&tilemap, coord)){
                     stop_on_boundary_x = true;
                     stop_on_boundary_y = true;
                }
@@ -1354,14 +1418,14 @@ int main(){
           // player movement
           {
                user_movement = vec_normalize(user_movement);
-               player.accel = user_movement * movement_speed;
+               player.accel = user_movement * PLAYER_SPEED;
 
                Vec_t pos_delta = (player.accel * dt * dt * 0.5f) + (player.vel * dt);
                player.vel += player.accel * dt;
                player.vel *= drag;
 
-               if(fabs(vec_magnitude(player.vel)) > movement_speed){
-                    player.vel = vec_normalize(player.vel) * movement_speed;
+               if(fabs(vec_magnitude(player.vel)) > PLAYER_SPEED){
+                    player.vel = vec_normalize(player.vel) * PLAYER_SPEED;
                }
 
                // figure out tiles that are close by
@@ -1450,28 +1514,7 @@ int main(){
                if(block_to_push){
                     player.push_time += dt;
                     if(player.push_time > 0.2f){ // TODO: #define
-                         // can we push the block? Is it against another block or against a wall?
-                         if(!block_against_another_block(block_to_push, player.face, blocks, block_count) &&
-                            !block_against_solid_tile(block_to_push, player.face, &tilemap)){
-                              switch(player.face){
-                              default:
-                                   break;
-                              case DIR_LEFT:
-                                   block_to_push->accel.x = -movement_speed * 0.99f;
-                                   break;
-                              case DIR_RIGHT:
-                                   block_to_push->accel.x = movement_speed * 0.99f;
-                                   break;
-                              case DIR_DOWN:
-                                   block_to_push->accel.y = -movement_speed * 0.99f;
-                                   break;
-                              case DIR_UP:
-                                   block_to_push->accel.y = movement_speed * 0.99f;
-                                   break;
-                              }
-
-                              block_to_push->push_start = block_to_push->pos.pixel;
-                         }
+                         block_push(block_to_push, player.face, &tilemap, blocks, block_count, true);
                     }
                }else{
                     player.push_time = 0;
@@ -1581,6 +1624,32 @@ int main(){
           glVertex2f(pos_vec.x + HALF_TILE_SIZE, pos_vec.y + HALF_TILE_SIZE);
           glTexCoord2f(tex_vec.x + PLAYER_FRAME_WIDTH, tex_vec.y);
           glVertex2f(pos_vec.x + HALF_TILE_SIZE, pos_vec.y - HALF_TILE_SIZE);
+          glEnd();
+
+          glBindTexture(GL_TEXTURE_2D, 0);
+          glBegin(GL_LINES);
+          glColor3f(0.0f, 1.0f, 1.0f);
+          for(S16 y = min.y; y <= max.y; y++){
+               for(S16 x = min.x; x <= max.x; x++){
+                    if(!tilemap_is_iced(&tilemap, Coord_t{x, y})) continue;
+
+                    Vec_t tile_pos {(F32)(x - min.x) * TILE_SIZE + camera_offset.x,
+                                    (F32)(y - min.y) * TILE_SIZE + camera_offset.y};
+
+                    glVertex2f(tile_pos.x, tile_pos.y);
+                    glVertex2f(tile_pos.x, tile_pos.y + TILE_SIZE);
+
+                    glVertex2f(tile_pos.x, tile_pos.y + TILE_SIZE);
+                    glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y + TILE_SIZE);
+
+                    glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y + TILE_SIZE);
+                    glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y);
+
+                    glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y);
+                    glVertex2f(tile_pos.x, tile_pos.y);
+
+               }
+          }
           glEnd();
 
           SDL_GL_SwapWindow(window);
