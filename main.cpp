@@ -1168,6 +1168,7 @@ int main(){
      Position_t camera {};
 
      Block_t* last_block_pushed = nullptr;
+     Direction_t last_block_pushed_direction = DIR_LEFT;
      Block_t* block_to_push = nullptr;
 
      player.radius = 3.5f / 272.0f;
@@ -1354,6 +1355,10 @@ int main(){
                          break;
                     }
 
+                    if(blocks + i == last_block_pushed && quadrant == last_block_pushed_direction){
+                         player.push_time = 0.f;
+                    }
+
                     if(block_on_ice(inside_block, &tilemap)){
                          block_push(inside_block, quadrant, &tilemap, blocks, block_count, false);
                     }
@@ -1507,6 +1512,7 @@ int main(){
                          if(player_quadrant == player.face &&
                             (user_movement.x != 0.0f || user_movement.y != 0.0f)){ // also check that the player is actually pushing against the block
                               block_to_push = blocks + i;
+                              last_block_pushed_direction = player.face;
                          }
                     }
                }
