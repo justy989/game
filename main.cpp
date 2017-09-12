@@ -11,20 +11,20 @@
 #include "bitmap.h"
 
 enum Direction_t : U8{
-     DIR_LEFT = 0,
-     DIR_UP = 1,
-     DIR_RIGHT = 2,
-     DIR_DOWN = 3,
-     DIR_COUNT = 4,
+     DIRECTION_LEFT = 0,
+     DIRECTION_UP = 1,
+     DIRECTION_RIGHT = 2,
+     DIRECTION_DOWN = 3,
+     DIRECTION_COUNT = 4,
 };
 
 enum DirectionMask_t : U8{
-     DM_NONE = 0,
-     DM_LEFT = 1,
-     DM_UP = 2,
-     DM_RIGHT = 4,
-     DM_DOWN = 8,
-     DM_ALL = 15,
+     DIRECTION_MASK_NONE = 0,
+     DIRECTION_MASK_LEFT = 1,
+     DIRECTION_MASK_UP = 2,
+     DIRECTION_MASK_RIGHT = 4,
+     DIRECTION_MASK_DOWN = 8,
+     DIRECTION_MASK_ALL = 15,
 };
 
 // 0  none
@@ -45,11 +45,11 @@ enum DirectionMask_t : U8{
 // 15 down | left | up | right
 
 DirectionMask_t g_direction_mask_conversion[] = {
-     DM_LEFT,
-     DM_UP,
-     DM_RIGHT,
-     DM_DOWN,
-     DM_NONE,
+     DIRECTION_MASK_LEFT,
+     DIRECTION_MASK_UP,
+     DIRECTION_MASK_RIGHT,
+     DIRECTION_MASK_DOWN,
+     DIRECTION_MASK_NONE,
 };
 
 bool direction_in_mask(DirectionMask_t mask, Direction_t dir){
@@ -61,7 +61,7 @@ bool direction_in_mask(DirectionMask_t mask, Direction_t dir){
 }
 
 DirectionMask_t direction_to_direction_mask(Direction_t dir){
-     assert(dir <= DIR_COUNT);
+     assert(dir <= DIRECTION_COUNT);
      return g_direction_mask_conversion[dir];
 }
 
@@ -89,12 +89,12 @@ DirectionMask_t direction_mask_remove(DirectionMask_t mask, Direction_t dir){
      return (DirectionMask_t)(mask & ~direction_to_direction_mask(dir)); // C++ makes this annoying
 }
 
-Direction_t direction_opposite(Direction_t dir){return (Direction_t)(((int)(dir) + 2) % DIR_COUNT);}
-bool direction_is_horizontal(Direction_t dir){return dir == DIR_LEFT || dir == DIR_RIGHT;}
+Direction_t direction_opposite(Direction_t dir){return (Direction_t)(((int)(dir) + 2) % DIRECTION_COUNT);}
+bool direction_is_horizontal(Direction_t dir){return dir == DIRECTION_LEFT || dir == DIRECTION_RIGHT;}
 
 U8 direction_rotations_between(Direction_t a, Direction_t b){
      if(a < b){
-          return ((int)(a) + DIR_COUNT) - (int)(b);
+          return ((int)(a) + DIRECTION_COUNT) - (int)(b);
      }
 
      return (int)(a) - (int)(b);
@@ -102,7 +102,7 @@ U8 direction_rotations_between(Direction_t a, Direction_t b){
 
 Direction_t direction_rotate_clockwise(Direction_t dir){
      U8 rot = (U8)(dir) + 1;
-     rot %= DIR_COUNT;
+     rot %= DIRECTION_COUNT;
      return (Direction_t)(rot);
 }
 
@@ -116,38 +116,38 @@ Direction_t direction_rotate_clockwise(Direction_t dir, U8 times){
 
 DirectionMask_t direction_mask_rotate_clockwise(DirectionMask_t mask){
      // TODO: could probably just shift?
-     S8 rot = DM_NONE;
+     S8 rot = DIRECTION_MASK_NONE;
 
-     if(mask & DM_LEFT) rot |= DM_UP;
-     if(mask & DM_UP) rot |= DM_RIGHT;
-     if(mask & DM_RIGHT) rot |= DM_DOWN;
-     if(mask & DM_DOWN) rot |= DM_LEFT;
+     if(mask & DIRECTION_MASK_LEFT) rot |= DIRECTION_MASK_UP;
+     if(mask & DIRECTION_MASK_UP) rot |= DIRECTION_MASK_RIGHT;
+     if(mask & DIRECTION_MASK_RIGHT) rot |= DIRECTION_MASK_DOWN;
+     if(mask & DIRECTION_MASK_DOWN) rot |= DIRECTION_MASK_LEFT;
 
      return (DirectionMask_t)(rot);
 }
 
 DirectionMask_t direction_mask_flip_horizontal(DirectionMask_t mask){
-     S8 flip = DM_NONE;
+     S8 flip = DIRECTION_MASK_NONE;
 
-     if(mask & DM_LEFT) flip |= DM_RIGHT;
-     if(mask & DM_RIGHT) flip |= DM_LEFT;
+     if(mask & DIRECTION_MASK_LEFT) flip |= DIRECTION_MASK_RIGHT;
+     if(mask & DIRECTION_MASK_RIGHT) flip |= DIRECTION_MASK_LEFT;
 
      // keep the vertical components the same
-     if(mask & DM_UP) flip |= DM_UP;
-     if(mask & DM_DOWN) flip |= DM_DOWN;
+     if(mask & DIRECTION_MASK_UP) flip |= DIRECTION_MASK_UP;
+     if(mask & DIRECTION_MASK_DOWN) flip |= DIRECTION_MASK_DOWN;
 
      return (DirectionMask_t)(flip);
 }
 
 DirectionMask_t direction_mask_flip_vertical(DirectionMask_t mask){
-     S8 flip = DM_NONE;
+     S8 flip = DIRECTION_MASK_NONE;
 
-     if(mask & DM_UP) flip |= DM_DOWN;
-     if(mask & DM_DOWN) flip |= DM_UP;
+     if(mask & DIRECTION_MASK_UP) flip |= DIRECTION_MASK_DOWN;
+     if(mask & DIRECTION_MASK_DOWN) flip |= DIRECTION_MASK_UP;
 
      // keep the horizontal components the same
-     if(mask & DM_LEFT) flip |= DM_LEFT;
-     if(mask & DM_RIGHT) flip |= DM_RIGHT;
+     if(mask & DIRECTION_MASK_LEFT) flip |= DIRECTION_MASK_LEFT;
+     if(mask & DIRECTION_MASK_RIGHT) flip |= DIRECTION_MASK_RIGHT;
 
      return (DirectionMask_t)(flip);
 }
@@ -156,14 +156,14 @@ const char* direction_to_string(Direction_t dir){
      switch(dir){
      default:
           break;
-     CASE_ENUM_RET_STR(DIR_LEFT)
-     CASE_ENUM_RET_STR(DIR_UP)
-     CASE_ENUM_RET_STR(DIR_RIGHT)
-     CASE_ENUM_RET_STR(DIR_DOWN)
-     CASE_ENUM_RET_STR(DIR_COUNT)
+     CASE_ENUM_RET_STR(DIRECTION_LEFT)
+     CASE_ENUM_RET_STR(DIRECTION_UP)
+     CASE_ENUM_RET_STR(DIRECTION_RIGHT)
+     CASE_ENUM_RET_STR(DIRECTION_DOWN)
+     CASE_ENUM_RET_STR(DIRECTION_COUNT)
      }
 
-     return "DIR_UNKNOWN";
+     return "DIRECTION_UNKNOWN";
 }
 
 struct Vec_t{
@@ -263,16 +263,16 @@ Coord_t coord_move(Coord_t c, Direction_t dir, S16 distance){
      default:
           assert(!"invalid direction");
           break;
-     case DIR_LEFT:
+     case DIRECTION_LEFT:
           c.x -= distance;
           break;
-     case DIR_UP:
+     case DIRECTION_UP:
           c.y += distance;
           break;
-     case DIR_RIGHT:
+     case DIRECTION_RIGHT:
           c.x += distance;
           break;
-     case DIR_DOWN:
+     case DIRECTION_DOWN:
           c.y -= distance;
           break;
      }
@@ -549,10 +549,10 @@ DirectionMask_t directions_between(Coord_t a, Coord_t b){
      Coord_t c = b - a;
 
      DirectionMask_t mask {};
-     if(c.x < 0) mask = direction_mask_add(mask, DM_LEFT);
-     if(c.x > 0) mask = direction_mask_add(mask, DM_RIGHT);
-     if(c.y < 0) mask = direction_mask_add(mask, DM_DOWN);
-     if(c.y > 0) mask = direction_mask_add(mask, DM_UP);
+     if(c.x < 0) mask = direction_mask_add(mask, DIRECTION_MASK_LEFT);
+     if(c.x > 0) mask = direction_mask_add(mask, DIRECTION_MASK_RIGHT);
+     if(c.y < 0) mask = direction_mask_add(mask, DIRECTION_MASK_DOWN);
+     if(c.y > 0) mask = direction_mask_add(mask, DIRECTION_MASK_UP);
 
      return mask;
 }
@@ -561,10 +561,10 @@ DirectionMask_t directions_between(Pixel_t a, Pixel_t b){
      Pixel_t c = b - a;
 
      DirectionMask_t mask {};
-     if(c.x < 0) mask = direction_mask_add(mask, DM_LEFT);
-     if(c.x > 0) mask = direction_mask_add(mask, DM_RIGHT);
-     if(c.y < 0) mask = direction_mask_add(mask, DM_DOWN);
-     if(c.y > 0) mask = direction_mask_add(mask, DM_UP);
+     if(c.x < 0) mask = direction_mask_add(mask, DIRECTION_MASK_LEFT);
+     if(c.x > 0) mask = direction_mask_add(mask, DIRECTION_MASK_RIGHT);
+     if(c.y < 0) mask = direction_mask_add(mask, DIRECTION_MASK_DOWN);
+     if(c.y > 0) mask = direction_mask_add(mask, DIRECTION_MASK_UP);
 
      return mask;
 }
@@ -574,27 +574,32 @@ Direction_t relative_quadrant(Pixel_t a, Pixel_t b){
      Pixel_t c = b - a;
 
      if(abs(c.x) > abs(c.y)){
-          if(c.x > 0) return DIR_RIGHT;
-          return DIR_LEFT;
+          if(c.x > 0) return DIRECTION_RIGHT;
+          return DIRECTION_LEFT;
      }
 
-     if(c.y > 0) return DIR_UP;
-     return DIR_DOWN;
+     if(c.y > 0) return DIRECTION_UP;
+     return DIRECTION_DOWN;
 }
 
 enum TileFlag_t{
      TILE_FLAG_ICED = 1,
      TILE_FLAG_CHECKPOINT = 2,
-     TILE_FLAG_WIRE_LEFT = 4,
-     TILE_FLAG_WIRE_UP = 8,
-     TILE_FLAG_WIRE_RIGHT = 16,
-     TILE_FLAG_WIRE_DOWN = 32,
+     TILE_FLAG_RESET_IMMUNE = 4,
+     TILE_FLAG_WIRE_LEFT_OFF = 8,
+     TILE_FLAG_WIRE_UP_OFF = 16,
+     TILE_FLAG_WIRE_RIGHT_OFF = 32,
+     TILE_FLAG_WIRE_DOWN_OFF = 64,
+     TILE_FLAG_WIRE_LEFT_ON = 128,
+     TILE_FLAG_WIRE_UP_ON = 256,
+     TILE_FLAG_WIRE_RIGHT_ON = 512,
+     TILE_FLAG_WIRE_DOWN_ON = 1024,
 };
 
 struct Tile_t{
      U8 id;
      U8 light;
-     U8 flags;
+     U16 flags;
 };
 
 struct TileMap_t{
@@ -774,7 +779,7 @@ Block_t* block_against_another_block(Block_t* block_to_check, Direction_t direct
      switch(direction){
      default:
           break;
-     case DIR_LEFT:
+     case DIRECTION_LEFT:
           for(S16 i = 0; i < block_count; i++){
                if((blocks[i].pos.pixel.x + TILE_SIZE_IN_PIXELS) == block_to_check->pos.pixel.x &&
                   blocks[i].pos.pixel.y >= block_to_check->pos.pixel.y &&
@@ -783,7 +788,7 @@ Block_t* block_against_another_block(Block_t* block_to_check, Direction_t direct
                }
           }
           break;
-     case DIR_RIGHT:
+     case DIRECTION_RIGHT:
           for(S16 i = 0; i < block_count; i++){
                if(blocks[i].pos.pixel.x == (block_to_check->pos.pixel.x + TILE_SIZE_IN_PIXELS) &&
                   blocks[i].pos.pixel.y >= block_to_check->pos.pixel.y &&
@@ -792,7 +797,7 @@ Block_t* block_against_another_block(Block_t* block_to_check, Direction_t direct
                }
           }
           break;
-     case DIR_DOWN:
+     case DIRECTION_DOWN:
           for(S16 i = 0; i < block_count; i++){
                if((blocks[i].pos.pixel.y + TILE_SIZE_IN_PIXELS) == block_to_check->pos.pixel.y &&
                   blocks[i].pos.pixel.x >= block_to_check->pos.pixel.x &&
@@ -801,7 +806,7 @@ Block_t* block_against_another_block(Block_t* block_to_check, Direction_t direct
                }
           }
           break;
-     case DIR_UP:
+     case DIRECTION_UP:
           for(S16 i = 0; i < block_count; i++){
                if(blocks[i].pos.pixel.y == (block_to_check->pos.pixel.y + TILE_SIZE_IN_PIXELS) &&
                   blocks[i].pos.pixel.x >= block_to_check->pos.pixel.x &&
@@ -842,7 +847,7 @@ Tile_t* block_against_solid_tile(Block_t* block_to_check, Direction_t direction,
      switch(direction){
      default:
           break;
-     case DIR_LEFT:
+     case DIRECTION_LEFT:
      {
           Pixel_t tile_pixel = block_to_check->pos.pixel;
           tile_pixel.x--;
@@ -858,7 +863,7 @@ Tile_t* block_against_solid_tile(Block_t* block_to_check, Direction_t direction,
           tile = tilemap_get_tile(tilemap, tile_coord);
           if(tile && tile->id) return tile;
      } break;
-     case DIR_RIGHT:
+     case DIRECTION_RIGHT:
      {
           Pixel_t tile_pixel = block_to_check->pos.pixel;
           tile_pixel.x += TILE_SIZE_IN_PIXELS;
@@ -874,7 +879,7 @@ Tile_t* block_against_solid_tile(Block_t* block_to_check, Direction_t direction,
           tile = tilemap_get_tile(tilemap, tile_coord);
           if(tile && tile->id) return tile;
      } break;
-     case DIR_DOWN:
+     case DIRECTION_DOWN:
      {
           Pixel_t tile_pixel = block_to_check->pos.pixel;
           tile_pixel.y--;
@@ -890,7 +895,7 @@ Tile_t* block_against_solid_tile(Block_t* block_to_check, Direction_t direction,
           tile = tilemap_get_tile(tilemap, tile_coord);
           if(tile && tile->id) return tile;
      } break;
-     case DIR_UP:
+     case DIRECTION_UP:
      {
           Pixel_t tile_pixel = block_to_check->pos.pixel;
           tile_pixel.y += TILE_SIZE_IN_PIXELS;
@@ -926,16 +931,16 @@ void block_push(Block_t* block, Direction_t direction, TileMap_t* tilemap, Block
      switch(direction){
      default:
           break;
-     case DIR_LEFT:
+     case DIRECTION_LEFT:
           block->accel.x = -PLAYER_SPEED * 0.99f;
           break;
-     case DIR_RIGHT:
+     case DIRECTION_RIGHT:
           block->accel.x = PLAYER_SPEED * 0.99f;
           break;
-     case DIR_DOWN:
+     case DIRECTION_DOWN:
           block->accel.y = -PLAYER_SPEED * 0.99f;
           break;
-     case DIR_UP:
+     case DIRECTION_UP:
           block->accel.y = PLAYER_SPEED * 0.99f;
           break;
      }
@@ -1020,6 +1025,107 @@ Vec_t player_frame(S8 x, S8 y){
      return Vec_t{(F32)(x) * PLAYER_FRAME_WIDTH, (F32)(y) * PLAYER_FRAME_HEIGHT};
 }
 
+struct Lift_t{
+     U8 ticks; // start at 1
+     bool up;
+     F32 timer;
+};
+
+void lift_update(Lift_t* lift, float tick_delay, float dt, S8 min_tick, S8 max_tick)
+{
+     lift->timer += dt;
+
+     if(lift->timer > tick_delay){
+          lift->timer -= tick_delay;
+
+          if(lift->up){
+               if(lift->ticks < max_tick) lift->ticks++;
+          }else{
+               if(lift->ticks > min_tick) lift->ticks--;
+          }
+     }
+}
+
+enum InteractiveType_t{
+     INTERACTIVE_TYPE_PRESSURE_PLATE,
+     INTERACTIVE_TYPE_WIRE_CLUSTER,
+     INTERACTIVE_TYPE_LIGHT_DETECTOR,
+     INTERACTIVE_TYPE_ICE_DETECTOR,
+     INTERACTIVE_TYPE_POPUP,
+     INTERACTIVE_TYPE_PIT,
+     INTERACTIVE_TYPE_STAIRS,
+     INTERACTIVE_TYPE_BOW,
+     INTERACTIVE_TYPE_PROMPT,
+     INTERACTIVE_TYPE_LEVER,
+     INTERACTIVE_TYPE_DOOR,
+     INTERACTIVE_TYPE_PORTAL,
+};
+
+enum WireClusterConnection_t : U8{
+     WIRE_CLUSTER_CONNECTION_NONE,
+     WIRE_CLUSTER_CONNECTION_OFF,
+     WIRE_CLUSTER_CONNECTION_ON,
+};
+
+struct PressurePlate_t{
+     bool down;
+     bool iced_under;
+};
+
+struct WireCluster_t{
+     Direction_t facing;
+     WireClusterConnection_t left;
+     WireClusterConnection_t mid;
+     WireClusterConnection_t right;
+};
+
+struct Detector_t{
+     bool on;
+};
+
+struct Popup_t{
+     Lift_t lift;
+     bool iced;
+};
+
+struct Stairs_t{
+     bool up;
+     Direction_t facing;
+};
+
+struct Lever_t{
+     Direction_t activated_from;
+     S8 ticks;
+     F32 timer;
+};
+
+struct Door_t{
+     Lift_t lift;
+     Direction_t face;
+};
+
+struct Portal_t{
+     Direction_t face;
+     bool on;
+};
+
+struct Interactive_t{
+     InteractiveType_t type;
+     Coord_t coord;
+
+     union{
+          PressurePlate_t pressure_plate;
+          WireCluster_t wire_cluster;
+          Detector_t detector;
+          Popup_t popup;
+          Lift_t pit;
+          Stairs_t stairs;
+          Lever_t lever;
+          Door_t door;
+          Portal_t portal;
+     };
+};
+
 using namespace std::chrono;
 
 int main(){
@@ -1067,19 +1173,25 @@ int main(){
      if(player_texture == 0) return 1;
 
      Rect_t rooms[2];
+     {
+          rooms[0].left = 0;
+          rooms[0].bottom = 0;
+          rooms[0].top = 16;
+          rooms[0].right = 16;
 
-     rooms[0].left = 0;
-     rooms[0].bottom = 0;
-     rooms[0].top = 16;
-     rooms[0].right = 16;
-
-     rooms[1].left = 17;
-     rooms[1].bottom = 5;
-     rooms[1].top = 15;
-     rooms[1].right = 27;
+          rooms[1].left = 17;
+          rooms[1].bottom = 5;
+          rooms[1].top = 15;
+          rooms[1].right = 27;
+     }
 
      const int block_count = 3;
      Block_t blocks[block_count];
+     memset(blocks, 0, sizeof(blocks));
+     {
+          blocks[0].pos = coord_to_pos(Coord_t{6, 6});
+          blocks[1].pos = coord_to_pos(Coord_t{6, 2});
+     }
 
      blocks[0].pos = coord_to_pos(Coord_t{6, 6});
      blocks[1].pos = coord_to_pos(Coord_t{6, 2});
@@ -1090,6 +1202,18 @@ int main(){
      blocks[0].accel = vec_zero();
      blocks[1].accel = vec_zero();
      blocks[2].accel = vec_zero();
+
+     const int interactive_count = 3;
+     Interactive_t interactives[interactive_count];
+     memset(interactives, 0, sizeof(interactives));
+     {
+          interactives[0].type = INTERACTIVE_TYPE_LEVER;
+          interactives[0].coord = Coord_t{2, 7};
+          interactives[1].type = INTERACTIVE_TYPE_LEVER;
+          interactives[1].coord = Coord_t{3, 9};
+          interactives[2].type = INTERACTIVE_TYPE_LEVER;
+          interactives[2].coord = Coord_t{1, 1};
+     }
 
      TileMap_t tilemap;
      {
@@ -1168,7 +1292,7 @@ int main(){
      Position_t camera {};
 
      Block_t* last_block_pushed = nullptr;
-     Direction_t last_block_pushed_direction = DIR_LEFT;
+     Direction_t last_block_pushed_direction = DIRECTION_LEFT;
      Block_t* block_to_push = nullptr;
 
      player.radius = 3.5f / 272.0f;
@@ -1201,19 +1325,19 @@ int main(){
                          break;
                     case SDL_SCANCODE_LEFT:
                          left_pressed = true;
-                         player.face = DIR_LEFT;
+                         player.face = DIRECTION_LEFT;
                          break;
                     case SDL_SCANCODE_RIGHT:
                          right_pressed = true;
-                         player.face = DIR_RIGHT;
+                         player.face = DIRECTION_RIGHT;
                          break;
                     case SDL_SCANCODE_UP:
                          up_pressed = true;
-                         player.face = DIR_UP;
+                         player.face = DIRECTION_UP;
                          break;
                     case SDL_SCANCODE_DOWN:
                          down_pressed = true;
-                         player.face = DIR_DOWN;
+                         player.face = DIRECTION_DOWN;
                          break;
                     }
                     break;
@@ -1226,19 +1350,19 @@ int main(){
                          break;
                     case SDL_SCANCODE_LEFT:
                          left_pressed = false;
-                         if(player.face == DIR_LEFT) reface = true;
+                         if(player.face == DIRECTION_LEFT) reface = true;
                          break;
                     case SDL_SCANCODE_RIGHT:
                          right_pressed = false;
-                         if(player.face == DIR_RIGHT) reface = true;
+                         if(player.face == DIRECTION_RIGHT) reface = true;
                          break;
                     case SDL_SCANCODE_UP:
                          up_pressed = false;
-                         if(player.face == DIR_UP) reface = true;
+                         if(player.face == DIRECTION_UP) reface = true;
                          break;
                     case SDL_SCANCODE_DOWN:
                          down_pressed = false;
-                         if(player.face == DIR_DOWN) reface = true;
+                         if(player.face == DIRECTION_DOWN) reface = true;
                          break;
                     }
                     break;
@@ -1249,22 +1373,22 @@ int main(){
 
           if(left_pressed){
                user_movement += Vec_t{-1, 0};
-               if(reface) player.face = DIR_LEFT;
+               if(reface) player.face = DIRECTION_LEFT;
           }
 
           if(right_pressed){
                user_movement += Vec_t{1, 0};
-               if(reface) player.face = DIR_RIGHT;
+               if(reface) player.face = DIRECTION_RIGHT;
           }
 
           if(up_pressed){
                user_movement += Vec_t{0, 1};
-               if(reface) player.face = DIR_UP;
+               if(reface) player.face = DIRECTION_UP;
           }
 
           if(down_pressed){
                user_movement += Vec_t{0, -1};
-               if(reface) player.face = DIR_DOWN;
+               if(reface) player.face = DIRECTION_DOWN;
           }
 
           if(!left_pressed && !right_pressed && !up_pressed && !down_pressed){
@@ -1329,25 +1453,25 @@ int main(){
                     switch(quadrant){
                     default:
                          break;
-                    case DIR_LEFT:
+                    case DIRECTION_LEFT:
                          blocks[i].pos.pixel.x = inside_block->pos.pixel.x + TILE_SIZE_IN_PIXELS;
                          blocks[i].pos.decimal.x = 0.0f;
                          blocks[i].vel.x = 0.0f;
                          blocks[i].accel.x = 0.0f;
                          break;
-                    case DIR_RIGHT:
+                    case DIRECTION_RIGHT:
                          blocks[i].pos.pixel.x = inside_block->pos.pixel.x - TILE_SIZE_IN_PIXELS;
                          blocks[i].pos.decimal.x = 0.0f;
                          blocks[i].vel.x = 0.0f;
                          blocks[i].accel.x = 0.0f;
                          break;
-                    case DIR_DOWN:
+                    case DIRECTION_DOWN:
                          blocks[i].pos.pixel.y = inside_block->pos.pixel.y + TILE_SIZE_IN_PIXELS;
                          blocks[i].pos.decimal.y = 0.0f;
                          blocks[i].vel.y = 0.0f;
                          blocks[i].accel.y = 0.0f;
                          break;
-                    case DIR_UP:
+                    case DIRECTION_UP:
                          blocks[i].pos.pixel.y = inside_block->pos.pixel.y - TILE_SIZE_IN_PIXELS;
                          blocks[i].pos.decimal.y = 0.0f;
                          blocks[i].vel.y = 0.0f;
@@ -1457,31 +1581,31 @@ int main(){
                               switch((U8)(mask)){
                               default:
                                    break;
-                              case DM_LEFT:
+                              case DIRECTION_MASK_LEFT:
                                    pos_delta += collide_circle_with_line(pos_delta, player.radius, bottom_left, top_left, &collide_with_tile);
                                    break;
-                              case DM_RIGHT:
+                              case DIRECTION_MASK_RIGHT:
                                    pos_delta += collide_circle_with_line(pos_delta, player.radius, bottom_right, top_right, &collide_with_tile);
                                    break;
-                              case DM_UP:
+                              case DIRECTION_MASK_UP:
                                    pos_delta += collide_circle_with_line(pos_delta, player.radius, top_left, top_right, &collide_with_tile);
                                    break;
-                              case DM_DOWN:
+                              case DIRECTION_MASK_DOWN:
                                    pos_delta += collide_circle_with_line(pos_delta, player.radius, bottom_left, bottom_right, &collide_with_tile);
                                    break;
-                              case DM_LEFT | DM_UP:
+                              case DIRECTION_MASK_LEFT | DIRECTION_MASK_UP:
                                    pos_delta += collide_circle_with_line(pos_delta, player.radius, bottom_left, top_left, &collide_with_tile);
                                    pos_delta += collide_circle_with_line(pos_delta, player.radius, top_left, top_right, &collide_with_tile);
                                    break;
-                              case DM_LEFT | DM_DOWN:
+                              case DIRECTION_MASK_LEFT | DIRECTION_MASK_DOWN:
                                    pos_delta += collide_circle_with_line(pos_delta, player.radius, bottom_left, top_left, &collide_with_tile);
                                    pos_delta += collide_circle_with_line(pos_delta, player.radius, bottom_left, bottom_right, &collide_with_tile);
                                    break;
-                              case DM_RIGHT | DM_UP:
+                              case DIRECTION_MASK_RIGHT | DIRECTION_MASK_UP:
                                    pos_delta += collide_circle_with_line(pos_delta, player.radius, bottom_right, top_right, &collide_with_tile);
                                    pos_delta += collide_circle_with_line(pos_delta, player.radius, top_left, top_right, &collide_with_tile);
                                    break;
-                              case DM_RIGHT | DM_DOWN:
+                              case DIRECTION_MASK_RIGHT | DIRECTION_MASK_DOWN:
                                    pos_delta += collide_circle_with_line(pos_delta, player.radius, bottom_right, top_right, &collide_with_tile);
                                    pos_delta += collide_circle_with_line(pos_delta, player.radius, bottom_left, bottom_right, &collide_with_tile);
                                    break;
@@ -1575,6 +1699,30 @@ int main(){
           for(U16 i = 0; i < block_count; i++){
                Position_t block_camera_offset = blocks[i].pos - screen_camera;
                pos_vec = pos_to_vec(block_camera_offset);
+               glTexCoord2f(tex_vec.x, tex_vec.y);
+               glVertex2f(pos_vec.x, pos_vec.y);
+               glTexCoord2f(tex_vec.x, tex_vec.y + 2.0f * THEME_FRAME_HEIGHT);
+               glVertex2f(pos_vec.x, pos_vec.y + 2.0f * TILE_SIZE);
+               glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y + 2.0f * THEME_FRAME_HEIGHT);
+               glVertex2f(pos_vec.x + TILE_SIZE, pos_vec.y + 2.0f * TILE_SIZE);
+               glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y);
+               glVertex2f(pos_vec.x + TILE_SIZE, pos_vec.y);
+          }
+          glEnd();
+
+          // interactive
+          glBegin(GL_QUADS);
+          for(U16 i = 0; i < interactive_count; i++){
+               switch(interactives[i].type){
+               default:
+                    break;
+               case INTERACTIVE_TYPE_LEVER:
+                    tex_vec = theme_frame(0, 12);
+                    break;
+               }
+
+               Position_t interactive_camera_offset = coord_to_pos(interactives[i].coord) - screen_camera;
+               pos_vec = pos_to_vec(interactive_camera_offset);
                glTexCoord2f(tex_vec.x, tex_vec.y);
                glVertex2f(pos_vec.x, pos_vec.y);
                glTexCoord2f(tex_vec.x, tex_vec.y + 2.0f * THEME_FRAME_HEIGHT);
