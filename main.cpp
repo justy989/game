@@ -1126,6 +1126,135 @@ struct Interactive_t{
      };
 };
 
+Interactive_t* interactive_get_at(Interactive_t* interactives, U16 interactive_count, Coord_t coord){
+     for(U16 i = 0; i < interactive_count; i++){
+          if(interactives[i].coord == coord){
+               return interactives + i;
+          }
+     }
+
+     return NULL;
+}
+
+void toggle_electricity(TileMap_t* tilemap, Interactive_t* interactives, U16 interactive_count, Coord_t coord, Direction_t direction){
+     Coord_t adjacent_coord = coord + direction;
+     Tile_t* tile = tilemap_get_tile(tilemap, adjacent_coord);
+     if(!tile) return;
+
+     switch(direction){
+     default:
+          return;
+     case DIRECTION_LEFT:
+          if(!(tile->flags & (TILE_FLAG_WIRE_RIGHT_OFF | TILE_FLAG_WIRE_RIGHT_ON))){
+               return;
+          }
+          break;
+     case DIRECTION_RIGHT:
+          if(!(tile->flags & (TILE_FLAG_WIRE_LEFT_OFF | TILE_FLAG_WIRE_LEFT_ON))){
+               return;
+          }
+          break;
+     case DIRECTION_UP:
+          if(!(tile->flags & (TILE_FLAG_WIRE_DOWN_OFF | TILE_FLAG_WIRE_DOWN_ON))){
+               return;
+          }
+          break;
+     case DIRECTION_DOWN:
+          if(!(tile->flags & (TILE_FLAG_WIRE_UP_OFF | TILE_FLAG_WIRE_UP_ON))){
+               return;
+          }
+          break;
+     }
+
+     S16 flags = 0;
+
+     if(tile->flags >= TILE_FLAG_WIRE_LEFT_ON){
+          flags = tile->flags >> 7;
+          S16 new_flags = tile->flags & ~(TILE_FLAG_WIRE_LEFT_ON | TILE_FLAG_WIRE_UP_ON | TILE_FLAG_WIRE_RIGHT_ON | TILE_FLAG_WIRE_DOWN_ON);
+          new_flags |= flags << 3;
+          tile->flags = new_flags;
+     }else if(tile->flags >= TILE_FLAG_WIRE_LEFT_OFF){
+          flags = tile->flags >> 3;
+          S16 new_flags = tile->flags & ~(TILE_FLAG_WIRE_LEFT_OFF | TILE_FLAG_WIRE_UP_OFF | TILE_FLAG_WIRE_RIGHT_OFF | TILE_FLAG_WIRE_DOWN_OFF);
+          new_flags |= flags << 7;
+          tile->flags = new_flags;
+     }
+
+     if(flags & DIRECTION_MASK_LEFT && direction != DIRECTION_RIGHT){
+          toggle_electricity(tilemap, interactives, interactive_count, adjacent_coord, DIRECTION_LEFT);
+     }
+
+     if(flags & DIRECTION_MASK_RIGHT && direction != DIRECTION_LEFT){
+          toggle_electricity(tilemap, interactives, interactive_count, adjacent_coord, DIRECTION_RIGHT);
+     }
+
+     if(flags & DIRECTION_MASK_DOWN && direction != DIRECTION_UP){
+          toggle_electricity(tilemap, interactives, interactive_count, adjacent_coord, DIRECTION_DOWN);
+     }
+
+     if(flags & DIRECTION_MASK_UP && direction != DIRECTION_DOWN){
+          toggle_electricity(tilemap, interactives, interactive_count, adjacent_coord, DIRECTION_UP);
+     }
+}
+
+void activate(TileMap_t* tilemap, Interactive_t* interactives, U16 interactive_count, Coord_t coord){
+     Interactive_t* interactive = interactive_get_at(interactives, interactive_count, coord);
+     if(!interactive) return;
+
+     if(interactive->type != INTERACTIVE_TYPE_LEVER) return;
+
+     toggle_electricity(tilemap, interactives, interactive_count, coord, DIRECTION_LEFT);
+     toggle_electricity(tilemap, interactives, interactive_count, coord, DIRECTION_RIGHT);
+     toggle_electricity(tilemap, interactives, interactive_count, coord, DIRECTION_UP);
+     toggle_electricity(tilemap, interactives, interactive_count, coord, DIRECTION_DOWN);
+}
+
+void player_collide_coord(Position_t player_pos, Coord_t coord, F32 player_radius, Vec_t* pos_delta, bool* collide_with_coord){
+     Coord_t player_coord = pos_to_coord(player_pos);
+     Position_t relative = coord_to_pos(coord) - player_pos;
+     Vec_t bottom_left = pos_to_vec(relative);
+     Vec_t top_left {bottom_left.x, bottom_left.y + TILE_SIZE};
+     Vec_t top_right {bottom_left.x + TILE_SIZE, bottom_left.y + TILE_SIZE};
+     Vec_t bottom_right {bottom_left.x + TILE_SIZE, bottom_left.y};
+
+     DirectionMask_t mask = directions_between(coord, player_coord);
+
+     // TODO: figure out slide when on tile boundaries
+     switch((U8)(mask)){
+     default:
+          break;
+     case DIRECTION_MASK_LEFT:
+          *pos_delta += collide_circle_with_line(*pos_delta, player_radius, bottom_left, top_left, collide_with_coord);
+          break;
+     case DIRECTION_MASK_RIGHT:
+          *pos_delta += collide_circle_with_line(*pos_delta, player_radius, bottom_right, top_right, collide_with_coord);
+          break;
+     case DIRECTION_MASK_UP:
+          *pos_delta += collide_circle_with_line(*pos_delta, player_radius, top_left, top_right, collide_with_coord);
+          break;
+     case DIRECTION_MASK_DOWN:
+          *pos_delta += collide_circle_with_line(*pos_delta, player_radius, bottom_left, bottom_right, collide_with_coord);
+          break;
+     case DIRECTION_MASK_LEFT | DIRECTION_MASK_UP:
+          *pos_delta += collide_circle_with_line(*pos_delta, player_radius, bottom_left, top_left, collide_with_coord);
+          *pos_delta += collide_circle_with_line(*pos_delta, player_radius, top_left, top_right, collide_with_coord);
+          break;
+     case DIRECTION_MASK_LEFT | DIRECTION_MASK_DOWN:
+          *pos_delta += collide_circle_with_line(*pos_delta, player_radius, bottom_left, top_left, collide_with_coord);
+          *pos_delta += collide_circle_with_line(*pos_delta, player_radius, bottom_left, bottom_right, collide_with_coord);
+          break;
+     case DIRECTION_MASK_RIGHT | DIRECTION_MASK_UP:
+          *pos_delta += collide_circle_with_line(*pos_delta, player_radius, bottom_right, top_right, collide_with_coord);
+          *pos_delta += collide_circle_with_line(*pos_delta, player_radius, top_left, top_right, collide_with_coord);
+          break;
+     case DIRECTION_MASK_RIGHT | DIRECTION_MASK_DOWN:
+          *pos_delta += collide_circle_with_line(*pos_delta, player_radius, bottom_right, top_right, collide_with_coord);
+          *pos_delta += collide_circle_with_line(*pos_delta, player_radius, bottom_left, bottom_right, collide_with_coord);
+          break;
+     }
+
+}
+
 using namespace std::chrono;
 
 int main(){
@@ -1185,7 +1314,7 @@ int main(){
           rooms[1].right = 27;
      }
 
-     const int block_count = 3;
+     const U16 block_count = 3;
      Block_t blocks[block_count];
      memset(blocks, 0, sizeof(blocks));
      {
@@ -1203,7 +1332,7 @@ int main(){
      blocks[1].accel = vec_zero();
      blocks[2].accel = vec_zero();
 
-     const int interactive_count = 3;
+     const U16 interactive_count = 3;
      Interactive_t interactives[interactive_count];
      memset(interactives, 0, sizeof(interactives));
      {
@@ -1271,6 +1400,13 @@ int main(){
           tilemap.tiles[8][8].flags |= TILE_FLAG_ICED;
           tilemap.tiles[9][8].flags |= TILE_FLAG_ICED;
           tilemap.tiles[10][8].flags |= TILE_FLAG_ICED;
+
+          tilemap.tiles[10][3].flags |= TILE_FLAG_WIRE_UP_OFF;
+          tilemap.tiles[10][3].flags |= TILE_FLAG_WIRE_DOWN_OFF;
+          tilemap.tiles[11][3].flags |= TILE_FLAG_WIRE_RIGHT_OFF;
+          tilemap.tiles[11][3].flags |= TILE_FLAG_WIRE_DOWN_OFF;
+          tilemap.tiles[11][4].flags |= TILE_FLAG_WIRE_LEFT_OFF;
+          tilemap.tiles[11][4].flags |= TILE_FLAG_WIRE_RIGHT_OFF;
      }
 
      bool quit = false;
@@ -1285,6 +1421,8 @@ int main(){
      bool right_pressed = false;
      bool up_pressed = false;
      bool down_pressed = false;
+     bool activate_pressed = false;
+     bool last_activate_pressed = false;
 
      auto last_time = system_clock::now();
      auto current_time = last_time;
@@ -1308,6 +1446,8 @@ int main(){
 
           last_block_pushed = block_to_push;
           block_to_push = nullptr;
+
+          last_activate_pressed = activate_pressed;
 
           bool reface = false;
 
@@ -1339,6 +1479,9 @@ int main(){
                          down_pressed = true;
                          player.face = DIRECTION_DOWN;
                          break;
+                    case SDL_SCANCODE_E:
+                         activate_pressed = true;
+                         break;
                     }
                     break;
                case SDL_KEYUP:
@@ -1363,6 +1506,9 @@ int main(){
                     case SDL_SCANCODE_DOWN:
                          down_pressed = false;
                          if(player.face == DIRECTION_DOWN) reface = true;
+                         break;
+                    case SDL_SCANCODE_E:
+                         activate_pressed = false;
                          break;
                     }
                     break;
@@ -1389,6 +1535,10 @@ int main(){
           if(down_pressed){
                user_movement += Vec_t{0, -1};
                if(reface) player.face = DIRECTION_DOWN;
+          }
+
+          if(activate_pressed && !last_activate_pressed){
+               activate(&tilemap, interactives, interactive_count, pos_to_coord(player.pos) + player.face);
           }
 
           if(!left_pressed && !right_pressed && !up_pressed && !down_pressed){
@@ -1483,7 +1633,7 @@ int main(){
                          player.push_time = 0.f;
                     }
 
-                    if(block_on_ice(inside_block, &tilemap)){
+                    if(block_on_ice(inside_block, &tilemap) && block_on_ice(blocks + i, &tilemap)){
                          block_push(inside_block, quadrant, &tilemap, blocks, block_count, false);
                     }
                }
@@ -1569,48 +1719,14 @@ int main(){
                     for(S16 x = min.x; x <= max.x; x++){
                          if(tilemap.tiles[y][x].id){
                               Coord_t coord {x, y};
-                              Position_t relative = coord_to_pos(coord) - player.pos;
-                              Vec_t bottom_left = pos_to_vec(relative);
-                              Vec_t top_left {bottom_left.x, bottom_left.y + TILE_SIZE};
-                              Vec_t top_right {bottom_left.x + TILE_SIZE, bottom_left.y + TILE_SIZE};
-                              Vec_t bottom_right {bottom_left.x + TILE_SIZE, bottom_left.y};
-
-                              DirectionMask_t mask = directions_between(coord, player_coord);
-
-                              // TODO: figure out slide when on tile boundaries
-                              switch((U8)(mask)){
-                              default:
-                                   break;
-                              case DIRECTION_MASK_LEFT:
-                                   pos_delta += collide_circle_with_line(pos_delta, player.radius, bottom_left, top_left, &collide_with_tile);
-                                   break;
-                              case DIRECTION_MASK_RIGHT:
-                                   pos_delta += collide_circle_with_line(pos_delta, player.radius, bottom_right, top_right, &collide_with_tile);
-                                   break;
-                              case DIRECTION_MASK_UP:
-                                   pos_delta += collide_circle_with_line(pos_delta, player.radius, top_left, top_right, &collide_with_tile);
-                                   break;
-                              case DIRECTION_MASK_DOWN:
-                                   pos_delta += collide_circle_with_line(pos_delta, player.radius, bottom_left, bottom_right, &collide_with_tile);
-                                   break;
-                              case DIRECTION_MASK_LEFT | DIRECTION_MASK_UP:
-                                   pos_delta += collide_circle_with_line(pos_delta, player.radius, bottom_left, top_left, &collide_with_tile);
-                                   pos_delta += collide_circle_with_line(pos_delta, player.radius, top_left, top_right, &collide_with_tile);
-                                   break;
-                              case DIRECTION_MASK_LEFT | DIRECTION_MASK_DOWN:
-                                   pos_delta += collide_circle_with_line(pos_delta, player.radius, bottom_left, top_left, &collide_with_tile);
-                                   pos_delta += collide_circle_with_line(pos_delta, player.radius, bottom_left, bottom_right, &collide_with_tile);
-                                   break;
-                              case DIRECTION_MASK_RIGHT | DIRECTION_MASK_UP:
-                                   pos_delta += collide_circle_with_line(pos_delta, player.radius, bottom_right, top_right, &collide_with_tile);
-                                   pos_delta += collide_circle_with_line(pos_delta, player.radius, top_left, top_right, &collide_with_tile);
-                                   break;
-                              case DIRECTION_MASK_RIGHT | DIRECTION_MASK_DOWN:
-                                   pos_delta += collide_circle_with_line(pos_delta, player.radius, bottom_right, top_right, &collide_with_tile);
-                                   pos_delta += collide_circle_with_line(pos_delta, player.radius, bottom_left, bottom_right, &collide_with_tile);
-                                   break;
-                              }
+                              player_collide_coord(player.pos, coord, player.radius, &pos_delta, &collide_with_tile);
                          }
+                    }
+               }
+
+               for(U16 i = 0; i < interactive_count; i++){
+                    if(interactives[i].type == INTERACTIVE_TYPE_LEVER){
+                         player_collide_coord(player.pos, interactives[i].coord, player.radius, &pos_delta, &collide_with_tile);
                     }
                }
 
@@ -1672,7 +1788,9 @@ int main(){
           glColor3f(1.0f, 1.0f, 1.0f);
           for(U16 y = min.y; y <= max.y; y++){
                for(U16 x = min.x; x <= max.x; x++){
-                    if(tilemap.tiles[y][x].id){
+                    Tile_t* tile = tilemap.tiles[y] + x;
+
+                    if(tile->id){
                          tex_vec = solid_tex_vec;
                     }else{
                          tex_vec = floor_tex_vec;
@@ -1689,6 +1807,29 @@ int main(){
                     glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y + TILE_SIZE);
                     glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y);
                     glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y);
+
+                    if(tile->flags >= TILE_FLAG_WIRE_LEFT_OFF){
+                         S16 frame_y = 9;
+                         S16 frame_x = 0;
+
+                         if(tile->flags >= TILE_FLAG_WIRE_LEFT_ON){
+                              frame_y++;
+                              frame_x = tile->flags >> 7;
+                         }else{
+                              frame_x = tile->flags >> 3;
+                         }
+
+                         tex_vec = theme_frame(frame_x, frame_y);
+
+                         glTexCoord2f(tex_vec.x, tex_vec.y);
+                         glVertex2f(tile_pos.x, tile_pos.y);
+                         glTexCoord2f(tex_vec.x, tex_vec.y + THEME_FRAME_HEIGHT);
+                         glVertex2f(tile_pos.x, tile_pos.y + TILE_SIZE);
+                         glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y + THEME_FRAME_HEIGHT);
+                         glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y + TILE_SIZE);
+                         glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y);
+                         glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y);
+                    }
                }
           }
           glEnd();
