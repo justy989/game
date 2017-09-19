@@ -843,6 +843,62 @@ Block_t* block_inside_another_block(Block_t* block_to_check, Block_t* blocks, S1
      return nullptr;
 }
 
+bool block_adjacent_pixels_to_check(Block_t* block_to_check, Direction_t direction, Pixel_t* a, Pixel_t* b){
+     switch(direction){
+     default:
+          break;
+     case DIRECTION_LEFT:
+     {
+          // check bottom corner
+          Pixel_t pixel = block_to_check->pos.pixel;
+          pixel.x--;
+          *a = pixel;
+
+          // top corner
+          pixel.y += (TILE_SIZE_IN_PIXELS - 1);
+          *b = pixel;
+          return true;
+     };
+     case DIRECTION_RIGHT:
+     {
+          // check bottom corner
+          Pixel_t pixel = block_to_check->pos.pixel;
+          pixel.x += TILE_SIZE_IN_PIXELS;
+          *a = pixel;
+
+          // check top corner
+          pixel.y += (TILE_SIZE_IN_PIXELS - 1);
+          *b = pixel;
+     };
+     case DIRECTION_DOWN:
+     {
+          // check left corner
+          Pixel_t pixel = block_to_check->pos.pixel;
+          pixel.y--;
+          *a = pixel;
+
+          // check right corner
+          pixel.x += (TILE_SIZE_IN_PIXELS - 1);
+          *b = pixel;
+          return true;
+     };
+     case DIRECTION_UP:
+     {
+          // check left corner
+          Pixel_t pixel = block_to_check->pos.pixel;
+          pixel.y += TILE_SIZE_IN_PIXELS;
+          *a = pixel;
+
+          // check right corner
+          pixel.x += (TILE_SIZE_IN_PIXELS - 1);
+          *b = pixel;
+          return true;
+     };
+     }
+
+     return false;
+}
+
 Tile_t* block_against_solid_tile(Block_t* block_to_check, Direction_t direction, TileMap_t* tilemap){
      switch(direction){
      default:
@@ -916,7 +972,8 @@ Tile_t* block_against_solid_tile(Block_t* block_to_check, Direction_t direction,
      return nullptr;
 }
 
-void block_push(Block_t* block, Direction_t direction, TileMap_t* tilemap, Block_t* blocks, S16 block_count, bool pushed_by_player){
+void block_push(Block_t* block, Direction_t direction, TileMap_t* tilemap, Interactive_t* interactives, S16 interactive_count,
+                Block_t* blocks, S16 block_count, bool pushed_by_player){
      Block_t* against_block = block_against_another_block(block, direction, blocks, block_count);
      if(against_block){
           if(!pushed_by_player && block_on_ice(against_block, tilemap)){
@@ -927,6 +984,7 @@ void block_push(Block_t* block, Direction_t direction, TileMap_t* tilemap, Block
      }
 
      if(block_against_solid_tile(block, direction, tilemap)) return;
+     if(block_against_solid_interactive(block, direction, interactives, interactive_count)) return;
 
      switch(direction){
      default:
@@ -1020,6 +1078,10 @@ Vec_t theme_frame(S16 x, S16 y){
 #define PLAYER_FRAMES_WIDE 4
 #define PLAYER_FRAMES_TALL 32
 
+// new quakelive bot settings
+// bot_thinktime
+// challenge mode
+
 Vec_t player_frame(S8 x, S8 y){
      y = (PLAYER_FRAMES_TALL - 1) - y;
      return Vec_t{(F32)(x) * PLAYER_FRAME_WIDTH, (F32)(y) * PLAYER_FRAME_HEIGHT};
@@ -1045,6 +1107,8 @@ void lift_update(Lift_t* lift, float tick_delay, float dt, S8 min_tick, S8 max_t
           }
      }
 }
+
+#define POPUP_TICK_DELAY 0.1f
 
 enum InteractiveType_t{
      INTERACTIVE_TYPE_PRESSURE_PLATE,
@@ -1140,6 +1204,17 @@ void toggle_electricity(TileMap_t* tilemap, Interactive_t* interactives, U16 int
      Coord_t adjacent_coord = coord + direction;
      Tile_t* tile = tilemap_get_tile(tilemap, adjacent_coord);
      if(!tile) return;
+
+     Interactive_t* interactive = interactive_get_at(interactives, interactive_count, adjacent_coord);
+     if(interactive){
+          switch(interactive->type){
+          default:
+               break;
+          case INTERACTIVE_TYPE_POPUP:
+               interactive->popup.lift.up = !interactive->popup.lift.up;
+               break;
+          }
+     }
 
      switch(direction){
      default:
@@ -1337,11 +1412,14 @@ int main(){
      memset(interactives, 0, sizeof(interactives));
      {
           interactives[0].type = INTERACTIVE_TYPE_LEVER;
-          interactives[0].coord = Coord_t{2, 7};
-          interactives[1].type = INTERACTIVE_TYPE_LEVER;
-          interactives[1].coord = Coord_t{3, 9};
-          interactives[2].type = INTERACTIVE_TYPE_LEVER;
-          interactives[2].coord = Coord_t{1, 1};
+          interactives[0].coord = Coord_t{3, 9};
+          interactives[1].type = INTERACTIVE_TYPE_POPUP;
+          interactives[1].coord = Coord_t{5, 11};
+          interactives[1].popup.lift.ticks = 1;
+          interactives[2].type = INTERACTIVE_TYPE_POPUP;
+          interactives[2].coord = Coord_t{9, 2};
+          interactives[2].popup.lift.ticks = HEIGHT_INTERVAL + 1;
+          interactives[2].popup.lift.up = true;
      }
 
      TileMap_t tilemap;
@@ -1515,6 +1593,14 @@ int main(){
                }
           }
 
+          // update interactives
+          for(S16 i = 0; i < interactive_count; i++){
+               if(interactives[i].type == INTERACTIVE_TYPE_POPUP){
+                    lift_update(&interactives[i].popup.lift, POPUP_TICK_DELAY, dt, 1, HEIGHT_INTERVAL + 1);
+               }
+          }
+
+          // update player
           user_movement = vec_zero();
 
           if(left_pressed){
@@ -1725,7 +1811,8 @@ int main(){
                }
 
                for(U16 i = 0; i < interactive_count; i++){
-                    if(interactives[i].type == INTERACTIVE_TYPE_LEVER){
+                    if(interactives[i].type == INTERACTIVE_TYPE_LEVER ||
+                       (interactives[i].type == INTERACTIVE_TYPE_POPUP && interactives[i].popup.lift.ticks > 1)){
                          player_collide_coord(player.pos, interactives[i].coord, player.radius, &pos_delta, &collide_with_tile);
                     }
                }
@@ -1859,6 +1946,9 @@ int main(){
                     break;
                case INTERACTIVE_TYPE_LEVER:
                     tex_vec = theme_frame(0, 12);
+                    break;
+               case INTERACTIVE_TYPE_POPUP:
+                    tex_vec = theme_frame(interactives[i].popup.lift.ticks - 1, 8);
                     break;
                }
 

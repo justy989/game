@@ -25,3 +25,4 @@
 
 #define ROOM_TILE_SIZE 17
 
+#define HEIGHT_INTERVAL 6
