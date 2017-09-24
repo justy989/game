@@ -869,6 +869,7 @@ bool block_adjacent_pixels_to_check(Block_t* block_to_check, Direction_t directi
           // check top corner
           pixel.y += (TILE_SIZE_IN_PIXELS - 1);
           *b = pixel;
+          return true;
      };
      case DIRECTION_DOWN:
      {
@@ -900,110 +901,22 @@ bool block_adjacent_pixels_to_check(Block_t* block_to_check, Direction_t directi
 }
 
 Tile_t* block_against_solid_tile(Block_t* block_to_check, Direction_t direction, TileMap_t* tilemap){
-     switch(direction){
-     default:
-          break;
-     case DIRECTION_LEFT:
-     {
-          Pixel_t tile_pixel = block_to_check->pos.pixel;
-          tile_pixel.x--;
+     Pixel_t pixel_a;
+     Pixel_t pixel_b;
 
-          // check bottom corner
-          Coord_t tile_coord = pixel_to_coord(tile_pixel);
-          Tile_t* tile = tilemap_get_tile(tilemap, tile_coord);
-          if(tile && tile->id) return tile;
-
-          // check top corner
-          tile_pixel.y += (TILE_SIZE_IN_PIXELS - 1);
-          tile_coord = pixel_to_coord(tile_pixel);
-          tile = tilemap_get_tile(tilemap, tile_coord);
-          if(tile && tile->id) return tile;
-     } break;
-     case DIRECTION_RIGHT:
-     {
-          Pixel_t tile_pixel = block_to_check->pos.pixel;
-          tile_pixel.x += TILE_SIZE_IN_PIXELS;
-
-          // check bottom corner
-          Coord_t tile_coord = pixel_to_coord(tile_pixel);
-          Tile_t* tile = tilemap_get_tile(tilemap, tile_coord);
-          if(tile && tile->id) return tile;
-
-          // check top corner
-          tile_pixel.y += (TILE_SIZE_IN_PIXELS - 1);
-          tile_coord = pixel_to_coord(tile_pixel);
-          tile = tilemap_get_tile(tilemap, tile_coord);
-          if(tile && tile->id) return tile;
-     } break;
-     case DIRECTION_DOWN:
-     {
-          Pixel_t tile_pixel = block_to_check->pos.pixel;
-          tile_pixel.y--;
-
-          // check left corner
-          Coord_t tile_coord = pixel_to_coord(tile_pixel);
-          Tile_t* tile = tilemap_get_tile(tilemap, tile_coord);
-          if(tile && tile->id) return tile;
-
-          // check right corner
-          tile_pixel.x += (TILE_SIZE_IN_PIXELS - 1);
-          tile_coord = pixel_to_coord(tile_pixel);
-          tile = tilemap_get_tile(tilemap, tile_coord);
-          if(tile && tile->id) return tile;
-     } break;
-     case DIRECTION_UP:
-     {
-          Pixel_t tile_pixel = block_to_check->pos.pixel;
-          tile_pixel.y += TILE_SIZE_IN_PIXELS;
-
-          // check left corner
-          Coord_t tile_coord = pixel_to_coord(tile_pixel);
-          Tile_t* tile = tilemap_get_tile(tilemap, tile_coord);
-          if(tile && tile->id) return tile;
-
-          // check right corner
-          tile_pixel.x += (TILE_SIZE_IN_PIXELS - 1);
-          tile_coord = pixel_to_coord(tile_pixel);
-          tile = tilemap_get_tile(tilemap, tile_coord);
-          if(tile && tile->id) return tile;
-     } break;
+     if(!block_adjacent_pixels_to_check(block_to_check, direction, &pixel_a, &pixel_b)){
+          return nullptr;
      }
+
+     Coord_t tile_coord = pixel_to_coord(pixel_a);
+     Tile_t* tile = tilemap_get_tile(tilemap, tile_coord);
+     if(tile && tile->id) return tile;
+
+     tile_coord = pixel_to_coord(pixel_b);
+     tile = tilemap_get_tile(tilemap, tile_coord);
+     if(tile && tile->id) return tile;
 
      return nullptr;
-}
-
-void block_push(Block_t* block, Direction_t direction, TileMap_t* tilemap, Interactive_t* interactives, S16 interactive_count,
-                Block_t* blocks, S16 block_count, bool pushed_by_player){
-     Block_t* against_block = block_against_another_block(block, direction, blocks, block_count);
-     if(against_block){
-          if(!pushed_by_player && block_on_ice(against_block, tilemap)){
-               block_push(against_block, direction, tilemap, blocks, block_count, false);
-          }
-
-          return;
-     }
-
-     if(block_against_solid_tile(block, direction, tilemap)) return;
-     if(block_against_solid_interactive(block, direction, interactives, interactive_count)) return;
-
-     switch(direction){
-     default:
-          break;
-     case DIRECTION_LEFT:
-          block->accel.x = -PLAYER_SPEED * 0.99f;
-          break;
-     case DIRECTION_RIGHT:
-          block->accel.x = PLAYER_SPEED * 0.99f;
-          break;
-     case DIRECTION_DOWN:
-          block->accel.y = -PLAYER_SPEED * 0.99f;
-          break;
-     case DIRECTION_UP:
-          block->accel.y = PLAYER_SPEED * 0.99f;
-          break;
-     }
-
-     block->push_start = block->pos.pixel;
 }
 
 Vec_t collide_circle_with_line(Vec_t circle_center, F32 circle_radius, Vec_t a, Vec_t b, bool* collided){
@@ -1200,6 +1113,11 @@ Interactive_t* interactive_get_at(Interactive_t* interactives, U16 interactive_c
      return NULL;
 }
 
+bool interactive_is_solid(Interactive_t* interactive){
+     return (interactive->type == INTERACTIVE_TYPE_LEVER ||
+             (interactive->type == INTERACTIVE_TYPE_POPUP && interactive->popup.lift.ticks > 1));
+}
+
 void toggle_electricity(TileMap_t* tilemap, Interactive_t* interactives, U16 interactive_count, Coord_t coord, Direction_t direction){
      Coord_t adjacent_coord = coord + direction;
      Tile_t* tile = tilemap_get_tile(tilemap, adjacent_coord);
@@ -1282,6 +1200,61 @@ void activate(TileMap_t* tilemap, Interactive_t* interactives, U16 interactive_c
      toggle_electricity(tilemap, interactives, interactive_count, coord, DIRECTION_RIGHT);
      toggle_electricity(tilemap, interactives, interactive_count, coord, DIRECTION_UP);
      toggle_electricity(tilemap, interactives, interactive_count, coord, DIRECTION_DOWN);
+}
+
+Interactive_t* block_against_solid_interactive(Block_t* block_to_check, Direction_t direction,
+                                               Interactive_t* interactives, S16 interactive_count){
+     Pixel_t pixel_a;
+     Pixel_t pixel_b;
+
+     if(!block_adjacent_pixels_to_check(block_to_check, direction, &pixel_a, &pixel_b)){
+          return nullptr;
+     }
+
+     Coord_t tile_coord = pixel_to_coord(pixel_a);
+     Interactive_t* interactive = interactive_get_at(interactives, interactive_count, tile_coord);
+     if(interactive && interactive_is_solid(interactive)) return interactive;
+
+     tile_coord = pixel_to_coord(pixel_b);
+     interactive = interactive_get_at(interactives, interactive_count, tile_coord);
+     if(interactive && interactive_is_solid(interactive)) return interactive;
+
+     return nullptr;
+}
+
+
+void block_push(Block_t* block, Direction_t direction, TileMap_t* tilemap, Interactive_t* interactives, S16 interactive_count,
+                Block_t* blocks, S16 block_count, bool pushed_by_player){
+     Block_t* against_block = block_against_another_block(block, direction, blocks, block_count);
+     if(against_block){
+          if(!pushed_by_player && block_on_ice(against_block, tilemap)){
+               block_push(against_block, direction, tilemap, interactives, interactive_count, blocks, block_count, false);
+          }
+
+          return;
+     }
+
+     if(block_against_solid_tile(block, direction, tilemap)) return;
+     if(block_against_solid_interactive(block, direction, interactives, interactive_count)) return;
+
+     switch(direction){
+     default:
+          break;
+     case DIRECTION_LEFT:
+          block->accel.x = -PLAYER_SPEED * 0.99f;
+          break;
+     case DIRECTION_RIGHT:
+          block->accel.x = PLAYER_SPEED * 0.99f;
+          break;
+     case DIRECTION_DOWN:
+          block->accel.y = -PLAYER_SPEED * 0.99f;
+          break;
+     case DIRECTION_UP:
+          block->accel.y = PLAYER_SPEED * 0.99f;
+          break;
+     }
+
+     block->push_start = block->pos.pixel;
 }
 
 void player_collide_coord(Position_t player_pos, Coord_t coord, F32 player_radius, Vec_t* pos_delta, bool* collide_with_coord){
@@ -1720,7 +1693,8 @@ int main(){
                     }
 
                     if(block_on_ice(inside_block, &tilemap) && block_on_ice(blocks + i, &tilemap)){
-                         block_push(inside_block, quadrant, &tilemap, blocks, block_count, false);
+                         block_push(inside_block, quadrant, &tilemap, interactives, interactive_count,
+                                    blocks, block_count, false);
                     }
                }
 
@@ -1733,11 +1707,21 @@ int main(){
                     Coord_t check = coord + Coord_t{1, 0};
                     if(tilemap_is_solid(&tilemap, check)){
                          stop_on_boundary_x = true;
+                    }else{
+                         Interactive_t* interactive = interactive_get_at(interactives, interactive_count, check);
+                         if(interactive && interactive_is_solid(interactive)){
+                              stop_on_boundary_x = true;
+                         }
                     }
                }else if(blocks[i].vel.x < 0.0f){
                     Coord_t check = coord + Coord_t{-1, 0};
                     if(tilemap_is_solid(&tilemap, check)){
                          stop_on_boundary_x = true;
+                    }else{
+                         Interactive_t* interactive = interactive_get_at(interactives, interactive_count, check);
+                         if(interactive && interactive_is_solid(interactive)){
+                              stop_on_boundary_x = true;
+                         }
                     }
                }
 
@@ -1745,11 +1729,21 @@ int main(){
                     Coord_t check = coord + Coord_t{0, 1};
                     if(tilemap_is_solid(&tilemap, check)){
                          stop_on_boundary_y = true;
+                    }else{
+                         Interactive_t* interactive = interactive_get_at(interactives, interactive_count, check);
+                         if(interactive && interactive_is_solid(interactive)){
+                              stop_on_boundary_y = true;
+                         }
                     }
                }else if(blocks[i].vel.y < 0.0f){
                     Coord_t check = coord + Coord_t{0, -1};
                     if(tilemap_is_solid(&tilemap, check)){
                          stop_on_boundary_y = true;
+                    }else{
+                         Interactive_t* interactive = interactive_get_at(interactives, interactive_count, check);
+                         if(interactive && interactive_is_solid(interactive)){
+                              stop_on_boundary_y = true;
+                         }
                     }
                }
 
@@ -1811,8 +1805,7 @@ int main(){
                }
 
                for(U16 i = 0; i < interactive_count; i++){
-                    if(interactives[i].type == INTERACTIVE_TYPE_LEVER ||
-                       (interactives[i].type == INTERACTIVE_TYPE_POPUP && interactives[i].popup.lift.ticks > 1)){
+                    if(interactive_is_solid(interactives + i)){
                          player_collide_coord(player.pos, interactives[i].coord, player.radius, &pos_delta, &collide_with_tile);
                     }
                }
@@ -1847,7 +1840,8 @@ int main(){
                if(block_to_push){
                     player.push_time += dt;
                     if(player.push_time > 0.2f){ // TODO: #define
-                         block_push(block_to_push, player.face, &tilemap, blocks, block_count, true);
+                         block_push(block_to_push, player.face, &tilemap, interactives, interactive_count,
+                                    blocks, block_count, true);
                     }
                }else{
                     player.push_time = 0;
