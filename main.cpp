@@ -1034,7 +1034,10 @@ GLuint transparent_texture_from_file(const char* filepath){
      Bitmap_t bitmap = bitmap_load_from_file(filepath);
      if(bitmap.raw.byte_count == 0) return 0;
      AlphaBitmap_t alpha_bitmap = bitmap_to_alpha_bitmap(&bitmap, BitmapPixel_t{255, 0, 255});
-     return create_texture_from_bitmap(&alpha_bitmap);
+     free(bitmap.raw.bytes);
+     GLuint texture_id = create_texture_from_bitmap(&alpha_bitmap);
+     free(alpha_bitmap.pixels);
+     return texture_id;
 }
 
 #define THEME_FRAMES_WIDE 16
