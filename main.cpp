@@ -1461,7 +1461,24 @@ void player_action_perform(PlayerAction_t* player_action, Player_t* player, Play
 
 using namespace std::chrono;
 
-int main(){
+int main(int argc, char** argv){
+     DemoMode_t demo_mode = DEMO_MODE_NONE;
+     const char* demo_filepath = NULL;
+
+     for(int i = 1; i < argc; i++){
+          if(strcmp(argv[i], "-play") == 0){
+               int next = i + 1;
+               if(next >= argc) continue;
+               demo_filepath = argv[next];
+               demo_mode = DEMO_MODE_PLAY;
+          }else if(strcmp(argv[i], "-record") == 0){
+               int next = i + 1;
+               if(next >= argc) continue;
+               demo_filepath = argv[next];
+               demo_mode = DEMO_MODE_RECORD;
+          }
+     }
+
      const char* log_path = "bryte.log";
      if(!Log_t::create(log_path)){
           fprintf(stderr, "failed to create log file: '%s'\n", log_path);
@@ -1636,9 +1653,7 @@ int main(){
      Direction_t last_block_pushed_direction = DIRECTION_LEFT;
      Block_t* block_to_push = nullptr;
 
-     DemoMode_t demo_mode = DEMO_MODE_PLAY;
      FILE* demo_file = NULL;
-     const char* demo_filepath = "test.bd";
      DemoEntry_t demo_entry {};
      switch(demo_mode){
      default:
