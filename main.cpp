@@ -761,6 +761,8 @@ struct Block_t{
      Position_t pos;
      Vec_t accel;
      Vec_t vel;
+     S8 height;
+     F32 fall_time;
      DirectionMask_t force;
      Element_t element;
      Pixel_t push_start;
@@ -1095,7 +1097,6 @@ struct Interactive_t{
           WireCluster_t wire_cluster;
           Detector_t detector;
           Popup_t popup;
-          Lift_t pit;
           Stairs_t stairs;
           Lever_t lever;
           Door_t door;
@@ -1116,6 +1117,11 @@ Interactive_t* interactive_get_at(Interactive_t* interactives, U16 interactive_c
 bool interactive_is_solid(Interactive_t* interactive){
      return (interactive->type == INTERACTIVE_TYPE_LEVER ||
              (interactive->type == INTERACTIVE_TYPE_POPUP && interactive->popup.lift.ticks > 1));
+}
+
+bool interactive_solid_at(Interactive_t* interactives, U16 interactive_count, Coord_t coord){
+     Interactive_t* interactive = interactive_get_at(interactives, interactive_count, coord);
+     return (interactive && interactive_is_solid(interactive));
 }
 
 void toggle_electricity(TileMap_t* tilemap, Interactive_t* interactives, U16 interactive_count, Coord_t coord, Direction_t direction){
@@ -1380,7 +1386,7 @@ int main(){
      blocks[1].accel = vec_zero();
      blocks[2].accel = vec_zero();
 
-     const U16 interactive_count = 3;
+     const U16 interactive_count = 4;
      Interactive_t interactives[interactive_count];
      memset(interactives, 0, sizeof(interactives));
      {
@@ -1393,6 +1399,8 @@ int main(){
           interactives[2].coord = Coord_t{9, 2};
           interactives[2].popup.lift.ticks = HEIGHT_INTERVAL + 1;
           interactives[2].popup.lift.up = true;
+          interactives[3].type = INTERACTIVE_TYPE_PIT;
+          interactives[3].coord = Coord_t{12, 9};
      }
 
      TileMap_t tilemap;
@@ -1708,20 +1716,14 @@ int main(){
                     if(tilemap_is_solid(&tilemap, check)){
                          stop_on_boundary_x = true;
                     }else{
-                         Interactive_t* interactive = interactive_get_at(interactives, interactive_count, check);
-                         if(interactive && interactive_is_solid(interactive)){
-                              stop_on_boundary_x = true;
-                         }
+                         stop_on_boundary_x = interactive_solid_at(interactives, interactive_count, check);
                     }
                }else if(blocks[i].vel.x < 0.0f){
                     Coord_t check = coord + Coord_t{-1, 0};
                     if(tilemap_is_solid(&tilemap, check)){
                          stop_on_boundary_x = true;
                     }else{
-                         Interactive_t* interactive = interactive_get_at(interactives, interactive_count, check);
-                         if(interactive && interactive_is_solid(interactive)){
-                              stop_on_boundary_x = true;
-                         }
+                         stop_on_boundary_x = interactive_solid_at(interactives, interactive_count, check);
                     }
                }
 
@@ -1730,20 +1732,14 @@ int main(){
                     if(tilemap_is_solid(&tilemap, check)){
                          stop_on_boundary_y = true;
                     }else{
-                         Interactive_t* interactive = interactive_get_at(interactives, interactive_count, check);
-                         if(interactive && interactive_is_solid(interactive)){
-                              stop_on_boundary_y = true;
-                         }
+                         stop_on_boundary_y = interactive_solid_at(interactives, interactive_count, check);
                     }
                }else if(blocks[i].vel.y < 0.0f){
                     Coord_t check = coord + Coord_t{0, -1};
                     if(tilemap_is_solid(&tilemap, check)){
                          stop_on_boundary_y = true;
                     }else{
-                         Interactive_t* interactive = interactive_get_at(interactives, interactive_count, check);
-                         if(interactive && interactive_is_solid(interactive)){
-                              stop_on_boundary_y = true;
-                         }
+                         stop_on_boundary_y = interactive_solid_at(interactives, interactive_count, check);
                     }
                }
 
@@ -1770,6 +1766,22 @@ int main(){
                          blocks[i].pos.decimal.y = 0.0f;
                          blocks[i].vel.y = 0.0f;
                          blocks[i].accel.y = 0.0f;
+                    }
+               }
+
+               // if the block is centered on a tile
+               // TODO: should we care about the decimal component of the position ?
+               if(blocks[i].pos.pixel.x % TILE_SIZE_IN_PIXELS == 0 && blocks[i].pos.pixel.y % TILE_SIZE_IN_PIXELS == 0 &&
+                  blocks[i].height > -HEIGHT_INTERVAL){
+                    // check for pit below blow
+                    Interactive_t* interactive = interactive_get_at(interactives, interactive_count, coord);
+                    if(interactive && interactive->type == INTERACTIVE_TYPE_PIT){
+                         // TODO: check if block is holding it up
+                         blocks[i].fall_time += dt;
+                         if(blocks[i].fall_time >= FALL_TIME){
+                              blocks[i].fall_time -= FALL_TIME;
+                              blocks[i].height--;
+                         }
                     }
                }
           }
@@ -1805,7 +1817,7 @@ int main(){
                }
 
                for(U16 i = 0; i < interactive_count; i++){
-                    if(interactive_is_solid(interactives + i)){
+                    if(interactive_is_solid(interactives + i) || interactives[i].type == INTERACTIVE_TYPE_PIT){
                          player_collide_coord(player.pos, interactives[i].coord, player.radius, &pos_delta, &collide_with_tile);
                     }
                }
@@ -1920,6 +1932,7 @@ int main(){
           glBegin(GL_QUADS);
           for(U16 i = 0; i < block_count; i++){
                Position_t block_camera_offset = blocks[i].pos - screen_camera;
+               block_camera_offset.pixel.y += blocks[i].height;
                pos_vec = pos_to_vec(block_camera_offset);
                glTexCoord2f(tex_vec.x, tex_vec.y);
                glVertex2f(pos_vec.x, pos_vec.y);
@@ -1943,6 +1956,9 @@ int main(){
                     break;
                case INTERACTIVE_TYPE_POPUP:
                     tex_vec = theme_frame(interactives[i].popup.lift.ticks - 1, 8);
+                    break;
+               case INTERACTIVE_TYPE_PIT:
+                    tex_vec = theme_frame(15, 8);
                     break;
                }
 
