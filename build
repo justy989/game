@@ -4,5 +4,5 @@ SOURCES=($(ls *.cpp))
 FLAGS='-Wall -Werror -Wshadow -Wextra -std=c++11 -ggdb3 -DDEBUG'
 EXE='game'
 LINK='-lSDL2 -lGL -pthread'
-g++ $FLAGS ${SOURCES[*]} -o $EXE $LINK
+g++ $FLAGS $@ ${SOURCES[*]} -o $EXE $LINK
 

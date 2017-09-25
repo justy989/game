@@ -1367,6 +1367,98 @@ void player_collide_coord(Position_t player_pos, Coord_t coord, F32 player_radiu
 
 }
 
+enum PlayerActionType_t{
+     PLAYER_ACTION_TYPE_MOVE_LEFT_START,
+     PLAYER_ACTION_TYPE_MOVE_LEFT_STOP,
+     PLAYER_ACTION_TYPE_MOVE_UP_START,
+     PLAYER_ACTION_TYPE_MOVE_UP_STOP,
+     PLAYER_ACTION_TYPE_MOVE_RIGHT_START,
+     PLAYER_ACTION_TYPE_MOVE_RIGHT_STOP,
+     PLAYER_ACTION_TYPE_MOVE_DOWN_START,
+     PLAYER_ACTION_TYPE_MOVE_DOWN_STOP,
+     PLAYER_ACTION_TYPE_ACTIVATE_START,
+     PLAYER_ACTION_TYPE_ACTIVATE_STOP,
+     PLAYER_ACTION_TYPE_SHOOT_START,
+     PLAYER_ACTION_TYPE_SHOOT_STOP,
+};
+
+struct PlayerAction_t{
+     bool move_left;
+     bool move_right;
+     bool move_up;
+     bool move_down;
+     bool activate;
+     bool last_activate;
+     bool reface;
+};
+
+enum DemoMode_t{
+     DEMO_MODE_NONE,
+     DEMO_MODE_PLAY,
+     DEMO_MODE_RECORD,
+};
+
+struct DemoEntry_t{
+     S64 frame;
+     PlayerActionType_t player_action_type;
+};
+
+void demo_entry_get(DemoEntry_t* demo_entry, FILE* file){
+     size_t read_count = fread(demo_entry, sizeof(*demo_entry), 1, file);
+     if(read_count != 1) demo_entry->frame = (S64)(-1);
+}
+
+void player_action_perform(PlayerAction_t* player_action, Player_t* player, PlayerActionType_t player_action_type,
+                           DemoMode_t demo_mode, FILE* demo_file, S64 frame_count){
+     switch(player_action_type){
+     default:
+          break;
+     case PLAYER_ACTION_TYPE_MOVE_LEFT_START:
+          player_action->move_left = true;
+          player->face = DIRECTION_LEFT;
+          break;
+     case PLAYER_ACTION_TYPE_MOVE_LEFT_STOP:
+          player_action->move_left = false;
+          if(player->face == DIRECTION_LEFT) player_action->reface = DIRECTION_LEFT;
+          break;
+     case PLAYER_ACTION_TYPE_MOVE_UP_START:
+          player_action->move_up = true;
+          player->face = DIRECTION_UP;
+          break;
+     case PLAYER_ACTION_TYPE_MOVE_UP_STOP:
+          player_action->move_up = false;
+          if(player->face == DIRECTION_UP) player_action->reface = DIRECTION_UP;
+          break;
+     case PLAYER_ACTION_TYPE_MOVE_RIGHT_START:
+          player_action->move_right = true;
+          player->face = DIRECTION_RIGHT;
+          break;
+     case PLAYER_ACTION_TYPE_MOVE_RIGHT_STOP:
+          player_action->move_right = false;
+          if(player->face == DIRECTION_RIGHT) player_action->reface = DIRECTION_RIGHT;
+          break;
+     case PLAYER_ACTION_TYPE_MOVE_DOWN_START:
+          player_action->move_down = true;
+          player->face = DIRECTION_DOWN;
+          break;
+     case PLAYER_ACTION_TYPE_MOVE_DOWN_STOP:
+          player_action->move_down = false;
+          if(player->face == DIRECTION_DOWN) player_action->reface = DIRECTION_DOWN;
+          break;
+     case PLAYER_ACTION_TYPE_ACTIVATE_START:
+          player_action->activate = true;
+          break;
+     case PLAYER_ACTION_TYPE_ACTIVATE_STOP:
+          player_action->activate = false;
+          break;
+     }
+
+     if(demo_mode == DEMO_MODE_RECORD){
+          DemoEntry_t demo_entry {frame_count, player_action_type};
+          fwrite(&demo_entry, sizeof(demo_entry), 1, demo_file);
+     }
+}
+
 using namespace std::chrono;
 
 int main(){
@@ -1531,13 +1623,9 @@ int main(){
      Player_t player {};
      player.pos = coord_to_pos(Coord_t{3, 3});
      player.walk_frame_delta = 1;
+     player.radius = 3.5f / 272.0f;
 
-     bool left_pressed = false;
-     bool right_pressed = false;
-     bool up_pressed = false;
-     bool down_pressed = false;
-     bool activate_pressed = false;
-     bool last_activate_pressed = false;
+     PlayerAction_t player_action {};
 
      auto last_time = system_clock::now();
      auto current_time = last_time;
@@ -1548,23 +1636,63 @@ int main(){
      Direction_t last_block_pushed_direction = DIRECTION_LEFT;
      Block_t* block_to_push = nullptr;
 
-     player.radius = 3.5f / 272.0f;
+     DemoMode_t demo_mode = DEMO_MODE_PLAY;
+     FILE* demo_file = NULL;
+     const char* demo_filepath = "test.bd";
+     DemoEntry_t demo_entry {};
+     switch(demo_mode){
+     default:
+          break;
+     case DEMO_MODE_RECORD:
+          demo_file = fopen(demo_filepath, "w");
+          // TODO: write header
+          break;
+     case DEMO_MODE_PLAY:
+          demo_file = fopen(demo_filepath, "r");
+          // TODO: read header
+          demo_entry_get(&demo_entry, demo_file);
+          break;
+     }
+
+     S64 frame_count = 0;
+
+#ifdef COUNT_FRAMES
+     float time_buildup = 0.0f;
+     S64 last_frame_count = 0;
+#endif
 
      while(!quit){
           current_time = system_clock::now();
           duration<double> elapsed_seconds = current_time - last_time;
           F64 dt = (F64)(elapsed_seconds.count());
 
-          if(dt < 0.0166666f) continue;
+          if(dt < 0.0166666f) continue; // limit 60 fps
+          frame_count++;
+
+#ifdef COUNT_FRAMES
+          time_buildup += dt;
+          if(time_buildup >= 1.0f){
+               LOG("FPS: %ld\n", frame_count, frame_count - last_frame_count);
+               last_frame_count = frame_count;
+               time_buildup -= 1.0f;
+          }
+#endif
 
           last_time = current_time;
 
           last_block_pushed = block_to_push;
           block_to_push = nullptr;
 
-          last_activate_pressed = activate_pressed;
+          player_action.last_activate = player_action.activate;
+          player_action.reface = false;
 
-          bool reface = false;
+          if(demo_mode == DEMO_MODE_PLAY){
+               while(frame_count == demo_entry.frame && !feof(demo_file)){
+                    player_action_perform(&player_action, &player, demo_entry.player_action_type, demo_mode,
+                                          demo_file, frame_count);
+                    demo_entry_get(&demo_entry, demo_file);
+               }
+          }
 
           SDL_Event sdl_event;
           while(SDL_PollEvent(&sdl_event)){
@@ -1579,23 +1707,24 @@ int main(){
                          quit = true;
                          break;
                     case SDL_SCANCODE_LEFT:
-                         left_pressed = true;
-                         player.face = DIRECTION_LEFT;
+                         player_action_perform(&player_action, &player, PLAYER_ACTION_TYPE_MOVE_LEFT_START, demo_mode,
+                                               demo_file, frame_count);
                          break;
                     case SDL_SCANCODE_RIGHT:
-                         right_pressed = true;
-                         player.face = DIRECTION_RIGHT;
+                         player_action_perform(&player_action, &player, PLAYER_ACTION_TYPE_MOVE_RIGHT_START, demo_mode,
+                                               demo_file, frame_count);
                          break;
                     case SDL_SCANCODE_UP:
-                         up_pressed = true;
-                         player.face = DIRECTION_UP;
+                         player_action_perform(&player_action, &player, PLAYER_ACTION_TYPE_MOVE_UP_START, demo_mode,
+                                               demo_file, frame_count);
                          break;
                     case SDL_SCANCODE_DOWN:
-                         down_pressed = true;
-                         player.face = DIRECTION_DOWN;
+                         player_action_perform(&player_action, &player, PLAYER_ACTION_TYPE_MOVE_DOWN_START, demo_mode,
+                                               demo_file, frame_count);
                          break;
                     case SDL_SCANCODE_E:
-                         activate_pressed = true;
+                         player_action_perform(&player_action, &player, PLAYER_ACTION_TYPE_ACTIVATE_START, demo_mode,
+                                               demo_file, frame_count);
                          break;
                     }
                     break;
@@ -1607,23 +1736,24 @@ int main(){
                          quit = true;
                          break;
                     case SDL_SCANCODE_LEFT:
-                         left_pressed = false;
-                         if(player.face == DIRECTION_LEFT) reface = true;
+                         player_action_perform(&player_action, &player, PLAYER_ACTION_TYPE_MOVE_LEFT_STOP, demo_mode,
+                                               demo_file, frame_count);
                          break;
                     case SDL_SCANCODE_RIGHT:
-                         right_pressed = false;
-                         if(player.face == DIRECTION_RIGHT) reface = true;
+                         player_action_perform(&player_action, &player, PLAYER_ACTION_TYPE_MOVE_RIGHT_STOP, demo_mode,
+                                               demo_file, frame_count);
                          break;
                     case SDL_SCANCODE_UP:
-                         up_pressed = false;
-                         if(player.face == DIRECTION_UP) reface = true;
+                         player_action_perform(&player_action, &player, PLAYER_ACTION_TYPE_MOVE_UP_STOP, demo_mode,
+                                               demo_file, frame_count);
                          break;
                     case SDL_SCANCODE_DOWN:
-                         down_pressed = false;
-                         if(player.face == DIRECTION_DOWN) reface = true;
+                         player_action_perform(&player_action, &player, PLAYER_ACTION_TYPE_MOVE_DOWN_STOP, demo_mode,
+                                               demo_file, frame_count);
                          break;
                     case SDL_SCANCODE_E:
-                         activate_pressed = false;
+                         player_action_perform(&player_action, &player, PLAYER_ACTION_TYPE_ACTIVATE_STOP, demo_mode,
+                                               demo_file, frame_count);
                          break;
                     }
                     break;
@@ -1640,31 +1770,31 @@ int main(){
           // update player
           user_movement = vec_zero();
 
-          if(left_pressed){
+          if(player_action.move_left){
                user_movement += Vec_t{-1, 0};
-               if(reface) player.face = DIRECTION_LEFT;
+               if(player_action.reface) player.face = DIRECTION_LEFT;
           }
 
-          if(right_pressed){
+          if(player_action.move_right){
                user_movement += Vec_t{1, 0};
-               if(reface) player.face = DIRECTION_RIGHT;
+               if(player_action.reface) player.face = DIRECTION_RIGHT;
           }
 
-          if(up_pressed){
+          if(player_action.move_up){
                user_movement += Vec_t{0, 1};
-               if(reface) player.face = DIRECTION_UP;
+               if(player_action.reface) player.face = DIRECTION_UP;
           }
 
-          if(down_pressed){
+          if(player_action.move_down){
                user_movement += Vec_t{0, -1};
-               if(reface) player.face = DIRECTION_DOWN;
+               if(player_action.reface) player.face = DIRECTION_DOWN;
           }
 
-          if(activate_pressed && !last_activate_pressed){
+          if(player_action.activate && !player_action.last_activate){
                activate(&tilemap, interactives, interactive_count, pos_to_coord(player.pos) + player.face);
           }
 
-          if(!left_pressed && !right_pressed && !up_pressed && !down_pressed){
+          if(!player_action.move_left && !player_action.move_right && !player_action.move_up && !player_action.move_down){
                player.walk_frame = 1;
           }else{
                player.walk_frame_time += dt;
@@ -2133,6 +2263,8 @@ int main(){
      SDL_GL_DeleteContext(opengl_context);
      SDL_DestroyWindow(window);
      SDL_Quit();
+
+     if(demo_file) fclose(demo_file);
 
      Log_t::destroy();
 
