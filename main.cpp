@@ -765,7 +765,6 @@ struct Block_t{
      Position_t pos;
      Vec_t accel;
      Vec_t vel;
-     S8 height;
      F32 fall_time;
      DirectionMask_t force;
      Element_t element;
@@ -782,14 +781,14 @@ bool block_on_ice(Block_t* block, TileMap_t* tilemap){
 }
 
 bool blocks_at_collidable_height(Block_t* a, Block_t* b){
-     S8 a_top = a->height + HEIGHT_INTERVAL - 1;
-     S8 b_top = b->height + HEIGHT_INTERVAL - 1;
+     S8 a_top = a->pos.z + HEIGHT_INTERVAL - 1;
+     S8 b_top = b->pos.z + HEIGHT_INTERVAL - 1;
 
-     if(a_top >= b->height && a_top <= b_top){
+     if(a_top >= b->pos.z && a_top <= b_top){
           return true;
      }
 
-     if(a->height >= b->height && a->height <= b_top){
+     if(a->pos.z >= b->pos.z && a->pos.z <= b_top){
           return true;
      }
 
@@ -885,9 +884,9 @@ Block_t* block_held_up_by_another_block(Block_t* block_to_check, Block_t* blocks
      Rect_t rect = {block_to_check->pos.pixel.x, block_to_check->pos.pixel.y,
                     (S16)(block_to_check->pos.pixel.x + TILE_SIZE_IN_PIXELS - 1),
                     (S16)(block_to_check->pos.pixel.y + TILE_SIZE_IN_PIXELS - 1)};
-     S8 held_at_height = block_to_check->height - HEIGHT_INTERVAL;
+     S8 held_at_height = block_to_check->pos.z - HEIGHT_INTERVAL;
      for(S16 i = 0; i < block_count; i++){
-          if(blocks + i == block_to_check || blocks[i].height != held_at_height) continue;
+          if(blocks + i == block_to_check || blocks[i].pos.z != held_at_height) continue;
 
           Pixel_t top_left {blocks[i].pos.pixel.x, (S16)(blocks[i].pos.pixel.y + TILE_SIZE_IN_PIXELS - 1)};
           Pixel_t top_right {(S16)(blocks[i].pos.pixel.x + TILE_SIZE_IN_PIXELS - 1), (S16)(blocks[i].pos.pixel.y + TILE_SIZE_IN_PIXELS - 1)};
@@ -1540,21 +1539,23 @@ int main(int argc, char** argv){
 
      const U16 block_count = 3;
      Block_t blocks[block_count];
+     Block_t* sorted_blocks[block_count];
      memset(blocks, 0, sizeof(blocks));
      {
           blocks[0].pos = coord_to_pos(Coord_t{6, 6});
           blocks[1].pos = coord_to_pos(Coord_t{6, 2});
-     }
+          blocks[2].pos = coord_to_pos(Coord_t{8, 8});
+          blocks[0].vel = vec_zero();
+          blocks[1].vel = vec_zero();
+          blocks[2].vel = vec_zero();
+          blocks[0].accel = vec_zero();
+          blocks[1].accel = vec_zero();
+          blocks[2].accel = vec_zero();
 
-     blocks[0].pos = coord_to_pos(Coord_t{6, 6});
-     blocks[1].pos = coord_to_pos(Coord_t{6, 2});
-     blocks[2].pos = coord_to_pos(Coord_t{8, 8});
-     blocks[0].vel = vec_zero();
-     blocks[1].vel = vec_zero();
-     blocks[2].vel = vec_zero();
-     blocks[0].accel = vec_zero();
-     blocks[1].accel = vec_zero();
-     blocks[2].accel = vec_zero();
+          for(U16 i = 0; i < block_count; ++i){
+               sorted_blocks[i] = blocks + i;
+          }
+     }
 
      const U16 interactive_count = 4;
      Interactive_t interactives[interactive_count];
@@ -1980,27 +1981,45 @@ int main(int argc, char** argv){
                Interactive_t* interactive = interactive_get_at(interactives, interactive_count, coord);
                if(interactive){
                     if(interactive->type == INTERACTIVE_TYPE_POPUP){
-                         if(blocks[i].height == interactive->popup.lift.ticks - 2){
-                              blocks[i].height++;
+                         if(blocks[i].pos.z == interactive->popup.lift.ticks - 2){
+                              blocks[i].pos.z++;
                               held_up = true;
-                         }else if(blocks[i].height > (interactive->popup.lift.ticks - 1)){
+                         }else if(blocks[i].pos.z > (interactive->popup.lift.ticks - 1)){
                               blocks[i].fall_time += dt;
                               if(blocks[i].fall_time >= FALL_TIME){
                                    blocks[i].fall_time -= FALL_TIME;
-                                   blocks[i].height--;
+                                   blocks[i].pos.z--;
                               }
                               held_up = true;
-                         }else if(blocks[i].height == (interactive->popup.lift.ticks - 1)){
+                         }else if(blocks[i].pos.z == (interactive->popup.lift.ticks - 1)){
                               held_up = true;
                          }
                     }
                }
 
-               if(!held_up && blocks[i].height > 0){
+               if(!held_up && blocks[i].pos.z > 0){
                     blocks[i].fall_time += dt;
                     if(blocks[i].fall_time >= FALL_TIME){
                          blocks[i].fall_time -= FALL_TIME;
-                         blocks[i].height--;
+                         blocks[i].pos.z--;
+                    }
+               }
+          }
+
+          // sort blocks
+          {
+               // TODO: do we ever need a better sort for this?
+               // bubble sort
+               for(U16 i = 0; i < block_count; ++i){
+                    for(U16 j = 0; j < block_count - i - 1; ++j){
+                         if(sorted_blocks[j]->pos.pixel.y < sorted_blocks[j + 1]->pos.pixel.y ||
+                            (sorted_blocks[j]->pos.pixel.y == sorted_blocks[j + 1]->pos.pixel.y &&
+                             sorted_blocks[j]->pos.z < sorted_blocks[j + 1]->pos.z)){
+                              // swap
+                              Block_t* tmp = sorted_blocks[j];
+                              sorted_blocks[j] = sorted_blocks[j + 1];
+                              sorted_blocks[j + 1] = tmp;
+                         }
                     }
                }
           }
@@ -2023,6 +2042,7 @@ int main(int argc, char** argv){
                Coord_t player_coord = pos_to_coord(player.pos);
                Coord_t min = player_coord - Coord_t{1, 1};
                Coord_t max = player_coord + Coord_t{1, 1};
+               S8 player_top = player.pos.z + 2 * HEIGHT_INTERVAL;
                min = coord_clamp_zero_to_dim(min, tilemap.width - 1, tilemap.height - 1);
                max = coord_clamp_zero_to_dim(max, tilemap.width - 1, tilemap.height - 1);
 
@@ -2036,12 +2056,11 @@ int main(int argc, char** argv){
                }
 
                for(U16 i = 0; i < block_count; i++){
-                    // TODO: handle player walking under a block
-                    if(blocks[i].height <= -HEIGHT_INTERVAL) continue;
+                    if(sorted_blocks[i]->pos.z >= player_top) continue;
 
                     bool collide_with_block = false;
 
-                    Position_t relative = blocks[i].pos - player.pos;
+                    Position_t relative = sorted_blocks[i]->pos - player.pos;
                     Vec_t bottom_left = pos_to_vec(relative);
                     if(vec_magnitude(bottom_left) > (2 * TILE_SIZE)) continue;
 
@@ -2055,13 +2074,12 @@ int main(int argc, char** argv){
                     pos_delta += collide_circle_with_line(pos_delta, player.radius, bottom_right, top_right, &collide_with_block);
 
                     if(collide_with_block){
-                         auto player_quadrant = relative_quadrant(player.pos.pixel, blocks[i].pos.pixel +
+                         auto player_quadrant = relative_quadrant(player.pos.pixel, sorted_blocks[i]->pos.pixel +
                                                                   Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS});
                          if(player_quadrant == player.face &&
                             (user_movement.x != 0.0f || user_movement.y != 0.0f)){ // also check that the player is actually pushing against the block
-                              if(block_to_push == nullptr ||
-                                 (block_to_push->height < blocks[i].height)){ // find the highest block the player is colliding with
-                                   block_to_push = blocks + i;
+                              if(block_to_push == nullptr){
+                                   block_to_push = sorted_blocks[i];
                                    last_block_pushed_direction = player.face;
                               }
                          }
@@ -2079,7 +2097,7 @@ int main(int argc, char** argv){
                     if(player.push_time > BLOCK_PUSH_TIME){
                          block_push(block_to_push, player.face, &tilemap, interactives, interactive_count,
                                     blocks, block_count, true);
-                         if(block_to_push->height > 0) player.push_time = -0.5f;
+                         if(block_to_push->pos.z > 0) player.push_time = -0.5f;
                     }
                }else{
                     player.push_time = 0;
@@ -2158,7 +2176,7 @@ int main(int argc, char** argv){
           glBegin(GL_QUADS);
           for(U16 i = 0; i < block_count; i++){
                Position_t block_camera_offset = blocks[i].pos - screen_camera;
-               block_camera_offset.pixel.y += blocks[i].height;
+               block_camera_offset.pixel.y += blocks[i].pos.z;
                pos_vec = pos_to_vec(block_camera_offset);
                glTexCoord2f(tex_vec.x, tex_vec.y);
                glVertex2f(pos_vec.x, pos_vec.y);
