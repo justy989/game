@@ -28,3 +28,4 @@
 #define HEIGHT_INTERVAL 6
 
 #define FALL_TIME 0.03f
+#define BLOCK_PUSH_TIME 0.25f

@@ -1090,7 +1090,6 @@ enum InteractiveType_t{
      INTERACTIVE_TYPE_LIGHT_DETECTOR,
      INTERACTIVE_TYPE_ICE_DETECTOR,
      INTERACTIVE_TYPE_POPUP,
-     INTERACTIVE_TYPE_PIT,
      INTERACTIVE_TYPE_STAIRS,
      INTERACTIVE_TYPE_BOW,
      INTERACTIVE_TYPE_PROMPT,
@@ -1458,8 +1457,6 @@ int main(){
           interactives[2].coord = Coord_t{9, 2};
           interactives[2].popup.lift.ticks = HEIGHT_INTERVAL + 1;
           interactives[2].popup.lift.up = true;
-          interactives[3].type = INTERACTIVE_TYPE_PIT;
-          interactives[3].coord = Coord_t{12, 9};
      }
 
      TileMap_t tilemap;
@@ -1720,6 +1717,7 @@ int main(){
 
                bool stop_on_boundary_x = false;
                bool stop_on_boundary_y = false;
+               bool held_up = false;
 
                Block_t* inside_block = nullptr;
 
@@ -1756,7 +1754,7 @@ int main(){
                     }
 
                     if(blocks + i == last_block_pushed && quadrant == last_block_pushed_direction){
-                         player.push_time = 0.f;
+                         player.push_time = 0.0f;
                     }
 
                     if(block_on_ice(inside_block, &tilemap) && block_on_ice(blocks + i, &tilemap)){
@@ -1828,20 +1826,33 @@ int main(){
                     }
                }
 
-               // if the block is centered on a tile
+               held_up = block_held_up_by_another_block(blocks + i, blocks, block_count);
+
                // TODO: should we care about the decimal component of the position ?
-               if(blocks[i].pos.pixel.x % TILE_SIZE_IN_PIXELS == 0 && blocks[i].pos.pixel.y % TILE_SIZE_IN_PIXELS == 0 &&
-                  blocks[i].height > -HEIGHT_INTERVAL){
-                    // check for pit below blow
-                    Interactive_t* interactive = interactive_get_at(interactives, interactive_count, coord);
-                    if(interactive && interactive->type == INTERACTIVE_TYPE_PIT){
-                         if(!block_held_up_by_another_block(blocks + i, blocks, block_count)){
+               Interactive_t* interactive = interactive_get_at(interactives, interactive_count, coord);
+               if(interactive){
+                    if(interactive->type == INTERACTIVE_TYPE_POPUP){
+                         if(blocks[i].height == interactive->popup.lift.ticks - 2){
+                              blocks[i].height++;
+                              held_up = true;
+                         }else if(blocks[i].height > (interactive->popup.lift.ticks - 1)){
                               blocks[i].fall_time += dt;
                               if(blocks[i].fall_time >= FALL_TIME){
                                    blocks[i].fall_time -= FALL_TIME;
                                    blocks[i].height--;
                               }
+                              held_up = true;
+                         }else if(blocks[i].height == (interactive->popup.lift.ticks - 1)){
+                              held_up = true;
                          }
+                    }
+               }
+
+               if(!held_up && blocks[i].height > 0){
+                    blocks[i].fall_time += dt;
+                    if(blocks[i].fall_time >= FALL_TIME){
+                         blocks[i].fall_time -= FALL_TIME;
+                         blocks[i].height--;
                     }
                }
           }
@@ -1876,25 +1887,6 @@ int main(){
                     }
                }
 
-               for(U16 i = 0; i < interactive_count; i++){
-                    if(interactive_is_solid(interactives + i)){
-                         player_collide_coord(player.pos, interactives[i].coord, player.radius, &pos_delta, &collide_with_tile);
-                    }else if(interactives[i].type == INTERACTIVE_TYPE_PIT){
-                         bool block_in_pit = false;
-                         Pixel_t coord_pixel = coord_to_pixel(interactives[i].coord);
-                         for(U16 b = 0; b < block_count; b++){
-                              if(blocks[b].pos.pixel == coord_pixel && blocks[b].height == -HEIGHT_INTERVAL){
-                                   block_in_pit = true;
-                                   break;
-                              }
-                         }
-                         if(!block_in_pit){
-                              player_collide_coord(player.pos, interactives[i].coord, player.radius, &pos_delta,
-                                                   &collide_with_tile);
-                         }
-                    }
-               }
-
                for(U16 i = 0; i < block_count; i++){
                     // TODO: handle player walking under a block
                     if(blocks[i].height <= -HEIGHT_INTERVAL) continue;
@@ -1919,17 +1911,27 @@ int main(){
                                                                   Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS});
                          if(player_quadrant == player.face &&
                             (user_movement.x != 0.0f || user_movement.y != 0.0f)){ // also check that the player is actually pushing against the block
-                              block_to_push = blocks + i;
-                              last_block_pushed_direction = player.face;
+                              if(block_to_push == nullptr ||
+                                 (block_to_push->height < blocks[i].height)){ // find the highest block the player is colliding with
+                                   block_to_push = blocks + i;
+                                   last_block_pushed_direction = player.face;
+                              }
                          }
+                    }
+               }
+
+               for(U16 i = 0; i < interactive_count; i++){
+                    if(interactive_is_solid(interactives + i)){
+                         player_collide_coord(player.pos, interactives[i].coord, player.radius, &pos_delta, &collide_with_tile);
                     }
                }
 
                if(block_to_push){
                     player.push_time += dt;
-                    if(player.push_time > 0.2f){ // TODO: #define
+                    if(player.push_time > BLOCK_PUSH_TIME){
                          block_push(block_to_push, player.face, &tilemap, interactives, interactive_count,
                                     blocks, block_count, true);
+                         if(block_to_push->height > 0) player.push_time = -0.5f;
                     }
                }else{
                     player.push_time = 0;
@@ -2032,9 +2034,6 @@ int main(){
                     break;
                case INTERACTIVE_TYPE_POPUP:
                     tex_vec = theme_frame(interactives[i].popup.lift.ticks - 1, 8);
-                    break;
-               case INTERACTIVE_TYPE_PIT:
-                    tex_vec = theme_frame(15, 8);
                     break;
                }
 
