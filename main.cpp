@@ -252,6 +252,10 @@ bool operator!=(Pixel_t& a, Pixel_t b){
      return (a.x != b.x || a.y != b.y);
 }
 
+bool operator==(Pixel_t& a, Pixel_t b){
+     return (a.x == b.x || a.y == b.y);
+}
+
 struct Coord_t{
      S16 x;
      S16 y;
@@ -777,12 +781,31 @@ bool block_on_ice(Block_t* block, TileMap_t* tilemap){
      return tilemap_is_iced(tilemap, block_coord(block));
 }
 
+bool blocks_at_collidable_height(Block_t* a, Block_t* b){
+     S8 a_top = a->height + HEIGHT_INTERVAL - 1;
+     S8 b_top = b->height + HEIGHT_INTERVAL - 1;
+
+     if(a_top >= b->height && a_top <= b_top){
+          return true;
+     }
+
+     if(a->height >= b->height && a->height <= b_top){
+          return true;
+     }
+
+     return false;
+}
+
 Block_t* block_against_another_block(Block_t* block_to_check, Direction_t direction, Block_t* blocks, S16 block_count){
      switch(direction){
      default:
           break;
      case DIRECTION_LEFT:
           for(S16 i = 0; i < block_count; i++){
+               if(!blocks_at_collidable_height(block_to_check, blocks + i)){
+                    continue;
+               }
+
                if((blocks[i].pos.pixel.x + TILE_SIZE_IN_PIXELS) == block_to_check->pos.pixel.x &&
                   blocks[i].pos.pixel.y >= block_to_check->pos.pixel.y &&
                   blocks[i].pos.pixel.y < (block_to_check->pos.pixel.y + TILE_SIZE_IN_PIXELS)){
@@ -792,6 +815,10 @@ Block_t* block_against_another_block(Block_t* block_to_check, Direction_t direct
           break;
      case DIRECTION_RIGHT:
           for(S16 i = 0; i < block_count; i++){
+               if(!blocks_at_collidable_height(block_to_check, blocks + i)){
+                    continue;
+               }
+
                if(blocks[i].pos.pixel.x == (block_to_check->pos.pixel.x + TILE_SIZE_IN_PIXELS) &&
                   blocks[i].pos.pixel.y >= block_to_check->pos.pixel.y &&
                   blocks[i].pos.pixel.y < (block_to_check->pos.pixel.y + TILE_SIZE_IN_PIXELS)){
@@ -801,6 +828,10 @@ Block_t* block_against_another_block(Block_t* block_to_check, Direction_t direct
           break;
      case DIRECTION_DOWN:
           for(S16 i = 0; i < block_count; i++){
+               if(!blocks_at_collidable_height(block_to_check, blocks + i)){
+                    continue;
+               }
+
                if((blocks[i].pos.pixel.y + TILE_SIZE_IN_PIXELS) == block_to_check->pos.pixel.y &&
                   blocks[i].pos.pixel.x >= block_to_check->pos.pixel.x &&
                   blocks[i].pos.pixel.x < (block_to_check->pos.pixel.x + TILE_SIZE_IN_PIXELS)){
@@ -810,6 +841,10 @@ Block_t* block_against_another_block(Block_t* block_to_check, Direction_t direct
           break;
      case DIRECTION_UP:
           for(S16 i = 0; i < block_count; i++){
+               if(!blocks_at_collidable_height(block_to_check, blocks + i)){
+                    continue;
+               }
+
                if(blocks[i].pos.pixel.y == (block_to_check->pos.pixel.y + TILE_SIZE_IN_PIXELS) &&
                   blocks[i].pos.pixel.x >= block_to_check->pos.pixel.x &&
                   blocks[i].pos.pixel.x < (block_to_check->pos.pixel.x + TILE_SIZE_IN_PIXELS)){
@@ -829,6 +864,30 @@ Block_t* block_inside_another_block(Block_t* block_to_check, Block_t* blocks, S1
                     (S16)(block_to_check->pos.pixel.y + TILE_SIZE_IN_PIXELS - 1)};
      for(S16 i = 0; i < block_count; i++){
           if(blocks + i == block_to_check) continue;
+
+          Pixel_t top_left {blocks[i].pos.pixel.x, (S16)(blocks[i].pos.pixel.y + TILE_SIZE_IN_PIXELS - 1)};
+          Pixel_t top_right {(S16)(blocks[i].pos.pixel.x + TILE_SIZE_IN_PIXELS - 1), (S16)(blocks[i].pos.pixel.y + TILE_SIZE_IN_PIXELS - 1)};
+          Pixel_t bottom_right {(S16)(blocks[i].pos.pixel.x + TILE_SIZE_IN_PIXELS - 1), blocks[i].pos.pixel.y};
+
+          if(pixel_in_rect(blocks[i].pos.pixel, rect) ||
+             pixel_in_rect(top_left, rect) ||
+             pixel_in_rect(top_right, rect) ||
+             pixel_in_rect(bottom_right, rect)){
+               return blocks + i;
+          }
+     }
+
+     return nullptr;
+}
+
+Block_t* block_held_up_by_another_block(Block_t* block_to_check, Block_t* blocks, S16 block_count){
+     // TODO: need more complicated function to detect this
+     Rect_t rect = {block_to_check->pos.pixel.x, block_to_check->pos.pixel.y,
+                    (S16)(block_to_check->pos.pixel.x + TILE_SIZE_IN_PIXELS - 1),
+                    (S16)(block_to_check->pos.pixel.y + TILE_SIZE_IN_PIXELS - 1)};
+     S8 held_at_height = block_to_check->height - HEIGHT_INTERVAL;
+     for(S16 i = 0; i < block_count; i++){
+          if(blocks + i == block_to_check || blocks[i].height != held_at_height) continue;
 
           Pixel_t top_left {blocks[i].pos.pixel.x, (S16)(blocks[i].pos.pixel.y + TILE_SIZE_IN_PIXELS - 1)};
           Pixel_t top_right {(S16)(blocks[i].pos.pixel.x + TILE_SIZE_IN_PIXELS - 1), (S16)(blocks[i].pos.pixel.y + TILE_SIZE_IN_PIXELS - 1)};
@@ -1664,7 +1723,7 @@ int main(){
 
                Block_t* inside_block = nullptr;
 
-               while((inside_block = block_inside_another_block(blocks + i, blocks, block_count))){
+               while((inside_block = block_inside_another_block(blocks + i, blocks, block_count)) && blocks_at_collidable_height(blocks + i, inside_block)){
                     auto quadrant = relative_quadrant(blocks[i].pos.pixel, inside_block->pos.pixel);
 
                     switch(quadrant){
@@ -1776,11 +1835,12 @@ int main(){
                     // check for pit below blow
                     Interactive_t* interactive = interactive_get_at(interactives, interactive_count, coord);
                     if(interactive && interactive->type == INTERACTIVE_TYPE_PIT){
-                         // TODO: check if block is holding it up
-                         blocks[i].fall_time += dt;
-                         if(blocks[i].fall_time >= FALL_TIME){
-                              blocks[i].fall_time -= FALL_TIME;
-                              blocks[i].height--;
+                         if(!block_held_up_by_another_block(blocks + i, blocks, block_count)){
+                              blocks[i].fall_time += dt;
+                              if(blocks[i].fall_time >= FALL_TIME){
+                                   blocks[i].fall_time -= FALL_TIME;
+                                   blocks[i].height--;
+                              }
                          }
                     }
                }
@@ -1817,12 +1877,28 @@ int main(){
                }
 
                for(U16 i = 0; i < interactive_count; i++){
-                    if(interactive_is_solid(interactives + i) || interactives[i].type == INTERACTIVE_TYPE_PIT){
+                    if(interactive_is_solid(interactives + i)){
                          player_collide_coord(player.pos, interactives[i].coord, player.radius, &pos_delta, &collide_with_tile);
+                    }else if(interactives[i].type == INTERACTIVE_TYPE_PIT){
+                         bool block_in_pit = false;
+                         Pixel_t coord_pixel = coord_to_pixel(interactives[i].coord);
+                         for(U16 b = 0; b < block_count; b++){
+                              if(blocks[b].pos.pixel == coord_pixel && blocks[b].height == -HEIGHT_INTERVAL){
+                                   block_in_pit = true;
+                                   break;
+                              }
+                         }
+                         if(!block_in_pit){
+                              player_collide_coord(player.pos, interactives[i].coord, player.radius, &pos_delta,
+                                                   &collide_with_tile);
+                         }
                     }
                }
 
                for(U16 i = 0; i < block_count; i++){
+                    // TODO: handle player walking under a block
+                    if(blocks[i].height <= -HEIGHT_INTERVAL) continue;
+
                     bool collide_with_block = false;
 
                     Position_t relative = blocks[i].pos - player.pos;
