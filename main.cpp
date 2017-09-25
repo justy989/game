@@ -771,13 +771,13 @@ struct Block_t{
      Pixel_t push_start;
 };
 
-Coord_t block_coord(Block_t* block){
+Coord_t block_get_coord(Block_t* block){
      Pixel_t center = block->pos.pixel + Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS};
      return pixel_to_coord(center);
 }
 
 bool block_on_ice(Block_t* block, TileMap_t* tilemap){
-     return tilemap_is_iced(tilemap, block_coord(block));
+     return tilemap_is_iced(tilemap, block_get_coord(block));
 }
 
 bool blocks_at_collidable_height(Block_t* a, Block_t* b){
@@ -1092,12 +1092,12 @@ enum InteractiveType_t{
      INTERACTIVE_TYPE_LIGHT_DETECTOR,
      INTERACTIVE_TYPE_ICE_DETECTOR,
      INTERACTIVE_TYPE_POPUP,
-     INTERACTIVE_TYPE_STAIRS,
-     INTERACTIVE_TYPE_BOW,
-     INTERACTIVE_TYPE_PROMPT,
      INTERACTIVE_TYPE_LEVER,
      INTERACTIVE_TYPE_DOOR,
      INTERACTIVE_TYPE_PORTAL,
+     INTERACTIVE_TYPE_BOW,
+     INTERACTIVE_TYPE_STAIRS,
+     INTERACTIVE_TYPE_PROMPT,
 };
 
 enum WireClusterConnection_t : U8{
@@ -1260,7 +1260,8 @@ void activate(TileMap_t* tilemap, Interactive_t* interactives, U16 interactive_c
      Interactive_t* interactive = interactive_get_at(interactives, interactive_count, coord);
      if(!interactive) return;
 
-     if(interactive->type != INTERACTIVE_TYPE_LEVER) return;
+     if(interactive->type != INTERACTIVE_TYPE_LEVER &&
+        interactive->type != INTERACTIVE_TYPE_PRESSURE_PLATE) return;
 
      toggle_electricity(tilemap, interactives, interactive_count, coord, DIRECTION_LEFT);
      toggle_electricity(tilemap, interactives, interactive_count, coord, DIRECTION_RIGHT);
@@ -1570,6 +1571,8 @@ int main(int argc, char** argv){
           interactives[2].coord = Coord_t{9, 2};
           interactives[2].popup.lift.ticks = HEIGHT_INTERVAL + 1;
           interactives[2].popup.lift.up = true;
+          interactives[3].type = INTERACTIVE_TYPE_PRESSURE_PLATE;
+          interactives[3].coord = Coord_t{3, 6};
      }
 
      TileMap_t tilemap;
@@ -1635,6 +1638,27 @@ int main(int argc, char** argv){
           tilemap.tiles[11][3].flags |= TILE_FLAG_WIRE_DOWN_OFF;
           tilemap.tiles[11][4].flags |= TILE_FLAG_WIRE_LEFT_OFF;
           tilemap.tiles[11][4].flags |= TILE_FLAG_WIRE_RIGHT_OFF;
+
+          tilemap.tiles[5][3].flags |= TILE_FLAG_WIRE_UP_OFF;
+          tilemap.tiles[5][3].flags |= TILE_FLAG_WIRE_DOWN_OFF;
+          tilemap.tiles[4][3].flags |= TILE_FLAG_WIRE_UP_OFF;
+          tilemap.tiles[4][3].flags |= TILE_FLAG_WIRE_DOWN_OFF;
+          tilemap.tiles[3][3].flags |= TILE_FLAG_WIRE_UP_OFF;
+          tilemap.tiles[3][3].flags |= TILE_FLAG_WIRE_DOWN_OFF;
+
+          tilemap.tiles[2][3].flags |= TILE_FLAG_WIRE_UP_OFF;
+          tilemap.tiles[2][3].flags |= TILE_FLAG_WIRE_RIGHT_OFF;
+
+          tilemap.tiles[2][4].flags |= TILE_FLAG_WIRE_LEFT_OFF;
+          tilemap.tiles[2][4].flags |= TILE_FLAG_WIRE_RIGHT_OFF;
+          tilemap.tiles[2][5].flags |= TILE_FLAG_WIRE_LEFT_OFF;
+          tilemap.tiles[2][5].flags |= TILE_FLAG_WIRE_RIGHT_OFF;
+          tilemap.tiles[2][6].flags |= TILE_FLAG_WIRE_LEFT_OFF;
+          tilemap.tiles[2][6].flags |= TILE_FLAG_WIRE_RIGHT_OFF;
+          tilemap.tiles[2][7].flags |= TILE_FLAG_WIRE_LEFT_OFF;
+          tilemap.tiles[2][7].flags |= TILE_FLAG_WIRE_RIGHT_OFF;
+          tilemap.tiles[2][8].flags |= TILE_FLAG_WIRE_LEFT_OFF;
+          tilemap.tiles[2][8].flags |= TILE_FLAG_WIRE_RIGHT_OFF;
      }
 
      bool quit = false;
@@ -1783,6 +1807,25 @@ int main(int argc, char** argv){
           for(S16 i = 0; i < interactive_count; i++){
                if(interactives[i].type == INTERACTIVE_TYPE_POPUP){
                     lift_update(&interactives[i].popup.lift, POPUP_TICK_DELAY, dt, 1, HEIGHT_INTERVAL + 1);
+               }else if(interactives[i].type == INTERACTIVE_TYPE_PRESSURE_PLATE){
+                    bool should_be_down = false;
+                    Coord_t player_coord = pos_to_coord(player.pos);
+                    if(interactives[i].coord == player_coord){
+                         should_be_down = true;
+                    }else{
+                         for(U16 b = 0; b < block_count; b++){
+                              Coord_t block_coord = block_get_coord(blocks + b);
+                              if(interactives[i].coord == block_coord){
+                                   should_be_down = true;
+                                   break;
+                              }
+                         }
+                    }
+
+                    if(should_be_down != interactives[i].pressure_plate.down){
+                         activate(&tilemap, interactives, interactive_count, interactives[i].coord);
+                         interactives[i].pressure_plate.down = should_be_down;
+                    }
                }
           }
 
@@ -2195,6 +2238,12 @@ int main(int argc, char** argv){
                switch(interactives[i].type){
                default:
                     break;
+               case INTERACTIVE_TYPE_PRESSURE_PLATE:
+               {
+                    int frame_x = 7;
+                    if(interactives[i].pressure_plate.down) frame_x++;
+                    tex_vec = theme_frame(frame_x, 8);
+               } break;
                case INTERACTIVE_TYPE_LEVER:
                     tex_vec = theme_frame(0, 12);
                     break;
