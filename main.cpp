@@ -640,6 +640,30 @@ void player_collide_coord(Position_t player_pos, Coord_t coord, F32 player_radiu
 
 }
 
+struct InteractiveQuadTreeBounds_t{
+     Coord_t min;
+     Coord_t max;
+};
+
+bool interactive_quad_tree_bounds_contains(const InteractiveQuadTreeBounds_t* bounds, Coord_t coord){
+     return (coord.x >= bounds->min.x && coord.x <= bounds->max.x &&
+             coord.y >= bounds->min.y && coord.y <= bounds->max.y);
+}
+
+#define INTERACTIVE_QUAD_TREE_NODE_ENTRY_COUNT 4
+
+struct InteractiveQuadTreeNode_t{
+     Interactive_t* entries[INTERACTIVE_QUAD_TREE_NODE_ENTRY_COUNT];
+     int entry_count;
+
+     InteractiveQuadTreeBounds_t bounds;
+
+     InteractiveQuadTreeNode_t* bottom_left;
+     InteractiveQuadTreeNode_t* bottom_right;
+     InteractiveQuadTreeNode_t* top_left;
+     InteractiveQuadTreeNode_t* top_right;
+};
+
 enum PlayerActionType_t{
      PLAYER_ACTION_TYPE_MOVE_LEFT_START,
      PLAYER_ACTION_TYPE_MOVE_LEFT_STOP,
