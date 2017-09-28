@@ -877,6 +877,28 @@ void player_action_perform(PlayerAction_t* player_action, Player_t* player, Play
      }
 }
 
+#define MAP_VERSION 1
+
+bool save_map(const TileMap_t* tilemap, Block_t* blocks, U16 block_count, Interactive_t* interactives,
+              U16 interactive_count, const char* filepath){
+     FILE* f = fopen(filepath, "wb");
+     if(!f){
+          LOG("%s: fopen() failed\n", __FUNCTION__);
+          return false;
+     }
+     U8 map_version = MAP_VERSION;
+     fwrite(&map_version, sizeof(map_version), 1, f);
+     fwrite(&tilemap->width, sizeof(tilemap->width), 1, f);
+     fwrite(&tilemap->height, sizeof(tilemap->height), 1, f);
+     for(S16 i = 0; i < tilemap->height; i++){
+          fwrite(tilemap->tiles[i], sizeof(tilemap->tiles[i][0]), tilemap->width, f);
+     }
+     fwrite(blocks, sizeof(*blocks), block_count, f);
+     fwrite(interactives, sizeof(*interactives), interactive_count, f);
+     fclose(f);
+     return true;
+}
+
 using namespace std::chrono;
 
 int main(int argc, char** argv){
@@ -1545,9 +1567,12 @@ int main(int argc, char** argv){
                     }
                }
 
-               for(U16 i = 0; i < interactive_count; i++){
-                    if(interactive_is_solid(interactives + i)){
-                         player_collide_coord(player.pos, interactives[i].coord, player.radius, &pos_delta, &collide_with_tile);
+               for(S16 y = min.y; y <= max.y; y++){
+                    for(S16 x = min.x; x <= max.x; x++){
+                         Coord_t coord {x, y};
+                         if(interactive_quad_tree_solid_at(interactive_quad_tree, coord)){
+                              player_collide_coord(player.pos, coord, player.radius, &pos_delta, &collide_with_tile);
+                         }
                     }
                }
 
@@ -1755,6 +1780,7 @@ int main(int argc, char** argv){
           SDL_GL_SwapWindow(window);
      }
 
+     save_map(&tilemap, blocks, block_count, interactives, interactive_count, "first.bm");
      interactive_quad_tree_free(interactive_quad_tree);
 
      destroy(&tilemap);
