@@ -454,12 +454,164 @@ bool interactive_solid_at(Interactive_t* interactives, U16 interactive_count, Co
      return (interactive && interactive_is_solid(interactive));
 }
 
-void toggle_electricity(TileMap_t* tilemap, Interactive_t* interactives, U16 interactive_count, Coord_t coord, Direction_t direction){
+struct InteractiveQuadTreeBounds_t{
+     Coord_t min;
+     Coord_t max;
+};
+
+bool interactive_quad_tree_bounds_contains(const InteractiveQuadTreeBounds_t* bounds, Coord_t coord){
+     return (coord.x >= bounds->min.x && coord.x <= bounds->max.x &&
+             coord.y >= bounds->min.y && coord.y <= bounds->max.y);
+}
+
+#define INTERACTIVE_QUAD_TREE_NODE_ENTRY_COUNT 4
+
+struct InteractiveQuadTreeNode_t{
+     Interactive_t* entries[INTERACTIVE_QUAD_TREE_NODE_ENTRY_COUNT];
+     S8 entry_count;
+
+     InteractiveQuadTreeBounds_t bounds;
+
+     InteractiveQuadTreeNode_t* bottom_left;
+     InteractiveQuadTreeNode_t* bottom_right;
+     InteractiveQuadTreeNode_t* top_left;
+     InteractiveQuadTreeNode_t* top_right;
+};
+
+bool interactive_quad_tree_insert(InteractiveQuadTreeNode_t* node, Interactive_t* interactive);
+
+bool interactive_quad_tree_subdivide(InteractiveQuadTreeNode_t* node){
+     node->bottom_left = (InteractiveQuadTreeNode_t*)(calloc(1, sizeof(*node)));
+     if(!node->bottom_left) return false;
+
+     node->bottom_right = (InteractiveQuadTreeNode_t*)(calloc(1, sizeof(*node)));
+     if(!node->bottom_right) return false;
+
+     node->top_left = (InteractiveQuadTreeNode_t*)(calloc(1, sizeof(*node)));
+     if(!node->top_left) return false;
+
+     node->top_right = (InteractiveQuadTreeNode_t*)(calloc(1, sizeof(*node)));
+     if(!node->top_right) return false;
+
+     int half_width = (node->bounds.max.x - node->bounds.min.x) / 2;
+     int half_height = (node->bounds.max.y - node->bounds.min.y) / 2;
+
+     node->bottom_left->bounds.min.x = node->bounds.min.x;
+     node->bottom_left->bounds.max.x = node->bounds.min.x + half_width;
+     node->bottom_left->bounds.min.y = node->bounds.min.y;
+     node->bottom_left->bounds.max.y = node->bounds.min.y + half_height;
+
+     node->bottom_right->bounds.min.x = node->bottom_left->bounds.max.x + 1;
+     node->bottom_right->bounds.max.x = node->bounds.max.x;
+     node->bottom_right->bounds.min.y = node->bounds.min.y;
+     node->bottom_right->bounds.max.y = node->bounds.min.y + half_height;
+
+     node->top_left->bounds.min.x = node->bounds.min.x;
+     node->top_left->bounds.max.x = node->bounds.min.x + half_width;
+     node->top_left->bounds.min.y = node->bottom_left->bounds.max.y + 1;
+     node->top_left->bounds.max.y = node->bounds.max.y;
+
+     node->top_right->bounds.min.x = node->bottom_right->bounds.min.x;
+     node->top_right->bounds.max.x = node->bottom_right->bounds.max.x;
+     node->top_right->bounds.min.y = node->bottom_left->bounds.max.y + 1;
+     node->top_right->bounds.max.y = node->bounds.max.y;
+
+     for(S8 i = 0; i < node->entry_count; i++){
+          if(interactive_quad_tree_insert(node->bottom_left, node->entries[i])) continue;
+          if(interactive_quad_tree_insert(node->bottom_right, node->entries[i])) continue;
+          if(interactive_quad_tree_insert(node->top_left, node->entries[i])) continue;
+          if(interactive_quad_tree_insert(node->top_right, node->entries[i])) continue;
+     }
+
+     node->entry_count = 0;
+     return true;
+}
+
+bool interactive_quad_tree_insert(InteractiveQuadTreeNode_t* node, Interactive_t* interactive){
+     if(!interactive_quad_tree_bounds_contains(&node->bounds, interactive->coord)) return false;
+
+     if(node->entry_count == 0 && node->bottom_left){
+          // pass if the node is empty and has been subdivided
+     }else{
+          if(node->entry_count < INTERACTIVE_QUAD_TREE_NODE_ENTRY_COUNT){
+               node->entries[node->entry_count] = interactive;
+               node->entry_count++;
+               return true;
+          }
+     }
+
+     if(!node->bottom_left){
+          if(!interactive_quad_tree_subdivide(node)) return false; // nomem
+     }
+
+     if(interactive_quad_tree_insert(node->bottom_left, interactive)) return true;
+     if(interactive_quad_tree_insert(node->bottom_right, interactive)) return true;
+     if(interactive_quad_tree_insert(node->top_left, interactive)) return true;
+     if(interactive_quad_tree_insert(node->top_right, interactive)) return true;
+
+     return false;
+}
+
+InteractiveQuadTreeNode_t* interactive_quad_tree_build(Interactive_t* interactives, int interactive_count){
+     if(interactive_count == 0) return nullptr;
+
+     InteractiveQuadTreeNode_t* root = (InteractiveQuadTreeNode_t*)(calloc(1, sizeof(*root)));
+     root->bounds.min.x = interactives[0].coord.x;
+     root->bounds.max.x = interactives[0].coord.x;
+     root->bounds.min.y = interactives[0].coord.y;
+     root->bounds.max.y = interactives[0].coord.y;
+
+     // find mins/maxs for dimensions
+     for(int i = 0; i < interactive_count; i++){
+          if(root->bounds.min.x > interactives[i].coord.x) root->bounds.min.x = interactives[i].coord.x;
+          if(root->bounds.max.x < interactives[i].coord.x) root->bounds.max.x = interactives[i].coord.x;
+          if(root->bounds.min.y > interactives[i].coord.y) root->bounds.min.y = interactives[i].coord.y;
+          if(root->bounds.max.y < interactives[i].coord.y) root->bounds.max.y = interactives[i].coord.y;
+     }
+
+     // insert coords
+     for(int i = 0; i < interactive_count; i++){
+          if(!interactive_quad_tree_insert(root, interactives + i)) break;
+     }
+
+     return root;
+}
+
+Interactive_t* interactive_quad_tree_find_at(const InteractiveQuadTreeNode_t* node, Coord_t coord){
+     if(!interactive_quad_tree_bounds_contains(&node->bounds, coord)) return nullptr;
+
+     for(S8 i = 0; i < node->entry_count; i++){
+          if(node->entries[i]->coord == coord) return node->entries[i];
+     }
+
+     if(node->bottom_left){
+          Interactive_t* result = interactive_quad_tree_find_at(node->bottom_left, coord);
+          if(result) return result;
+          result = interactive_quad_tree_find_at(node->bottom_right, coord);
+          if(result) return result;
+          result = interactive_quad_tree_find_at(node->top_left, coord);
+          if(result) return result;
+          result = interactive_quad_tree_find_at(node->top_right, coord);
+          if(result) return result;
+     }
+
+     return nullptr;
+}
+
+void interactive_quad_tree_free(InteractiveQuadTreeNode_t* root){
+     if(root->top_left) interactive_quad_tree_free(root->top_left);
+     if(root->top_right) interactive_quad_tree_free(root->top_right);
+     if(root->bottom_left) interactive_quad_tree_free(root->bottom_left);
+     if(root->bottom_right) interactive_quad_tree_free(root->bottom_right);
+     free(root);
+}
+
+void toggle_electricity(TileMap_t* tilemap, InteractiveQuadTreeNode_t* interactive_quad_tree,  Coord_t coord, Direction_t direction){
      Coord_t adjacent_coord = coord + direction;
      Tile_t* tile = tilemap_get_tile(tilemap, adjacent_coord);
      if(!tile) return;
 
-     Interactive_t* interactive = interactive_get_at(interactives, interactive_count, adjacent_coord);
+     Interactive_t* interactive = interactive_quad_tree_find_at(interactive_quad_tree, adjacent_coord);
      if(interactive){
           switch(interactive->type){
           default:
@@ -510,33 +662,33 @@ void toggle_electricity(TileMap_t* tilemap, Interactive_t* interactives, U16 int
      }
 
      if(flags & DIRECTION_MASK_LEFT && direction != DIRECTION_RIGHT){
-          toggle_electricity(tilemap, interactives, interactive_count, adjacent_coord, DIRECTION_LEFT);
+          toggle_electricity(tilemap, interactive_quad_tree, adjacent_coord, DIRECTION_LEFT);
      }
 
      if(flags & DIRECTION_MASK_RIGHT && direction != DIRECTION_LEFT){
-          toggle_electricity(tilemap, interactives, interactive_count, adjacent_coord, DIRECTION_RIGHT);
+          toggle_electricity(tilemap, interactive_quad_tree, adjacent_coord, DIRECTION_RIGHT);
      }
 
      if(flags & DIRECTION_MASK_DOWN && direction != DIRECTION_UP){
-          toggle_electricity(tilemap, interactives, interactive_count, adjacent_coord, DIRECTION_DOWN);
+          toggle_electricity(tilemap, interactive_quad_tree, adjacent_coord, DIRECTION_DOWN);
      }
 
      if(flags & DIRECTION_MASK_UP && direction != DIRECTION_DOWN){
-          toggle_electricity(tilemap, interactives, interactive_count, adjacent_coord, DIRECTION_UP);
+          toggle_electricity(tilemap, interactive_quad_tree, adjacent_coord, DIRECTION_UP);
      }
 }
 
-void activate(TileMap_t* tilemap, Interactive_t* interactives, U16 interactive_count, Coord_t coord){
-     Interactive_t* interactive = interactive_get_at(interactives, interactive_count, coord);
+void activate(TileMap_t* tilemap, InteractiveQuadTreeNode_t* interactive_quad_tree, Coord_t coord){
+     Interactive_t* interactive = interactive_quad_tree_find_at(interactive_quad_tree, coord);
      if(!interactive) return;
 
      if(interactive->type != INTERACTIVE_TYPE_LEVER &&
         interactive->type != INTERACTIVE_TYPE_PRESSURE_PLATE) return;
 
-     toggle_electricity(tilemap, interactives, interactive_count, coord, DIRECTION_LEFT);
-     toggle_electricity(tilemap, interactives, interactive_count, coord, DIRECTION_RIGHT);
-     toggle_electricity(tilemap, interactives, interactive_count, coord, DIRECTION_UP);
-     toggle_electricity(tilemap, interactives, interactive_count, coord, DIRECTION_DOWN);
+     toggle_electricity(tilemap, interactive_quad_tree, coord, DIRECTION_LEFT);
+     toggle_electricity(tilemap, interactive_quad_tree, coord, DIRECTION_RIGHT);
+     toggle_electricity(tilemap, interactive_quad_tree, coord, DIRECTION_UP);
+     toggle_electricity(tilemap, interactive_quad_tree, coord, DIRECTION_DOWN);
 }
 
 Interactive_t* block_against_solid_interactive(Block_t* block_to_check, Direction_t direction,
@@ -639,31 +791,6 @@ void player_collide_coord(Position_t player_pos, Coord_t coord, F32 player_radiu
      }
 
 }
-
-struct InteractiveQuadTreeBounds_t{
-     Coord_t min;
-     Coord_t max;
-};
-
-bool interactive_quad_tree_bounds_contains(const InteractiveQuadTreeBounds_t* bounds, Coord_t coord){
-     return (coord.x >= bounds->min.x && coord.x <= bounds->max.x &&
-             coord.y >= bounds->min.y && coord.y <= bounds->max.y);
-}
-
-#define INTERACTIVE_QUAD_TREE_NODE_ENTRY_COUNT 4
-
-struct InteractiveQuadTreeNode_t{
-     Interactive_t* entries[INTERACTIVE_QUAD_TREE_NODE_ENTRY_COUNT];
-     int entry_count;
-
-     InteractiveQuadTreeBounds_t bounds;
-
-     InteractiveQuadTreeNode_t* bottom_left;
-     InteractiveQuadTreeNode_t* bottom_right;
-     InteractiveQuadTreeNode_t* top_left;
-     InteractiveQuadTreeNode_t* top_right;
-};
-
 enum PlayerActionType_t{
      PLAYER_ACTION_TYPE_MOVE_LEFT_START,
      PLAYER_ACTION_TYPE_MOVE_LEFT_STOP,
@@ -868,6 +995,8 @@ int main(int argc, char** argv){
           interactives[3].type = INTERACTIVE_TYPE_PRESSURE_PLATE;
           interactives[3].coord = Coord_t{3, 6};
      }
+
+     auto* interactive_quad_tree = interactive_quad_tree_build(interactives, interactive_count);
 
      TileMap_t tilemap;
      {
@@ -1117,7 +1246,7 @@ int main(int argc, char** argv){
                     }
 
                     if(should_be_down != interactives[i].pressure_plate.down){
-                         activate(&tilemap, interactives, interactive_count, interactives[i].coord);
+                         activate(&tilemap, interactive_quad_tree, interactives[i].coord);
                          interactives[i].pressure_plate.down = should_be_down;
                     }
                }
@@ -1147,7 +1276,7 @@ int main(int argc, char** argv){
           }
 
           if(player_action.activate && !player_action.last_activate){
-               activate(&tilemap, interactives, interactive_count, pos_to_coord(player.pos) + player.face);
+               activate(&tilemap, interactive_quad_tree, pos_to_coord(player.pos) + player.face);
           }
 
           if(!player_action.move_left && !player_action.move_right && !player_action.move_up && !player_action.move_down){
@@ -1633,6 +1762,8 @@ int main(int argc, char** argv){
 
           SDL_GL_SwapWindow(window);
      }
+
+     interactive_quad_tree_free(interactive_quad_tree);
 
      destroy(&tilemap);
 
