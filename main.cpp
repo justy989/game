@@ -434,24 +434,9 @@ struct Interactive_t{
      };
 };
 
-Interactive_t* interactive_get_at(Interactive_t* interactives, U16 interactive_count, Coord_t coord){
-     for(U16 i = 0; i < interactive_count; i++){
-          if(interactives[i].coord == coord){
-               return interactives + i;
-          }
-     }
-
-     return NULL;
-}
-
 bool interactive_is_solid(Interactive_t* interactive){
      return (interactive->type == INTERACTIVE_TYPE_LEVER ||
              (interactive->type == INTERACTIVE_TYPE_POPUP && interactive->popup.lift.ticks > 1));
-}
-
-bool interactive_solid_at(Interactive_t* interactives, U16 interactive_count, Coord_t coord){
-     Interactive_t* interactive = interactive_get_at(interactives, interactive_count, coord);
-     return (interactive && interactive_is_solid(interactive));
 }
 
 struct InteractiveQuadTreeBounds_t{
@@ -606,6 +591,15 @@ void interactive_quad_tree_free(InteractiveQuadTreeNode_t* root){
      free(root);
 }
 
+Interactive_t* interactive_quad_tree_solid_at(const InteractiveQuadTreeNode_t* root, Coord_t coord){
+     Interactive_t* interactive = interactive_quad_tree_find_at(root, coord);
+     if(interactive && interactive_is_solid(interactive)){
+          return interactive;
+     }
+
+     return nullptr;
+}
+
 void toggle_electricity(TileMap_t* tilemap, InteractiveQuadTreeNode_t* interactive_quad_tree,  Coord_t coord, Direction_t direction){
      Coord_t adjacent_coord = coord + direction;
      Tile_t* tile = tilemap_get_tile(tilemap, adjacent_coord);
@@ -692,7 +686,7 @@ void activate(TileMap_t* tilemap, InteractiveQuadTreeNode_t* interactive_quad_tr
 }
 
 Interactive_t* block_against_solid_interactive(Block_t* block_to_check, Direction_t direction,
-                                               Interactive_t* interactives, S16 interactive_count){
+                                               InteractiveQuadTreeNode_t* interactive_quad_tree){
      Pixel_t pixel_a;
      Pixel_t pixel_b;
 
@@ -701,30 +695,30 @@ Interactive_t* block_against_solid_interactive(Block_t* block_to_check, Directio
      }
 
      Coord_t tile_coord = pixel_to_coord(pixel_a);
-     Interactive_t* interactive = interactive_get_at(interactives, interactive_count, tile_coord);
-     if(interactive && interactive_is_solid(interactive)) return interactive;
+     Interactive_t* interactive = interactive_quad_tree_solid_at(interactive_quad_tree, tile_coord);
+     if(interactive) return interactive;
 
      tile_coord = pixel_to_coord(pixel_b);
-     interactive = interactive_get_at(interactives, interactive_count, tile_coord);
-     if(interactive && interactive_is_solid(interactive)) return interactive;
+     interactive = interactive_quad_tree_solid_at(interactive_quad_tree, tile_coord);
+     if(interactive) return interactive;
 
      return nullptr;
 }
 
 
-void block_push(Block_t* block, Direction_t direction, TileMap_t* tilemap, Interactive_t* interactives, S16 interactive_count,
+void block_push(Block_t* block, Direction_t direction, TileMap_t* tilemap, InteractiveQuadTreeNode_t* interactive_quad_tree,
                 Block_t* blocks, S16 block_count, bool pushed_by_player){
      Block_t* against_block = block_against_another_block(block, direction, blocks, block_count);
      if(against_block){
           if(!pushed_by_player && block_on_ice(against_block, tilemap)){
-               block_push(against_block, direction, tilemap, interactives, interactive_count, blocks, block_count, false);
+               block_push(against_block, direction, tilemap, interactive_quad_tree, blocks, block_count, false);
           }
 
           return;
      }
 
      if(block_against_solid_tile(block, direction, tilemap)) return;
-     if(block_against_solid_interactive(block, direction, interactives, interactive_count)) return;
+     if(block_against_solid_interactive(block, direction, interactive_quad_tree)) return;
 
      switch(direction){
      default:
@@ -1373,8 +1367,7 @@ int main(int argc, char** argv){
                     }
 
                     if(block_on_ice(inside_block, &tilemap) && block_on_ice(blocks + i, &tilemap)){
-                         block_push(inside_block, quadrant, &tilemap, interactives, interactive_count,
-                                    blocks, block_count, false);
+                         block_push(inside_block, quadrant, &tilemap, interactive_quad_tree, blocks, block_count, false);
                     }
                }
 
@@ -1388,14 +1381,14 @@ int main(int argc, char** argv){
                     if(tilemap_is_solid(&tilemap, check)){
                          stop_on_boundary_x = true;
                     }else{
-                         stop_on_boundary_x = interactive_solid_at(interactives, interactive_count, check);
+                         stop_on_boundary_x = interactive_quad_tree_solid_at(interactive_quad_tree, check);
                     }
                }else if(blocks[i].vel.x < 0.0f){
                     Coord_t check = coord + Coord_t{-1, 0};
                     if(tilemap_is_solid(&tilemap, check)){
                          stop_on_boundary_x = true;
                     }else{
-                         stop_on_boundary_x = interactive_solid_at(interactives, interactive_count, check);
+                         stop_on_boundary_x = interactive_quad_tree_solid_at(interactive_quad_tree, check);
                     }
                }
 
@@ -1404,14 +1397,14 @@ int main(int argc, char** argv){
                     if(tilemap_is_solid(&tilemap, check)){
                          stop_on_boundary_y = true;
                     }else{
-                         stop_on_boundary_y = interactive_solid_at(interactives, interactive_count, check);
+                         stop_on_boundary_y = interactive_quad_tree_solid_at(interactive_quad_tree, check);
                     }
                }else if(blocks[i].vel.y < 0.0f){
                     Coord_t check = coord + Coord_t{0, -1};
                     if(tilemap_is_solid(&tilemap, check)){
                          stop_on_boundary_y = true;
                     }else{
-                         stop_on_boundary_y = interactive_solid_at(interactives, interactive_count, check);
+                         stop_on_boundary_y = interactive_quad_tree_solid_at(interactive_quad_tree, check);
                     }
                }
 
@@ -1444,7 +1437,7 @@ int main(int argc, char** argv){
                held_up = block_held_up_by_another_block(blocks + i, blocks, block_count);
 
                // TODO: should we care about the decimal component of the position ?
-               Interactive_t* interactive = interactive_get_at(interactives, interactive_count, coord);
+               Interactive_t* interactive = interactive_quad_tree_find_at(interactive_quad_tree, coord);
                if(interactive){
                     if(interactive->type == INTERACTIVE_TYPE_POPUP){
                          if(blocks[i].pos.z == interactive->popup.lift.ticks - 2){
@@ -1561,8 +1554,7 @@ int main(int argc, char** argv){
                if(block_to_push){
                     player.push_time += dt;
                     if(player.push_time > BLOCK_PUSH_TIME){
-                         block_push(block_to_push, player.face, &tilemap, interactives, interactive_count,
-                                    blocks, block_count, true);
+                         block_push(block_to_push, player.face, &tilemap, interactive_quad_tree, blocks, block_count, true);
                          if(block_to_push->pos.z > 0) player.push_time = -0.5f;
                     }
                }else{
