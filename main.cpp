@@ -37,6 +37,7 @@ struct Block_t{
      Vec_t vel;
      F32 fall_time;
      DirectionMask_t force;
+     Direction_t face;
      Element_t element;
      Pixel_t push_start;
 };
@@ -879,6 +880,23 @@ void player_action_perform(PlayerAction_t* player_action, Player_t* player, Play
 
 #define MAP_VERSION 1
 
+#pragma pack(push, 1)
+struct MapTileV1_t{
+     U8 id;
+     U16 flags;
+};
+
+struct MapBlockV1_t{
+     Pixel_t pixel;
+     Direction_t face;
+     Element_t element;
+};
+
+struct MapInteractive_t{
+     Coord_t coord;
+};
+#pragma pack(pop)
+
 bool save_map(const TileMap_t* tilemap, Block_t* blocks, U16 block_count, Interactive_t* interactives,
               U16 interactive_count, const char* filepath){
      FILE* f = fopen(filepath, "wb");
@@ -893,7 +911,9 @@ bool save_map(const TileMap_t* tilemap, Block_t* blocks, U16 block_count, Intera
      for(S16 i = 0; i < tilemap->height; i++){
           fwrite(tilemap->tiles[i], sizeof(tilemap->tiles[i][0]), tilemap->width, f);
      }
+     fwrite(&block_count, sizeof(block_count), 1, f);
      fwrite(blocks, sizeof(*blocks), block_count, f);
+     fwrite(&interactive_count, sizeof(interactive_count), 1, f);
      fwrite(interactives, sizeof(*interactives), interactive_count, f);
      fclose(f);
      return true;
