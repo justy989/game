@@ -358,6 +358,7 @@ void lift_update(Lift_t* lift, float tick_delay, float dt, S8 min_tick, S8 max_t
 #define POPUP_TICK_DELAY 0.1f
 
 enum InteractiveType_t{
+     INTERACTIVE_TYPE_NONE,
      INTERACTIVE_TYPE_PRESSURE_PLATE,
      INTERACTIVE_TYPE_WIRE_CLUSTER,
      INTERACTIVE_TYPE_LIGHT_DETECTOR,
@@ -400,7 +401,7 @@ struct Popup_t{
 
 struct Stairs_t{
      bool up;
-     Direction_t facing;
+     Direction_t face;
 };
 
 struct Lever_t{
@@ -892,13 +893,110 @@ struct MapBlockV1_t{
      Element_t element;
 };
 
-struct MapInteractive_t{
+struct MapPopupV1_t{
+     bool up;
+     bool iced;
+};
+
+struct MapDoorV1_t{
+     bool up;
+     Direction_t face;
+};
+
+struct MapInteractiveV1_t{
+     InteractiveType_t type;
      Coord_t coord;
+
+     union{
+          PressurePlate_t pressure_plate;
+          WireCluster_t wire_cluster;
+          Detector_t detector;
+          MapPopupV1_t popup;
+          Stairs_t stairs;
+          MapDoorV1_t door; // up or down
+          Portal_t portal;
+     };
 };
 #pragma pack(pop)
 
 bool save_map(const TileMap_t* tilemap, Block_t* blocks, U16 block_count, Interactive_t* interactives,
               U16 interactive_count, const char* filepath){
+     // alloc and convert map elements to map format
+     S32 map_tile_count = (S32)(tilemap->width) * (S32)(tilemap->height);
+     MapTileV1_t* map_tiles = (MapTileV1_t*)(calloc(map_tile_count, sizeof(*map_tiles)));
+     if(!map_tiles){
+          LOG("%s(): failed to allocate %d tiles\n", __FUNCTION__, map_tile_count);
+          return false;
+     }
+
+     MapBlockV1_t* map_blocks = (MapBlockV1_t*)(calloc(block_count, sizeof(*map_blocks)));
+     if(!map_blocks){
+          LOG("%s(): failed to allocate %d blocks\n", __FUNCTION__, block_count);
+          return false;
+     }
+
+     MapInteractiveV1_t* map_interactives = (MapInteractiveV1_t*)(calloc(interactive_count, sizeof(*map_interactives)));
+     if(!map_interactives){
+          LOG("%s(): failed to allocate %d interactives\n", __FUNCTION__, interactive_count);
+          return false;
+     }
+
+     // convert to map formats
+     for(S32 y = 0; y < tilemap->height; y++){
+          for(S32 x = 0; x < tilemap->width; x++){
+               int index = y * tilemap->width + x;
+               map_tiles[index].id = tilemap->tiles[y][x].id;
+               map_tiles[index].flags = tilemap->tiles[y][x].flags;
+          }
+     }
+
+     for(U16 i = 0; i < block_count; i++){
+          map_blocks[i].pixel = blocks[i].pos.pixel;
+          map_blocks[i].face = blocks[i].face;
+          map_blocks[i].element = blocks[i].element;
+     }
+
+     for(U16 i = 0; i < interactive_count; i++){
+          map_interactives[i].coord = interactives[i].coord;
+          map_interactives[i].type = interactives[i].type;
+
+          switch(map_interactives[i].type){
+          default:
+          case INTERACTIVE_TYPE_LEVER:
+          case INTERACTIVE_TYPE_BOW:
+               break;
+          case INTERACTIVE_TYPE_PRESSURE_PLATE:
+               map_interactives[i].pressure_plate = interactives[i].pressure_plate;
+               break;
+          case INTERACTIVE_TYPE_WIRE_CLUSTER:
+               map_interactives[i].wire_cluster = interactives[i].wire_cluster;
+               break;
+          case INTERACTIVE_TYPE_LIGHT_DETECTOR:
+          case INTERACTIVE_TYPE_ICE_DETECTOR:
+               map_interactives[i].detector = interactives[i].detector;
+               break;
+          case INTERACTIVE_TYPE_POPUP:
+               map_interactives[i].popup.up = interactives[i].popup.lift.up;
+               map_interactives[i].popup.iced = interactives[i].popup.iced;
+               break;
+          case INTERACTIVE_TYPE_DOOR:
+               map_interactives[i].door.up = interactives[i].door.lift.up;
+               map_interactives[i].door.face = interactives[i].door.face;
+               break;
+          case INTERACTIVE_TYPE_PORTAL:
+               map_interactives[i].portal.face = interactives[i].portal.face;
+               map_interactives[i].portal.on = interactives[i].portal.on;
+               break;
+          case INTERACTIVE_TYPE_STAIRS:
+               map_interactives[i].stairs.up = interactives[i].stairs.up;
+               map_interactives[i].stairs.face = interactives[i].stairs.face;
+               break;
+          case INTERACTIVE_TYPE_PROMPT:
+               break;
+          }
+     }
+
+     // write to file
      FILE* f = fopen(filepath, "wb");
      if(!f){
           LOG("%s: fopen() failed\n", __FUNCTION__);
@@ -908,14 +1006,17 @@ bool save_map(const TileMap_t* tilemap, Block_t* blocks, U16 block_count, Intera
      fwrite(&map_version, sizeof(map_version), 1, f);
      fwrite(&tilemap->width, sizeof(tilemap->width), 1, f);
      fwrite(&tilemap->height, sizeof(tilemap->height), 1, f);
-     for(S16 i = 0; i < tilemap->height; i++){
-          fwrite(tilemap->tiles[i], sizeof(tilemap->tiles[i][0]), tilemap->width, f);
-     }
+     fwrite(map_tiles, sizeof(*map_tiles), map_tile_count, f);
      fwrite(&block_count, sizeof(block_count), 1, f);
-     fwrite(blocks, sizeof(*blocks), block_count, f);
+     fwrite(map_blocks, sizeof(*map_blocks), block_count, f);
      fwrite(&interactive_count, sizeof(interactive_count), 1, f);
-     fwrite(interactives, sizeof(*interactives), interactive_count, f);
+     fwrite(map_interactives, sizeof(*map_interactives), interactive_count, f);
      fclose(f);
+
+     free(map_tiles);
+     free(map_blocks);
+     free(map_interactives);
+
      return true;
 }
 
