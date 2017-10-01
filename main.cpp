@@ -71,59 +71,63 @@ bool blocks_at_collidable_height(Block_t* a, Block_t* b){
      return false;
 }
 
-Block_t* block_against_another_block(Block_t* block_to_check, Direction_t direction, Block_t* blocks, S16 block_count){
+Block_t* block_against_another_block(Block_t* block_to_check, Direction_t direction, BlockArray_t* block_array){
      switch(direction){
      default:
           break;
      case DIRECTION_LEFT:
-          for(S16 i = 0; i < block_count; i++){
-               if(!blocks_at_collidable_height(block_to_check, blocks + i)){
+          for(S16 i = 0; i < block_array->count; i++){
+               Block_t* block = block_array->blocks + i;
+               if(!blocks_at_collidable_height(block_to_check, block)){
                     continue;
                }
 
-               if((blocks[i].pos.pixel.x + TILE_SIZE_IN_PIXELS) == block_to_check->pos.pixel.x &&
-                  blocks[i].pos.pixel.y >= block_to_check->pos.pixel.y &&
-                  blocks[i].pos.pixel.y < (block_to_check->pos.pixel.y + TILE_SIZE_IN_PIXELS)){
-                    return blocks + i;
+               if((block->pos.pixel.x + TILE_SIZE_IN_PIXELS) == block_to_check->pos.pixel.x &&
+                  block->pos.pixel.y >= block_to_check->pos.pixel.y &&
+                  block->pos.pixel.y < (block_to_check->pos.pixel.y + TILE_SIZE_IN_PIXELS)){
+                    return block;
                }
           }
           break;
      case DIRECTION_RIGHT:
-          for(S16 i = 0; i < block_count; i++){
-               if(!blocks_at_collidable_height(block_to_check, blocks + i)){
+          for(S16 i = 0; i < block_array->count; i++){
+               Block_t* block = block_array->blocks + i;
+               if(!blocks_at_collidable_height(block_to_check, block)){
                     continue;
                }
 
-               if(blocks[i].pos.pixel.x == (block_to_check->pos.pixel.x + TILE_SIZE_IN_PIXELS) &&
-                  blocks[i].pos.pixel.y >= block_to_check->pos.pixel.y &&
-                  blocks[i].pos.pixel.y < (block_to_check->pos.pixel.y + TILE_SIZE_IN_PIXELS)){
-                    return blocks + i;
+               if(block->pos.pixel.x == (block_to_check->pos.pixel.x + TILE_SIZE_IN_PIXELS) &&
+                  block->pos.pixel.y >= block_to_check->pos.pixel.y &&
+                  block->pos.pixel.y < (block_to_check->pos.pixel.y + TILE_SIZE_IN_PIXELS)){
+                    return block;
                }
           }
           break;
      case DIRECTION_DOWN:
-          for(S16 i = 0; i < block_count; i++){
-               if(!blocks_at_collidable_height(block_to_check, blocks + i)){
+          for(S16 i = 0; i < block_array->count; i++){
+               Block_t* block = block_array->blocks + i;
+               if(!blocks_at_collidable_height(block_to_check, block)){
                     continue;
                }
 
-               if((blocks[i].pos.pixel.y + TILE_SIZE_IN_PIXELS) == block_to_check->pos.pixel.y &&
-                  blocks[i].pos.pixel.x >= block_to_check->pos.pixel.x &&
-                  blocks[i].pos.pixel.x < (block_to_check->pos.pixel.x + TILE_SIZE_IN_PIXELS)){
-                    return blocks + i;
+               if((block->pos.pixel.y + TILE_SIZE_IN_PIXELS) == block_to_check->pos.pixel.y &&
+                  block->pos.pixel.x >= block_to_check->pos.pixel.x &&
+                  block->pos.pixel.x < (block_to_check->pos.pixel.x + TILE_SIZE_IN_PIXELS)){
+                    return block;
                }
           }
           break;
      case DIRECTION_UP:
-          for(S16 i = 0; i < block_count; i++){
-               if(!blocks_at_collidable_height(block_to_check, blocks + i)){
+          for(S16 i = 0; i < block_array->count; i++){
+               Block_t* block = block_array->blocks + i;
+               if(!blocks_at_collidable_height(block_to_check, block)){
                     continue;
                }
 
-               if(blocks[i].pos.pixel.y == (block_to_check->pos.pixel.y + TILE_SIZE_IN_PIXELS) &&
-                  blocks[i].pos.pixel.x >= block_to_check->pos.pixel.x &&
-                  blocks[i].pos.pixel.x < (block_to_check->pos.pixel.x + TILE_SIZE_IN_PIXELS)){
-                    return blocks + i;
+               if(block->pos.pixel.y == (block_to_check->pos.pixel.y + TILE_SIZE_IN_PIXELS) &&
+                  block->pos.pixel.x >= block_to_check->pos.pixel.x &&
+                  block->pos.pixel.x < (block_to_check->pos.pixel.x + TILE_SIZE_IN_PIXELS)){
+                    return block;
                }
           }
           break;
@@ -132,47 +136,49 @@ Block_t* block_against_another_block(Block_t* block_to_check, Direction_t direct
      return nullptr;
 }
 
-Block_t* block_inside_another_block(Block_t* block_to_check, Block_t* blocks, S16 block_count){
+Block_t* block_inside_another_block(Block_t* block_to_check, BlockArray_t* block_array){
      // TODO: need more complicated function to detect this
      Rect_t rect = {block_to_check->pos.pixel.x, block_to_check->pos.pixel.y,
                     (S16)(block_to_check->pos.pixel.x + TILE_SIZE_IN_PIXELS - 1),
                     (S16)(block_to_check->pos.pixel.y + TILE_SIZE_IN_PIXELS - 1)};
-     for(S16 i = 0; i < block_count; i++){
-          if(blocks + i == block_to_check) continue;
+     for(S16 i = 0; i < block_array->count; i++){
+          if(block_array->blocks + i == block_to_check) continue;
+          Block_t* block = block_array->blocks + i;
 
-          Pixel_t top_left {blocks[i].pos.pixel.x, (S16)(blocks[i].pos.pixel.y + TILE_SIZE_IN_PIXELS - 1)};
-          Pixel_t top_right {(S16)(blocks[i].pos.pixel.x + TILE_SIZE_IN_PIXELS - 1), (S16)(blocks[i].pos.pixel.y + TILE_SIZE_IN_PIXELS - 1)};
-          Pixel_t bottom_right {(S16)(blocks[i].pos.pixel.x + TILE_SIZE_IN_PIXELS - 1), blocks[i].pos.pixel.y};
+          Pixel_t top_left {block->pos.pixel.x, (S16)(block->pos.pixel.y + TILE_SIZE_IN_PIXELS - 1)};
+          Pixel_t top_right {(S16)(block->pos.pixel.x + TILE_SIZE_IN_PIXELS - 1), (S16)(block->pos.pixel.y + TILE_SIZE_IN_PIXELS - 1)};
+          Pixel_t bottom_right {(S16)(block->pos.pixel.x + TILE_SIZE_IN_PIXELS - 1), block->pos.pixel.y};
 
-          if(pixel_in_rect(blocks[i].pos.pixel, rect) ||
+          if(pixel_in_rect(block->pos.pixel, rect) ||
              pixel_in_rect(top_left, rect) ||
              pixel_in_rect(top_right, rect) ||
              pixel_in_rect(bottom_right, rect)){
-               return blocks + i;
+               return block;
           }
      }
 
      return nullptr;
 }
 
-Block_t* block_held_up_by_another_block(Block_t* block_to_check, Block_t* blocks, S16 block_count){
+Block_t* block_held_up_by_another_block(Block_t* block_to_check, BlockArray_t* block_array){
      // TODO: need more complicated function to detect this
      Rect_t rect = {block_to_check->pos.pixel.x, block_to_check->pos.pixel.y,
                     (S16)(block_to_check->pos.pixel.x + TILE_SIZE_IN_PIXELS - 1),
                     (S16)(block_to_check->pos.pixel.y + TILE_SIZE_IN_PIXELS - 1)};
      S8 held_at_height = block_to_check->pos.z - HEIGHT_INTERVAL;
-     for(S16 i = 0; i < block_count; i++){
-          if(blocks + i == block_to_check || blocks[i].pos.z != held_at_height) continue;
+     for(S16 i = 0; i < block_array->count; i++){
+          Block_t* block = block_array->blocks + i;
+          if(block == block_to_check || block->pos.z != held_at_height) continue;
 
-          Pixel_t top_left {blocks[i].pos.pixel.x, (S16)(blocks[i].pos.pixel.y + TILE_SIZE_IN_PIXELS - 1)};
-          Pixel_t top_right {(S16)(blocks[i].pos.pixel.x + TILE_SIZE_IN_PIXELS - 1), (S16)(blocks[i].pos.pixel.y + TILE_SIZE_IN_PIXELS - 1)};
-          Pixel_t bottom_right {(S16)(blocks[i].pos.pixel.x + TILE_SIZE_IN_PIXELS - 1), blocks[i].pos.pixel.y};
+          Pixel_t top_left {block->pos.pixel.x, (S16)(block->pos.pixel.y + TILE_SIZE_IN_PIXELS - 1)};
+          Pixel_t top_right {(S16)(block->pos.pixel.x + TILE_SIZE_IN_PIXELS - 1), (S16)(block->pos.pixel.y + TILE_SIZE_IN_PIXELS - 1)};
+          Pixel_t bottom_right {(S16)(block->pos.pixel.x + TILE_SIZE_IN_PIXELS - 1), block->pos.pixel.y};
 
-          if(pixel_in_rect(blocks[i].pos.pixel, rect) ||
+          if(pixel_in_rect(block->pos.pixel, rect) ||
              pixel_in_rect(top_left, rect) ||
              pixel_in_rect(top_right, rect) ||
              pixel_in_rect(bottom_right, rect)){
-               return blocks + i;
+               return block;
           }
      }
 
@@ -712,13 +718,12 @@ Interactive_t* block_against_solid_interactive(Block_t* block_to_check, Directio
      return nullptr;
 }
 
-
 void block_push(Block_t* block, Direction_t direction, TileMap_t* tilemap, InteractiveQuadTreeNode_t* interactive_quad_tree,
-                Block_t* blocks, S16 block_count, bool pushed_by_player){
-     Block_t* against_block = block_against_another_block(block, direction, blocks, block_count);
+                BlockArray_t* block_array, bool pushed_by_player){
+     Block_t* against_block = block_against_another_block(block, direction, block_array);
      if(against_block){
           if(!pushed_by_player && block_on_ice(against_block, tilemap)){
-               block_push(against_block, direction, tilemap, interactive_quad_tree, blocks, block_count, false);
+               block_push(against_block, direction, tilemap, interactive_quad_tree, block_array, false);
           }
 
           return;
@@ -924,7 +929,7 @@ struct MapInteractiveV1_t{
 };
 #pragma pack(pop)
 
-bool save_map(const TileMap_t* tilemap, Block_t* blocks, U16 block_count, Interactive_t* interactives,
+bool save_map(const TileMap_t* tilemap, BlockArray_t* block_array, Interactive_t* interactives,
               U16 interactive_count, const char* filepath){
      // alloc and convert map elements to map format
      S32 map_tile_count = (S32)(tilemap->width) * (S32)(tilemap->height);
@@ -934,9 +939,9 @@ bool save_map(const TileMap_t* tilemap, Block_t* blocks, U16 block_count, Intera
           return false;
      }
 
-     MapBlockV1_t* map_blocks = (MapBlockV1_t*)(calloc(block_count, sizeof(*map_blocks)));
+     MapBlockV1_t* map_blocks = (MapBlockV1_t*)(calloc(block_array->count, sizeof(*map_blocks)));
      if(!map_blocks){
-          LOG("%s(): failed to allocate %d blocks\n", __FUNCTION__, block_count);
+          LOG("%s(): failed to allocate %d blocks\n", __FUNCTION__, block_array->count);
           return false;
      }
 
@@ -955,10 +960,11 @@ bool save_map(const TileMap_t* tilemap, Block_t* blocks, U16 block_count, Intera
           }
      }
 
-     for(U16 i = 0; i < block_count; i++){
-          map_blocks[i].pixel = blocks[i].pos.pixel;
-          map_blocks[i].face = blocks[i].face;
-          map_blocks[i].element = blocks[i].element;
+     for(U16 i = 0; i < block_array->count; i++){
+          Block_t* block = block_array->blocks + i;
+          map_blocks[i].pixel = block->pos.pixel;
+          map_blocks[i].face = block->face;
+          map_blocks[i].element = block->element;
      }
 
      for(U16 i = 0; i < interactive_count; i++){
@@ -1012,9 +1018,9 @@ bool save_map(const TileMap_t* tilemap, Block_t* blocks, U16 block_count, Intera
      fwrite(&tilemap->width, sizeof(tilemap->width), 1, f);
      fwrite(&tilemap->height, sizeof(tilemap->height), 1, f);
      fwrite(&interactive_count, sizeof(interactive_count), 1, f);
-     fwrite(&block_count, sizeof(block_count), 1, f);
+     fwrite(&block_array->count, sizeof(block_array->count), 1, f);
      fwrite(map_tiles, sizeof(*map_tiles), map_tile_count, f);
-     fwrite(map_blocks, sizeof(*map_blocks), block_count, f);
+     fwrite(map_blocks, sizeof(*map_blocks), block_array->count, f);
      fwrite(map_interactives, sizeof(*map_interactives), interactive_count, f);
      fclose(f);
 
@@ -1208,23 +1214,31 @@ int main(int argc, char** argv){
      }
 
      BlockArray_t block_array;
-     if(!block_array_init(block_array, 3)){
-          return 1;
+     {
+          const int block_count = 3;
+          block_array.blocks = (Block_t*)(calloc(block_count, sizeof(*block_array.blocks)));
+          if(!block_array.blocks){
+               LOG("failed to calloc %d blocks\n", block_count);
+               return 1;
+          }
+          block_array.count = block_count;
      }
 
+     Block_t** sorted_blocks;
      {
-          blocks[0].pos = coord_to_pos(Coord_t{6, 6});
-          blocks[1].pos = coord_to_pos(Coord_t{6, 2});
-          blocks[2].pos = coord_to_pos(Coord_t{8, 8});
-          blocks[0].vel = vec_zero();
-          blocks[1].vel = vec_zero();
-          blocks[2].vel = vec_zero();
-          blocks[0].accel = vec_zero();
-          blocks[1].accel = vec_zero();
-          blocks[2].accel = vec_zero();
+          block_array.blocks[0].pos = coord_to_pos(Coord_t{6, 6});
+          block_array.blocks[1].pos = coord_to_pos(Coord_t{6, 2});
+          block_array.blocks[2].pos = coord_to_pos(Coord_t{8, 8});
+          block_array.blocks[0].vel = vec_zero();
+          block_array.blocks[1].vel = vec_zero();
+          block_array.blocks[2].vel = vec_zero();
+          block_array.blocks[0].accel = vec_zero();
+          block_array.blocks[1].accel = vec_zero();
+          block_array.blocks[2].accel = vec_zero();
 
-          for(U16 i = 0; i < block_count; ++i){
-               sorted_blocks[i] = blocks + i;
+          sorted_blocks = (Block_t**)(calloc(block_array.count, sizeof(*sorted_blocks)));
+          for(U16 i = 0; i < block_array.count; ++i){
+               sorted_blocks[i] = block_array.blocks + i;
           }
      }
 
@@ -1485,8 +1499,8 @@ int main(int argc, char** argv){
                     if(interactives[i].coord == player_coord){
                          should_be_down = true;
                     }else{
-                         for(U16 b = 0; b < block_count; b++){
-                              Coord_t block_coord = block_get_coord(blocks + b);
+                         for(U16 b = 0; b < block_array.count; b++){
+                              Coord_t block_coord = block_get_coord(block_array.blocks + b);
                               if(interactives[i].coord == block_coord){
                                    should_be_down = true;
                                    break;
@@ -1569,15 +1583,17 @@ int main(int argc, char** argv){
           float drag = 0.625f;
 
           // block movement
-          for(U16 i = 0; i < block_count; i++){
-               Vec_t pos_delta = (blocks[i].accel * dt * dt * 0.5f) + (blocks[i].vel * dt);
-               blocks[i].vel += blocks[i].accel * dt;
-               blocks[i].vel *= drag;
+          for(U16 i = 0; i < block_array.count; i++){
+               Block_t* block = block_array.blocks + i;
+
+               Vec_t pos_delta = (block->accel * dt * dt * 0.5f) + (block->vel * dt);
+               block->vel += block->accel * dt;
+               block->vel *= drag;
 
                // TODO: blocks with velocity need to be checked against other blocks
 
-               Position_t pre_move = blocks[i].pos;
-               blocks[i].pos += pos_delta;
+               Position_t pre_move = block->pos;
+               block->pos += pos_delta;
 
                bool stop_on_boundary_x = false;
                bool stop_on_boundary_y = false;
@@ -1585,60 +1601,60 @@ int main(int argc, char** argv){
 
                Block_t* inside_block = nullptr;
 
-               while((inside_block = block_inside_another_block(blocks + i, blocks, block_count)) && blocks_at_collidable_height(blocks + i, inside_block)){
-                    auto quadrant = relative_quadrant(blocks[i].pos.pixel, inside_block->pos.pixel);
+               while((inside_block = block_inside_another_block(block_array.blocks + i, &block_array)) && blocks_at_collidable_height(block, inside_block)){
+                    auto quadrant = relative_quadrant(block->pos.pixel, inside_block->pos.pixel);
 
                     switch(quadrant){
                     default:
                          break;
                     case DIRECTION_LEFT:
-                         blocks[i].pos.pixel.x = inside_block->pos.pixel.x + TILE_SIZE_IN_PIXELS;
-                         blocks[i].pos.decimal.x = 0.0f;
-                         blocks[i].vel.x = 0.0f;
-                         blocks[i].accel.x = 0.0f;
+                         block->pos.pixel.x = inside_block->pos.pixel.x + TILE_SIZE_IN_PIXELS;
+                         block->pos.decimal.x = 0.0f;
+                         block->vel.x = 0.0f;
+                         block->accel.x = 0.0f;
                          break;
                     case DIRECTION_RIGHT:
-                         blocks[i].pos.pixel.x = inside_block->pos.pixel.x - TILE_SIZE_IN_PIXELS;
-                         blocks[i].pos.decimal.x = 0.0f;
-                         blocks[i].vel.x = 0.0f;
-                         blocks[i].accel.x = 0.0f;
+                         block->pos.pixel.x = inside_block->pos.pixel.x - TILE_SIZE_IN_PIXELS;
+                         block->pos.decimal.x = 0.0f;
+                         block->vel.x = 0.0f;
+                         block->accel.x = 0.0f;
                          break;
                     case DIRECTION_DOWN:
-                         blocks[i].pos.pixel.y = inside_block->pos.pixel.y + TILE_SIZE_IN_PIXELS;
-                         blocks[i].pos.decimal.y = 0.0f;
-                         blocks[i].vel.y = 0.0f;
-                         blocks[i].accel.y = 0.0f;
+                         block->pos.pixel.y = inside_block->pos.pixel.y + TILE_SIZE_IN_PIXELS;
+                         block->pos.decimal.y = 0.0f;
+                         block->vel.y = 0.0f;
+                         block->accel.y = 0.0f;
                          break;
                     case DIRECTION_UP:
-                         blocks[i].pos.pixel.y = inside_block->pos.pixel.y - TILE_SIZE_IN_PIXELS;
-                         blocks[i].pos.decimal.y = 0.0f;
-                         blocks[i].vel.y = 0.0f;
-                         blocks[i].accel.y = 0.0f;
+                         block->pos.pixel.y = inside_block->pos.pixel.y - TILE_SIZE_IN_PIXELS;
+                         block->pos.decimal.y = 0.0f;
+                         block->vel.y = 0.0f;
+                         block->accel.y = 0.0f;
                          break;
                     }
 
-                    if(blocks + i == last_block_pushed && quadrant == last_block_pushed_direction){
+                    if(block == last_block_pushed && quadrant == last_block_pushed_direction){
                          player.push_time = 0.0f;
                     }
 
-                    if(block_on_ice(inside_block, &tilemap) && block_on_ice(blocks + i, &tilemap)){
-                         block_push(inside_block, quadrant, &tilemap, interactive_quad_tree, blocks, block_count, false);
+                    if(block_on_ice(inside_block, &tilemap) && block_on_ice(block, &tilemap)){
+                         block_push(inside_block, quadrant, &tilemap, interactive_quad_tree, &block_array, false);
                     }
                }
 
                // get the current coord of the center of the block
-               Pixel_t center = blocks[i].pos.pixel + Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS};
+               Pixel_t center = block->pos.pixel + Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS};
                Coord_t coord = pixel_to_coord(center);
 
                // check for adjacent walls
-               if(blocks[i].vel.x > 0.0f){
+               if(block->vel.x > 0.0f){
                     Coord_t check = coord + Coord_t{1, 0};
                     if(tilemap_is_solid(&tilemap, check)){
                          stop_on_boundary_x = true;
                     }else{
                          stop_on_boundary_x = interactive_quad_tree_solid_at(interactive_quad_tree, check);
                     }
-               }else if(blocks[i].vel.x < 0.0f){
+               }else if(block->vel.x < 0.0f){
                     Coord_t check = coord + Coord_t{-1, 0};
                     if(tilemap_is_solid(&tilemap, check)){
                          stop_on_boundary_x = true;
@@ -1647,14 +1663,14 @@ int main(int argc, char** argv){
                     }
                }
 
-               if(blocks[i].vel.y > 0.0f){
+               if(block->vel.y > 0.0f){
                     Coord_t check = coord + Coord_t{0, 1};
                     if(tilemap_is_solid(&tilemap, check)){
                          stop_on_boundary_y = true;
                     }else{
                          stop_on_boundary_y = interactive_quad_tree_solid_at(interactive_quad_tree, check);
                     }
-               }else if(blocks[i].vel.y < 0.0f){
+               }else if(block->vel.y < 0.0f){
                     Coord_t check = coord + Coord_t{0, -1};
                     if(tilemap_is_solid(&tilemap, check)){
                          stop_on_boundary_y = true;
@@ -1663,59 +1679,59 @@ int main(int argc, char** argv){
                     }
                }
 
-               if(blocks + i != last_block_pushed && !tilemap_is_iced(&tilemap, coord)){
+               if(block != last_block_pushed && !tilemap_is_iced(&tilemap, coord)){
                     stop_on_boundary_x = true;
                     stop_on_boundary_y = true;
                }
 
                if(stop_on_boundary_x){
                     // stop on tile boundaries separately for each axis
-                    S16 boundary_x = range_passes_tile_boundary(pre_move.pixel.x, blocks[i].pos.pixel.x, blocks[i].push_start.x);
+                    S16 boundary_x = range_passes_tile_boundary(pre_move.pixel.x, block->pos.pixel.x, block->push_start.x);
                     if(boundary_x){
-                         blocks[i].pos.pixel.x = boundary_x;
-                         blocks[i].pos.decimal.x = 0.0f;
-                         blocks[i].vel.x = 0.0f;
-                         blocks[i].accel.x = 0.0f;
+                         block->pos.pixel.x = boundary_x;
+                         block->pos.decimal.x = 0.0f;
+                         block->vel.x = 0.0f;
+                         block->accel.x = 0.0f;
                     }
                }
 
                if(stop_on_boundary_y){
-                    S16 boundary_y = range_passes_tile_boundary(pre_move.pixel.y, blocks[i].pos.pixel.y, blocks[i].push_start.y);
+                    S16 boundary_y = range_passes_tile_boundary(pre_move.pixel.y, block->pos.pixel.y, block->push_start.y);
                     if(boundary_y){
-                         blocks[i].pos.pixel.y = boundary_y;
-                         blocks[i].pos.decimal.y = 0.0f;
-                         blocks[i].vel.y = 0.0f;
-                         blocks[i].accel.y = 0.0f;
+                         block->pos.pixel.y = boundary_y;
+                         block->pos.decimal.y = 0.0f;
+                         block->vel.y = 0.0f;
+                         block->accel.y = 0.0f;
                     }
                }
 
-               held_up = block_held_up_by_another_block(blocks + i, blocks, block_count);
+               held_up = block_held_up_by_another_block(block, &block_array);
 
                // TODO: should we care about the decimal component of the position ?
                Interactive_t* interactive = interactive_quad_tree_find_at(interactive_quad_tree, coord);
                if(interactive){
                     if(interactive->type == INTERACTIVE_TYPE_POPUP){
-                         if(blocks[i].pos.z == interactive->popup.lift.ticks - 2){
-                              blocks[i].pos.z++;
+                         if(block->pos.z == interactive->popup.lift.ticks - 2){
+                              block->pos.z++;
                               held_up = true;
-                         }else if(blocks[i].pos.z > (interactive->popup.lift.ticks - 1)){
-                              blocks[i].fall_time += dt;
-                              if(blocks[i].fall_time >= FALL_TIME){
-                                   blocks[i].fall_time -= FALL_TIME;
-                                   blocks[i].pos.z--;
+                         }else if(block->pos.z > (interactive->popup.lift.ticks - 1)){
+                              block->fall_time += dt;
+                              if(block->fall_time >= FALL_TIME){
+                                   block->fall_time -= FALL_TIME;
+                                   block->pos.z--;
                               }
                               held_up = true;
-                         }else if(blocks[i].pos.z == (interactive->popup.lift.ticks - 1)){
+                         }else if(block->pos.z == (interactive->popup.lift.ticks - 1)){
                               held_up = true;
                          }
                     }
                }
 
-               if(!held_up && blocks[i].pos.z > 0){
-                    blocks[i].fall_time += dt;
-                    if(blocks[i].fall_time >= FALL_TIME){
-                         blocks[i].fall_time -= FALL_TIME;
-                         blocks[i].pos.z--;
+               if(!held_up && block->pos.z > 0){
+                    block->fall_time += dt;
+                    if(block->fall_time >= FALL_TIME){
+                         block->fall_time -= FALL_TIME;
+                         block->pos.z--;
                     }
                }
           }
@@ -1724,8 +1740,8 @@ int main(int argc, char** argv){
           {
                // TODO: do we ever need a better sort for this?
                // bubble sort
-               for(U16 i = 0; i < block_count; ++i){
-                    for(U16 j = 0; j < block_count - i - 1; ++j){
+               for(U16 i = 0; i < block_array.count; ++i){
+                    for(U16 j = 0; j < block_array.count - i - 1; ++j){
                          if(sorted_blocks[j]->pos.pixel.y < sorted_blocks[j + 1]->pos.pixel.y ||
                             (sorted_blocks[j]->pos.pixel.y == sorted_blocks[j + 1]->pos.pixel.y &&
                              sorted_blocks[j]->pos.z < sorted_blocks[j + 1]->pos.z)){
@@ -1769,7 +1785,7 @@ int main(int argc, char** argv){
                     }
                }
 
-               for(U16 i = 0; i < block_count; i++){
+               for(U16 i = 0; i < block_array.count; i++){
                     if(sorted_blocks[i]->pos.z >= player_top) continue;
 
                     bool collide_with_block = false;
@@ -1812,7 +1828,7 @@ int main(int argc, char** argv){
                if(block_to_push){
                     player.push_time += dt;
                     if(player.push_time > BLOCK_PUSH_TIME){
-                         block_push(block_to_push, player.face, &tilemap, interactive_quad_tree, blocks, block_count, true);
+                         block_push(block_to_push, player.face, &tilemap, interactive_quad_tree, &block_array, true);
                          if(block_to_push->pos.z > 0) player.push_time = -0.5f;
                     }
                }else{
@@ -1890,9 +1906,10 @@ int main(int argc, char** argv){
           // block
           tex_vec = theme_frame(0, 6);
           glBegin(GL_QUADS);
-          for(U16 i = 0; i < block_count; i++){
-               Position_t block_camera_offset = blocks[i].pos - screen_camera;
-               block_camera_offset.pixel.y += blocks[i].pos.z;
+          for(U16 i = 0; i < block_array.count; i++){
+               Block_t* block = block_array.blocks + i;
+               Position_t block_camera_offset = block->pos - screen_camera;
+               block_camera_offset.pixel.y += block->pos.z;
                pos_vec = pos_to_vec(block_camera_offset);
                glTexCoord2f(tex_vec.x, tex_vec.y);
                glVertex2f(pos_vec.x, pos_vec.y);
@@ -2013,7 +2030,7 @@ int main(int argc, char** argv){
           SDL_GL_SwapWindow(window);
      }
 
-     save_map(&tilemap, blocks, block_count, interactives, interactive_count, "first.bm");
+     save_map(&tilemap, &block_array, interactives, interactive_count, "first.bm");
      interactive_quad_tree_free(interactive_quad_tree);
 
      destroy(&tilemap);
