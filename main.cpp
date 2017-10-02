@@ -47,6 +47,22 @@ struct BlockArray_t{
      S16 count;
 };
 
+bool init(BlockArray_t* block_array, S16 count){
+     block_array->blocks = (Block_t*)(calloc(count, sizeof(*block_array->blocks)));
+     if(!block_array->blocks){
+          LOG("failed to calloc %d blocks\n", count);
+          return false;
+     }
+     block_array->count = count;
+     return true;
+}
+
+void destroy(BlockArray_t* block_array){
+     free(block_array->blocks);
+     block_array->blocks = nullptr;
+     block_array->count = 0;
+}
+
 Coord_t block_get_coord(Block_t* block){
      Pixel_t center = block->pos.pixel + Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS};
      return pixel_to_coord(center);
@@ -452,6 +468,27 @@ bool interactive_is_solid(Interactive_t* interactive){
              (interactive->type == INTERACTIVE_TYPE_POPUP && interactive->popup.lift.ticks > 1));
 }
 
+struct InteractiveArray_t{
+     Interactive_t* interactives;
+     S16 count;
+};
+
+bool init(InteractiveArray_t* interactive_array, S16 count){
+     interactive_array->interactives = (Interactive_t*)(calloc(count, sizeof(*interactive_array->interactives)));
+     if(!interactive_array->interactives){
+          LOG("failed to calloc %d interactives\n", count);
+          return false;
+     }
+     interactive_array->count = count;
+     return true;
+}
+
+void destroy(InteractiveArray_t* interactive_array){
+     free(interactive_array->interactives);
+     interactive_array->interactives = nullptr;
+     interactive_array->count = 0;
+}
+
 struct InteractiveQuadTreeBounds_t{
      Coord_t min;
      Coord_t max;
@@ -550,26 +587,26 @@ bool interactive_quad_tree_insert(InteractiveQuadTreeNode_t* node, Interactive_t
      return false;
 }
 
-InteractiveQuadTreeNode_t* interactive_quad_tree_build(Interactive_t* interactives, int interactive_count){
-     if(interactive_count == 0) return nullptr;
+InteractiveQuadTreeNode_t* interactive_quad_tree_build(InteractiveArray_t* interactive_array){
+     if(interactive_array->count == 0) return nullptr;
 
      InteractiveQuadTreeNode_t* root = (InteractiveQuadTreeNode_t*)(calloc(1, sizeof(*root)));
-     root->bounds.min.x = interactives[0].coord.x;
-     root->bounds.max.x = interactives[0].coord.x;
-     root->bounds.min.y = interactives[0].coord.y;
-     root->bounds.max.y = interactives[0].coord.y;
+     root->bounds.min.x = interactive_array->interactives[0].coord.x;
+     root->bounds.max.x = interactive_array->interactives[0].coord.x;
+     root->bounds.min.y = interactive_array->interactives[0].coord.y;
+     root->bounds.max.y = interactive_array->interactives[0].coord.y;
 
      // find mins/maxs for dimensions
-     for(int i = 0; i < interactive_count; i++){
-          if(root->bounds.min.x > interactives[i].coord.x) root->bounds.min.x = interactives[i].coord.x;
-          if(root->bounds.max.x < interactives[i].coord.x) root->bounds.max.x = interactives[i].coord.x;
-          if(root->bounds.min.y > interactives[i].coord.y) root->bounds.min.y = interactives[i].coord.y;
-          if(root->bounds.max.y < interactives[i].coord.y) root->bounds.max.y = interactives[i].coord.y;
+     for(int i = 0; i < interactive_array->count; i++){
+          if(root->bounds.min.x > interactive_array->interactives[i].coord.x) root->bounds.min.x = interactive_array->interactives[i].coord.x;
+          if(root->bounds.max.x < interactive_array->interactives[i].coord.x) root->bounds.max.x = interactive_array->interactives[i].coord.x;
+          if(root->bounds.min.y > interactive_array->interactives[i].coord.y) root->bounds.min.y = interactive_array->interactives[i].coord.y;
+          if(root->bounds.max.y < interactive_array->interactives[i].coord.y) root->bounds.max.y = interactive_array->interactives[i].coord.y;
      }
 
      // insert coords
-     for(int i = 0; i < interactive_count; i++){
-          if(!interactive_quad_tree_insert(root, interactives + i)) break;
+     for(int i = 0; i < interactive_array->count; i++){
+          if(!interactive_quad_tree_insert(root, interactive_array->interactives + i)) break;
      }
 
      return root;
@@ -929,8 +966,8 @@ struct MapInteractiveV1_t{
 };
 #pragma pack(pop)
 
-bool save_map(const TileMap_t* tilemap, BlockArray_t* block_array, Interactive_t* interactives,
-              U16 interactive_count, const char* filepath){
+bool save_map(const TileMap_t* tilemap, BlockArray_t* block_array, InteractiveArray_t* interactive_array,
+              const char* filepath){
      // alloc and convert map elements to map format
      S32 map_tile_count = (S32)(tilemap->width) * (S32)(tilemap->height);
      MapTileV1_t* map_tiles = (MapTileV1_t*)(calloc(map_tile_count, sizeof(*map_tiles)));
@@ -945,9 +982,9 @@ bool save_map(const TileMap_t* tilemap, BlockArray_t* block_array, Interactive_t
           return false;
      }
 
-     MapInteractiveV1_t* map_interactives = (MapInteractiveV1_t*)(calloc(interactive_count, sizeof(*map_interactives)));
+     MapInteractiveV1_t* map_interactives = (MapInteractiveV1_t*)(calloc(interactive_array->count, sizeof(*map_interactives)));
      if(!map_interactives){
-          LOG("%s(): failed to allocate %d interactives\n", __FUNCTION__, interactive_count);
+          LOG("%s(): failed to allocate %d interactives\n", __FUNCTION__, interactive_array->count);
           return false;
      }
 
@@ -960,16 +997,16 @@ bool save_map(const TileMap_t* tilemap, BlockArray_t* block_array, Interactive_t
           }
      }
 
-     for(U16 i = 0; i < block_array->count; i++){
+     for(S16 i = 0; i < block_array->count; i++){
           Block_t* block = block_array->blocks + i;
           map_blocks[i].pixel = block->pos.pixel;
           map_blocks[i].face = block->face;
           map_blocks[i].element = block->element;
      }
 
-     for(U16 i = 0; i < interactive_count; i++){
-          map_interactives[i].coord = interactives[i].coord;
-          map_interactives[i].type = interactives[i].type;
+     for(S16 i = 0; i < interactive_array->count; i++){
+          map_interactives[i].coord = interactive_array->interactives[i].coord;
+          map_interactives[i].type = interactive_array->interactives[i].type;
 
           switch(map_interactives[i].type){
           default:
@@ -977,30 +1014,30 @@ bool save_map(const TileMap_t* tilemap, BlockArray_t* block_array, Interactive_t
           case INTERACTIVE_TYPE_BOW:
                break;
           case INTERACTIVE_TYPE_PRESSURE_PLATE:
-               map_interactives[i].pressure_plate = interactives[i].pressure_plate;
+               map_interactives[i].pressure_plate = interactive_array->interactives[i].pressure_plate;
                break;
           case INTERACTIVE_TYPE_WIRE_CLUSTER:
-               map_interactives[i].wire_cluster = interactives[i].wire_cluster;
+               map_interactives[i].wire_cluster = interactive_array->interactives[i].wire_cluster;
                break;
           case INTERACTIVE_TYPE_LIGHT_DETECTOR:
           case INTERACTIVE_TYPE_ICE_DETECTOR:
-               map_interactives[i].detector = interactives[i].detector;
+               map_interactives[i].detector = interactive_array->interactives[i].detector;
                break;
           case INTERACTIVE_TYPE_POPUP:
-               map_interactives[i].popup.up = interactives[i].popup.lift.up;
-               map_interactives[i].popup.iced = interactives[i].popup.iced;
+               map_interactives[i].popup.up = interactive_array->interactives[i].popup.lift.up;
+               map_interactives[i].popup.iced = interactive_array->interactives[i].popup.iced;
                break;
           case INTERACTIVE_TYPE_DOOR:
-               map_interactives[i].door.up = interactives[i].door.lift.up;
-               map_interactives[i].door.face = interactives[i].door.face;
+               map_interactives[i].door.up = interactive_array->interactives[i].door.lift.up;
+               map_interactives[i].door.face = interactive_array->interactives[i].door.face;
                break;
           case INTERACTIVE_TYPE_PORTAL:
-               map_interactives[i].portal.face = interactives[i].portal.face;
-               map_interactives[i].portal.on = interactives[i].portal.on;
+               map_interactives[i].portal.face = interactive_array->interactives[i].portal.face;
+               map_interactives[i].portal.on = interactive_array->interactives[i].portal.on;
                break;
           case INTERACTIVE_TYPE_STAIRS:
-               map_interactives[i].stairs.up = interactives[i].stairs.up;
-               map_interactives[i].stairs.face = interactives[i].stairs.face;
+               map_interactives[i].stairs.up = interactive_array->interactives[i].stairs.up;
+               map_interactives[i].stairs.face = interactive_array->interactives[i].stairs.face;
                break;
           case INTERACTIVE_TYPE_PROMPT:
                break;
@@ -1013,15 +1050,16 @@ bool save_map(const TileMap_t* tilemap, BlockArray_t* block_array, Interactive_t
           LOG("%s: fopen() failed\n", __FUNCTION__);
           return false;
      }
+
      U8 map_version = MAP_VERSION;
      fwrite(&map_version, sizeof(map_version), 1, f);
      fwrite(&tilemap->width, sizeof(tilemap->width), 1, f);
      fwrite(&tilemap->height, sizeof(tilemap->height), 1, f);
-     fwrite(&interactive_count, sizeof(interactive_count), 1, f);
      fwrite(&block_array->count, sizeof(block_array->count), 1, f);
+     fwrite(&interactive_array->count, sizeof(interactive_array->count), 1, f);
      fwrite(map_tiles, sizeof(*map_tiles), map_tile_count, f);
      fwrite(map_blocks, sizeof(*map_blocks), block_array->count, f);
-     fwrite(map_interactives, sizeof(*map_interactives), interactive_count, f);
+     fwrite(map_interactives, sizeof(*map_interactives), interactive_array->count, f);
      fclose(f);
 
      free(map_tiles);
@@ -1031,22 +1069,31 @@ bool save_map(const TileMap_t* tilemap, BlockArray_t* block_array, Interactive_t
      return true;
 }
 
-#if 0
-bool load_map(TileMap_t* tilemap, Block_t* blocks, U16 block_count, Interactive_t* interactives,
-              U16 interactive_count, const char* filepath){
+bool load_map(TileMap_t* tilemap, BlockArray_t* block_array, InteractiveArray_t* interactive_array,
+              const char* filepath){
      // read counts from file
-     S32 map_tile_count = 0;
-     U16 interactive_count = 0;
+     S16 map_width;
+     S16 map_height;
+     S16 interactive_count;
+     S16 block_count;
+
      FILE* f = fopen(filepath, "rb");
      if(!f){
-          LOG("%s: fopen() failed\n", __FUNCTION__);
+          LOG("%s(): fopen() failed\n", __FUNCTION__);
           return false;
      }
+
      U8 map_version = MAP_VERSION;
-     fwrite(&map_version, sizeof(map_version), 1, f);
-     fwrite(&map_tile_count, sizeof(map_tile_count), 1, f);
-     fwrite(&interactive_count, sizeof(interactive_count), 1, f);
-     fwrite(&block_count, sizeof(block_count), 1, f);
+     fread(&map_version, sizeof(map_version), 1, f);
+     if(map_version != MAP_VERSION){
+          LOG("%s(): mismatched version loading '%s', actual %d, expected %d\n", __FUNCTION__, filepath, map_version, MAP_VERSION);
+          return false;
+     }
+
+     fread(&map_width, sizeof(map_width), 1, f);
+     fread(&map_height, sizeof(map_height), 1, f);
+     fread(&block_count, sizeof(block_count), 1, f);
+     fread(&interactive_count, sizeof(interactive_count), 1, f);
 
      // alloc and convert map elements to map format
      S32 map_tile_count = (S32)(tilemap->width) * (S32)(tilemap->height);
@@ -1062,30 +1109,45 @@ bool load_map(TileMap_t* tilemap, Block_t* blocks, U16 block_count, Interactive_
           return false;
      }
 
-     MapInteractiveV1_t* map_interactives = (MapInteractiveV1_t*)(calloc(interactive_count, sizeof(*map_interactives)));
+     MapInteractiveV1_t* map_interactives = (MapInteractiveV1_t*)(calloc(interactive_array->count, sizeof(*map_interactives)));
      if(!map_interactives){
-          LOG("%s(): failed to allocate %d interactives\n", __FUNCTION__, interactive_count);
+          LOG("%s(): failed to allocate %d interactives\n", __FUNCTION__, interactive_array->count);
           return false;
      }
+
+     // read data from file
+     fread(map_tiles, sizeof(*map_tiles), map_tile_count, f);
+     fread(map_blocks, sizeof(*map_blocks), block_count, f);
+     fread(map_interactives, sizeof(*map_interactives), interactive_array->count, f);
+     fclose(f);
+
+     destroy(tilemap);
+     init(tilemap, map_width, map_height);
+
+     destroy(block_array);
+     init(block_array, block_count);
+
+     destroy(interactive_array);
+     init(interactive_array, interactive_count);
 
      // convert to map formats
      for(S32 y = 0; y < tilemap->height; y++){
           for(S32 x = 0; x < tilemap->width; x++){
                int index = y * tilemap->width + x;
-               map_tiles[index].id = tilemap->tiles[y][x].id;
-               map_tiles[index].flags = tilemap->tiles[y][x].flags;
+               tilemap->tiles[y][x].id = map_tiles[index].id;
+               tilemap->tiles[y][x].flags = map_tiles[index].flags;
           }
      }
 
-     for(U16 i = 0; i < block_count; i++){
-          map_blocks[i].pixel = blocks[i].pos.pixel;
-          map_blocks[i].face = blocks[i].face;
-          map_blocks[i].element = blocks[i].element;
+     for(S16 i = 0; i < block_count; i++){
+          block_array->blocks[i].pos.pixel = map_blocks[i].pixel ;
+          block_array->blocks[i].face = map_blocks[i].face;
+          block_array->blocks[i].element = map_blocks[i].element;
      }
 
-     for(U16 i = 0; i < interactive_count; i++){
-          map_interactives[i].coord = interactives[i].coord;
-          map_interactives[i].type = interactives[i].type;
+     for(S16 i = 0; i < interactive_array->count; i++){
+          interactive_array->interactives[i].coord = map_interactives[i].coord;
+          interactive_array->interactives[i].type = map_interactives[i].type;
 
           switch(map_interactives[i].type){
           default:
@@ -1093,41 +1155,40 @@ bool load_map(TileMap_t* tilemap, Block_t* blocks, U16 block_count, Interactive_
           case INTERACTIVE_TYPE_BOW:
                break;
           case INTERACTIVE_TYPE_PRESSURE_PLATE:
-               map_interactives[i].pressure_plate = interactives[i].pressure_plate;
+               interactive_array->interactives[i].pressure_plate = map_interactives[i].pressure_plate;
                break;
           case INTERACTIVE_TYPE_WIRE_CLUSTER:
-               map_interactives[i].wire_cluster = interactives[i].wire_cluster;
+               interactive_array->interactives[i].wire_cluster = map_interactives[i].wire_cluster;
                break;
           case INTERACTIVE_TYPE_LIGHT_DETECTOR:
           case INTERACTIVE_TYPE_ICE_DETECTOR:
-               map_interactives[i].detector = interactives[i].detector;
+               interactive_array->interactives[i].detector = map_interactives[i].detector;
                break;
           case INTERACTIVE_TYPE_POPUP:
-               map_interactives[i].popup.up = interactives[i].popup.lift.up;
-               map_interactives[i].popup.iced = interactives[i].popup.iced;
+               interactive_array->interactives[i].popup.lift.up = map_interactives[i].popup.up;
+               interactive_array->interactives[i].popup.iced = map_interactives[i].popup.iced;
+               if(interactive_array->interactives[i].popup.lift.up){
+                    interactive_array->interactives[i].popup.lift.ticks = HEIGHT_INTERVAL + 1;
+               }else{
+                    interactive_array->interactives[i].popup.lift.ticks = 1;
+               }
                break;
           case INTERACTIVE_TYPE_DOOR:
-               map_interactives[i].door.up = interactives[i].door.lift.up;
-               map_interactives[i].door.face = interactives[i].door.face;
+               interactive_array->interactives[i].door.lift.up = map_interactives[i].door.up;
+               interactive_array->interactives[i].door.face = map_interactives[i].door.face;
                break;
           case INTERACTIVE_TYPE_PORTAL:
-               map_interactives[i].portal.face = interactives[i].portal.face;
-               map_interactives[i].portal.on = interactives[i].portal.on;
+               interactive_array->interactives[i].portal.face = map_interactives[i].portal.face;
+               interactive_array->interactives[i].portal.on = map_interactives[i].portal.on;
                break;
           case INTERACTIVE_TYPE_STAIRS:
-               map_interactives[i].stairs.up = interactives[i].stairs.up;
-               map_interactives[i].stairs.face = interactives[i].stairs.face;
+               interactive_array->interactives[i].stairs.up = map_interactives[i].stairs.up;
+               interactive_array->interactives[i].stairs.face = map_interactives[i].stairs.face;
                break;
           case INTERACTIVE_TYPE_PROMPT:
                break;
           }
      }
-
-     // write to file
-     fwrite(map_tiles, sizeof(*map_tiles), map_tile_count, f);
-     fwrite(map_blocks, sizeof(*map_blocks), block_count, f);
-     fwrite(map_interactives, sizeof(*map_interactives), interactive_count, f);
-     fclose(f);
 
      free(map_tiles);
      free(map_blocks);
@@ -1135,7 +1196,6 @@ bool load_map(TileMap_t* tilemap, Block_t* blocks, U16 block_count, Interactive_
 
      return true;
 }
-#endif
 
 using namespace std::chrono;
 
@@ -1214,14 +1274,8 @@ int main(int argc, char** argv){
      }
 
      BlockArray_t block_array;
-     {
-          const int block_count = 3;
-          block_array.blocks = (Block_t*)(calloc(block_count, sizeof(*block_array.blocks)));
-          if(!block_array.blocks){
-               LOG("failed to calloc %d blocks\n", block_count);
-               return 1;
-          }
-          block_array.count = block_count;
+     if(!init(&block_array, 3)){
+          return 1;
      }
 
      Block_t** sorted_blocks;
@@ -1237,51 +1291,53 @@ int main(int argc, char** argv){
           block_array.blocks[2].accel = vec_zero();
 
           sorted_blocks = (Block_t**)(calloc(block_array.count, sizeof(*sorted_blocks)));
-          for(U16 i = 0; i < block_array.count; ++i){
+          for(S16 i = 0; i < block_array.count; ++i){
                sorted_blocks[i] = block_array.blocks + i;
           }
      }
 
-     const U16 interactive_count = 4;
-     Interactive_t interactives[interactive_count];
-     memset(interactives, 0, sizeof(interactives));
+     InteractiveArray_t interactive_array;
      {
-          interactives[0].type = INTERACTIVE_TYPE_LEVER;
-          interactives[0].coord = Coord_t{3, 9};
-          interactives[1].type = INTERACTIVE_TYPE_POPUP;
-          interactives[1].coord = Coord_t{5, 11};
-          interactives[1].popup.lift.ticks = 1;
-          interactives[2].type = INTERACTIVE_TYPE_POPUP;
-          interactives[2].coord = Coord_t{9, 2};
-          interactives[2].popup.lift.ticks = HEIGHT_INTERVAL + 1;
-          interactives[2].popup.lift.up = true;
-          interactives[3].type = INTERACTIVE_TYPE_PRESSURE_PLATE;
-          interactives[3].coord = Coord_t{3, 6};
+          if(!init(&interactive_array, 4)){
+               return 1;
+          }
+
+          interactive_array.interactives[0].type = INTERACTIVE_TYPE_LEVER;
+          interactive_array.interactives[0].coord = Coord_t{3, 9};
+          interactive_array.interactives[1].type = INTERACTIVE_TYPE_POPUP;
+          interactive_array.interactives[1].coord = Coord_t{5, 11};
+          interactive_array.interactives[1].popup.lift.ticks = 1;
+          interactive_array.interactives[2].type = INTERACTIVE_TYPE_POPUP;
+          interactive_array.interactives[2].coord = Coord_t{9, 2};
+          interactive_array.interactives[2].popup.lift.ticks = HEIGHT_INTERVAL + 1;
+          interactive_array.interactives[2].popup.lift.up = true;
+          interactive_array.interactives[3].type = INTERACTIVE_TYPE_PRESSURE_PLATE;
+          interactive_array.interactives[3].coord = Coord_t{3, 6};
      }
 
-     auto* interactive_quad_tree = interactive_quad_tree_build(interactives, interactive_count);
+     auto* interactive_quad_tree = interactive_quad_tree_build(&interactive_array);
 
      TileMap_t tilemap;
      {
           init(&tilemap, 34, 17);
 
-          for(U16 i = 0; i < 17; i++){
+          for(S16 i = 0; i < 17; i++){
                tilemap.tiles[0][i].id = 1;
                tilemap.tiles[tilemap.height - 1][i].id = 1;
           }
 
-          for(U16 i = 0; i < 10; i++){
+          for(S16 i = 0; i < 10; i++){
                tilemap.tiles[5][17 + i].id = 1;
                tilemap.tiles[15][17 + i].id = 1;
           }
 
-          for(U16 i = 0; i < tilemap.height; i++){
+          for(S16 i = 0; i < tilemap.height; i++){
                tilemap.tiles[i][0].id = 1;
                tilemap.tiles[i][16].id = 1;
                tilemap.tiles[i][17].id = 1;
           }
 
-          for(U16 i = 0; i < 10; i++){
+          for(S16 i = 0; i < 10; i++){
                tilemap.tiles[5 + i][27].id = 1;
           }
 
@@ -1455,6 +1511,20 @@ int main(int argc, char** argv){
                          player_action_perform(&player_action, &player, PLAYER_ACTION_TYPE_ACTIVATE_START, demo_mode,
                                                demo_file, frame_count);
                          break;
+                    case SDL_SCANCODE_L:
+                         if(load_map(&tilemap, &block_array, &interactive_array, "first.bm")){
+                              // update sort blocks list
+                              free(sorted_blocks);
+                              sorted_blocks = (Block_t**)(calloc(block_array.count, sizeof(*sorted_blocks)));
+                              for(S16 i = 0; i < block_array.count; ++i){
+                                   sorted_blocks[i] = block_array.blocks + i;
+                              }
+
+                              // update interactive quad tree
+                              interactive_quad_tree_free(interactive_quad_tree);
+                              interactive_quad_tree = interactive_quad_tree_build(&interactive_array);
+                         }
+                         break;
                     }
                     break;
                case SDL_KEYUP:
@@ -1490,27 +1560,28 @@ int main(int argc, char** argv){
           }
 
           // update interactives
-          for(S16 i = 0; i < interactive_count; i++){
-               if(interactives[i].type == INTERACTIVE_TYPE_POPUP){
-                    lift_update(&interactives[i].popup.lift, POPUP_TICK_DELAY, dt, 1, HEIGHT_INTERVAL + 1);
-               }else if(interactives[i].type == INTERACTIVE_TYPE_PRESSURE_PLATE){
+          for(S16 i = 0; i < interactive_array.count; i++){
+               Interactive_t* interactive = interactive_array.interactives + i;
+               if(interactive->type == INTERACTIVE_TYPE_POPUP){
+                    lift_update(&interactive->popup.lift, POPUP_TICK_DELAY, dt, 1, HEIGHT_INTERVAL + 1);
+               }else if(interactive->type == INTERACTIVE_TYPE_PRESSURE_PLATE){
                     bool should_be_down = false;
                     Coord_t player_coord = pos_to_coord(player.pos);
-                    if(interactives[i].coord == player_coord){
+                    if(interactive->coord == player_coord){
                          should_be_down = true;
                     }else{
-                         for(U16 b = 0; b < block_array.count; b++){
+                         for(S16 b = 0; b < block_array.count; b++){
                               Coord_t block_coord = block_get_coord(block_array.blocks + b);
-                              if(interactives[i].coord == block_coord){
+                              if(interactive->coord == block_coord){
                                    should_be_down = true;
                                    break;
                               }
                          }
                     }
 
-                    if(should_be_down != interactives[i].pressure_plate.down){
-                         activate(&tilemap, interactive_quad_tree, interactives[i].coord);
-                         interactives[i].pressure_plate.down = should_be_down;
+                    if(should_be_down != interactive->pressure_plate.down){
+                         activate(&tilemap, interactive_quad_tree, interactive->coord);
+                         interactive->pressure_plate.down = should_be_down;
                     }
                }
           }
@@ -1583,7 +1654,7 @@ int main(int argc, char** argv){
           float drag = 0.625f;
 
           // block movement
-          for(U16 i = 0; i < block_array.count; i++){
+          for(S16 i = 0; i < block_array.count; i++){
                Block_t* block = block_array.blocks + i;
 
                Vec_t pos_delta = (block->accel * dt * dt * 0.5f) + (block->vel * dt);
@@ -1740,8 +1811,8 @@ int main(int argc, char** argv){
           {
                // TODO: do we ever need a better sort for this?
                // bubble sort
-               for(U16 i = 0; i < block_array.count; ++i){
-                    for(U16 j = 0; j < block_array.count - i - 1; ++j){
+               for(S16 i = 0; i < block_array.count; ++i){
+                    for(S16 j = 0; j < block_array.count - i - 1; ++j){
                          if(sorted_blocks[j]->pos.pixel.y < sorted_blocks[j + 1]->pos.pixel.y ||
                             (sorted_blocks[j]->pos.pixel.y == sorted_blocks[j + 1]->pos.pixel.y &&
                              sorted_blocks[j]->pos.z < sorted_blocks[j + 1]->pos.z)){
@@ -1785,7 +1856,7 @@ int main(int argc, char** argv){
                     }
                }
 
-               for(U16 i = 0; i < block_array.count; i++){
+               for(S16 i = 0; i < block_array.count; i++){
                     if(sorted_blocks[i]->pos.z >= player_top) continue;
 
                     bool collide_with_block = false;
@@ -1855,8 +1926,8 @@ int main(int argc, char** argv){
           glBindTexture(GL_TEXTURE_2D, theme_texture);
           glBegin(GL_QUADS);
           glColor3f(1.0f, 1.0f, 1.0f);
-          for(U16 y = min.y; y <= max.y; y++){
-               for(U16 x = min.x; x <= max.x; x++){
+          for(S16 y = min.y; y <= max.y; y++){
+               for(S16 x = min.x; x <= max.x; x++){
                     Tile_t* tile = tilemap.tiles[y] + x;
 
                     if(tile->id){
@@ -1906,7 +1977,7 @@ int main(int argc, char** argv){
           // block
           tex_vec = theme_frame(0, 6);
           glBegin(GL_QUADS);
-          for(U16 i = 0; i < block_array.count; i++){
+          for(S16 i = 0; i < block_array.count; i++){
                Block_t* block = block_array.blocks + i;
                Position_t block_camera_offset = block->pos - screen_camera;
                block_camera_offset.pixel.y += block->pos.z;
@@ -1924,25 +1995,26 @@ int main(int argc, char** argv){
 
           // interactive
           glBegin(GL_QUADS);
-          for(U16 i = 0; i < interactive_count; i++){
-               switch(interactives[i].type){
+          for(S16 i = 0; i < interactive_array.count; i++){
+               Interactive_t* interactive = interactive_array.interactives + i;
+               switch(interactive->type){
                default:
                     break;
                case INTERACTIVE_TYPE_PRESSURE_PLATE:
                {
                     int frame_x = 7;
-                    if(interactives[i].pressure_plate.down) frame_x++;
+                    if(interactive->pressure_plate.down) frame_x++;
                     tex_vec = theme_frame(frame_x, 8);
                } break;
                case INTERACTIVE_TYPE_LEVER:
                     tex_vec = theme_frame(0, 12);
                     break;
                case INTERACTIVE_TYPE_POPUP:
-                    tex_vec = theme_frame(interactives[i].popup.lift.ticks - 1, 8);
+                    tex_vec = theme_frame(interactive->popup.lift.ticks - 1, 8);
                     break;
                }
 
-               Position_t interactive_camera_offset = coord_to_pos(interactives[i].coord) - screen_camera;
+               Position_t interactive_camera_offset = coord_to_pos(interactive->coord) - screen_camera;
                pos_vec = pos_to_vec(interactive_camera_offset);
                glTexCoord2f(tex_vec.x, tex_vec.y);
                glVertex2f(pos_vec.x, pos_vec.y);
@@ -2030,7 +2102,7 @@ int main(int argc, char** argv){
           SDL_GL_SwapWindow(window);
      }
 
-     save_map(&tilemap, &block_array, interactives, interactive_count, "first.bm");
+     save_map(&tilemap, &block_array, &interactive_array, "first.bm");
      interactive_quad_tree_free(interactive_quad_tree);
 
      destroy(&tilemap);
