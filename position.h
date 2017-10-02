@@ -5,7 +5,7 @@
 
 struct Position_t{
      Pixel_t pixel;
-     S8 z;
+     S8 z; // TODO: rename to height
      Vec_t decimal;
 };
 

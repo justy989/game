@@ -37,7 +37,7 @@ Tile_t* tilemap_get_tile(TileMap_t* tilemap, Coord_t coord){
 bool tilemap_is_solid(TileMap_t* tilemap, Coord_t coord){
      Tile_t* tile = tilemap_get_tile(tilemap, coord);
      if(!tile) return false;
-     return tile->id;
+     return tile->id >= TILE_ID_SOLID_START;
 }
 
 bool tilemap_is_iced(TileMap_t* tilemap, Coord_t coord){

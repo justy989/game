@@ -19,6 +19,30 @@
 #define PLAYER_WALK_DELAY 0.15f
 #define PLAYER_IDLE_SPEED 0.0025f
 
+template <typename T>
+struct ObjectArray_t{
+     T* elements;
+     S16 count;
+};
+
+template <typename T>
+bool init(ObjectArray_t<T>* object_array, S16 count){
+     object_array->elements = (T*)(calloc(count, sizeof(*object_array->elements)));
+     if(!object_array->elements){
+          LOG("%s() failed to calloc %d objects\n", __FUNCTION__, count);
+          return false;
+     }
+     object_array->count = count;
+     return true;
+}
+
+template <typename T>
+void destroy(ObjectArray_t<T>* object_array){
+     free(object_array->elements);
+     object_array->elements = nullptr;
+     object_array->count = 0;
+}
+
 struct Player_t{
      Position_t pos;
      Vec_t accel;
@@ -938,6 +962,7 @@ struct MapBlockV1_t{
      Pixel_t pixel;
      Direction_t face;
      Element_t element;
+     S8 z;
 };
 
 struct MapPopupV1_t{
@@ -1000,6 +1025,7 @@ bool save_map(const TileMap_t* tilemap, BlockArray_t* block_array, InteractiveAr
      for(S16 i = 0; i < block_array->count; i++){
           Block_t* block = block_array->blocks + i;
           map_blocks[i].pixel = block->pos.pixel;
+          map_blocks[i].z = block->pos.z;
           map_blocks[i].face = block->face;
           map_blocks[i].element = block->element;
      }
@@ -1140,7 +1166,8 @@ bool load_map(TileMap_t* tilemap, BlockArray_t* block_array, InteractiveArray_t*
      }
 
      for(S16 i = 0; i < block_count; i++){
-          block_array->blocks[i].pos.pixel = map_blocks[i].pixel ;
+          block_array->blocks[i].pos.pixel = map_blocks[i].pixel;
+          block_array->blocks[i].pos.z = map_blocks[i].z;
           block_array->blocks[i].face = map_blocks[i].face;
           block_array->blocks[i].element = map_blocks[i].element;
      }
@@ -1193,6 +1220,106 @@ bool load_map(TileMap_t* tilemap, BlockArray_t* block_array, InteractiveArray_t*
      free(map_tiles);
      free(map_blocks);
      free(map_interactives);
+
+     return true;
+}
+
+enum StampType_t{
+     STAMP_TYPE_NONE,
+     STAMP_TYPE_TILE_ID,
+     STAMP_TYPE_TILE_FLAGS,
+     STAMP_TYPE_BLOCK,
+     STAMP_TYPE_INTERACTIVE,
+};
+
+struct StampBlock_t{
+     Element_t element;
+     Direction_t face;
+};
+
+struct Stamp_t{
+     StampType_t type;
+
+     union{
+          U8 tile_id;
+          U16 tile_flags;
+          StampBlock_t block;
+          Interactive_t interactive;
+     };
+
+     Coord_t offset;
+};
+
+enum EditorMode_t : U8{
+     EDITOR_MODE_OFF,
+     EDITOR_MODE_CATEGORY_SELECT,
+     EDITOR_MODE_STAMP_SELECT,
+     EDITOR_MODE_STAMP_HIDE,
+     EDITOR_MODE_CREATE_SELECTION,
+     EDITOR_MODE_SELECTION_MANIPULATION,
+};
+
+Coord_t stamp_array_dimensions(ObjectArray_t<Stamp_t>* object_array){
+     Coord_t min {0, 0};
+     Coord_t max {0, 0};
+
+     for(S32 i = 0; i < object_array->count; ++i){
+          Stamp_t* stamp = object_array->elements + i;
+
+          if(stamp->offset.x < min.x){min.x = stamp->offset.x;}
+          if(stamp->offset.y < min.y){min.y = stamp->offset.y;}
+
+          if(stamp->offset.x > max.x){max.x = stamp->offset.x;}
+          if(stamp->offset.y > max.y){max.y = stamp->offset.y;}
+     }
+
+     return (max - min) + Coord_t{1, 1};
+}
+
+enum EditorCategory_t : U8{
+     EDITOR_CATEGORY_TILE_ID,
+     // EDITOR_CATEGORY_TILE_FLAGS,
+     EDITOR_CATEGORY_BLOCK,
+     // EDITOR_CATEGORY_INTERACTIVE_LEVER,
+     EDITOR_CATEGORY_COUNT,
+};
+
+struct Editor_t{
+     ObjectArray_t<ObjectArray_t<Stamp_t>> category_array;
+     EditorMode_t mode = EDITOR_MODE_OFF;
+
+     S32 category = 0;
+     S32 stamp = 0;
+
+     Coord_t selection_start;
+     Coord_t selection_end;
+
+     Coord_t clipboard_start_offset;
+     Coord_t clipboard_end_offset;
+
+     ObjectArray_t<Stamp_t> selection;
+     ObjectArray_t<Stamp_t> clipboard;
+};
+
+bool init(Editor_t* editor){
+     memset(editor, 0, sizeof(*editor));
+     init(&editor->category_array, EDITOR_CATEGORY_COUNT);
+
+     // tile
+     auto* tile_category = editor->category_array.elements + EDITOR_CATEGORY_TILE_ID;
+     init(tile_category, 48);
+     for(S16 i = 0; i < tile_category->count; i++){
+          tile_category->elements[i].type = STAMP_TYPE_TILE_ID;
+          tile_category->elements[i].tile_id = (U8)(i);
+     }
+
+     auto* block_category = editor->category_array.elements + EDITOR_CATEGORY_BLOCK;
+     init(block_category, 4);
+     for(S16 i = 0; i < tile_category->count; i++){
+          tile_category->elements[i].type = STAMP_TYPE_BLOCK;
+          tile_category->elements[i].block.face = DIRECTION_LEFT;
+          tile_category->elements[i].block.element = (Element_t)(i);
+     }
 
      return true;
 }
@@ -1317,52 +1444,54 @@ int main(int argc, char** argv){
 
      auto* interactive_quad_tree = interactive_quad_tree_build(&interactive_array);
 
+#define SOLID_TILE 16
+
      TileMap_t tilemap;
      {
           init(&tilemap, 34, 17);
 
           for(S16 i = 0; i < 17; i++){
-               tilemap.tiles[0][i].id = 1;
-               tilemap.tiles[tilemap.height - 1][i].id = 1;
+               tilemap.tiles[0][i].id = SOLID_TILE;
+               tilemap.tiles[tilemap.height - 1][i].id = SOLID_TILE;
           }
 
           for(S16 i = 0; i < 10; i++){
-               tilemap.tiles[5][17 + i].id = 1;
-               tilemap.tiles[15][17 + i].id = 1;
+               tilemap.tiles[5][17 + i].id = SOLID_TILE;
+               tilemap.tiles[15][17 + i].id = SOLID_TILE;
           }
 
           for(S16 i = 0; i < tilemap.height; i++){
-               tilemap.tiles[i][0].id = 1;
-               tilemap.tiles[i][16].id = 1;
-               tilemap.tiles[i][17].id = 1;
+               tilemap.tiles[i][0].id = SOLID_TILE;
+               tilemap.tiles[i][16].id = SOLID_TILE;
+               tilemap.tiles[i][17].id = SOLID_TILE;
           }
 
           for(S16 i = 0; i < 10; i++){
-               tilemap.tiles[5 + i][27].id = 1;
+               tilemap.tiles[5 + i][27].id = SOLID_TILE;
           }
 
           tilemap.tiles[10][17].id = 0;
           tilemap.tiles[10][16].id = 0;
 
-          tilemap.tiles[3][4].id = 1;
-          tilemap.tiles[4][5].id = 1;
+          tilemap.tiles[3][4].id = SOLID_TILE;
+          tilemap.tiles[4][5].id = SOLID_TILE;
 
-          tilemap.tiles[8][4].id = 1;
-          tilemap.tiles[8][5].id = 1;
+          tilemap.tiles[8][4].id = SOLID_TILE;
+          tilemap.tiles[8][5].id = SOLID_TILE;
 
-          tilemap.tiles[11][10].id = 1;
-          tilemap.tiles[12][10].id = 1;
+          tilemap.tiles[11][10].id = SOLID_TILE;
+          tilemap.tiles[12][10].id = SOLID_TILE;
 
-          tilemap.tiles[5][10].id = 1;
-          tilemap.tiles[7][10].id = 1;
+          tilemap.tiles[5][10].id = SOLID_TILE;
+          tilemap.tiles[7][10].id = SOLID_TILE;
 
-          tilemap.tiles[5][12].id = 1;
-          tilemap.tiles[7][12].id = 1;
+          tilemap.tiles[5][12].id = SOLID_TILE;
+          tilemap.tiles[7][12].id = SOLID_TILE;
 
-          tilemap.tiles[2][14].id = 1;
+          tilemap.tiles[2][14].id = SOLID_TILE;
 
-          tilemap.tiles[8][22].id = 1;
-          tilemap.tiles[9][23].id = 1;
+          tilemap.tiles[8][22].id = SOLID_TILE;
+          tilemap.tiles[9][23].id = SOLID_TILE;
 
           tilemap.tiles[8][6].flags |= TILE_FLAG_ICED;
           tilemap.tiles[9][6].flags |= TILE_FLAG_ICED;
@@ -1422,6 +1551,9 @@ int main(int argc, char** argv){
      Block_t* last_block_pushed = nullptr;
      Direction_t last_block_pushed_direction = DIRECTION_LEFT;
      Block_t* block_to_push = nullptr;
+
+     Editor_t editor;
+     init(&editor);
 
      FILE* demo_file = NULL;
      DemoEntry_t demo_entry {};
@@ -1525,6 +1657,17 @@ int main(int argc, char** argv){
                               interactive_quad_tree = interactive_quad_tree_build(&interactive_array);
                          }
                          break;
+#if DEBUG
+                    case SDL_SCANCODE_GRAVE:
+                         if(editor.mode == EDITOR_MODE_OFF){
+                              editor.mode = EDITOR_MODE_CATEGORY_SELECT;
+                         }else{
+                              editor.mode = EDITOR_MODE_OFF;
+                              editor.selection_start = {};
+                              editor.selection_end = {};
+                         }
+                         break;
+#endif
                     }
                     break;
                case SDL_KEYUP:
@@ -1921,8 +2064,6 @@ int main(int argc, char** argv){
           Position_t tile_bottom_left = coord_to_pos(min);
           Vec_t camera_offset = pos_to_vec(tile_bottom_left - screen_camera);
           Vec_t tex_vec;
-          Vec_t floor_tex_vec = theme_frame(0, 25);
-          Vec_t solid_tex_vec = theme_frame(0, 1);
           glBindTexture(GL_TEXTURE_2D, theme_texture);
           glBegin(GL_QUADS);
           glColor3f(1.0f, 1.0f, 1.0f);
@@ -1930,11 +2071,10 @@ int main(int argc, char** argv){
                for(S16 x = min.x; x <= max.x; x++){
                     Tile_t* tile = tilemap.tiles[y] + x;
 
-                    if(tile->id){
-                         tex_vec = solid_tex_vec;
-                    }else{
-                         tex_vec = floor_tex_vec;
-                    }
+                    U8 id_x = tile->id % 16;
+                    U8 id_y = tile->id / 16;
+
+                    tex_vec = theme_frame(id_x, id_y);
 
                     Vec_t tile_pos {(F32)(x - min.x) * TILE_SIZE + camera_offset.x,
                                     (F32)(y - min.y) * TILE_SIZE + camera_offset.y};

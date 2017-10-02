@@ -3,6 +3,8 @@
 #include "types.h"
 #include "coord.h"
 
+#define TILE_ID_SOLID_START 16
+
 enum TileFlag_t : U16{
      TILE_FLAG_ICED = 1,
      TILE_FLAG_CHECKPOINT = 2,
