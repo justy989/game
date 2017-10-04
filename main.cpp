@@ -1315,13 +1315,41 @@ bool init(Editor_t* editor){
 
      auto* block_category = editor->category_array.elements + EDITOR_CATEGORY_BLOCK;
      init(block_category, 4);
-     for(S16 i = 0; i < tile_category->count; i++){
-          tile_category->elements[i].type = STAMP_TYPE_BLOCK;
-          tile_category->elements[i].block.face = DIRECTION_LEFT;
-          tile_category->elements[i].block.element = (Element_t)(i);
+     for(S16 i = 0; i < block_category->count; i++){
+          block_category->elements[i].type = STAMP_TYPE_BLOCK;
+          block_category->elements[i].block.face = DIRECTION_LEFT;
+          block_category->elements[i].block.element = (Element_t)(i);
      }
 
      return true;
+}
+
+void tile_id_draw(U8 id, Vec_t pos){
+     U8 id_x = id % 16;
+     U8 id_y = id / 16;
+
+     Vec_t tex_vec = theme_frame(id_x, id_y);
+
+     glTexCoord2f(tex_vec.x, tex_vec.y);
+     glVertex2f(pos.x, pos.y);
+     glTexCoord2f(tex_vec.x, tex_vec.y + THEME_FRAME_HEIGHT);
+     glVertex2f(pos.x, pos.y + TILE_SIZE);
+     glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y + THEME_FRAME_HEIGHT);
+     glVertex2f(pos.x + TILE_SIZE, pos.y + TILE_SIZE);
+     glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y);
+     glVertex2f(pos.x + TILE_SIZE, pos.y);
+
+}
+
+Coord_t mouse_select_coord(Vec_t mouse_screen)
+{
+     return {(S16)(mouse_screen.x * (F32)(ROOM_TILE_SIZE)), (S16)(mouse_screen.y * (F32)(ROOM_TILE_SIZE))};
+}
+
+S32 mouse_select_index(Vec_t mouse_screen)
+{
+     Coord_t coord = mouse_select_coord(mouse_screen);
+     return coord.y * ROOM_TILE_SIZE + coord.x;
 }
 
 using namespace std::chrono;
@@ -1552,6 +1580,10 @@ int main(int argc, char** argv){
      Direction_t last_block_pushed_direction = DIRECTION_LEFT;
      Block_t* block_to_push = nullptr;
 
+     // bool left_click_down = false;
+     Vec_t mouse_screen = {}; // 0.0f to 1.0f
+     Position_t mouse_world = {};
+
      Editor_t editor;
      init(&editor);
 
@@ -1624,20 +1656,40 @@ int main(int argc, char** argv){
                          quit = true;
                          break;
                     case SDL_SCANCODE_LEFT:
-                         player_action_perform(&player_action, &player, PLAYER_ACTION_TYPE_MOVE_LEFT_START, demo_mode,
-                                               demo_file, frame_count);
+                         if(editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
+                              editor.selection_start.x--;
+                              editor.selection_end.x--;
+                         }else{
+                              player_action_perform(&player_action, &player, PLAYER_ACTION_TYPE_MOVE_LEFT_START, demo_mode,
+                                                    demo_file, frame_count);
+                         }
                          break;
                     case SDL_SCANCODE_RIGHT:
-                         player_action_perform(&player_action, &player, PLAYER_ACTION_TYPE_MOVE_RIGHT_START, demo_mode,
-                                               demo_file, frame_count);
+                         if(editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
+                              editor.selection_start.x++;
+                              editor.selection_end.x++;
+                         }else{
+                              player_action_perform(&player_action, &player, PLAYER_ACTION_TYPE_MOVE_RIGHT_START, demo_mode,
+                                                    demo_file, frame_count);
+                         }
                          break;
                     case SDL_SCANCODE_UP:
-                         player_action_perform(&player_action, &player, PLAYER_ACTION_TYPE_MOVE_UP_START, demo_mode,
-                                               demo_file, frame_count);
+                         if(editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
+                              editor.selection_start.y++;
+                              editor.selection_end.y++;
+                         }else{
+                              player_action_perform(&player_action, &player, PLAYER_ACTION_TYPE_MOVE_UP_START, demo_mode,
+                                                    demo_file, frame_count);
+                         }
                          break;
                     case SDL_SCANCODE_DOWN:
-                         player_action_perform(&player_action, &player, PLAYER_ACTION_TYPE_MOVE_DOWN_START, demo_mode,
-                                               demo_file, frame_count);
+                         if(editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
+                              editor.selection_start.y--;
+                              editor.selection_end.y--;
+                         }else{
+                              player_action_perform(&player_action, &player, PLAYER_ACTION_TYPE_MOVE_DOWN_START, demo_mode,
+                                                    demo_file, frame_count);
+                         }
                          break;
                     case SDL_SCANCODE_E:
                          player_action_perform(&player_action, &player, PLAYER_ACTION_TYPE_ACTIVATE_START, demo_mode,
@@ -1657,7 +1709,7 @@ int main(int argc, char** argv){
                               interactive_quad_tree = interactive_quad_tree_build(&interactive_array);
                          }
                          break;
-#if DEBUG
+                    // TODO: #ifdef DEBUG
                     case SDL_SCANCODE_GRAVE:
                          if(editor.mode == EDITOR_MODE_OFF){
                               editor.mode = EDITOR_MODE_CATEGORY_SELECT;
@@ -1667,7 +1719,6 @@ int main(int argc, char** argv){
                               editor.selection_end = {};
                          }
                          break;
-#endif
                     }
                     break;
                case SDL_KEYUP:
@@ -1698,6 +1749,48 @@ int main(int argc, char** argv){
                                                demo_file, frame_count);
                          break;
                     }
+                    break;
+               case SDL_MOUSEBUTTONDOWN:
+                    switch(sdl_event.button.button){
+                    default:
+                         break;
+                    case SDL_BUTTON_LEFT:
+                         // left_click_down = true;
+
+                         switch(editor.mode){
+                         default:
+                              break;
+                         case EDITOR_MODE_OFF:
+                              break;
+                         case EDITOR_MODE_CATEGORY_SELECT:
+                         {
+                              S32 select_index = mouse_select_index(mouse_screen);
+                              if(select_index < EDITOR_CATEGORY_COUNT){
+                                   editor.mode = EDITOR_MODE_STAMP_SELECT;
+                                   editor.category = select_index;
+                                   editor.stamp = 0;
+                              }else{
+                                   editor.mode = EDITOR_MODE_CREATE_SELECTION;
+                                   editor.selection_start = pixel_to_coord(mouse_world.pixel);
+                                   editor.selection_end = editor.selection_start;
+                              }
+                         } break;
+                         }
+                    }
+                    break;
+               case SDL_MOUSEBUTTONUP:
+                    switch(sdl_event.button.button){
+                    default:
+                         break;
+                    case SDL_BUTTON_LEFT:
+                         // left_click_down = false;
+                         break;
+                    }
+                    break;
+               case SDL_MOUSEMOTION:
+                    mouse_screen = Vec_t{((F32)(sdl_event.button.x) / (F32)(window_width)),
+                                         1.0f - ((F32)(sdl_event.button.y) / (F32)(window_height))};
+                    mouse_world = camera + (mouse_screen * 2.0f) - Vec_t{1.0f, 1.0f};
                     break;
                }
           }
@@ -2071,22 +2164,10 @@ int main(int argc, char** argv){
                for(S16 x = min.x; x <= max.x; x++){
                     Tile_t* tile = tilemap.tiles[y] + x;
 
-                    U8 id_x = tile->id % 16;
-                    U8 id_y = tile->id / 16;
-
-                    tex_vec = theme_frame(id_x, id_y);
-
                     Vec_t tile_pos {(F32)(x - min.x) * TILE_SIZE + camera_offset.x,
                                     (F32)(y - min.y) * TILE_SIZE + camera_offset.y};
 
-                    glTexCoord2f(tex_vec.x, tex_vec.y);
-                    glVertex2f(tile_pos.x, tile_pos.y);
-                    glTexCoord2f(tex_vec.x, tex_vec.y + THEME_FRAME_HEIGHT);
-                    glVertex2f(tile_pos.x, tile_pos.y + TILE_SIZE);
-                    glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y + THEME_FRAME_HEIGHT);
-                    glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y + TILE_SIZE);
-                    glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y);
-                    glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y);
+                    tile_id_draw(tile->id, tile_pos);
 
                     if(tile->flags >= TILE_FLAG_WIRE_LEFT_OFF){
                          S16 frame_y = 9;
@@ -2238,6 +2319,90 @@ int main(int argc, char** argv){
                }
           }
           glEnd();
+
+          // editor
+          switch(editor.mode){
+          default:
+               break;
+          case EDITOR_MODE_OFF:
+               // pass
+               break;
+          case EDITOR_MODE_CATEGORY_SELECT:
+          {
+               glBindTexture(GL_TEXTURE_2D, theme_texture);
+               glBegin(GL_QUADS);
+               glColor3f(1.0f, 1.0f, 1.0f);
+
+               Vec_t pos = {0.0f, 0.0f};
+
+               for(S32 g = 0; g < editor.category_array.count; ++g){
+                    auto* group = editor.category_array.elements + g;
+                    auto* stamp = group->elements + 0;
+
+                    if(g && (g % ROOM_TILE_SIZE) == 0){
+                         pos.x = -1.0f;
+                         pos.y += TILE_SIZE;
+                    }
+
+                    switch(stamp->type){
+                    default:
+                         break;
+                    case STAMP_TYPE_TILE_ID:
+                         tile_id_draw(stamp->tile_id, pos);
+                         break;
+                    case STAMP_TYPE_TILE_FLAGS:
+                         // flat_draw(&stamp->flat, pos, app.controller != nullptr, false);
+                         break;
+                    case STAMP_TYPE_BLOCK:
+                         // if(stamp->solid.type == SOLID_DOOR){
+                         //      solid_draw_door_bottom(&stamp->solid, pos);
+                         // }else{
+                         //      solid_draw(&stamp->solid, pos);
+                         // }
+                         break;
+                    case STAMP_TYPE_INTERACTIVE:
+                         // block_draw(&stamp->block, pos, block_frame);
+                         break;
+                    }
+
+                    pos.x += TILE_SIZE;
+               }
+
+               glEnd();
+          } break;
+          case EDITOR_MODE_STAMP_SELECT:
+          {
+               glBindTexture(GL_TEXTURE_2D, theme_texture);
+               glBegin(GL_QUADS);
+               glColor3f(1.0f, 1.0f, 1.0f);
+
+               // draw stamps to select from at the bottom
+               Vec_t pos = {0.0f, 0.0f};
+               int max_stamp_height = 1;
+               auto* category = editor.category_array.elements + editor.category;
+
+               for(S32 g = 0; g < category->count; ++g){
+                    auto* stamp = category->elements + g;
+                    switch(stamp->type){
+                    default:
+                         break;
+                    case STAMP_TYPE_TILE_ID:
+                         tile_id_draw(stamp->tile_id, pos + coord_to_vec(stamp->offset));
+                         break;
+                    }
+
+                    pos.x += (F32)(max_stamp_height) * TILE_SIZE;
+
+                    if(pos.x + TILE_SIZE >= 1.0f){
+                         pos.x = -1.0f;
+                         pos.y += max_stamp_height * TILE_SIZE;
+                         max_stamp_height = 1;
+                    }
+               }
+
+               glEnd();
+          } break;
+          }
 
           SDL_GL_SwapWindow(window);
      }
