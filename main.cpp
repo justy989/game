@@ -1324,6 +1324,16 @@ bool init(Editor_t* editor){
      return true;
 }
 
+void destroy(Editor_t* editor){
+     for(S16 i = 0; i < editor->category_array.count; i++){
+          destroy(editor->category_array.elements + i);
+     }
+
+     destroy(&editor->category_array);
+     destroy(&editor->selection);
+     destroy(&editor->clipboard);
+}
+
 void tile_id_draw(U8 id, Vec_t pos){
      U8 id_x = id % 16;
      U8 id_y = id / 16;
