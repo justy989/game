@@ -1362,6 +1362,13 @@ S32 mouse_select_index(Vec_t mouse_screen)
      return coord.y * ROOM_TILE_SIZE + coord.x;
 }
 
+Vec_t coord_to_screen_position(Coord_t coord)
+{
+     Pixel_t pixel = coord_to_pixel(coord);
+     Position_t relative_loc {pixel, 0, {0.0f, 0.0f}};
+     return pos_to_vec(relative_loc);
+}
+
 using namespace std::chrono;
 
 int main(int argc, char** argv){
@@ -1785,6 +1792,19 @@ int main(int argc, char** argv){
                                    editor.selection_end = editor.selection_start;
                               }
                          } break;
+                         case EDITOR_MODE_STAMP_SELECT:
+                         {
+                              S32 select_index = mouse_select_index(mouse_screen);
+                              if(select_index < editor.category_array.elements[editor.category].count){
+                                   editor.stamp = select_index;
+                              }else{
+                                   Coord_t select_coord = mouse_select_coord(mouse_screen) + (pos_to_coord(camera) - Coord_t{ROOM_TILE_SIZE / 2 - 1, ROOM_TILE_SIZE / 2 - 1});
+                                   Tile_t* tile =tilemap_get_tile(&tilemap, select_coord);
+                                   if(tile){
+                                        tile->id = editor.category_array.elements[editor.category].elements[editor.stamp].tile_id;
+                                   }
+                              }
+                         } break;
                          }
                     }
                     break;
@@ -1800,7 +1820,7 @@ int main(int argc, char** argv){
                case SDL_MOUSEMOTION:
                     mouse_screen = Vec_t{((F32)(sdl_event.button.x) / (F32)(window_width)),
                                          1.0f - ((F32)(sdl_event.button.y) / (F32)(window_height))};
-                    mouse_world = camera + (mouse_screen * 2.0f) - Vec_t{1.0f, 1.0f};
+                    mouse_world = vec_to_pos(mouse_screen);
                     break;
                }
           }
@@ -2346,8 +2366,8 @@ int main(int argc, char** argv){
                Vec_t pos = {0.0f, 0.0f};
 
                for(S32 g = 0; g < editor.category_array.count; ++g){
-                    auto* group = editor.category_array.elements + g;
-                    auto* stamp = group->elements + 0;
+                    auto* stamp_array = editor.category_array.elements + g;
+                    auto* stamp = stamp_array->elements + 0;
 
                     if(g && (g % ROOM_TILE_SIZE) == 0){
                          pos.x = -1.0f;
@@ -2386,13 +2406,26 @@ int main(int argc, char** argv){
                glBegin(GL_QUADS);
                glColor3f(1.0f, 1.0f, 1.0f);
 
+               // draw stamp at mouse
+               auto* mouse_stamp = editor.category_array.elements[editor.category].elements + editor.stamp;
+               Coord_t mouse_coord = mouse_select_coord(mouse_screen);
+               Vec_t stamp_pos = coord_to_screen_position(mouse_coord);
+
+               switch(mouse_stamp->type){
+               default:
+                    break;
+               case STAMP_TYPE_TILE_ID:
+                    tile_id_draw(mouse_stamp->tile_id, stamp_pos);
+                    break;
+               }
+
                // draw stamps to select from at the bottom
                Vec_t pos = {0.0f, 0.0f};
                int max_stamp_height = 1;
-               auto* category = editor.category_array.elements + editor.category;
+               auto* stamp_array = editor.category_array.elements + editor.category;
 
-               for(S32 g = 0; g < category->count; ++g){
-                    auto* stamp = category->elements + g;
+               for(S32 g = 0; g < stamp_array->count; ++g){
+                    auto* stamp = stamp_array->elements + g;
                     switch(stamp->type){
                     default:
                          break;
@@ -2403,10 +2436,10 @@ int main(int argc, char** argv){
 
                     pos.x += (F32)(max_stamp_height) * TILE_SIZE;
 
-                    if(pos.x + TILE_SIZE >= 1.0f){
-                         pos.x = -1.0f;
+                    if(g > 0 && (g % ROOM_TILE_SIZE) == 0){
+                         pos.x = 0.0f;
                          pos.y += max_stamp_height * TILE_SIZE;
-                         max_stamp_height = 1;
+                         // max_stamp_height = 1;
                     }
                }
 

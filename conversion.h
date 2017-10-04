@@ -11,6 +11,7 @@ Coord_t pos_to_coord(Position_t p);
 Pixel_t coord_to_pixel(Coord_t c);
 Position_t coord_to_pos_at_tile_center(Coord_t c);
 Position_t coord_to_pos(Coord_t c);
+Position_t vec_to_pos(Vec_t v);
 DirectionMask_t directions_between(Coord_t a, Coord_t b);
 DirectionMask_t directions_between(Pixel_t a, Pixel_t b);
 Direction_t relative_quadrant(Pixel_t a, Pixel_t b);

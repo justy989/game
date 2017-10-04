@@ -54,6 +54,13 @@ Position_t coord_to_pos(Coord_t c){
      return pixel_pos(coord_to_pixel(c));
 }
 
+Position_t vec_to_pos(Vec_t v){
+     Position_t p = {};
+     p.decimal = v;
+     canonicalize(&p);
+     return p;
+}
+
 DirectionMask_t directions_between(Coord_t a, Coord_t b){
      Coord_t c = b - a;
 
