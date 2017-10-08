@@ -1351,6 +1351,31 @@ void tile_id_draw(U8 id, Vec_t pos){
 
 }
 
+void block_draw(Block_t* block, Vec_t pos_vec){
+     Vec_t tex_vec = theme_frame(0, 6);
+     glTexCoord2f(tex_vec.x, tex_vec.y);
+     glVertex2f(pos_vec.x, pos_vec.y);
+     glTexCoord2f(tex_vec.x, tex_vec.y + 2.0f * THEME_FRAME_HEIGHT);
+     glVertex2f(pos_vec.x, pos_vec.y + 2.0f * TILE_SIZE);
+     glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y + 2.0f * THEME_FRAME_HEIGHT);
+     glVertex2f(pos_vec.x + TILE_SIZE, pos_vec.y + 2.0f * TILE_SIZE);
+     glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y);
+     glVertex2f(pos_vec.x + TILE_SIZE, pos_vec.y);
+
+     if(block->element == ELEMENT_FIRE){
+          tex_vec = theme_frame(1, 6);
+          // TODO: compress
+          glTexCoord2f(tex_vec.x, tex_vec.y);
+          glVertex2f(pos_vec.x, pos_vec.y);
+          glTexCoord2f(tex_vec.x, tex_vec.y + 2.0f * THEME_FRAME_HEIGHT);
+          glVertex2f(pos_vec.x, pos_vec.y + 2.0f * TILE_SIZE);
+          glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y + 2.0f * THEME_FRAME_HEIGHT);
+          glVertex2f(pos_vec.x + TILE_SIZE, pos_vec.y + 2.0f * TILE_SIZE);
+          glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y);
+          glVertex2f(pos_vec.x + TILE_SIZE, pos_vec.y);
+     }
+}
+
 Coord_t mouse_select_coord(Vec_t mouse_screen)
 {
      return {(S16)(mouse_screen.x * (F32)(ROOM_TILE_SIZE)), (S16)(mouse_screen.y * (F32)(ROOM_TILE_SIZE))};
@@ -1798,10 +1823,19 @@ int main(int argc, char** argv){
                               if(select_index < editor.category_array.elements[editor.category].count){
                                    editor.stamp = select_index;
                               }else{
-                                   Coord_t select_coord = mouse_select_coord(mouse_screen) + (pos_to_coord(camera) - Coord_t{ROOM_TILE_SIZE / 2 - 1, ROOM_TILE_SIZE / 2 - 1});
-                                   Tile_t* tile =tilemap_get_tile(&tilemap, select_coord);
-                                   if(tile){
-                                        tile->id = editor.category_array.elements[editor.category].elements[editor.stamp].tile_id;
+                                   Stamp_t* stamp = editor.category_array.elements[editor.category].elements + editor.stamp;
+                                   switch(stamp->type){
+                                   default:
+                                        break;
+                                   case STAMP_TYPE_TILE_ID:
+                                   {
+                                        Coord_t select_coord = mouse_select_coord(mouse_screen) + (pos_to_coord(camera) - Coord_t{ROOM_TILE_SIZE / 2 - 1, ROOM_TILE_SIZE / 2 - 1});
+                                        Tile_t* tile = tilemap_get_tile(&tilemap, select_coord);
+                                        if(tile) tile->id = stamp->tile_id;
+                                   } break;
+                                   case STAMP_TYPE_BLOCK:
+                                   {
+                                   } break;
                                    }
                               }
                          } break;
@@ -2226,21 +2260,12 @@ int main(int argc, char** argv){
           glEnd();
 
           // block
-          tex_vec = theme_frame(0, 6);
           glBegin(GL_QUADS);
           for(S16 i = 0; i < block_array.count; i++){
                Block_t* block = block_array.blocks + i;
                Position_t block_camera_offset = block->pos - screen_camera;
                block_camera_offset.pixel.y += block->pos.z;
-               pos_vec = pos_to_vec(block_camera_offset);
-               glTexCoord2f(tex_vec.x, tex_vec.y);
-               glVertex2f(pos_vec.x, pos_vec.y);
-               glTexCoord2f(tex_vec.x, tex_vec.y + 2.0f * THEME_FRAME_HEIGHT);
-               glVertex2f(pos_vec.x, pos_vec.y + 2.0f * TILE_SIZE);
-               glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y + 2.0f * THEME_FRAME_HEIGHT);
-               glVertex2f(pos_vec.x + TILE_SIZE, pos_vec.y + 2.0f * TILE_SIZE);
-               glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y);
-               glVertex2f(pos_vec.x + TILE_SIZE, pos_vec.y);
+               block_draw(block, pos_to_vec(block_camera_offset));
           }
           glEnd();
 
@@ -2363,39 +2388,46 @@ int main(int argc, char** argv){
                glBegin(GL_QUADS);
                glColor3f(1.0f, 1.0f, 1.0f);
 
-               Vec_t pos = {0.0f, 0.0f};
+               Vec_t vec = {0.0f, 0.0f};
 
                for(S32 g = 0; g < editor.category_array.count; ++g){
                     auto* stamp_array = editor.category_array.elements + g;
                     auto* stamp = stamp_array->elements + 0;
 
                     if(g && (g % ROOM_TILE_SIZE) == 0){
-                         pos.x = -1.0f;
-                         pos.y += TILE_SIZE;
+                         vec.x = -1.0f;
+                         vec.y += TILE_SIZE;
                     }
 
                     switch(stamp->type){
                     default:
                          break;
                     case STAMP_TYPE_TILE_ID:
-                         tile_id_draw(stamp->tile_id, pos);
+                         tile_id_draw(stamp->tile_id, vec);
                          break;
                     case STAMP_TYPE_TILE_FLAGS:
-                         // flat_draw(&stamp->flat, pos, app.controller != nullptr, false);
+                         // flat_draw(&stamp->flat, vec, app.controller != nullptr, false);
                          break;
                     case STAMP_TYPE_BLOCK:
-                         // if(stamp->solid.type == SOLID_DOOR){
-                         //      solid_draw_door_bottom(&stamp->solid, pos);
-                         // }else{
-                         //      solid_draw(&stamp->solid, pos);
-                         // }
-                         break;
+                    {
+                         Block_t block = {};
+                         block.pos = vec_to_pos(vec);
+                         block.element = stamp->block.element;
+                         block.face = stamp->block.face;
+
+                         block_draw(&block, vec);
+                    } break;
                     case STAMP_TYPE_INTERACTIVE:
-                         // block_draw(&stamp->block, pos, block_frame);
+                         // if(stamp->solid.type == SOLID_DOOR){
+                         //      solid_draw_door_bottom(&stamp->solid, vec);
+                         // }else{
+                         //      solid_draw(&stamp->solid, vec);
+                         // }
+                         // block_draw(&stamp->block, vec, block_frame);
                          break;
                     }
 
-                    pos.x += TILE_SIZE;
+                    vec.x += TILE_SIZE;
                }
 
                glEnd();
