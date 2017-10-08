@@ -471,27 +471,6 @@ bool interactive_is_solid(Interactive_t* interactive){
              (interactive->type == INTERACTIVE_TYPE_POPUP && interactive->popup.lift.ticks > 1));
 }
 
-struct InteractiveArray_t{
-     Interactive_t* interactives;
-     S16 count;
-};
-
-bool init(InteractiveArray_t* interactive_array, S16 count){
-     interactive_array->interactives = (Interactive_t*)(calloc(count, sizeof(*interactive_array->interactives)));
-     if(!interactive_array->interactives){
-          LOG("failed to calloc %d interactives\n", count);
-          return false;
-     }
-     interactive_array->count = count;
-     return true;
-}
-
-void destroy(InteractiveArray_t* interactive_array){
-     free(interactive_array->interactives);
-     interactive_array->interactives = nullptr;
-     interactive_array->count = 0;
-}
-
 struct InteractiveQuadTreeBounds_t{
      Coord_t min;
      Coord_t max;
@@ -590,26 +569,26 @@ bool interactive_quad_tree_insert(InteractiveQuadTreeNode_t* node, Interactive_t
      return false;
 }
 
-InteractiveQuadTreeNode_t* interactive_quad_tree_build(InteractiveArray_t* interactive_array){
+InteractiveQuadTreeNode_t* interactive_quad_tree_build(ObjectArray_t<Interactive_t>* interactive_array){
      if(interactive_array->count == 0) return nullptr;
 
      InteractiveQuadTreeNode_t* root = (InteractiveQuadTreeNode_t*)(calloc(1, sizeof(*root)));
-     root->bounds.min.x = interactive_array->interactives[0].coord.x;
-     root->bounds.max.x = interactive_array->interactives[0].coord.x;
-     root->bounds.min.y = interactive_array->interactives[0].coord.y;
-     root->bounds.max.y = interactive_array->interactives[0].coord.y;
+     root->bounds.min.x = interactive_array->elements[0].coord.x;
+     root->bounds.max.x = interactive_array->elements[0].coord.x;
+     root->bounds.min.y = interactive_array->elements[0].coord.y;
+     root->bounds.max.y = interactive_array->elements[0].coord.y;
 
      // find mins/maxs for dimensions
      for(int i = 0; i < interactive_array->count; i++){
-          if(root->bounds.min.x > interactive_array->interactives[i].coord.x) root->bounds.min.x = interactive_array->interactives[i].coord.x;
-          if(root->bounds.max.x < interactive_array->interactives[i].coord.x) root->bounds.max.x = interactive_array->interactives[i].coord.x;
-          if(root->bounds.min.y > interactive_array->interactives[i].coord.y) root->bounds.min.y = interactive_array->interactives[i].coord.y;
-          if(root->bounds.max.y < interactive_array->interactives[i].coord.y) root->bounds.max.y = interactive_array->interactives[i].coord.y;
+          if(root->bounds.min.x > interactive_array->elements[i].coord.x) root->bounds.min.x = interactive_array->elements[i].coord.x;
+          if(root->bounds.max.x < interactive_array->elements[i].coord.x) root->bounds.max.x = interactive_array->elements[i].coord.x;
+          if(root->bounds.min.y > interactive_array->elements[i].coord.y) root->bounds.min.y = interactive_array->elements[i].coord.y;
+          if(root->bounds.max.y < interactive_array->elements[i].coord.y) root->bounds.max.y = interactive_array->elements[i].coord.y;
      }
 
      // insert coords
      for(int i = 0; i < interactive_array->count; i++){
-          if(!interactive_quad_tree_insert(root, interactive_array->interactives + i)) break;
+          if(!interactive_quad_tree_insert(root, interactive_array->elements + i)) break;
      }
 
      return root;
@@ -970,7 +949,7 @@ struct MapInteractiveV1_t{
 };
 #pragma pack(pop)
 
-bool save_map(const TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array, InteractiveArray_t* interactive_array,
+bool save_map(const TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array, ObjectArray_t<Interactive_t>* interactive_array,
               const char* filepath){
      // alloc and convert map elements to map format
      S32 map_tile_count = (S32)(tilemap->width) * (S32)(tilemap->height);
@@ -1010,8 +989,8 @@ bool save_map(const TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array, Int
      }
 
      for(S16 i = 0; i < interactive_array->count; i++){
-          map_interactives[i].coord = interactive_array->interactives[i].coord;
-          map_interactives[i].type = interactive_array->interactives[i].type;
+          map_interactives[i].coord = interactive_array->elements[i].coord;
+          map_interactives[i].type = interactive_array->elements[i].type;
 
           switch(map_interactives[i].type){
           default:
@@ -1019,30 +998,30 @@ bool save_map(const TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array, Int
           case INTERACTIVE_TYPE_BOW:
                break;
           case INTERACTIVE_TYPE_PRESSURE_PLATE:
-               map_interactives[i].pressure_plate = interactive_array->interactives[i].pressure_plate;
+               map_interactives[i].pressure_plate = interactive_array->elements[i].pressure_plate;
                break;
           case INTERACTIVE_TYPE_WIRE_CLUSTER:
-               map_interactives[i].wire_cluster = interactive_array->interactives[i].wire_cluster;
+               map_interactives[i].wire_cluster = interactive_array->elements[i].wire_cluster;
                break;
           case INTERACTIVE_TYPE_LIGHT_DETECTOR:
           case INTERACTIVE_TYPE_ICE_DETECTOR:
-               map_interactives[i].detector = interactive_array->interactives[i].detector;
+               map_interactives[i].detector = interactive_array->elements[i].detector;
                break;
           case INTERACTIVE_TYPE_POPUP:
-               map_interactives[i].popup.up = interactive_array->interactives[i].popup.lift.up;
-               map_interactives[i].popup.iced = interactive_array->interactives[i].popup.iced;
+               map_interactives[i].popup.up = interactive_array->elements[i].popup.lift.up;
+               map_interactives[i].popup.iced = interactive_array->elements[i].popup.iced;
                break;
           case INTERACTIVE_TYPE_DOOR:
-               map_interactives[i].door.up = interactive_array->interactives[i].door.lift.up;
-               map_interactives[i].door.face = interactive_array->interactives[i].door.face;
+               map_interactives[i].door.up = interactive_array->elements[i].door.lift.up;
+               map_interactives[i].door.face = interactive_array->elements[i].door.face;
                break;
           case INTERACTIVE_TYPE_PORTAL:
-               map_interactives[i].portal.face = interactive_array->interactives[i].portal.face;
-               map_interactives[i].portal.on = interactive_array->interactives[i].portal.on;
+               map_interactives[i].portal.face = interactive_array->elements[i].portal.face;
+               map_interactives[i].portal.on = interactive_array->elements[i].portal.on;
                break;
           case INTERACTIVE_TYPE_STAIRS:
-               map_interactives[i].stairs.up = interactive_array->interactives[i].stairs.up;
-               map_interactives[i].stairs.face = interactive_array->interactives[i].stairs.face;
+               map_interactives[i].stairs.up = interactive_array->elements[i].stairs.up;
+               map_interactives[i].stairs.face = interactive_array->elements[i].stairs.face;
                break;
           case INTERACTIVE_TYPE_PROMPT:
                break;
@@ -1074,7 +1053,7 @@ bool save_map(const TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array, Int
      return true;
 }
 
-bool load_map(TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array, InteractiveArray_t* interactive_array,
+bool load_map(TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array, ObjectArray_t<Interactive_t>* interactive_array,
               const char* filepath){
      // read counts from file
      S16 map_width;
@@ -1152,8 +1131,8 @@ bool load_map(TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array, Interacti
      }
 
      for(S16 i = 0; i < interactive_array->count; i++){
-          interactive_array->interactives[i].coord = map_interactives[i].coord;
-          interactive_array->interactives[i].type = map_interactives[i].type;
+          interactive_array->elements[i].coord = map_interactives[i].coord;
+          interactive_array->elements[i].type = map_interactives[i].type;
 
           switch(map_interactives[i].type){
           default:
@@ -1161,35 +1140,35 @@ bool load_map(TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array, Interacti
           case INTERACTIVE_TYPE_BOW:
                break;
           case INTERACTIVE_TYPE_PRESSURE_PLATE:
-               interactive_array->interactives[i].pressure_plate = map_interactives[i].pressure_plate;
+               interactive_array->elements[i].pressure_plate = map_interactives[i].pressure_plate;
                break;
           case INTERACTIVE_TYPE_WIRE_CLUSTER:
-               interactive_array->interactives[i].wire_cluster = map_interactives[i].wire_cluster;
+               interactive_array->elements[i].wire_cluster = map_interactives[i].wire_cluster;
                break;
           case INTERACTIVE_TYPE_LIGHT_DETECTOR:
           case INTERACTIVE_TYPE_ICE_DETECTOR:
-               interactive_array->interactives[i].detector = map_interactives[i].detector;
+               interactive_array->elements[i].detector = map_interactives[i].detector;
                break;
           case INTERACTIVE_TYPE_POPUP:
-               interactive_array->interactives[i].popup.lift.up = map_interactives[i].popup.up;
-               interactive_array->interactives[i].popup.iced = map_interactives[i].popup.iced;
-               if(interactive_array->interactives[i].popup.lift.up){
-                    interactive_array->interactives[i].popup.lift.ticks = HEIGHT_INTERVAL + 1;
+               interactive_array->elements[i].popup.lift.up = map_interactives[i].popup.up;
+               interactive_array->elements[i].popup.iced = map_interactives[i].popup.iced;
+               if(interactive_array->elements[i].popup.lift.up){
+                    interactive_array->elements[i].popup.lift.ticks = HEIGHT_INTERVAL + 1;
                }else{
-                    interactive_array->interactives[i].popup.lift.ticks = 1;
+                    interactive_array->elements[i].popup.lift.ticks = 1;
                }
                break;
           case INTERACTIVE_TYPE_DOOR:
-               interactive_array->interactives[i].door.lift.up = map_interactives[i].door.up;
-               interactive_array->interactives[i].door.face = map_interactives[i].door.face;
+               interactive_array->elements[i].door.lift.up = map_interactives[i].door.up;
+               interactive_array->elements[i].door.face = map_interactives[i].door.face;
                break;
           case INTERACTIVE_TYPE_PORTAL:
-               interactive_array->interactives[i].portal.face = map_interactives[i].portal.face;
-               interactive_array->interactives[i].portal.on = map_interactives[i].portal.on;
+               interactive_array->elements[i].portal.face = map_interactives[i].portal.face;
+               interactive_array->elements[i].portal.on = map_interactives[i].portal.on;
                break;
           case INTERACTIVE_TYPE_STAIRS:
-               interactive_array->interactives[i].stairs.up = map_interactives[i].stairs.up;
-               interactive_array->interactives[i].stairs.face = map_interactives[i].stairs.face;
+               interactive_array->elements[i].stairs.up = map_interactives[i].stairs.up;
+               interactive_array->elements[i].stairs.face = map_interactives[i].stairs.face;
                break;
           case INTERACTIVE_TYPE_PROMPT:
                break;
@@ -1472,23 +1451,23 @@ int main(int argc, char** argv){
           }
      }
 
-     InteractiveArray_t interactive_array;
+     ObjectArray_t<Interactive_t> interactive_array;
      {
           if(!init(&interactive_array, 4)){
                return 1;
           }
 
-          interactive_array.interactives[0].type = INTERACTIVE_TYPE_LEVER;
-          interactive_array.interactives[0].coord = Coord_t{3, 9};
-          interactive_array.interactives[1].type = INTERACTIVE_TYPE_POPUP;
-          interactive_array.interactives[1].coord = Coord_t{5, 11};
-          interactive_array.interactives[1].popup.lift.ticks = 1;
-          interactive_array.interactives[2].type = INTERACTIVE_TYPE_POPUP;
-          interactive_array.interactives[2].coord = Coord_t{9, 2};
-          interactive_array.interactives[2].popup.lift.ticks = HEIGHT_INTERVAL + 1;
-          interactive_array.interactives[2].popup.lift.up = true;
-          interactive_array.interactives[3].type = INTERACTIVE_TYPE_PRESSURE_PLATE;
-          interactive_array.interactives[3].coord = Coord_t{3, 6};
+          interactive_array.elements[0].type = INTERACTIVE_TYPE_LEVER;
+          interactive_array.elements[0].coord = Coord_t{3, 9};
+          interactive_array.elements[1].type = INTERACTIVE_TYPE_POPUP;
+          interactive_array.elements[1].coord = Coord_t{5, 11};
+          interactive_array.elements[1].popup.lift.ticks = 1;
+          interactive_array.elements[2].type = INTERACTIVE_TYPE_POPUP;
+          interactive_array.elements[2].coord = Coord_t{9, 2};
+          interactive_array.elements[2].popup.lift.ticks = HEIGHT_INTERVAL + 1;
+          interactive_array.elements[2].popup.lift.up = true;
+          interactive_array.elements[3].type = INTERACTIVE_TYPE_PRESSURE_PLATE;
+          interactive_array.elements[3].coord = Coord_t{3, 6};
      }
 
      auto* interactive_quad_tree = interactive_quad_tree_build(&interactive_array);
@@ -1840,7 +1819,7 @@ int main(int argc, char** argv){
 
           // update interactives
           for(S16 i = 0; i < interactive_array.count; i++){
-               Interactive_t* interactive = interactive_array.interactives + i;
+               Interactive_t* interactive = interactive_array.elements + i;
                if(interactive->type == INTERACTIVE_TYPE_POPUP){
                     lift_update(&interactive->popup.lift, POPUP_TICK_DELAY, dt, 1, HEIGHT_INTERVAL + 1);
                }else if(interactive->type == INTERACTIVE_TYPE_PRESSURE_PLATE){
@@ -2251,7 +2230,7 @@ int main(int argc, char** argv){
           // interactive
           glBegin(GL_QUADS);
           for(S16 i = 0; i < interactive_array.count; i++){
-               Interactive_t* interactive = interactive_array.interactives + i;
+               Interactive_t* interactive = interactive_array.elements + i;
                switch(interactive->type){
                default:
                     break;
