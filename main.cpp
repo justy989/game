@@ -416,6 +416,8 @@ struct Lever_t{
      F32 timer;
 };
 
+#define DOOR_MAX_HEIGHT 7
+
 struct Door_t{
      Lift_t lift;
      Direction_t face;
@@ -621,6 +623,9 @@ void toggle_electricity(TileMap_t* tilemap, InteractiveQuadTreeNode_t* interacti
           case INTERACTIVE_TYPE_POPUP:
                interactive->popup.lift.up = !interactive->popup.lift.up;
                break;
+          case INTERACTIVE_TYPE_DOOR:
+               interactive->door.lift.up = !interactive->door.lift.up;
+               break;
           }
      }
 
@@ -790,8 +795,8 @@ void player_collide_coord(Position_t player_pos, Coord_t coord, F32 player_radiu
           *pos_delta += collide_circle_with_line(*pos_delta, player_radius, bottom_left, bottom_right, collide_with_coord);
           break;
      }
-
 }
+
 enum PlayerActionType_t{
      PLAYER_ACTION_TYPE_MOVE_LEFT_START,
      PLAYER_ACTION_TYPE_MOVE_LEFT_STOP,
@@ -1409,6 +1414,28 @@ void block_draw(Block_t* block, Vec_t pos_vec){
      }
 }
 
+void draw_interactive_frame(Vec_t tex_vec, Vec_t pos_vec){
+     glTexCoord2f(tex_vec.x, tex_vec.y);
+     glVertex2f(pos_vec.x, pos_vec.y);
+     glTexCoord2f(tex_vec.x, tex_vec.y + THEME_FRAME_HEIGHT);
+     glVertex2f(pos_vec.x, pos_vec.y + TILE_SIZE);
+     glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y + THEME_FRAME_HEIGHT);
+     glVertex2f(pos_vec.x + TILE_SIZE, pos_vec.y + TILE_SIZE);
+     glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y);
+     glVertex2f(pos_vec.x + TILE_SIZE, pos_vec.y);
+}
+
+void draw_double_interactive_frame(Vec_t tex_vec, Vec_t pos_vec){
+     glTexCoord2f(tex_vec.x, tex_vec.y);
+     glVertex2f(pos_vec.x, pos_vec.y);
+     glTexCoord2f(tex_vec.x, tex_vec.y + 2.0f * THEME_FRAME_HEIGHT);
+     glVertex2f(pos_vec.x, pos_vec.y + 2.0f * TILE_SIZE);
+     glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y + 2.0f * THEME_FRAME_HEIGHT);
+     glVertex2f(pos_vec.x + TILE_SIZE, pos_vec.y + 2.0f * TILE_SIZE);
+     glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y);
+     glVertex2f(pos_vec.x + TILE_SIZE, pos_vec.y);
+}
+
 void interactive_draw(Interactive_t* interactive, Vec_t pos_vec){
      Vec_t tex_vec = {};
      switch(interactive->type){
@@ -1419,23 +1446,22 @@ void interactive_draw(Interactive_t* interactive, Vec_t pos_vec){
           int frame_x = 7;
           if(interactive->pressure_plate.down) frame_x++;
           tex_vec = theme_frame(frame_x, 8);
+          draw_interactive_frame(tex_vec, pos_vec);
      } break;
      case INTERACTIVE_TYPE_LEVER:
           tex_vec = theme_frame(0, 12);
+          draw_double_interactive_frame(tex_vec, pos_vec);
           break;
      case INTERACTIVE_TYPE_POPUP:
           tex_vec = theme_frame(interactive->popup.lift.ticks - 1, 8);
+          draw_double_interactive_frame(tex_vec, pos_vec);
+          break;
+     case INTERACTIVE_TYPE_DOOR:
+          tex_vec = theme_frame(interactive->popup.lift.ticks + 8, 11);
+          draw_interactive_frame(tex_vec, pos_vec);
           break;
      }
 
-     glTexCoord2f(tex_vec.x, tex_vec.y);
-     glVertex2f(pos_vec.x, pos_vec.y);
-     glTexCoord2f(tex_vec.x, tex_vec.y + 2.0f * THEME_FRAME_HEIGHT);
-     glVertex2f(pos_vec.x, pos_vec.y + 2.0f * TILE_SIZE);
-     glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y + 2.0f * THEME_FRAME_HEIGHT);
-     glVertex2f(pos_vec.x + TILE_SIZE, pos_vec.y + 2.0f * TILE_SIZE);
-     glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y);
-     glVertex2f(pos_vec.x + TILE_SIZE, pos_vec.y);
 }
 
 Coord_t mouse_select_coord(Vec_t mouse_screen)
@@ -1560,7 +1586,7 @@ int main(int argc, char** argv){
 
      ObjectArray_t<Interactive_t> interactive_array;
      {
-          if(!init(&interactive_array, 4)){
+          if(!init(&interactive_array, 5)){
                return 1;
           }
 
@@ -1575,6 +1601,10 @@ int main(int argc, char** argv){
           interactive_array.elements[2].popup.lift.up = true;
           interactive_array.elements[3].type = INTERACTIVE_TYPE_PRESSURE_PLATE;
           interactive_array.elements[3].coord = Coord_t{3, 6};
+          interactive_array.elements[4].type = INTERACTIVE_TYPE_DOOR;
+          interactive_array.elements[4].coord = Coord_t{0, 6};
+          interactive_array.elements[4].door.lift.ticks = DOOR_MAX_HEIGHT;
+          interactive_array.elements[4].door.lift.up = true;
      }
 
      auto* interactive_quad_tree = interactive_quad_tree_build(&interactive_array);
@@ -1607,6 +1637,7 @@ int main(int argc, char** argv){
 
           tilemap.tiles[10][17].id = 0;
           tilemap.tiles[10][16].id = 0;
+          tilemap.tiles[6][0].id = 0;
 
           tilemap.tiles[3][4].id = SOLID_TILE;
           tilemap.tiles[4][5].id = SOLID_TILE;
@@ -1936,6 +1967,7 @@ int main(int argc, char** argv){
                               }
                          } break;
                          }
+                         break;
                     case SDL_BUTTON_RIGHT:
                          switch(editor.mode){
                          default:
@@ -1998,6 +2030,8 @@ int main(int argc, char** argv){
                Interactive_t* interactive = interactive_array.elements + i;
                if(interactive->type == INTERACTIVE_TYPE_POPUP){
                     lift_update(&interactive->popup.lift, POPUP_TICK_DELAY, dt, 1, HEIGHT_INTERVAL + 1);
+               }else if(interactive->type == INTERACTIVE_TYPE_DOOR){
+                    lift_update(&interactive->door.lift, POPUP_TICK_DELAY, dt, 0, DOOR_MAX_HEIGHT);
                }else if(interactive->type == INTERACTIVE_TYPE_PRESSURE_PLATE){
                     bool should_be_down = false;
                     Coord_t player_coord = pos_to_coord(player.pos);
