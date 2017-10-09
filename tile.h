@@ -49,5 +49,5 @@ void destroy(TileMap_t* tilemap);
 Tile_t* tilemap_get_tile(TileMap_t* tilemap, Coord_t coord);
 bool tilemap_is_solid(TileMap_t* tilemap, Coord_t coord);
 bool tilemap_is_iced(TileMap_t* tilemap, Coord_t coord);
-Direction_t tile_direction_cluster_direction(U16 flags);
-void tile_set_direction_cluster_direction(U16* flags, Direction_t dir);
+Direction_t tile_flags_cluster_direction(U16 flags);
+void tile_flags_set_cluster_direction(U16* flags, Direction_t dir);

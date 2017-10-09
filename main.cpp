@@ -1356,6 +1356,28 @@ void destroy(Editor_t* editor){
      destroy(&editor->clipboard);
 }
 
+void draw_theme_frame(Vec_t tex_vec, Vec_t pos_vec){
+     glTexCoord2f(tex_vec.x, tex_vec.y);
+     glVertex2f(pos_vec.x, pos_vec.y);
+     glTexCoord2f(tex_vec.x, tex_vec.y + THEME_FRAME_HEIGHT);
+     glVertex2f(pos_vec.x, pos_vec.y + TILE_SIZE);
+     glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y + THEME_FRAME_HEIGHT);
+     glVertex2f(pos_vec.x + TILE_SIZE, pos_vec.y + TILE_SIZE);
+     glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y);
+     glVertex2f(pos_vec.x + TILE_SIZE, pos_vec.y);
+}
+
+void draw_double_theme_frame(Vec_t tex_vec, Vec_t pos_vec){
+     glTexCoord2f(tex_vec.x, tex_vec.y);
+     glVertex2f(pos_vec.x, pos_vec.y);
+     glTexCoord2f(tex_vec.x, tex_vec.y + 2.0f * THEME_FRAME_HEIGHT);
+     glVertex2f(pos_vec.x, pos_vec.y + 2.0f * TILE_SIZE);
+     glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y + 2.0f * THEME_FRAME_HEIGHT);
+     glVertex2f(pos_vec.x + TILE_SIZE, pos_vec.y + 2.0f * TILE_SIZE);
+     glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y);
+     glVertex2f(pos_vec.x + TILE_SIZE, pos_vec.y);
+}
+
 void tile_id_draw(U8 id, Vec_t pos){
      U8 id_x = id % 16;
      U8 id_y = id / 16;
@@ -1374,21 +1396,53 @@ void tile_id_draw(U8 id, Vec_t pos){
 }
 
 void tile_flags_draw(U16 flags, Vec_t tile_pos){
-     S16 frame_y = 9;
-     S16 frame_x = flags >> 4;
+     if(flags == 0) return;
 
-     if(flags & TILE_FLAG_WIRE_STATE) frame_y++;
+     if(flags & TILE_FLAG_ICED){
+     }else if(flags & TILE_FLAG_CHECKPOINT){
+     }else if(flags & TILE_FLAG_RESET_IMMUNE){
+     }else if(flags & (TILE_FLAG_WIRE_LEFT | TILE_FLAG_WIRE_RIGHT | TILE_FLAG_WIRE_UP | TILE_FLAG_WIRE_DOWN)){
+          S16 frame_y = 9;
+          S16 frame_x = flags >> 4;
 
-     Vec_t tex_vec = theme_frame(frame_x, frame_y);
+          if(flags & TILE_FLAG_WIRE_STATE) frame_y++;
 
-     glTexCoord2f(tex_vec.x, tex_vec.y);
-     glVertex2f(tile_pos.x, tile_pos.y);
-     glTexCoord2f(tex_vec.x, tex_vec.y + THEME_FRAME_HEIGHT);
-     glVertex2f(tile_pos.x, tile_pos.y + TILE_SIZE);
-     glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y + THEME_FRAME_HEIGHT);
-     glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y + TILE_SIZE);
-     glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y);
-     glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y);
+          Vec_t tex_vec = theme_frame(frame_x, frame_y);
+          draw_theme_frame(tex_vec, tile_pos);
+     }else if(flags & (TILE_FLAG_WIRE_CLUSTER_LEFT | TILE_FLAG_WIRE_CLUSTER_MID | TILE_FLAG_WIRE_CLUSTER_RIGHT)){
+          S16 frame_y = 17 + tile_flags_cluster_direction(flags);
+          S16 frame_x = 0;
+
+          if(flags & TILE_FLAG_WIRE_CLUSTER_LEFT){
+               if(flags & TILE_FLAG_WIRE_CLUSTER_LEFT_ON){
+                    frame_x = 1;
+               }else{
+                    frame_x = 0;
+               }
+
+               draw_theme_frame(theme_frame(frame_x, frame_y), tile_pos);
+          }
+
+          if(flags & TILE_FLAG_WIRE_CLUSTER_MID){
+               if(flags & TILE_FLAG_WIRE_CLUSTER_MID_ON){
+                    frame_x = 3;
+               }else{
+                    frame_x = 2;
+               }
+
+               draw_theme_frame(theme_frame(frame_x, frame_y), tile_pos);
+          }
+
+          if(flags & TILE_FLAG_WIRE_CLUSTER_RIGHT){
+               if(flags & TILE_FLAG_WIRE_CLUSTER_RIGHT_ON){
+                    frame_x = 5;
+               }else{
+                    frame_x = 4;
+               }
+
+               draw_theme_frame(theme_frame(frame_x, frame_y), tile_pos);
+          }
+     }
 }
 
 void block_draw(Block_t* block, Vec_t pos_vec){
@@ -1427,28 +1481,6 @@ void block_draw(Block_t* block, Vec_t pos_vec){
      }
 }
 
-void draw_interactive_frame(Vec_t tex_vec, Vec_t pos_vec){
-     glTexCoord2f(tex_vec.x, tex_vec.y);
-     glVertex2f(pos_vec.x, pos_vec.y);
-     glTexCoord2f(tex_vec.x, tex_vec.y + THEME_FRAME_HEIGHT);
-     glVertex2f(pos_vec.x, pos_vec.y + TILE_SIZE);
-     glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y + THEME_FRAME_HEIGHT);
-     glVertex2f(pos_vec.x + TILE_SIZE, pos_vec.y + TILE_SIZE);
-     glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y);
-     glVertex2f(pos_vec.x + TILE_SIZE, pos_vec.y);
-}
-
-void draw_double_interactive_frame(Vec_t tex_vec, Vec_t pos_vec){
-     glTexCoord2f(tex_vec.x, tex_vec.y);
-     glVertex2f(pos_vec.x, pos_vec.y);
-     glTexCoord2f(tex_vec.x, tex_vec.y + 2.0f * THEME_FRAME_HEIGHT);
-     glVertex2f(pos_vec.x, pos_vec.y + 2.0f * TILE_SIZE);
-     glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y + 2.0f * THEME_FRAME_HEIGHT);
-     glVertex2f(pos_vec.x + TILE_SIZE, pos_vec.y + 2.0f * TILE_SIZE);
-     glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y);
-     glVertex2f(pos_vec.x + TILE_SIZE, pos_vec.y);
-}
-
 void interactive_draw(Interactive_t* interactive, Vec_t pos_vec){
      Vec_t tex_vec = {};
      switch(interactive->type){
@@ -1459,19 +1491,19 @@ void interactive_draw(Interactive_t* interactive, Vec_t pos_vec){
           int frame_x = 7;
           if(interactive->pressure_plate.down) frame_x++;
           tex_vec = theme_frame(frame_x, 8);
-          draw_interactive_frame(tex_vec, pos_vec);
+          draw_theme_frame(tex_vec, pos_vec);
      } break;
      case INTERACTIVE_TYPE_LEVER:
           tex_vec = theme_frame(0, 12);
-          draw_double_interactive_frame(tex_vec, pos_vec);
+          draw_double_theme_frame(tex_vec, pos_vec);
           break;
      case INTERACTIVE_TYPE_POPUP:
           tex_vec = theme_frame(interactive->popup.lift.ticks - 1, 8);
-          draw_double_interactive_frame(tex_vec, pos_vec);
+          draw_double_theme_frame(tex_vec, pos_vec);
           break;
      case INTERACTIVE_TYPE_DOOR:
           tex_vec = theme_frame(interactive->door.lift.ticks + 8, 11 + interactive->door.face);
-          draw_interactive_frame(tex_vec, pos_vec);
+          draw_theme_frame(tex_vec, pos_vec);
           break;
      }
 
@@ -1709,6 +1741,14 @@ int main(int argc, char** argv){
           tilemap.tiles[2][7].flags |= TILE_FLAG_WIRE_RIGHT;
           tilemap.tiles[2][8].flags |= TILE_FLAG_WIRE_LEFT;
           tilemap.tiles[2][8].flags |= TILE_FLAG_WIRE_RIGHT;
+
+          tile_flags_set_cluster_direction(&tilemap.tiles[10][10].flags, DIRECTION_LEFT);
+          tilemap.tiles[10][10].flags |= TILE_FLAG_WIRE_CLUSTER_LEFT;
+          tilemap.tiles[10][10].flags |= TILE_FLAG_WIRE_CLUSTER_MID;
+          tilemap.tiles[10][10].flags |= TILE_FLAG_WIRE_CLUSTER_RIGHT;
+          tilemap.tiles[10][10].flags |= TILE_FLAG_WIRE_CLUSTER_LEFT_ON;
+          tilemap.tiles[10][10].flags |= TILE_FLAG_WIRE_CLUSTER_MID_ON;
+          tilemap.tiles[10][10].flags |= TILE_FLAG_WIRE_CLUSTER_RIGHT_ON;
      }
 
      bool quit = false;

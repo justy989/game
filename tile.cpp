@@ -47,7 +47,7 @@ bool tilemap_is_iced(TileMap_t* tilemap, Coord_t coord){
      return (tile->flags & TILE_FLAG_ICED);
 }
 
-Direction_t tile_direction_cluster_direction(U16 flags){
+Direction_t tile_flags_cluster_direction(U16 flags){
      bool first_bit = flags & (1 << 14);
      bool second_bit = flags & (1 << 15);
      if(first_bit){
@@ -66,7 +66,7 @@ Direction_t tile_direction_cluster_direction(U16 flags){
      return DIRECTION_COUNT;
 }
 
-void tile_set_direction_cluster_direction(U16* flags, Direction_t dir){
+void tile_flags_set_cluster_direction(U16* flags, Direction_t dir){
      switch(dir){
      default:
           break;
