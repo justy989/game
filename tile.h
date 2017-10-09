@@ -7,16 +7,29 @@
 
 enum TileFlag_t : U16{
      TILE_FLAG_ICED = 1,
-     TILE_FLAG_CHECKPOINT = 2,
-     TILE_FLAG_RESET_IMMUNE = 4,
-     TILE_FLAG_WIRE_LEFT_OFF = 8,
-     TILE_FLAG_WIRE_UP_OFF = 16,
-     TILE_FLAG_WIRE_RIGHT_OFF = 32,
-     TILE_FLAG_WIRE_DOWN_OFF = 64,
-     TILE_FLAG_WIRE_LEFT_ON = 128,
-     TILE_FLAG_WIRE_UP_ON = 256,
-     TILE_FLAG_WIRE_RIGHT_ON = 512,
-     TILE_FLAG_WIRE_DOWN_ON = 1024,
+     TILE_FLAG_CHECKPOINT = 1 << 1,
+     TILE_FLAG_RESET_IMMUNE = 1 << 2,
+
+     TILE_FLAG_WIRE_STATE = 1 << 3,
+
+     TILE_FLAG_WIRE_LEFT = 1 << 4,
+     TILE_FLAG_WIRE_UP = 1 << 5,
+     TILE_FLAG_WIRE_RIGHT = 1 << 6,
+     TILE_FLAG_WIRE_DOWN = 1 << 7,
+
+     TILE_FLAG_WIRE_CLUSTER_LEFT = 1 << 8,
+     TILE_FLAG_WIRE_CLUSTER_MID = 1 << 9,
+     TILE_FLAG_WIRE_CLUSTER_RIGHT = 1 << 10,
+
+     TILE_FLAG_WIRE_CLUSTER_LEFT_ON = 1 << 11,
+     TILE_FLAG_WIRE_CLUSTER_MID_ON = 1 << 12,
+     TILE_FLAG_WIRE_CLUSTER_RIGHT_ON = 1 << 13,
+
+     // last 2 bits combine to say which direction the cluster is facing
+     // 00 left
+     // 10 right
+     // 11 up
+     // 01 down
 };
 
 struct Tile_t{
@@ -36,3 +49,5 @@ void destroy(TileMap_t* tilemap);
 Tile_t* tilemap_get_tile(TileMap_t* tilemap, Coord_t coord);
 bool tilemap_is_solid(TileMap_t* tilemap, Coord_t coord);
 bool tilemap_is_iced(TileMap_t* tilemap, Coord_t coord);
+Direction_t tile_direction_cluster_direction(U16 flags);
+void tile_set_direction_cluster_direction(U16* flags, Direction_t dir);

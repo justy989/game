@@ -634,54 +634,47 @@ void toggle_electricity(TileMap_t* tilemap, InteractiveQuadTreeNode_t* interacti
      default:
           return;
      case DIRECTION_LEFT:
-          if(!(tile->flags & (TILE_FLAG_WIRE_RIGHT_OFF | TILE_FLAG_WIRE_RIGHT_ON))){
+          if(!(tile->flags & TILE_FLAG_WIRE_RIGHT)){
                return;
           }
           break;
      case DIRECTION_RIGHT:
-          if(!(tile->flags & (TILE_FLAG_WIRE_LEFT_OFF | TILE_FLAG_WIRE_LEFT_ON))){
+          if(!(tile->flags & TILE_FLAG_WIRE_LEFT)){
                return;
           }
           break;
      case DIRECTION_UP:
-          if(!(tile->flags & (TILE_FLAG_WIRE_DOWN_OFF | TILE_FLAG_WIRE_DOWN_ON))){
+          if(!(tile->flags & TILE_FLAG_WIRE_DOWN)){
                return;
           }
           break;
      case DIRECTION_DOWN:
-          if(!(tile->flags & (TILE_FLAG_WIRE_UP_OFF | TILE_FLAG_WIRE_UP_ON))){
+          if(!(tile->flags & TILE_FLAG_WIRE_UP)){
                return;
           }
           break;
      }
 
-     S16 flags = 0;
-
-     if(tile->flags >= TILE_FLAG_WIRE_LEFT_ON){
-          flags = tile->flags >> 7;
-          S16 new_flags = tile->flags & ~(TILE_FLAG_WIRE_LEFT_ON | TILE_FLAG_WIRE_UP_ON | TILE_FLAG_WIRE_RIGHT_ON | TILE_FLAG_WIRE_DOWN_ON);
-          new_flags |= flags << 3;
-          tile->flags = new_flags;
-     }else if(tile->flags >= TILE_FLAG_WIRE_LEFT_OFF){
-          flags = tile->flags >> 3;
-          S16 new_flags = tile->flags & ~(TILE_FLAG_WIRE_LEFT_OFF | TILE_FLAG_WIRE_UP_OFF | TILE_FLAG_WIRE_RIGHT_OFF | TILE_FLAG_WIRE_DOWN_OFF);
-          new_flags |= flags << 7;
-          tile->flags = new_flags;
+     // toggle wire state
+     if(tile->flags & TILE_FLAG_WIRE_STATE){
+          tile->flags &= ~TILE_FLAG_WIRE_STATE;
+     }else{
+          tile->flags |= TILE_FLAG_WIRE_STATE;
      }
 
-     if(flags & DIRECTION_MASK_LEFT && direction != DIRECTION_RIGHT){
+     if(tile->flags & TILE_FLAG_WIRE_LEFT && direction != DIRECTION_RIGHT){
           toggle_electricity(tilemap, interactive_quad_tree, adjacent_coord, DIRECTION_LEFT);
      }
 
-     if(flags & DIRECTION_MASK_RIGHT && direction != DIRECTION_LEFT){
+     if(tile->flags & TILE_FLAG_WIRE_RIGHT && direction != DIRECTION_LEFT){
           toggle_electricity(tilemap, interactive_quad_tree, adjacent_coord, DIRECTION_RIGHT);
      }
 
-     if(flags & DIRECTION_MASK_DOWN && direction != DIRECTION_UP){
+     if(tile->flags & TILE_FLAG_WIRE_DOWN && direction != DIRECTION_UP){
           toggle_electricity(tilemap, interactive_quad_tree, adjacent_coord, DIRECTION_DOWN);
      }
 
-     if(flags & DIRECTION_MASK_UP && direction != DIRECTION_DOWN){
+     if(tile->flags & TILE_FLAG_WIRE_UP && direction != DIRECTION_DOWN){
           toggle_electricity(tilemap, interactive_quad_tree, adjacent_coord, DIRECTION_UP);
      }
 }
@@ -1257,38 +1250,42 @@ bool init(Editor_t* editor){
 
      auto* tile_flags_category = editor->category_array.elements + EDITOR_CATEGORY_TILE_FLAGS;
      init(tile_flags_category, 33);
-     for(int i = 0; i < 2; i++){
-          int index_offset = i * 15;
+     for(S8 i = 0; i < 2; i++){
+          S8 index_offset = i * 15;
           tile_flags_category->elements[index_offset + 0].type = STAMP_TYPE_TILE_FLAGS;
-          tile_flags_category->elements[index_offset + 0].tile_flags = (TILE_FLAG_WIRE_LEFT_OFF << (i * 4));
+          tile_flags_category->elements[index_offset + 0].tile_flags = TILE_FLAG_WIRE_LEFT;
           tile_flags_category->elements[index_offset + 1].type = STAMP_TYPE_TILE_FLAGS;
-          tile_flags_category->elements[index_offset + 1].tile_flags = (TILE_FLAG_WIRE_UP_OFF << (i * 4));
+          tile_flags_category->elements[index_offset + 1].tile_flags = TILE_FLAG_WIRE_UP;
           tile_flags_category->elements[index_offset + 2].type = STAMP_TYPE_TILE_FLAGS;
-          tile_flags_category->elements[index_offset + 2].tile_flags = (TILE_FLAG_WIRE_RIGHT_OFF << (i * 4));
+          tile_flags_category->elements[index_offset + 2].tile_flags = TILE_FLAG_WIRE_RIGHT;
           tile_flags_category->elements[index_offset + 3].type = STAMP_TYPE_TILE_FLAGS;
-          tile_flags_category->elements[index_offset + 3].tile_flags = (TILE_FLAG_WIRE_DOWN_OFF << (i * 4));
+          tile_flags_category->elements[index_offset + 3].tile_flags = TILE_FLAG_WIRE_DOWN;
           tile_flags_category->elements[index_offset + 4].type = STAMP_TYPE_TILE_FLAGS;
-          tile_flags_category->elements[index_offset + 4].tile_flags = (TILE_FLAG_WIRE_LEFT_OFF << (i * 4)) | (TILE_FLAG_WIRE_DOWN_OFF << (i * 4));
+          tile_flags_category->elements[index_offset + 4].tile_flags = TILE_FLAG_WIRE_LEFT | TILE_FLAG_WIRE_DOWN;
           tile_flags_category->elements[index_offset + 5].type = STAMP_TYPE_TILE_FLAGS;
-          tile_flags_category->elements[index_offset + 5].tile_flags = (TILE_FLAG_WIRE_LEFT_OFF << (i * 4)) | (TILE_FLAG_WIRE_RIGHT_OFF << (i * 4));
+          tile_flags_category->elements[index_offset + 5].tile_flags = TILE_FLAG_WIRE_LEFT | TILE_FLAG_WIRE_RIGHT;
           tile_flags_category->elements[index_offset + 6].type = STAMP_TYPE_TILE_FLAGS;
-          tile_flags_category->elements[index_offset + 6].tile_flags = (TILE_FLAG_WIRE_LEFT_OFF << (i * 4)) | (TILE_FLAG_WIRE_UP_OFF << (i * 4));
+          tile_flags_category->elements[index_offset + 6].tile_flags = TILE_FLAG_WIRE_LEFT | TILE_FLAG_WIRE_UP;
           tile_flags_category->elements[index_offset + 7].type = STAMP_TYPE_TILE_FLAGS;
-          tile_flags_category->elements[index_offset + 7].tile_flags = (TILE_FLAG_WIRE_LEFT_OFF << (i * 4)) | (TILE_FLAG_WIRE_UP_OFF << (i * 4)) | (TILE_FLAG_WIRE_RIGHT_OFF << (i * 4));
+          tile_flags_category->elements[index_offset + 7].tile_flags = TILE_FLAG_WIRE_LEFT | TILE_FLAG_WIRE_UP | TILE_FLAG_WIRE_RIGHT;
           tile_flags_category->elements[index_offset + 8].type = STAMP_TYPE_TILE_FLAGS;
-          tile_flags_category->elements[index_offset + 8].tile_flags = (TILE_FLAG_WIRE_LEFT_OFF << (i * 4)) | (TILE_FLAG_WIRE_UP_OFF << (i * 4)) | (TILE_FLAG_WIRE_DOWN_OFF << (i * 4));
+          tile_flags_category->elements[index_offset + 8].tile_flags = TILE_FLAG_WIRE_LEFT | TILE_FLAG_WIRE_UP | TILE_FLAG_WIRE_DOWN;
           tile_flags_category->elements[index_offset + 9].type = STAMP_TYPE_TILE_FLAGS;
-          tile_flags_category->elements[index_offset + 9].tile_flags = (TILE_FLAG_WIRE_LEFT_OFF << (i * 4)) | (TILE_FLAG_WIRE_DOWN_OFF << (i * 4)) | (TILE_FLAG_WIRE_RIGHT_OFF << (i * 4));
+          tile_flags_category->elements[index_offset + 9].tile_flags = TILE_FLAG_WIRE_LEFT | TILE_FLAG_WIRE_DOWN | TILE_FLAG_WIRE_RIGHT;
           tile_flags_category->elements[index_offset + 10].type = STAMP_TYPE_TILE_FLAGS;
-          tile_flags_category->elements[index_offset + 10].tile_flags = (TILE_FLAG_WIRE_LEFT_OFF << (i * 4)) | (TILE_FLAG_WIRE_UP_OFF << (i * 4)) | (TILE_FLAG_WIRE_DOWN_OFF << (i * 4)) | (TILE_FLAG_WIRE_RIGHT_OFF << (i * 4));
+          tile_flags_category->elements[index_offset + 10].tile_flags = TILE_FLAG_WIRE_LEFT | TILE_FLAG_WIRE_UP | TILE_FLAG_WIRE_DOWN | TILE_FLAG_WIRE_RIGHT;
           tile_flags_category->elements[index_offset + 11].type = STAMP_TYPE_TILE_FLAGS;
-          tile_flags_category->elements[index_offset + 11].tile_flags = (TILE_FLAG_WIRE_UP_OFF << (i * 4)) | (TILE_FLAG_WIRE_RIGHT_OFF << (i * 4));
+          tile_flags_category->elements[index_offset + 11].tile_flags = TILE_FLAG_WIRE_UP | TILE_FLAG_WIRE_RIGHT;
           tile_flags_category->elements[index_offset + 12].type = STAMP_TYPE_TILE_FLAGS;
-          tile_flags_category->elements[index_offset + 12].tile_flags = (TILE_FLAG_WIRE_UP_OFF << (i * 4)) | (TILE_FLAG_WIRE_DOWN_OFF << (i * 4));
+          tile_flags_category->elements[index_offset + 12].tile_flags = TILE_FLAG_WIRE_UP | TILE_FLAG_WIRE_DOWN;
           tile_flags_category->elements[index_offset + 13].type = STAMP_TYPE_TILE_FLAGS;
-          tile_flags_category->elements[index_offset + 13].tile_flags = (TILE_FLAG_WIRE_UP_OFF << (i * 4)) | (TILE_FLAG_WIRE_DOWN_OFF << (i * 4)) | (TILE_FLAG_WIRE_RIGHT_OFF << (i * 4));
+          tile_flags_category->elements[index_offset + 13].tile_flags = TILE_FLAG_WIRE_UP | TILE_FLAG_WIRE_DOWN | TILE_FLAG_WIRE_RIGHT;
           tile_flags_category->elements[index_offset + 14].type = STAMP_TYPE_TILE_FLAGS;
-          tile_flags_category->elements[index_offset + 14].tile_flags = (TILE_FLAG_WIRE_RIGHT_OFF << (i * 4)) | (TILE_FLAG_WIRE_DOWN_OFF << (i * 4));
+          tile_flags_category->elements[index_offset + 14].tile_flags = TILE_FLAG_WIRE_RIGHT | TILE_FLAG_WIRE_DOWN;
+     }
+
+     for(S8 i = 0; i < 15; i++){
+          tile_flags_category->elements[15 + i].tile_flags |= TILE_FLAG_WIRE_STATE;
      }
 
      tile_flags_category->elements[30].type = STAMP_TYPE_TILE_FLAGS;
@@ -1378,14 +1375,9 @@ void tile_id_draw(U8 id, Vec_t pos){
 
 void tile_flags_draw(U16 flags, Vec_t tile_pos){
      S16 frame_y = 9;
-     S16 frame_x = 0;
+     S16 frame_x = flags >> 4;
 
-     if(flags >= TILE_FLAG_WIRE_LEFT_ON){
-          frame_y++;
-          frame_x = flags >> 7;
-     }else{
-          frame_x = flags >> 3;
-     }
+     if(flags & TILE_FLAG_WIRE_STATE) frame_y++;
 
      Vec_t tex_vec = theme_frame(frame_x, frame_y);
 
@@ -1690,33 +1682,33 @@ int main(int argc, char** argv){
           tilemap.tiles[9][8].flags |= TILE_FLAG_ICED;
           tilemap.tiles[10][8].flags |= TILE_FLAG_ICED;
 
-          tilemap.tiles[10][3].flags |= TILE_FLAG_WIRE_UP_OFF;
-          tilemap.tiles[10][3].flags |= TILE_FLAG_WIRE_DOWN_OFF;
-          tilemap.tiles[11][3].flags |= TILE_FLAG_WIRE_RIGHT_OFF;
-          tilemap.tiles[11][3].flags |= TILE_FLAG_WIRE_DOWN_OFF;
-          tilemap.tiles[11][4].flags |= TILE_FLAG_WIRE_LEFT_OFF;
-          tilemap.tiles[11][4].flags |= TILE_FLAG_WIRE_RIGHT_OFF;
+          tilemap.tiles[10][3].flags |= TILE_FLAG_WIRE_UP;
+          tilemap.tiles[10][3].flags |= TILE_FLAG_WIRE_DOWN;
+          tilemap.tiles[11][3].flags |= TILE_FLAG_WIRE_RIGHT;
+          tilemap.tiles[11][3].flags |= TILE_FLAG_WIRE_DOWN;
+          tilemap.tiles[11][4].flags |= TILE_FLAG_WIRE_LEFT;
+          tilemap.tiles[11][4].flags |= TILE_FLAG_WIRE_RIGHT;
 
-          tilemap.tiles[5][3].flags |= TILE_FLAG_WIRE_UP_OFF;
-          tilemap.tiles[5][3].flags |= TILE_FLAG_WIRE_DOWN_OFF;
-          tilemap.tiles[4][3].flags |= TILE_FLAG_WIRE_UP_OFF;
-          tilemap.tiles[4][3].flags |= TILE_FLAG_WIRE_DOWN_OFF;
-          tilemap.tiles[3][3].flags |= TILE_FLAG_WIRE_UP_OFF;
-          tilemap.tiles[3][3].flags |= TILE_FLAG_WIRE_DOWN_OFF;
+          tilemap.tiles[5][3].flags |= TILE_FLAG_WIRE_UP;
+          tilemap.tiles[5][3].flags |= TILE_FLAG_WIRE_DOWN;
+          tilemap.tiles[4][3].flags |= TILE_FLAG_WIRE_UP;
+          tilemap.tiles[4][3].flags |= TILE_FLAG_WIRE_DOWN;
+          tilemap.tiles[3][3].flags |= TILE_FLAG_WIRE_UP;
+          tilemap.tiles[3][3].flags |= TILE_FLAG_WIRE_DOWN;
 
-          tilemap.tiles[2][3].flags |= TILE_FLAG_WIRE_UP_OFF;
-          tilemap.tiles[2][3].flags |= TILE_FLAG_WIRE_RIGHT_OFF;
+          tilemap.tiles[2][3].flags |= TILE_FLAG_WIRE_UP;
+          tilemap.tiles[2][3].flags |= TILE_FLAG_WIRE_RIGHT;
 
-          tilemap.tiles[2][4].flags |= TILE_FLAG_WIRE_LEFT_OFF;
-          tilemap.tiles[2][4].flags |= TILE_FLAG_WIRE_RIGHT_OFF;
-          tilemap.tiles[2][5].flags |= TILE_FLAG_WIRE_LEFT_OFF;
-          tilemap.tiles[2][5].flags |= TILE_FLAG_WIRE_RIGHT_OFF;
-          tilemap.tiles[2][6].flags |= TILE_FLAG_WIRE_LEFT_OFF;
-          tilemap.tiles[2][6].flags |= TILE_FLAG_WIRE_RIGHT_OFF;
-          tilemap.tiles[2][7].flags |= TILE_FLAG_WIRE_LEFT_OFF;
-          tilemap.tiles[2][7].flags |= TILE_FLAG_WIRE_RIGHT_OFF;
-          tilemap.tiles[2][8].flags |= TILE_FLAG_WIRE_LEFT_OFF;
-          tilemap.tiles[2][8].flags |= TILE_FLAG_WIRE_RIGHT_OFF;
+          tilemap.tiles[2][4].flags |= TILE_FLAG_WIRE_LEFT;
+          tilemap.tiles[2][4].flags |= TILE_FLAG_WIRE_RIGHT;
+          tilemap.tiles[2][5].flags |= TILE_FLAG_WIRE_LEFT;
+          tilemap.tiles[2][5].flags |= TILE_FLAG_WIRE_RIGHT;
+          tilemap.tiles[2][6].flags |= TILE_FLAG_WIRE_LEFT;
+          tilemap.tiles[2][6].flags |= TILE_FLAG_WIRE_RIGHT;
+          tilemap.tiles[2][7].flags |= TILE_FLAG_WIRE_LEFT;
+          tilemap.tiles[2][7].flags |= TILE_FLAG_WIRE_RIGHT;
+          tilemap.tiles[2][8].flags |= TILE_FLAG_WIRE_LEFT;
+          tilemap.tiles[2][8].flags |= TILE_FLAG_WIRE_RIGHT;
      }
 
      bool quit = false;
@@ -2422,7 +2414,7 @@ int main(int argc, char** argv){
 
                     tile_id_draw(tile->id, tile_pos);
 
-                    if(tile->flags >= TILE_FLAG_WIRE_LEFT_OFF){
+                    if(tile->flags >= TILE_FLAG_WIRE_LEFT){
                          tile_flags_draw(tile->flags, tile_pos);
                     }
                }

@@ -1,4 +1,5 @@
 #include "tile.h"
+#include "defines.h"
 
 #include <cstdlib>
 #include <cstring>
@@ -44,4 +45,46 @@ bool tilemap_is_iced(TileMap_t* tilemap, Coord_t coord){
      Tile_t* tile = tilemap_get_tile(tilemap, coord);
      if(!tile) return false;
      return (tile->flags & TILE_FLAG_ICED);
+}
+
+Direction_t tile_direction_cluster_direction(U16 flags){
+     bool first_bit = flags & (1 << 14);
+     bool second_bit = flags & (1 << 15);
+     if(first_bit){
+          if(second_bit){
+               return DIRECTION_UP;
+          }else{
+               return DIRECTION_RIGHT;
+          }
+     }else{
+          if(second_bit){
+               return DIRECTION_DOWN;
+          }else{
+               return DIRECTION_LEFT;
+          }
+     }
+     return DIRECTION_COUNT;
+}
+
+void tile_set_direction_cluster_direction(U16* flags, Direction_t dir){
+     switch(dir){
+     default:
+          break;
+     case DIRECTION_LEFT:
+          OFF_BIT(*flags, 14);
+          OFF_BIT(*flags, 15);
+          break;
+     case DIRECTION_RIGHT:
+          ON_BIT(*flags, 14);
+          OFF_BIT(*flags, 15);
+          break;
+     case DIRECTION_UP:
+          ON_BIT(*flags, 14);
+          ON_BIT(*flags, 15);
+          break;
+     case DIRECTION_DOWN:
+          OFF_BIT(*flags, 14);
+          ON_BIT(*flags, 15);
+          break;
+     }
 }
