@@ -1216,6 +1216,7 @@ enum EditorCategory_t : U8{
      // EDITOR_CATEGORY_TILE_FLAGS,
      EDITOR_CATEGORY_BLOCK,
      EDITOR_CATEGORY_INTERACTIVE_LEVER,
+     EDITOR_CATEGORY_INTERACTIVE_PRESSURE_PLATE,
      EDITOR_CATEGORY_COUNT,
 };
 
@@ -1260,6 +1261,11 @@ bool init(Editor_t* editor){
      init(interactive_lever_category, 1);
      interactive_lever_category->elements[0].type = STAMP_TYPE_INTERACTIVE;
      interactive_lever_category->elements[0].interactive.type = INTERACTIVE_TYPE_LEVER;
+
+     auto* interactive_pressure_plate_category = editor->category_array.elements + EDITOR_CATEGORY_INTERACTIVE_PRESSURE_PLATE;
+     init(interactive_pressure_plate_category, 1);
+     interactive_pressure_plate_category->elements[0].type = STAMP_TYPE_INTERACTIVE;
+     interactive_pressure_plate_category->elements[0].interactive.type = INTERACTIVE_TYPE_PRESSURE_PLATE;
 
      return true;
 }
@@ -1823,6 +1829,8 @@ int main(int argc, char** argv){
                                         block->pos = coord_to_pos(select_coord);
                                         block->vel = vec_zero();
                                         block->accel = vec_zero();
+                                        block->element = stamp->block.element;
+                                        block->face = stamp->block.face;
 
                                         sorted_blocks = (Block_t**)(realloc(sorted_blocks, block_array.count * sizeof(*sorted_blocks)));
                                         for(S16 i = 0; i < block_array.count; ++i){
@@ -1834,7 +1842,7 @@ int main(int argc, char** argv){
                                         Coord_t select_coord = mouse_select_coord(mouse_screen) + (pos_to_coord(camera) - Coord_t{ROOM_TILE_SIZE / 2 - 1, ROOM_TILE_SIZE / 2 - 1});
                                         int index = interactive_array.count;
                                         resize(&interactive_array, interactive_array.count + 1);
-                                        interactive_array.elements[index].type = INTERACTIVE_TYPE_LEVER;
+                                        interactive_array.elements[index] = stamp->interactive;
                                         interactive_array.elements[index].coord = select_coord;
                                         interactive_quad_tree_free(interactive_quad_tree);
                                         interactive_quad_tree = interactive_quad_tree_build(&interactive_array);
