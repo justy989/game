@@ -29,6 +29,19 @@ bool resize(ObjectArray_t<T>* object_array, S16 new_count){
 }
 
 template <typename T>
+bool remove(ObjectArray_t<T>* object_array, S16 index){
+     if(index < 0 || index >= object_array->count) return false;
+     if(object_array->count > 1){
+          // move the last element to the index of the element that we want to remove
+          object_array->elements[index] = object_array->elements[object_array->count - 1];
+          resize(object_array, object_array->count - 1);
+     }else if(object_array->count == 1){
+          destroy(object_array);
+     }
+     return true;
+}
+
+template <typename T>
 void destroy(ObjectArray_t<T>* object_array){
      free(object_array->elements);
      object_array->elements = nullptr;

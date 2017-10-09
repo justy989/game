@@ -1443,6 +1443,9 @@ Coord_t mouse_select_coord(Vec_t mouse_screen)
      return {(S16)(mouse_screen.x * (F32)(ROOM_TILE_SIZE)), (S16)(mouse_screen.y * (F32)(ROOM_TILE_SIZE))};
 }
 
+Coord_t mouse_select_world(Vec_t mouse_screen, Position_t camera){
+     return mouse_select_coord(mouse_screen) + (pos_to_coord(camera) - Coord_t{ROOM_TILE_SIZE / 2 - 1, ROOM_TILE_SIZE / 2 - 1});
+}
 S32 mouse_select_index(Vec_t mouse_screen)
 {
      Coord_t coord = mouse_select_coord(mouse_screen);
@@ -1892,19 +1895,19 @@ int main(int argc, char** argv){
                                         break;
                                    case STAMP_TYPE_TILE_ID:
                                    {
-                                        Coord_t select_coord = mouse_select_coord(mouse_screen) + (pos_to_coord(camera) - Coord_t{ROOM_TILE_SIZE / 2 - 1, ROOM_TILE_SIZE / 2 - 1});
+                                        Coord_t select_coord = mouse_select_world(mouse_screen, camera);
                                         Tile_t* tile = tilemap_get_tile(&tilemap, select_coord);
                                         if(tile) tile->id = stamp->tile_id;
                                    } break;
                                    case STAMP_TYPE_TILE_FLAGS:
                                    {
-                                        Coord_t select_coord = mouse_select_coord(mouse_screen) + (pos_to_coord(camera) - Coord_t{ROOM_TILE_SIZE / 2 - 1, ROOM_TILE_SIZE / 2 - 1});
+                                        Coord_t select_coord = mouse_select_world(mouse_screen, camera);
                                         Tile_t* tile = tilemap_get_tile(&tilemap, select_coord);
                                         if(tile) tile->flags = stamp->tile_flags;
                                    } break;
                                    case STAMP_TYPE_BLOCK:
                                    {
-                                        Coord_t select_coord = mouse_select_coord(mouse_screen) + (pos_to_coord(camera) - Coord_t{ROOM_TILE_SIZE / 2 - 1, ROOM_TILE_SIZE / 2 - 1});
+                                        Coord_t select_coord = mouse_select_world(mouse_screen, camera);
                                         int index = block_array.count;
                                         resize(&block_array, block_array.count + 1);
                                         Block_t* block = block_array.elements + index;
@@ -1921,7 +1924,7 @@ int main(int argc, char** argv){
                                    } break;
                                    case STAMP_TYPE_INTERACTIVE:
                                    {
-                                        Coord_t select_coord = mouse_select_coord(mouse_screen) + (pos_to_coord(camera) - Coord_t{ROOM_TILE_SIZE / 2 - 1, ROOM_TILE_SIZE / 2 - 1});
+                                        Coord_t select_coord = mouse_select_world(mouse_screen, camera);
                                         int index = interactive_array.count;
                                         resize(&interactive_array, interactive_array.count + 1);
                                         interactive_array.elements[index] = stamp->interactive;
@@ -1933,6 +1936,44 @@ int main(int argc, char** argv){
                               }
                          } break;
                          }
+                    case SDL_BUTTON_RIGHT:
+                         switch(editor.mode){
+                         default:
+                              break;
+                         case EDITOR_MODE_CATEGORY_SELECT:
+                         case EDITOR_MODE_STAMP_SELECT:
+                         {
+                              Coord_t select_coord = mouse_select_world(mouse_screen, camera);
+                              Tile_t* tile = tilemap_get_tile(&tilemap, select_coord);
+                              if(tile){
+                                   tile->id = 0;
+                                   tile->flags = 0;
+                              }
+
+                              auto* interactive = interactive_quad_tree_find_at(interactive_quad_tree, select_coord);
+                              if(interactive){
+                                   S16 index = interactive - interactive_array.elements;
+                                   if(index >= 0){
+                                        remove(&interactive_array, index);
+                                        interactive_quad_tree_free(interactive_quad_tree);
+                                        interactive_quad_tree = interactive_quad_tree_build(&interactive_array);
+                                   }
+                              }
+
+                              S16 block_index = -1;
+                              for(S16 i = 0; i < block_array.count; i++){
+                                   if(pos_to_coord(block_array.elements[i].pos) == select_coord){
+                                        block_index = i;
+                                        break;
+                                   }
+                              }
+
+                              if(block_index >= 0){
+                                   remove(&block_array, block_index);
+                              }
+                         } break;
+                         }
+                         break;
                     }
                     break;
                case SDL_MOUSEBUTTONUP:
