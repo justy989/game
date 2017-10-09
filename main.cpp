@@ -1216,6 +1216,7 @@ enum EditorCategory_t : U8{
      EDITOR_CATEGORY_BLOCK,
      EDITOR_CATEGORY_INTERACTIVE_LEVER,
      EDITOR_CATEGORY_INTERACTIVE_PRESSURE_PLATE,
+     EDITOR_CATEGORY_INTERACTIVE_POPUP,
      EDITOR_CATEGORY_COUNT,
 };
 
@@ -1247,26 +1248,8 @@ bool init(Editor_t* editor){
           tile_category->elements[i].tile_id = (U8)(i);
      }
 
-     auto* block_category = editor->category_array.elements + EDITOR_CATEGORY_BLOCK;
-     init(block_category, 4);
-     for(S16 i = 0; i < block_category->count; i++){
-          block_category->elements[i].type = STAMP_TYPE_BLOCK;
-          block_category->elements[i].block.face = DIRECTION_LEFT;
-          block_category->elements[i].block.element = (Element_t)(i);
-     }
-
-     auto* interactive_lever_category = editor->category_array.elements + EDITOR_CATEGORY_INTERACTIVE_LEVER;
-     init(interactive_lever_category, 1);
-     interactive_lever_category->elements[0].type = STAMP_TYPE_INTERACTIVE;
-     interactive_lever_category->elements[0].interactive.type = INTERACTIVE_TYPE_LEVER;
-
-     auto* interactive_pressure_plate_category = editor->category_array.elements + EDITOR_CATEGORY_INTERACTIVE_PRESSURE_PLATE;
-     init(interactive_pressure_plate_category, 1);
-     interactive_pressure_plate_category->elements[0].type = STAMP_TYPE_INTERACTIVE;
-     interactive_pressure_plate_category->elements[0].interactive.type = INTERACTIVE_TYPE_PRESSURE_PLATE;
-
      auto* tile_flags_category = editor->category_array.elements + EDITOR_CATEGORY_TILE_FLAGS;
-     init(tile_flags_category, 30);
+     init(tile_flags_category, 33);
      for(int i = 0; i < 2; i++){
           int index_offset = i * 15;
           tile_flags_category->elements[index_offset + 0].type = STAMP_TYPE_TILE_FLAGS;
@@ -1300,6 +1283,42 @@ bool init(Editor_t* editor){
           tile_flags_category->elements[index_offset + 14].type = STAMP_TYPE_TILE_FLAGS;
           tile_flags_category->elements[index_offset + 14].tile_flags = (TILE_FLAG_WIRE_RIGHT_OFF << (i * 4)) | (TILE_FLAG_WIRE_DOWN_OFF << (i * 4));
      }
+
+     tile_flags_category->elements[30].type = STAMP_TYPE_TILE_FLAGS;
+     tile_flags_category->elements[30].tile_flags = TILE_FLAG_ICED;
+     tile_flags_category->elements[31].type = STAMP_TYPE_TILE_FLAGS;
+     tile_flags_category->elements[31].tile_flags = TILE_FLAG_CHECKPOINT;
+     tile_flags_category->elements[32].type = STAMP_TYPE_TILE_FLAGS;
+     tile_flags_category->elements[32].tile_flags = TILE_FLAG_RESET_IMMUNE;
+
+     auto* block_category = editor->category_array.elements + EDITOR_CATEGORY_BLOCK;
+     init(block_category, 4);
+     for(S16 i = 0; i < block_category->count; i++){
+          block_category->elements[i].type = STAMP_TYPE_BLOCK;
+          block_category->elements[i].block.face = DIRECTION_LEFT;
+          block_category->elements[i].block.element = (Element_t)(i);
+     }
+
+     auto* interactive_lever_category = editor->category_array.elements + EDITOR_CATEGORY_INTERACTIVE_LEVER;
+     init(interactive_lever_category, 1);
+     interactive_lever_category->elements[0].type = STAMP_TYPE_INTERACTIVE;
+     interactive_lever_category->elements[0].interactive.type = INTERACTIVE_TYPE_LEVER;
+
+     auto* interactive_pressure_plate_category = editor->category_array.elements + EDITOR_CATEGORY_INTERACTIVE_PRESSURE_PLATE;
+     init(interactive_pressure_plate_category, 1);
+     interactive_pressure_plate_category->elements[0].type = STAMP_TYPE_INTERACTIVE;
+     interactive_pressure_plate_category->elements[0].interactive.type = INTERACTIVE_TYPE_PRESSURE_PLATE;
+
+     auto* interactive_popup_category = editor->category_array.elements + EDITOR_CATEGORY_INTERACTIVE_POPUP;
+     init(interactive_popup_category, 2);
+     interactive_popup_category->elements[0].type = STAMP_TYPE_INTERACTIVE;
+     interactive_popup_category->elements[0].interactive.type = INTERACTIVE_TYPE_POPUP;
+     interactive_popup_category->elements[0].interactive.popup.lift.ticks = HEIGHT_INTERVAL + 1;
+     interactive_popup_category->elements[0].interactive.popup.lift.up = true;
+     interactive_popup_category->elements[1].type = STAMP_TYPE_INTERACTIVE;
+     interactive_popup_category->elements[1].interactive.type = INTERACTIVE_TYPE_POPUP;
+     interactive_popup_category->elements[1].interactive.popup.lift.ticks = 1;
+     interactive_popup_category->elements[1].interactive.popup.lift.up = false;
 
      return true;
 }
@@ -2515,7 +2534,7 @@ int main(int argc, char** argv){
                     } break;
                     case STAMP_TYPE_INTERACTIVE:
                     {
-                         interactive_draw(&mouse_stamp->interactive, stamp_vec);
+                         interactive_draw(&stamp->interactive, stamp_vec);
                     } break;
                     }
 
