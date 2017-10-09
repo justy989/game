@@ -1215,7 +1215,7 @@ enum EditorCategory_t : U8{
      EDITOR_CATEGORY_TILE_ID,
      // EDITOR_CATEGORY_TILE_FLAGS,
      EDITOR_CATEGORY_BLOCK,
-     // EDITOR_CATEGORY_INTERACTIVE_LEVER,
+     EDITOR_CATEGORY_INTERACTIVE_LEVER,
      EDITOR_CATEGORY_COUNT,
 };
 
@@ -1255,6 +1255,11 @@ bool init(Editor_t* editor){
           block_category->elements[i].block.face = DIRECTION_LEFT;
           block_category->elements[i].block.element = (Element_t)(i);
      }
+
+     auto* interactive_lever_category = editor->category_array.elements + EDITOR_CATEGORY_INTERACTIVE_LEVER;
+     init(interactive_lever_category, 1);
+     interactive_lever_category->elements[0].type = STAMP_TYPE_INTERACTIVE;
+     interactive_lever_category->elements[0].interactive.type = INTERACTIVE_TYPE_LEVER;
 
      return true;
 }
@@ -1320,6 +1325,35 @@ void block_draw(Block_t* block, Vec_t pos_vec){
           glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y);
           glVertex2f(pos_vec.x + TILE_SIZE, pos_vec.y);
      }
+}
+
+void interactive_draw(Interactive_t* interactive, Vec_t pos_vec){
+     Vec_t tex_vec = {};
+     switch(interactive->type){
+     default:
+          break;
+     case INTERACTIVE_TYPE_PRESSURE_PLATE:
+     {
+          int frame_x = 7;
+          if(interactive->pressure_plate.down) frame_x++;
+          tex_vec = theme_frame(frame_x, 8);
+     } break;
+     case INTERACTIVE_TYPE_LEVER:
+          tex_vec = theme_frame(0, 12);
+          break;
+     case INTERACTIVE_TYPE_POPUP:
+          tex_vec = theme_frame(interactive->popup.lift.ticks - 1, 8);
+          break;
+     }
+
+     glTexCoord2f(tex_vec.x, tex_vec.y);
+     glVertex2f(pos_vec.x, pos_vec.y);
+     glTexCoord2f(tex_vec.x, tex_vec.y + 2.0f * THEME_FRAME_HEIGHT);
+     glVertex2f(pos_vec.x, pos_vec.y + 2.0f * TILE_SIZE);
+     glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y + 2.0f * THEME_FRAME_HEIGHT);
+     glVertex2f(pos_vec.x + TILE_SIZE, pos_vec.y + 2.0f * TILE_SIZE);
+     glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y);
+     glVertex2f(pos_vec.x + TILE_SIZE, pos_vec.y);
 }
 
 Coord_t mouse_select_coord(Vec_t mouse_screen)
@@ -1795,6 +1829,16 @@ int main(int argc, char** argv){
                                              sorted_blocks[i] = block_array.elements + i;
                                         }
                                    } break;
+                                   case STAMP_TYPE_INTERACTIVE:
+                                   {
+                                        Coord_t select_coord = mouse_select_coord(mouse_screen) + (pos_to_coord(camera) - Coord_t{ROOM_TILE_SIZE / 2 - 1, ROOM_TILE_SIZE / 2 - 1});
+                                        int index = interactive_array.count;
+                                        resize(&interactive_array, interactive_array.count + 1);
+                                        interactive_array.elements[index].type = INTERACTIVE_TYPE_LEVER;
+                                        interactive_array.elements[index].coord = select_coord;
+                                        interactive_quad_tree_free(interactive_quad_tree);
+                                        interactive_quad_tree = interactive_quad_tree_build(&interactive_array);
+                                   } break;
                                    }
                               }
                          } break;
@@ -2232,33 +2276,7 @@ int main(int argc, char** argv){
           glBegin(GL_QUADS);
           for(S16 i = 0; i < interactive_array.count; i++){
                Interactive_t* interactive = interactive_array.elements + i;
-               switch(interactive->type){
-               default:
-                    break;
-               case INTERACTIVE_TYPE_PRESSURE_PLATE:
-               {
-                    int frame_x = 7;
-                    if(interactive->pressure_plate.down) frame_x++;
-                    tex_vec = theme_frame(frame_x, 8);
-               } break;
-               case INTERACTIVE_TYPE_LEVER:
-                    tex_vec = theme_frame(0, 12);
-                    break;
-               case INTERACTIVE_TYPE_POPUP:
-                    tex_vec = theme_frame(interactive->popup.lift.ticks - 1, 8);
-                    break;
-               }
-
-               Position_t interactive_camera_offset = coord_to_pos(interactive->coord) - screen_camera;
-               pos_vec = pos_to_vec(interactive_camera_offset);
-               glTexCoord2f(tex_vec.x, tex_vec.y);
-               glVertex2f(pos_vec.x, pos_vec.y);
-               glTexCoord2f(tex_vec.x, tex_vec.y + 2.0f * THEME_FRAME_HEIGHT);
-               glVertex2f(pos_vec.x, pos_vec.y + 2.0f * TILE_SIZE);
-               glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y + 2.0f * THEME_FRAME_HEIGHT);
-               glVertex2f(pos_vec.x + TILE_SIZE, pos_vec.y + 2.0f * TILE_SIZE);
-               glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y);
-               glVertex2f(pos_vec.x + TILE_SIZE, pos_vec.y);
+               interactive_draw(interactive, pos_to_vec(coord_to_pos(interactive->coord) - screen_camera));
           }
           glEnd();
 
@@ -2376,13 +2394,9 @@ int main(int argc, char** argv){
                          block_draw(&block, vec);
                     } break;
                     case STAMP_TYPE_INTERACTIVE:
-                         // if(stamp->solid.type == SOLID_DOOR){
-                         //      solid_draw_door_bottom(&stamp->solid, vec);
-                         // }else{
-                         //      solid_draw(&stamp->solid, vec);
-                         // }
-                         // block_draw(&stamp->block, vec, block_frame);
-                         break;
+                    {
+                         interactive_draw(&stamp->interactive, vec);
+                    } break;
                     }
 
                     vec.x += TILE_SIZE;
@@ -2414,6 +2428,10 @@ int main(int argc, char** argv){
                     block.face = mouse_stamp->block.face;
                     block_draw(&block, stamp_pos);
                } break;
+               case STAMP_TYPE_INTERACTIVE:
+               {
+                    interactive_draw(&mouse_stamp->interactive, stamp_pos);
+               } break;
                }
 
                // draw stamps to select from at the bottom
@@ -2423,18 +2441,23 @@ int main(int argc, char** argv){
 
                for(S32 g = 0; g < stamp_array->count; ++g){
                     auto* stamp = stamp_array->elements + g;
+                    Vec_t stamp_vec = pos + coord_to_vec(stamp->offset);
                     switch(stamp->type){
                     default:
                          break;
                     case STAMP_TYPE_TILE_ID:
-                         tile_id_draw(stamp->tile_id, pos + coord_to_vec(stamp->offset));
+                         tile_id_draw(stamp->tile_id, stamp_vec);
                          break;
                     case STAMP_TYPE_BLOCK:
                     {
                          Block_t block = {};
                          block.element = stamp->block.element;
                          block.face = stamp->block.face;
-                         block_draw(&block, pos + coord_to_vec(stamp->offset));
+                         block_draw(&block, stamp_vec);
+                    } break;
+                    case STAMP_TYPE_INTERACTIVE:
+                    {
+                         interactive_draw(&mouse_stamp->interactive, stamp_vec);
                     } break;
                     }
 
