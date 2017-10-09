@@ -347,8 +347,7 @@ struct Lift_t{
      F32 timer;
 };
 
-void lift_update(Lift_t* lift, float tick_delay, float dt, S8 min_tick, S8 max_tick)
-{
+void lift_update(Lift_t* lift, float tick_delay, float dt, S8 min_tick, S8 max_tick){
      lift->timer += dt;
 
      if(lift->timer > tick_delay){
@@ -1213,7 +1212,7 @@ Coord_t stamp_array_dimensions(ObjectArray_t<Stamp_t>* object_array){
 
 enum EditorCategory_t : U8{
      EDITOR_CATEGORY_TILE_ID,
-     // EDITOR_CATEGORY_TILE_FLAGS,
+     EDITOR_CATEGORY_TILE_FLAGS,
      EDITOR_CATEGORY_BLOCK,
      EDITOR_CATEGORY_INTERACTIVE_LEVER,
      EDITOR_CATEGORY_INTERACTIVE_PRESSURE_PLATE,
@@ -1241,7 +1240,6 @@ bool init(Editor_t* editor){
      memset(editor, 0, sizeof(*editor));
      init(&editor->category_array, EDITOR_CATEGORY_COUNT);
 
-     // tile
      auto* tile_category = editor->category_array.elements + EDITOR_CATEGORY_TILE_ID;
      init(tile_category, 48);
      for(S16 i = 0; i < tile_category->count; i++){
@@ -1266,6 +1264,42 @@ bool init(Editor_t* editor){
      init(interactive_pressure_plate_category, 1);
      interactive_pressure_plate_category->elements[0].type = STAMP_TYPE_INTERACTIVE;
      interactive_pressure_plate_category->elements[0].interactive.type = INTERACTIVE_TYPE_PRESSURE_PLATE;
+
+     auto* tile_flags_category = editor->category_array.elements + EDITOR_CATEGORY_TILE_FLAGS;
+     init(tile_flags_category, 30);
+     for(int i = 0; i < 2; i++){
+          int index_offset = i * 15;
+          tile_flags_category->elements[index_offset + 0].type = STAMP_TYPE_TILE_FLAGS;
+          tile_flags_category->elements[index_offset + 0].tile_flags = (TILE_FLAG_WIRE_LEFT_OFF << (i * 4));
+          tile_flags_category->elements[index_offset + 1].type = STAMP_TYPE_TILE_FLAGS;
+          tile_flags_category->elements[index_offset + 1].tile_flags = (TILE_FLAG_WIRE_UP_OFF << (i * 4));
+          tile_flags_category->elements[index_offset + 2].type = STAMP_TYPE_TILE_FLAGS;
+          tile_flags_category->elements[index_offset + 2].tile_flags = (TILE_FLAG_WIRE_RIGHT_OFF << (i * 4));
+          tile_flags_category->elements[index_offset + 3].type = STAMP_TYPE_TILE_FLAGS;
+          tile_flags_category->elements[index_offset + 3].tile_flags = (TILE_FLAG_WIRE_DOWN_OFF << (i * 4));
+          tile_flags_category->elements[index_offset + 4].type = STAMP_TYPE_TILE_FLAGS;
+          tile_flags_category->elements[index_offset + 4].tile_flags = (TILE_FLAG_WIRE_LEFT_OFF << (i * 4)) | (TILE_FLAG_WIRE_DOWN_OFF << (i * 4));
+          tile_flags_category->elements[index_offset + 5].type = STAMP_TYPE_TILE_FLAGS;
+          tile_flags_category->elements[index_offset + 5].tile_flags = (TILE_FLAG_WIRE_LEFT_OFF << (i * 4)) | (TILE_FLAG_WIRE_RIGHT_OFF << (i * 4));
+          tile_flags_category->elements[index_offset + 6].type = STAMP_TYPE_TILE_FLAGS;
+          tile_flags_category->elements[index_offset + 6].tile_flags = (TILE_FLAG_WIRE_LEFT_OFF << (i * 4)) | (TILE_FLAG_WIRE_UP_OFF << (i * 4));
+          tile_flags_category->elements[index_offset + 7].type = STAMP_TYPE_TILE_FLAGS;
+          tile_flags_category->elements[index_offset + 7].tile_flags = (TILE_FLAG_WIRE_LEFT_OFF << (i * 4)) | (TILE_FLAG_WIRE_UP_OFF << (i * 4)) | (TILE_FLAG_WIRE_RIGHT_OFF << (i * 4));
+          tile_flags_category->elements[index_offset + 8].type = STAMP_TYPE_TILE_FLAGS;
+          tile_flags_category->elements[index_offset + 8].tile_flags = (TILE_FLAG_WIRE_LEFT_OFF << (i * 4)) | (TILE_FLAG_WIRE_UP_OFF << (i * 4)) | (TILE_FLAG_WIRE_DOWN_OFF << (i * 4));
+          tile_flags_category->elements[index_offset + 9].type = STAMP_TYPE_TILE_FLAGS;
+          tile_flags_category->elements[index_offset + 9].tile_flags = (TILE_FLAG_WIRE_LEFT_OFF << (i * 4)) | (TILE_FLAG_WIRE_DOWN_OFF << (i * 4)) | (TILE_FLAG_WIRE_RIGHT_OFF << (i * 4));
+          tile_flags_category->elements[index_offset + 10].type = STAMP_TYPE_TILE_FLAGS;
+          tile_flags_category->elements[index_offset + 10].tile_flags = (TILE_FLAG_WIRE_LEFT_OFF << (i * 4)) | (TILE_FLAG_WIRE_UP_OFF << (i * 4)) | (TILE_FLAG_WIRE_DOWN_OFF << (i * 4)) | (TILE_FLAG_WIRE_RIGHT_OFF << (i * 4));
+          tile_flags_category->elements[index_offset + 11].type = STAMP_TYPE_TILE_FLAGS;
+          tile_flags_category->elements[index_offset + 11].tile_flags = (TILE_FLAG_WIRE_UP_OFF << (i * 4)) | (TILE_FLAG_WIRE_RIGHT_OFF << (i * 4));
+          tile_flags_category->elements[index_offset + 12].type = STAMP_TYPE_TILE_FLAGS;
+          tile_flags_category->elements[index_offset + 12].tile_flags = (TILE_FLAG_WIRE_UP_OFF << (i * 4)) | (TILE_FLAG_WIRE_DOWN_OFF << (i * 4));
+          tile_flags_category->elements[index_offset + 13].type = STAMP_TYPE_TILE_FLAGS;
+          tile_flags_category->elements[index_offset + 13].tile_flags = (TILE_FLAG_WIRE_UP_OFF << (i * 4)) | (TILE_FLAG_WIRE_DOWN_OFF << (i * 4)) | (TILE_FLAG_WIRE_RIGHT_OFF << (i * 4));
+          tile_flags_category->elements[index_offset + 14].type = STAMP_TYPE_TILE_FLAGS;
+          tile_flags_category->elements[index_offset + 14].tile_flags = (TILE_FLAG_WIRE_RIGHT_OFF << (i * 4)) | (TILE_FLAG_WIRE_DOWN_OFF << (i * 4));
+     }
 
      return true;
 }
@@ -1295,6 +1329,29 @@ void tile_id_draw(U8 id, Vec_t pos){
      glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y);
      glVertex2f(pos.x + TILE_SIZE, pos.y);
 
+}
+
+void tile_flags_draw(U16 flags, Vec_t tile_pos){
+     S16 frame_y = 9;
+     S16 frame_x = 0;
+
+     if(flags >= TILE_FLAG_WIRE_LEFT_ON){
+          frame_y++;
+          frame_x = flags >> 7;
+     }else{
+          frame_x = flags >> 3;
+     }
+
+     Vec_t tex_vec = theme_frame(frame_x, frame_y);
+
+     glTexCoord2f(tex_vec.x, tex_vec.y);
+     glVertex2f(tile_pos.x, tile_pos.y);
+     glTexCoord2f(tex_vec.x, tex_vec.y + THEME_FRAME_HEIGHT);
+     glVertex2f(tile_pos.x, tile_pos.y + TILE_SIZE);
+     glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y + THEME_FRAME_HEIGHT);
+     glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y + TILE_SIZE);
+     glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y);
+     glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y);
 }
 
 void block_draw(Block_t* block, Vec_t pos_vec){
@@ -1820,6 +1877,12 @@ int main(int argc, char** argv){
                                         Tile_t* tile = tilemap_get_tile(&tilemap, select_coord);
                                         if(tile) tile->id = stamp->tile_id;
                                    } break;
+                                   case STAMP_TYPE_TILE_FLAGS:
+                                   {
+                                        Coord_t select_coord = mouse_select_coord(mouse_screen) + (pos_to_coord(camera) - Coord_t{ROOM_TILE_SIZE / 2 - 1, ROOM_TILE_SIZE / 2 - 1});
+                                        Tile_t* tile = tilemap_get_tile(&tilemap, select_coord);
+                                        if(tile) tile->flags = stamp->tile_flags;
+                                   } break;
                                    case STAMP_TYPE_BLOCK:
                                    {
                                         Coord_t select_coord = mouse_select_coord(mouse_screen) + (pos_to_coord(camera) - Coord_t{ROOM_TILE_SIZE / 2 - 1, ROOM_TILE_SIZE / 2 - 1});
@@ -2245,26 +2308,7 @@ int main(int argc, char** argv){
                     tile_id_draw(tile->id, tile_pos);
 
                     if(tile->flags >= TILE_FLAG_WIRE_LEFT_OFF){
-                         S16 frame_y = 9;
-                         S16 frame_x = 0;
-
-                         if(tile->flags >= TILE_FLAG_WIRE_LEFT_ON){
-                              frame_y++;
-                              frame_x = tile->flags >> 7;
-                         }else{
-                              frame_x = tile->flags >> 3;
-                         }
-
-                         tex_vec = theme_frame(frame_x, frame_y);
-
-                         glTexCoord2f(tex_vec.x, tex_vec.y);
-                         glVertex2f(tile_pos.x, tile_pos.y);
-                         glTexCoord2f(tex_vec.x, tex_vec.y + THEME_FRAME_HEIGHT);
-                         glVertex2f(tile_pos.x, tile_pos.y + TILE_SIZE);
-                         glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y + THEME_FRAME_HEIGHT);
-                         glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y + TILE_SIZE);
-                         glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y);
-                         glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y);
+                         tile_flags_draw(tile->flags, tile_pos);
                     }
                }
           }
@@ -2391,7 +2435,7 @@ int main(int argc, char** argv){
                          tile_id_draw(stamp->tile_id, vec);
                          break;
                     case STAMP_TYPE_TILE_FLAGS:
-                         // flat_draw(&stamp->flat, vec, app.controller != nullptr, false);
+                         tile_flags_draw(stamp->tile_flags, vec);
                          break;
                     case STAMP_TYPE_BLOCK:
                     {
@@ -2429,6 +2473,9 @@ int main(int argc, char** argv){
                case STAMP_TYPE_TILE_ID:
                     tile_id_draw(mouse_stamp->tile_id, stamp_pos);
                     break;
+               case STAMP_TYPE_TILE_FLAGS:
+                    tile_flags_draw(mouse_stamp->tile_flags, stamp_pos);
+                    break;
                case STAMP_TYPE_BLOCK:
                {
                     Block_t block = {};
@@ -2455,6 +2502,9 @@ int main(int argc, char** argv){
                          break;
                     case STAMP_TYPE_TILE_ID:
                          tile_id_draw(stamp->tile_id, stamp_vec);
+                         break;
+                    case STAMP_TYPE_TILE_FLAGS:
+                         tile_flags_draw(stamp->tile_flags, stamp_vec);
                          break;
                     case STAMP_TYPE_BLOCK:
                     {
