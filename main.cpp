@@ -446,7 +446,8 @@ struct Interactive_t{
 
 bool interactive_is_solid(Interactive_t* interactive){
      return (interactive->type == INTERACTIVE_TYPE_LEVER ||
-             (interactive->type == INTERACTIVE_TYPE_POPUP && interactive->popup.lift.ticks > 1));
+             (interactive->type == INTERACTIVE_TYPE_POPUP && interactive->popup.lift.ticks > 1) ||
+             (interactive->type == INTERACTIVE_TYPE_DOOR && interactive->door.lift.ticks < DOOR_MAX_HEIGHT));
 }
 
 struct InteractiveQuadTreeBounds_t{
@@ -1222,6 +1223,7 @@ enum EditorCategory_t : U8{
      EDITOR_CATEGORY_INTERACTIVE_LEVER,
      EDITOR_CATEGORY_INTERACTIVE_PRESSURE_PLATE,
      EDITOR_CATEGORY_INTERACTIVE_POPUP,
+     EDITOR_CATEGORY_INTERACTIVE_DOOR,
      EDITOR_CATEGORY_COUNT,
 };
 
@@ -1324,6 +1326,25 @@ bool init(Editor_t* editor){
      interactive_popup_category->elements[1].interactive.type = INTERACTIVE_TYPE_POPUP;
      interactive_popup_category->elements[1].interactive.popup.lift.ticks = 1;
      interactive_popup_category->elements[1].interactive.popup.lift.up = false;
+
+     auto* interactive_door_category = editor->category_array.elements + EDITOR_CATEGORY_INTERACTIVE_DOOR;
+     init(interactive_door_category, 8);
+     for(S8 j = 0; j < DIRECTION_COUNT; j++){
+          interactive_door_category->elements[j].type = STAMP_TYPE_INTERACTIVE;
+          interactive_door_category->elements[j].interactive.type = INTERACTIVE_TYPE_DOOR;
+          interactive_door_category->elements[j].interactive.door.lift.ticks = DOOR_MAX_HEIGHT;
+          interactive_door_category->elements[j].interactive.door.lift.up = true;
+          interactive_door_category->elements[j].interactive.door.face = (Direction_t)(j);
+     }
+
+     for(S8 j = 0; j < DIRECTION_COUNT; j++){
+          interactive_door_category->elements[j + 4].type = STAMP_TYPE_INTERACTIVE;
+          interactive_door_category->elements[j + 4].interactive.type = INTERACTIVE_TYPE_DOOR;
+          interactive_door_category->elements[j + 4].interactive.door.lift.ticks = 0;
+          interactive_door_category->elements[j + 4].interactive.door.lift.up = false;
+          interactive_door_category->elements[j + 4].interactive.door.face = (Direction_t)(j);
+
+     }
 
      return true;
 }
@@ -1457,7 +1478,7 @@ void interactive_draw(Interactive_t* interactive, Vec_t pos_vec){
           draw_double_interactive_frame(tex_vec, pos_vec);
           break;
      case INTERACTIVE_TYPE_DOOR:
-          tex_vec = theme_frame(interactive->popup.lift.ticks + 8, 11);
+          tex_vec = theme_frame(interactive->door.lift.ticks + 8, 11 + interactive->door.face);
           draw_interactive_frame(tex_vec, pos_vec);
           break;
      }
