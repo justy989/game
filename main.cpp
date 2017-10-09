@@ -37,6 +37,17 @@ bool init(ObjectArray_t<T>* object_array, S16 count){
 }
 
 template <typename T>
+bool resize(ObjectArray_t<T>* object_array, S16 new_count){
+     object_array->elements = (T*)(realloc(object_array->elements, new_count * sizeof(*object_array->elements)));
+     if(!object_array->elements){
+          LOG("%s() failed to realloc %d objects\n", __FUNCTION__, new_count);
+          return false;
+     }
+     object_array->count = new_count;
+     return true;
+}
+
+template <typename T>
 void destroy(ObjectArray_t<T>* object_array){
      free(object_array->elements);
      object_array->elements = nullptr;
@@ -1331,6 +1342,17 @@ void block_draw(Block_t* block, Vec_t pos_vec){
           glVertex2f(pos_vec.x + TILE_SIZE, pos_vec.y + 2.0f * TILE_SIZE);
           glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y);
           glVertex2f(pos_vec.x + TILE_SIZE, pos_vec.y);
+     }else if(block->element == ELEMENT_ICE){
+          tex_vec = theme_frame(5, 6);
+          // TODO: compress
+          glTexCoord2f(tex_vec.x, tex_vec.y);
+          glVertex2f(pos_vec.x, pos_vec.y);
+          glTexCoord2f(tex_vec.x, tex_vec.y + 2.0f * THEME_FRAME_HEIGHT);
+          glVertex2f(pos_vec.x, pos_vec.y + 2.0f * TILE_SIZE);
+          glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y + 2.0f * THEME_FRAME_HEIGHT);
+          glVertex2f(pos_vec.x + TILE_SIZE, pos_vec.y + 2.0f * TILE_SIZE);
+          glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y);
+          glVertex2f(pos_vec.x + TILE_SIZE, pos_vec.y);
      }
 }
 
@@ -1616,6 +1638,7 @@ int main(int argc, char** argv){
           F64 dt = (F64)(elapsed_seconds.count());
 
           if(dt < 0.0166666f) continue; // limit 60 fps
+          dt = 0.0166666f; // the game always runs as if a 60th of a frame has occurred.
           frame_count++;
 
 #ifdef COUNT_FRAMES
@@ -1793,6 +1816,18 @@ int main(int argc, char** argv){
                                    } break;
                                    case STAMP_TYPE_BLOCK:
                                    {
+                                        Coord_t select_coord = mouse_select_coord(mouse_screen) + (pos_to_coord(camera) - Coord_t{ROOM_TILE_SIZE / 2 - 1, ROOM_TILE_SIZE / 2 - 1});
+                                        int index = block_array.count;
+                                        resize(&block_array, block_array.count + 1);
+                                        Block_t* block = block_array.elements + index;
+                                        block->pos = coord_to_pos(select_coord);
+                                        block->vel = vec_zero();
+                                        block->accel = vec_zero();
+
+                                        sorted_blocks = (Block_t**)(realloc(sorted_blocks, block_array.count * sizeof(*sorted_blocks)));
+                                        for(S16 i = 0; i < block_array.count; ++i){
+                                             sorted_blocks[i] = block_array.elements + i;
+                                        }
                                    } break;
                                    }
                               }
@@ -2369,7 +2404,6 @@ int main(int argc, char** argv){
                     case STAMP_TYPE_BLOCK:
                     {
                          Block_t block = {};
-                         block.pos = vec_to_pos(vec);
                          block.element = stamp->block.element;
                          block.face = stamp->block.face;
 
@@ -2407,6 +2441,13 @@ int main(int argc, char** argv){
                case STAMP_TYPE_TILE_ID:
                     tile_id_draw(mouse_stamp->tile_id, stamp_pos);
                     break;
+               case STAMP_TYPE_BLOCK:
+               {
+                    Block_t block = {};
+                    block.element = mouse_stamp->block.element;
+                    block.face = mouse_stamp->block.face;
+                    block_draw(&block, stamp_pos);
+               } break;
                }
 
                // draw stamps to select from at the bottom
@@ -2422,6 +2463,13 @@ int main(int argc, char** argv){
                     case STAMP_TYPE_TILE_ID:
                          tile_id_draw(stamp->tile_id, pos + coord_to_vec(stamp->offset));
                          break;
+                    case STAMP_TYPE_BLOCK:
+                    {
+                         Block_t block = {};
+                         block.element = stamp->block.element;
+                         block.face = stamp->block.face;
+                         block_draw(&block, pos + coord_to_vec(stamp->offset));
+                    } break;
                     }
 
                     pos.x += (F32)(max_stamp_height) * TILE_SIZE;
