@@ -2203,6 +2203,38 @@ int main(int argc, char** argv){
                          case EDITOR_MODE_CREATE_SELECTION:
                          {
                               editor.selection_end = mouse_select_world(mouse_screen, camera);
+
+                              // sort selection range
+                              if(editor.selection_start.x > editor.selection_end.x) SWAP(editor.selection_start.x, editor.selection_end.x);
+                              if(editor.selection_start.y > editor.selection_end.y) SWAP(editor.selection_start.y, editor.selection_end.y);
+
+                              // destroy(&editor.selection);
+
+                              S16 stamp_count = (((editor.selection_end.x - editor.selection_start.x) + 1) * ((editor.selection_end.y - editor.selection_start.y) + 1)) * 2;
+                              init(&editor.selection, stamp_count);
+                              S16 stamp_index = 0;
+                              for(S16 j = editor.selection_start.y; j <= editor.selection_end.y; j++){
+                                   for(S16 i = editor.selection_start.x; i <= editor.selection_end.x; i++){
+                                        Coord_t coord = {i, j};
+                                        Tile_t* tile = tilemap_get_tile(&tilemap, coord);
+                                        editor.selection.elements[stamp_index].type = STAMP_TYPE_TILE_ID;
+                                        editor.selection.elements[stamp_index].tile_id = tile->id;
+                                        editor.selection.elements[stamp_index].offset = coord - editor.selection_start;
+                                        stamp_index++;
+                                   }
+                              }
+
+                              for(S16 j = editor.selection_start.y; j <= editor.selection_end.y; j++){
+                                   for(S16 i = editor.selection_start.x; i <= editor.selection_end.x; i++){
+                                        Coord_t coord = {i, j};
+                                        Tile_t* tile = tilemap_get_tile(&tilemap, coord);
+                                        editor.selection.elements[stamp_index].type = STAMP_TYPE_TILE_FLAGS;
+                                        editor.selection.elements[stamp_index].tile_flags = tile->flags;
+                                        editor.selection.elements[stamp_index].offset = coord - editor.selection_start;
+                                        stamp_index++;
+                                   }
+                              }
+
                               editor.mode = EDITOR_MODE_SELECTION_MANIPULATION;
                          } break;
                          }
@@ -2829,6 +2861,43 @@ int main(int argc, char** argv){
           case EDITOR_MODE_CREATE_SELECTION:
                selection_draw(editor.selection_start, editor.selection_end, screen_camera, 1.0f, 0.0f, 0.0f);
                break;
+          case EDITOR_MODE_SELECTION_MANIPULATION:
+          {
+               selection_draw(editor.selection_start, editor.selection_end, screen_camera, 1.0f, 0.0f, 0.0f);
+
+               glBindTexture(GL_TEXTURE_2D, theme_texture);
+               glBegin(GL_QUADS);
+               glColor3f(1.0f, 1.0f, 1.0f);
+
+               for(S32 g = 0; g < editor.selection.count; ++g){
+                    auto* stamp = editor.selection.elements + g;
+                    Position_t stamp_pos = coord_to_pos(editor.selection_start + stamp->offset);
+                    Vec_t stamp_vec = pos_to_vec(stamp_pos);
+
+                    switch(stamp->type){
+                    default:
+                         break;
+                    case STAMP_TYPE_TILE_ID:
+                         tile_id_draw(stamp->tile_id, stamp_vec);
+                         break;
+                    case STAMP_TYPE_TILE_FLAGS:
+                         tile_flags_draw(stamp->tile_flags, stamp_vec);
+                         break;
+                    case STAMP_TYPE_BLOCK:
+                    {
+                         Block_t block = {};
+                         block.element = stamp->block.element;
+                         block.face = stamp->block.face;
+                         block_draw(&block, stamp_vec);
+                    } break;
+                    case STAMP_TYPE_INTERACTIVE:
+                    {
+                         interactive_draw(&stamp->interactive, stamp_vec);
+                    } break;
+                    }
+               }
+               glEnd();
+          } break;
           }
 
           SDL_GL_SwapWindow(window);
