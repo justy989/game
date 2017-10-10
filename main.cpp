@@ -2653,7 +2653,7 @@ int main(int argc, char** argv){
                     auto* stamp = stamp_array->elements + 0;
 
                     if(g && (g % ROOM_TILE_SIZE) == 0){
-                         vec.x = -1.0f;
+                         vec.x = 0.0f;
                          vec.y += TILE_SIZE;
                     }
 
@@ -2726,6 +2726,13 @@ int main(int argc, char** argv){
                for(S32 g = 0; g < stamp_array->count; ++g){
                     auto* stamp = stamp_array->elements + g;
                     Vec_t stamp_vec = pos + coord_to_vec(stamp->offset);
+
+                    if(g > 0 && (g % ROOM_TILE_SIZE) == 0){
+                         pos.x = 0.0f;
+                         pos.y += max_stamp_height * TILE_SIZE;
+                         // max_stamp_height = 1;
+                    }
+
                     switch(stamp->type){
                     default:
                          break;
@@ -2749,12 +2756,6 @@ int main(int argc, char** argv){
                     }
 
                     pos.x += (F32)(max_stamp_height) * TILE_SIZE;
-
-                    if(g > 0 && (g % ROOM_TILE_SIZE) == 0){
-                         pos.x = 0.0f;
-                         pos.y += max_stamp_height * TILE_SIZE;
-                         // max_stamp_height = 1;
-                    }
                }
 
                glEnd();
