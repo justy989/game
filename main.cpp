@@ -1587,6 +1587,43 @@ void interactive_draw(Interactive_t* interactive, Vec_t pos_vec){
 
 }
 
+struct Quad_t{
+     F32 left;
+     F32 bottom;
+     F32 right;
+     F32 top;
+};
+
+void draw_quad_wireframe(const Quad_t* quad, F32 red, F32 green, F32 blue)
+{
+     glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
+     glBegin(GL_QUADS);
+     glColor3f(red, green, blue);
+     glVertex2f(quad->left,  quad->top);
+     glVertex2f(quad->left,  quad->bottom);
+     glVertex2f(quad->right, quad->bottom);
+     glVertex2f(quad->right, quad->top);
+     glEnd();
+
+     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+}
+
+void selection_draw(Coord_t selection_start, Coord_t selection_end, Position_t camera, F32 red, F32 green, F32 blue)
+{
+     if(selection_start.x > selection_end.x) SWAP(selection_start.x, selection_end.x);
+     if(selection_start.y > selection_end.y) SWAP(selection_start.y, selection_end.y);
+
+     Position_t start_location = coord_to_pos(selection_start) - camera;
+     Position_t end_location = coord_to_pos(selection_end) - camera;
+     Vec_t start_vec = pos_to_vec(start_location);
+     Vec_t end_vec = pos_to_vec(end_location);
+
+     Quad_t selection_quad {start_vec.x, start_vec.y, end_vec.x + TILE_SIZE, end_vec.y + TILE_SIZE};
+     glBindTexture(GL_TEXTURE_2D, 0);
+     draw_quad_wireframe(&selection_quad, red, green, blue);
+}
+
 Coord_t mouse_select_coord(Vec_t mouse_screen)
 {
      return {(S16)(mouse_screen.x * (F32)(ROOM_TILE_SIZE)), (S16)(mouse_screen.y * (F32)(ROOM_TILE_SIZE))};
@@ -2160,6 +2197,15 @@ int main(int argc, char** argv){
                          break;
                     case SDL_BUTTON_LEFT:
                          // left_click_down = false;
+                         switch(editor.mode){
+                         default:
+                              break;
+                         case EDITOR_MODE_CREATE_SELECTION:
+                         {
+                              editor.selection_end = mouse_select_world(mouse_screen, camera);
+                              editor.mode = EDITOR_MODE_SELECTION_MANIPULATION;
+                         } break;
+                         }
                          break;
                     }
                     break;
@@ -2167,6 +2213,15 @@ int main(int argc, char** argv){
                     mouse_screen = Vec_t{((F32)(sdl_event.button.x) / (F32)(window_width)),
                                          1.0f - ((F32)(sdl_event.button.y) / (F32)(window_height))};
                     mouse_world = vec_to_pos(mouse_screen);
+                    switch(editor.mode){
+                    default:
+                         break;
+                    case EDITOR_MODE_CREATE_SELECTION:
+                         if(editor.selection_start.x > 0 && editor.selection_start.y > 0){
+                              editor.selection_end = pos_to_coord(mouse_world);
+                         }
+                         break;
+                    }
                     break;
                }
           }
@@ -2771,6 +2826,9 @@ int main(int argc, char** argv){
 
                glEnd();
           } break;
+          case EDITOR_MODE_CREATE_SELECTION:
+               selection_draw(editor.selection_start, editor.selection_end, screen_camera, 1.0f, 0.0f, 0.0f);
+               break;
           }
 
           SDL_GL_SwapWindow(window);
