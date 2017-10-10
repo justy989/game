@@ -366,7 +366,6 @@ void lift_update(Lift_t* lift, float tick_delay, float dt, S8 min_tick, S8 max_t
 enum InteractiveType_t{
      INTERACTIVE_TYPE_NONE,
      INTERACTIVE_TYPE_PRESSURE_PLATE,
-     INTERACTIVE_TYPE_WIRE_CLUSTER,
      INTERACTIVE_TYPE_LIGHT_DETECTOR,
      INTERACTIVE_TYPE_ICE_DETECTOR,
      INTERACTIVE_TYPE_POPUP,
@@ -378,22 +377,9 @@ enum InteractiveType_t{
      INTERACTIVE_TYPE_PROMPT,
 };
 
-enum WireClusterConnection_t : U8{
-     WIRE_CLUSTER_CONNECTION_NONE,
-     WIRE_CLUSTER_CONNECTION_OFF,
-     WIRE_CLUSTER_CONNECTION_ON,
-};
-
 struct PressurePlate_t{
      bool down;
      bool iced_under;
-};
-
-struct WireCluster_t{
-     Direction_t facing;
-     WireClusterConnection_t left;
-     WireClusterConnection_t mid;
-     WireClusterConnection_t right;
 };
 
 struct Detector_t{
@@ -434,7 +420,6 @@ struct Interactive_t{
 
      union{
           PressurePlate_t pressure_plate;
-          WireCluster_t wire_cluster;
           Detector_t detector;
           Popup_t popup;
           Stairs_t stairs;
@@ -611,6 +596,14 @@ Interactive_t* interactive_quad_tree_solid_at(const InteractiveQuadTreeNode_t* r
      return nullptr;
 }
 
+void toggle_flag(U16* flags, U16 flag){
+     if(*flags & flag){
+          *flags &= ~flag;
+     }else{
+          *flags |= flag;
+     }
+}
+
 void toggle_electricity(TileMap_t* tilemap, InteractiveQuadTreeNode_t* interactive_quad_tree,  Coord_t coord, Direction_t direction){
      Coord_t adjacent_coord = coord + direction;
      Tile_t* tile = tilemap_get_tile(tilemap, adjacent_coord);
@@ -630,52 +623,128 @@ void toggle_electricity(TileMap_t* tilemap, InteractiveQuadTreeNode_t* interacti
           }
      }
 
-     switch(direction){
-     default:
-          return;
-     case DIRECTION_LEFT:
-          if(!(tile->flags & TILE_FLAG_WIRE_RIGHT)){
+     if(tile->flags & (TILE_FLAG_WIRE_LEFT | TILE_FLAG_WIRE_UP | TILE_FLAG_WIRE_RIGHT | TILE_FLAG_WIRE_DOWN)){
+          switch(direction){
+          default:
                return;
+          case DIRECTION_LEFT:
+               if(!(tile->flags & TILE_FLAG_WIRE_RIGHT)){
+                    return;
+               }
+               break;
+          case DIRECTION_RIGHT:
+               if(!(tile->flags & TILE_FLAG_WIRE_LEFT)){
+                    return;
+               }
+               break;
+          case DIRECTION_UP:
+               if(!(tile->flags & TILE_FLAG_WIRE_DOWN)){
+                    return;
+               }
+               break;
+          case DIRECTION_DOWN:
+               if(!(tile->flags & TILE_FLAG_WIRE_UP)){
+                    return;
+               }
+               break;
           }
-          break;
-     case DIRECTION_RIGHT:
-          if(!(tile->flags & TILE_FLAG_WIRE_LEFT)){
-               return;
+
+          // toggle wire state
+          if(tile->flags & TILE_FLAG_WIRE_STATE){
+               tile->flags &= ~TILE_FLAG_WIRE_STATE;
+          }else{
+               tile->flags |= TILE_FLAG_WIRE_STATE;
           }
-          break;
-     case DIRECTION_UP:
-          if(!(tile->flags & TILE_FLAG_WIRE_DOWN)){
-               return;
+
+          if(tile->flags & TILE_FLAG_WIRE_LEFT && direction != DIRECTION_RIGHT){
+               toggle_electricity(tilemap, interactive_quad_tree, adjacent_coord, DIRECTION_LEFT);
           }
-          break;
-     case DIRECTION_DOWN:
-          if(!(tile->flags & TILE_FLAG_WIRE_UP)){
-               return;
+
+          if(tile->flags & TILE_FLAG_WIRE_RIGHT && direction != DIRECTION_LEFT){
+               toggle_electricity(tilemap, interactive_quad_tree, adjacent_coord, DIRECTION_RIGHT);
           }
-          break;
-     }
 
-     // toggle wire state
-     if(tile->flags & TILE_FLAG_WIRE_STATE){
-          tile->flags &= ~TILE_FLAG_WIRE_STATE;
-     }else{
-          tile->flags |= TILE_FLAG_WIRE_STATE;
-     }
+          if(tile->flags & TILE_FLAG_WIRE_DOWN && direction != DIRECTION_UP){
+               toggle_electricity(tilemap, interactive_quad_tree, adjacent_coord, DIRECTION_DOWN);
+          }
 
-     if(tile->flags & TILE_FLAG_WIRE_LEFT && direction != DIRECTION_RIGHT){
-          toggle_electricity(tilemap, interactive_quad_tree, adjacent_coord, DIRECTION_LEFT);
-     }
+          if(tile->flags & TILE_FLAG_WIRE_UP && direction != DIRECTION_DOWN){
+               toggle_electricity(tilemap, interactive_quad_tree, adjacent_coord, DIRECTION_UP);
+          }
+     }else if(tile->flags & (TILE_FLAG_WIRE_CLUSTER_LEFT | TILE_FLAG_WIRE_CLUSTER_MID | TILE_FLAG_WIRE_CLUSTER_RIGHT)){
+          bool all_on_before = tile_flags_cluster_all_on(tile->flags);
 
-     if(tile->flags & TILE_FLAG_WIRE_RIGHT && direction != DIRECTION_LEFT){
-          toggle_electricity(tilemap, interactive_quad_tree, adjacent_coord, DIRECTION_RIGHT);
-     }
+          Direction_t cluster_direction = tile_flags_cluster_direction(tile->flags);
+          switch(cluster_direction){
+          default:
+               break;
+          case DIRECTION_LEFT:
+               switch(direction){
+               default:
+                    break;
+               case DIRECTION_RIGHT:
+                    if(tile->flags & TILE_FLAG_WIRE_CLUSTER_MID) toggle_flag(&tile->flags, TILE_FLAG_WIRE_CLUSTER_MID_ON);
+                    break;
+               case DIRECTION_UP:
+                    if(tile->flags & TILE_FLAG_WIRE_CLUSTER_LEFT) toggle_flag(&tile->flags, TILE_FLAG_WIRE_CLUSTER_LEFT_ON);
+                    break;
+               case DIRECTION_DOWN:
+                    if(tile->flags & TILE_FLAG_WIRE_CLUSTER_RIGHT) toggle_flag(&tile->flags, TILE_FLAG_WIRE_CLUSTER_RIGHT_ON);
+                    break;
+               }
+               break;
+          case DIRECTION_RIGHT:
+               switch(direction){
+               default:
+                    break;
+               case DIRECTION_LEFT:
+                    if(tile->flags & TILE_FLAG_WIRE_CLUSTER_MID) toggle_flag(&tile->flags, TILE_FLAG_WIRE_CLUSTER_MID_ON);
+                    break;
+               case DIRECTION_DOWN:
+                    if(tile->flags & TILE_FLAG_WIRE_CLUSTER_LEFT) toggle_flag(&tile->flags, TILE_FLAG_WIRE_CLUSTER_LEFT_ON);
+                    break;
+               case DIRECTION_UP:
+                    if(tile->flags & TILE_FLAG_WIRE_CLUSTER_RIGHT) toggle_flag(&tile->flags, TILE_FLAG_WIRE_CLUSTER_RIGHT_ON);
+                    break;
+               }
+               break;
+          case DIRECTION_DOWN:
+               switch(direction){
+               default:
+                    break;
+               case DIRECTION_UP:
+                    if(tile->flags & TILE_FLAG_WIRE_CLUSTER_MID) toggle_flag(&tile->flags, TILE_FLAG_WIRE_CLUSTER_MID_ON);
+                    break;
+               case DIRECTION_RIGHT:
+                    if(tile->flags & TILE_FLAG_WIRE_CLUSTER_LEFT) toggle_flag(&tile->flags, TILE_FLAG_WIRE_CLUSTER_LEFT_ON);
+                    break;
+               case DIRECTION_LEFT:
+                    if(tile->flags & TILE_FLAG_WIRE_CLUSTER_RIGHT) toggle_flag(&tile->flags, TILE_FLAG_WIRE_CLUSTER_RIGHT_ON);
+                    break;
+               }
+               break;
+          case DIRECTION_UP:
+               switch(direction){
+               default:
+                    break;
+               case DIRECTION_DOWN:
+                    if(tile->flags & TILE_FLAG_WIRE_CLUSTER_MID) toggle_flag(&tile->flags, TILE_FLAG_WIRE_CLUSTER_MID_ON);
+                    break;
+               case DIRECTION_LEFT:
+                    if(tile->flags & TILE_FLAG_WIRE_CLUSTER_LEFT) toggle_flag(&tile->flags, TILE_FLAG_WIRE_CLUSTER_LEFT_ON);
+                    break;
+               case DIRECTION_RIGHT:
+                    if(tile->flags & TILE_FLAG_WIRE_CLUSTER_RIGHT) toggle_flag(&tile->flags, TILE_FLAG_WIRE_CLUSTER_RIGHT_ON);
+                    break;
+               }
+               break;
+          }
 
-     if(tile->flags & TILE_FLAG_WIRE_DOWN && direction != DIRECTION_UP){
-          toggle_electricity(tilemap, interactive_quad_tree, adjacent_coord, DIRECTION_DOWN);
-     }
+          bool all_on_after = tile_flags_cluster_all_on(tile->flags);
 
-     if(tile->flags & TILE_FLAG_WIRE_UP && direction != DIRECTION_DOWN){
-          toggle_electricity(tilemap, interactive_quad_tree, adjacent_coord, DIRECTION_UP);
+          if(all_on_before != all_on_after){
+               toggle_electricity(tilemap, interactive_quad_tree, adjacent_coord, cluster_direction);
+          }
      }
 }
 
@@ -914,7 +983,6 @@ struct MapInteractiveV1_t{
 
      union{
           PressurePlate_t pressure_plate;
-          WireCluster_t wire_cluster;
           Detector_t detector;
           MapPopupV1_t popup;
           Stairs_t stairs;
@@ -974,9 +1042,6 @@ bool save_map(const TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array, Obj
                break;
           case INTERACTIVE_TYPE_PRESSURE_PLATE:
                map_interactives[i].pressure_plate = interactive_array->elements[i].pressure_plate;
-               break;
-          case INTERACTIVE_TYPE_WIRE_CLUSTER:
-               map_interactives[i].wire_cluster = interactive_array->elements[i].wire_cluster;
                break;
           case INTERACTIVE_TYPE_LIGHT_DETECTOR:
           case INTERACTIVE_TYPE_ICE_DETECTOR:
@@ -1117,9 +1182,6 @@ bool load_map(TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array, ObjectArr
           case INTERACTIVE_TYPE_PRESSURE_PLATE:
                interactive_array->elements[i].pressure_plate = map_interactives[i].pressure_plate;
                break;
-          case INTERACTIVE_TYPE_WIRE_CLUSTER:
-               interactive_array->elements[i].wire_cluster = map_interactives[i].wire_cluster;
-               break;
           case INTERACTIVE_TYPE_LIGHT_DETECTOR:
           case INTERACTIVE_TYPE_ICE_DETECTOR:
                interactive_array->elements[i].detector = map_interactives[i].detector;
@@ -1249,7 +1311,7 @@ bool init(Editor_t* editor){
      }
 
      auto* tile_flags_category = editor->category_array.elements + EDITOR_CATEGORY_TILE_FLAGS;
-     init(tile_flags_category, 33);
+     init(tile_flags_category, 62);
      for(S8 i = 0; i < 2; i++){
           S8 index_offset = i * 15;
           tile_flags_category->elements[index_offset + 0].type = STAMP_TYPE_TILE_FLAGS;
@@ -1288,12 +1350,37 @@ bool init(Editor_t* editor){
           tile_flags_category->elements[15 + i].tile_flags |= TILE_FLAG_WIRE_STATE;
      }
 
-     tile_flags_category->elements[30].type = STAMP_TYPE_TILE_FLAGS;
-     tile_flags_category->elements[30].tile_flags = TILE_FLAG_ICED;
-     tile_flags_category->elements[31].type = STAMP_TYPE_TILE_FLAGS;
-     tile_flags_category->elements[31].tile_flags = TILE_FLAG_CHECKPOINT;
-     tile_flags_category->elements[32].type = STAMP_TYPE_TILE_FLAGS;
-     tile_flags_category->elements[32].tile_flags = TILE_FLAG_RESET_IMMUNE;
+     for(S8 i = 0; i < DIRECTION_COUNT; i++){
+          S8 index_offset = 30 + (i * 7);
+          tile_flags_category->elements[index_offset].type = STAMP_TYPE_TILE_FLAGS;
+          tile_flags_category->elements[index_offset].tile_flags = TILE_FLAG_WIRE_CLUSTER_LEFT;
+          tile_flags_set_cluster_direction(&tile_flags_category->elements[index_offset].tile_flags, (Direction_t)(i));
+          tile_flags_category->elements[index_offset + 1].type = STAMP_TYPE_TILE_FLAGS;
+          tile_flags_category->elements[index_offset + 1].tile_flags = TILE_FLAG_WIRE_CLUSTER_MID;
+          tile_flags_set_cluster_direction(&tile_flags_category->elements[index_offset + 1].tile_flags, (Direction_t)(i));
+          tile_flags_category->elements[index_offset + 2].type = STAMP_TYPE_TILE_FLAGS;
+          tile_flags_category->elements[index_offset + 2].tile_flags = TILE_FLAG_WIRE_CLUSTER_RIGHT;
+          tile_flags_set_cluster_direction(&tile_flags_category->elements[index_offset + 2].tile_flags, (Direction_t)(i));
+          tile_flags_category->elements[index_offset + 3].type = STAMP_TYPE_TILE_FLAGS;
+          tile_flags_category->elements[index_offset + 3].tile_flags = TILE_FLAG_WIRE_CLUSTER_LEFT | TILE_FLAG_WIRE_CLUSTER_MID;
+          tile_flags_set_cluster_direction(&tile_flags_category->elements[index_offset + 3].tile_flags, (Direction_t)(i));
+          tile_flags_category->elements[index_offset + 4].type = STAMP_TYPE_TILE_FLAGS;
+          tile_flags_category->elements[index_offset + 4].tile_flags = TILE_FLAG_WIRE_CLUSTER_LEFT | TILE_FLAG_WIRE_CLUSTER_RIGHT;
+          tile_flags_set_cluster_direction(&tile_flags_category->elements[index_offset + 4].tile_flags, (Direction_t)(i));
+          tile_flags_category->elements[index_offset + 5].type = STAMP_TYPE_TILE_FLAGS;
+          tile_flags_category->elements[index_offset + 5].tile_flags = TILE_FLAG_WIRE_CLUSTER_MID | TILE_FLAG_WIRE_CLUSTER_RIGHT;
+          tile_flags_set_cluster_direction(&tile_flags_category->elements[index_offset + 5].tile_flags, (Direction_t)(i));
+          tile_flags_category->elements[index_offset + 6].type = STAMP_TYPE_TILE_FLAGS;
+          tile_flags_category->elements[index_offset + 6].tile_flags = TILE_FLAG_WIRE_CLUSTER_LEFT | TILE_FLAG_WIRE_CLUSTER_MID | TILE_FLAG_WIRE_CLUSTER_RIGHT;
+          tile_flags_set_cluster_direction(&tile_flags_category->elements[index_offset + 6].tile_flags, (Direction_t)(i));
+     }
+
+     tile_flags_category->elements[59].type = STAMP_TYPE_TILE_FLAGS;
+     tile_flags_category->elements[59].tile_flags = TILE_FLAG_ICED;
+     tile_flags_category->elements[60].type = STAMP_TYPE_TILE_FLAGS;
+     tile_flags_category->elements[60].tile_flags = TILE_FLAG_CHECKPOINT;
+     tile_flags_category->elements[61].type = STAMP_TYPE_TILE_FLAGS;
+     tile_flags_category->elements[61].tile_flags = TILE_FLAG_RESET_IMMUNE;
 
      auto* block_category = editor->category_array.elements + EDITOR_CATEGORY_BLOCK;
      init(block_category, 4);
@@ -1382,17 +1469,7 @@ void tile_id_draw(U8 id, Vec_t pos){
      U8 id_x = id % 16;
      U8 id_y = id / 16;
 
-     Vec_t tex_vec = theme_frame(id_x, id_y);
-
-     glTexCoord2f(tex_vec.x, tex_vec.y);
-     glVertex2f(pos.x, pos.y);
-     glTexCoord2f(tex_vec.x, tex_vec.y + THEME_FRAME_HEIGHT);
-     glVertex2f(pos.x, pos.y + TILE_SIZE);
-     glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y + THEME_FRAME_HEIGHT);
-     glVertex2f(pos.x + TILE_SIZE, pos.y + TILE_SIZE);
-     glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y);
-     glVertex2f(pos.x + TILE_SIZE, pos.y);
-
+     draw_theme_frame(theme_frame(id_x, id_y), pos);
 }
 
 void tile_flags_draw(U16 flags, Vec_t tile_pos){
@@ -1400,15 +1477,16 @@ void tile_flags_draw(U16 flags, Vec_t tile_pos){
 
      if(flags & TILE_FLAG_ICED){
      }else if(flags & TILE_FLAG_CHECKPOINT){
+          draw_theme_frame(theme_frame(0, 21), tile_pos);
      }else if(flags & TILE_FLAG_RESET_IMMUNE){
+          draw_theme_frame(theme_frame(1, 21), tile_pos);
      }else if(flags & (TILE_FLAG_WIRE_LEFT | TILE_FLAG_WIRE_RIGHT | TILE_FLAG_WIRE_UP | TILE_FLAG_WIRE_DOWN)){
           S16 frame_y = 9;
           S16 frame_x = flags >> 4;
 
           if(flags & TILE_FLAG_WIRE_STATE) frame_y++;
 
-          Vec_t tex_vec = theme_frame(frame_x, frame_y);
-          draw_theme_frame(tex_vec, tile_pos);
+          draw_theme_frame(theme_frame(frame_x, frame_y), tile_pos);
      }else if(flags & (TILE_FLAG_WIRE_CLUSTER_LEFT | TILE_FLAG_WIRE_CLUSTER_MID | TILE_FLAG_WIRE_CLUSTER_RIGHT)){
           S16 frame_y = 17 + tile_flags_cluster_direction(flags);
           S16 frame_x = 0;
@@ -1631,7 +1709,7 @@ int main(int argc, char** argv){
 
      ObjectArray_t<Interactive_t> interactive_array;
      {
-          if(!init(&interactive_array, 5)){
+          if(!init(&interactive_array, 8)){
                return 1;
           }
 
@@ -1650,6 +1728,13 @@ int main(int argc, char** argv){
           interactive_array.elements[4].coord = Coord_t{0, 6};
           interactive_array.elements[4].door.lift.ticks = DOOR_MAX_HEIGHT;
           interactive_array.elements[4].door.lift.up = true;
+          interactive_array.elements[5].type = INTERACTIVE_TYPE_POPUP;
+          interactive_array.elements[5].coord = Coord_t{13, 10};
+          interactive_array.elements[5].popup.lift.ticks = 1;
+          interactive_array.elements[6].type = INTERACTIVE_TYPE_LEVER;
+          interactive_array.elements[6].coord = Coord_t{12, 12};
+          interactive_array.elements[7].type = INTERACTIVE_TYPE_LEVER;
+          interactive_array.elements[7].coord = Coord_t{12, 8};
      }
 
      auto* interactive_quad_tree = interactive_quad_tree_build(&interactive_array);
@@ -1742,13 +1827,13 @@ int main(int argc, char** argv){
           tilemap.tiles[2][8].flags |= TILE_FLAG_WIRE_LEFT;
           tilemap.tiles[2][8].flags |= TILE_FLAG_WIRE_RIGHT;
 
-          tile_flags_set_cluster_direction(&tilemap.tiles[10][10].flags, DIRECTION_LEFT);
-          tilemap.tiles[10][10].flags |= TILE_FLAG_WIRE_CLUSTER_LEFT;
-          tilemap.tiles[10][10].flags |= TILE_FLAG_WIRE_CLUSTER_MID;
-          tilemap.tiles[10][10].flags |= TILE_FLAG_WIRE_CLUSTER_RIGHT;
-          tilemap.tiles[10][10].flags |= TILE_FLAG_WIRE_CLUSTER_LEFT_ON;
-          tilemap.tiles[10][10].flags |= TILE_FLAG_WIRE_CLUSTER_MID_ON;
-          tilemap.tiles[10][10].flags |= TILE_FLAG_WIRE_CLUSTER_RIGHT_ON;
+          tile_flags_set_cluster_direction(&tilemap.tiles[10][12].flags, DIRECTION_RIGHT);
+          tilemap.tiles[10][12].flags |= TILE_FLAG_WIRE_CLUSTER_LEFT;
+          tilemap.tiles[10][12].flags |= TILE_FLAG_WIRE_CLUSTER_RIGHT;
+          tilemap.tiles[11][12].flags |= TILE_FLAG_WIRE_UP;
+          tilemap.tiles[11][12].flags |= TILE_FLAG_WIRE_DOWN;
+          tilemap.tiles[9][12].flags |= TILE_FLAG_WIRE_UP;
+          tilemap.tiles[9][12].flags |= TILE_FLAG_WIRE_DOWN;
      }
 
      bool quit = false;
@@ -2453,10 +2538,7 @@ int main(int argc, char** argv){
                                     (F32)(y - min.y) * TILE_SIZE + camera_offset.y};
 
                     tile_id_draw(tile->id, tile_pos);
-
-                    if(tile->flags >= TILE_FLAG_WIRE_LEFT){
-                         tile_flags_draw(tile->flags, tile_pos);
-                    }
+                    tile_flags_draw(tile->flags, tile_pos);
                }
           }
           glEnd();

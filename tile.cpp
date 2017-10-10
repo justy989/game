@@ -88,3 +88,19 @@ void tile_flags_set_cluster_direction(U16* flags, Direction_t dir){
           break;
      }
 }
+
+bool tile_flags_cluster_all_on(U16 flags){
+     if(flags & TILE_FLAG_WIRE_CLUSTER_LEFT && !(flags & TILE_FLAG_WIRE_CLUSTER_LEFT_ON)){
+          return false;
+     }
+
+     if(flags & TILE_FLAG_WIRE_CLUSTER_MID && !(flags & TILE_FLAG_WIRE_CLUSTER_MID_ON)){
+          return false;
+     }
+
+     if(flags & TILE_FLAG_WIRE_CLUSTER_RIGHT && !(flags & TILE_FLAG_WIRE_CLUSTER_RIGHT_ON)){
+          return false;
+     }
+
+     return true;
+}

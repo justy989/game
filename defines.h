@@ -20,6 +20,8 @@
 #define ON_BIT(value, bit) value |= (1 << bit)
 #define OFF_BIT(value, bit) value &= ~(1 << bit)
 
+#define TOGGLE_BIT(value, bit){if(value & (1 << bit)){OFF_BIT(value, bit);}else{ON_BIT(value, bit);}}
+
 #define PIXEL_SIZE .00367647f
 #define TILE_SIZE (16.0f / 272.0f)
 #define HALF_TILE_SIZE (TILE_SIZE * 0.5f)
