@@ -1996,6 +1996,13 @@ int main(int argc, char** argv){
                               editor.selection_end = {};
                          }
                          break;
+                    case SDL_SCANCODE_TAB:
+                         if(editor.mode == EDITOR_MODE_STAMP_SELECT){
+                              editor.mode = EDITOR_MODE_STAMP_HIDE;
+                         }else{
+                              editor.mode = EDITOR_MODE_STAMP_SELECT;
+                         }
+                         break;
                     }
                     break;
                case SDL_KEYUP:
@@ -2053,9 +2060,10 @@ int main(int argc, char** argv){
                               }
                          } break;
                          case EDITOR_MODE_STAMP_SELECT:
+                         case EDITOR_MODE_STAMP_HIDE:
                          {
                               S32 select_index = mouse_select_index(mouse_screen);
-                              if(select_index < editor.category_array.elements[editor.category].count){
+                              if(editor.mode != EDITOR_MODE_STAMP_HIDE && select_index < editor.category_array.elements[editor.category].count){
                                    editor.stamp = select_index;
                               }else{
                                    Stamp_t* stamp = editor.category_array.elements[editor.category].elements + editor.stamp;
@@ -2686,6 +2694,7 @@ int main(int argc, char** argv){
                glEnd();
           } break;
           case EDITOR_MODE_STAMP_SELECT:
+          case EDITOR_MODE_STAMP_HIDE:
           {
                glBindTexture(GL_TEXTURE_2D, theme_texture);
                glBegin(GL_QUADS);
@@ -2718,44 +2727,46 @@ int main(int argc, char** argv){
                } break;
                }
 
-               // draw stamps to select from at the bottom
-               Vec_t pos = {0.0f, 0.0f};
-               int max_stamp_height = 1;
-               auto* stamp_array = editor.category_array.elements + editor.category;
+               if(editor.mode == EDITOR_MODE_STAMP_SELECT){
+                    // draw stamps to select from at the bottom
+                    Vec_t pos = {0.0f, 0.0f};
+                    int max_stamp_height = 1;
+                    auto* stamp_array = editor.category_array.elements + editor.category;
 
-               for(S32 g = 0; g < stamp_array->count; ++g){
-                    auto* stamp = stamp_array->elements + g;
-                    Vec_t stamp_vec = pos + coord_to_vec(stamp->offset);
+                    for(S32 g = 0; g < stamp_array->count; ++g){
+                         auto* stamp = stamp_array->elements + g;
+                         Vec_t stamp_vec = pos + coord_to_vec(stamp->offset);
 
-                    if(g > 0 && (g % ROOM_TILE_SIZE) == 0){
-                         pos.x = 0.0f;
-                         pos.y += max_stamp_height * TILE_SIZE;
-                         // max_stamp_height = 1;
+                         if(g > 0 && (g % ROOM_TILE_SIZE) == 0){
+                              pos.x = 0.0f;
+                              pos.y += max_stamp_height * TILE_SIZE;
+                              // max_stamp_height = 1;
+                         }
+
+                         switch(stamp->type){
+                         default:
+                              break;
+                         case STAMP_TYPE_TILE_ID:
+                              tile_id_draw(stamp->tile_id, stamp_vec);
+                              break;
+                         case STAMP_TYPE_TILE_FLAGS:
+                              tile_flags_draw(stamp->tile_flags, stamp_vec);
+                              break;
+                         case STAMP_TYPE_BLOCK:
+                         {
+                              Block_t block = {};
+                              block.element = stamp->block.element;
+                              block.face = stamp->block.face;
+                              block_draw(&block, stamp_vec);
+                         } break;
+                         case STAMP_TYPE_INTERACTIVE:
+                         {
+                              interactive_draw(&stamp->interactive, stamp_vec);
+                         } break;
+                         }
+
+                         pos.x += (F32)(max_stamp_height) * TILE_SIZE;
                     }
-
-                    switch(stamp->type){
-                    default:
-                         break;
-                    case STAMP_TYPE_TILE_ID:
-                         tile_id_draw(stamp->tile_id, stamp_vec);
-                         break;
-                    case STAMP_TYPE_TILE_FLAGS:
-                         tile_flags_draw(stamp->tile_flags, stamp_vec);
-                         break;
-                    case STAMP_TYPE_BLOCK:
-                    {
-                         Block_t block = {};
-                         block.element = stamp->block.element;
-                         block.face = stamp->block.face;
-                         block_draw(&block, stamp_vec);
-                    } break;
-                    case STAMP_TYPE_INTERACTIVE:
-                    {
-                         interactive_draw(&stamp->interactive, stamp_vec);
-                    } break;
-                    }
-
-                    pos.x += (F32)(max_stamp_height) * TILE_SIZE;
                }
 
                glEnd();
