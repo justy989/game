@@ -1645,6 +1645,49 @@ Vec_t coord_to_screen_position(Coord_t coord)
      return pos_to_vec(relative_loc);
 }
 
+void apply_stamp(Stamp_t* stamp, Coord_t coord, TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array, ObjectArray_t<Interactive_t>* interactive_array,
+                 InteractiveQuadTreeNode_t** interactive_quad_tree, Block_t*** sorted_blocks){
+     switch(stamp->type){
+     default:
+          break;
+     case STAMP_TYPE_TILE_ID:
+     {
+          Tile_t* tile = tilemap_get_tile(tilemap, coord);
+          if(tile) tile->id = stamp->tile_id;
+     } break;
+     case STAMP_TYPE_TILE_FLAGS:
+     {
+          Tile_t* tile = tilemap_get_tile(tilemap, coord);
+          if(tile) tile->flags = stamp->tile_flags;
+     } break;
+     case STAMP_TYPE_BLOCK:
+     {
+          int index = block_array->count;
+          resize(block_array, block_array->count + 1);
+          Block_t* block = block_array->elements + index;
+          block->pos = coord_to_pos(coord);
+          block->vel = vec_zero();
+          block->accel = vec_zero();
+          block->element = stamp->block.element;
+          block->face = stamp->block.face;
+
+          *sorted_blocks = (Block_t**)(realloc(*sorted_blocks, block_array->count * sizeof(**sorted_blocks)));
+          for(S16 i = 0; i < block_array->count; ++i){
+               (*sorted_blocks)[i] = block_array->elements + i;
+          }
+     } break;
+     case STAMP_TYPE_INTERACTIVE:
+     {
+          int index = interactive_array->count;
+          resize(interactive_array, interactive_array->count + 1);
+          interactive_array->elements[index] = stamp->interactive;
+          interactive_array->elements[index].coord = coord;
+          interactive_quad_tree_free(*interactive_quad_tree);
+          *interactive_quad_tree = interactive_quad_tree_build(interactive_array);
+     } break;
+     }
+}
+
 using namespace std::chrono;
 
 int main(int argc, char** argv){
@@ -2103,50 +2146,9 @@ int main(int argc, char** argv){
                               if(editor.mode != EDITOR_MODE_STAMP_HIDE && select_index < editor.category_array.elements[editor.category].count){
                                    editor.stamp = select_index;
                               }else{
-                                   Stamp_t* stamp = editor.category_array.elements[editor.category].elements + editor.stamp;
-                                   switch(stamp->type){
-                                   default:
-                                        break;
-                                   case STAMP_TYPE_TILE_ID:
-                                   {
-                                        Coord_t select_coord = mouse_select_world(mouse_screen, camera);
-                                        Tile_t* tile = tilemap_get_tile(&tilemap, select_coord);
-                                        if(tile) tile->id = stamp->tile_id;
-                                   } break;
-                                   case STAMP_TYPE_TILE_FLAGS:
-                                   {
-                                        Coord_t select_coord = mouse_select_world(mouse_screen, camera);
-                                        Tile_t* tile = tilemap_get_tile(&tilemap, select_coord);
-                                        if(tile) tile->flags = stamp->tile_flags;
-                                   } break;
-                                   case STAMP_TYPE_BLOCK:
-                                   {
-                                        Coord_t select_coord = mouse_select_world(mouse_screen, camera);
-                                        int index = block_array.count;
-                                        resize(&block_array, block_array.count + 1);
-                                        Block_t* block = block_array.elements + index;
-                                        block->pos = coord_to_pos(select_coord);
-                                        block->vel = vec_zero();
-                                        block->accel = vec_zero();
-                                        block->element = stamp->block.element;
-                                        block->face = stamp->block.face;
-
-                                        sorted_blocks = (Block_t**)(realloc(sorted_blocks, block_array.count * sizeof(*sorted_blocks)));
-                                        for(S16 i = 0; i < block_array.count; ++i){
-                                             sorted_blocks[i] = block_array.elements + i;
-                                        }
-                                   } break;
-                                   case STAMP_TYPE_INTERACTIVE:
-                                   {
-                                        Coord_t select_coord = mouse_select_world(mouse_screen, camera);
-                                        int index = interactive_array.count;
-                                        resize(&interactive_array, interactive_array.count + 1);
-                                        interactive_array.elements[index] = stamp->interactive;
-                                        interactive_array.elements[index].coord = select_coord;
-                                        interactive_quad_tree_free(interactive_quad_tree);
-                                        interactive_quad_tree = interactive_quad_tree_build(&interactive_array);
-                                   } break;
-                                   }
+                                   Coord_t select_coord = mouse_select_world(mouse_screen, camera);
+                                   apply_stamp(editor.category_array.elements[editor.category].elements + editor.stamp, select_coord,
+                                               &tilemap, &block_array, &interactive_array, &interactive_quad_tree, &sorted_blocks);
                               }
                          } break;
                          }
