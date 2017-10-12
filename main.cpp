@@ -1688,6 +1688,37 @@ void apply_stamp(Stamp_t* stamp, Coord_t coord, TileMap_t* tilemap, ObjectArray_
      }
 }
 
+void coord_clear(Coord_t coord, TileMap_t* tilemap, ObjectArray_t<Interactive_t>* interactive_array,
+                 InteractiveQuadTreeNode_t* interactive_quad_tree, ObjectArray_t<Block_t>* block_array){
+     Tile_t* tile = tilemap_get_tile(tilemap, coord);
+     if(tile){
+          tile->id = 0;
+          tile->flags = 0;
+     }
+
+     auto* interactive = interactive_quad_tree_find_at(interactive_quad_tree, coord);
+     if(interactive){
+          S16 index = interactive - interactive_array->elements;
+          if(index >= 0){
+               remove(interactive_array, index);
+               interactive_quad_tree_free(interactive_quad_tree);
+               interactive_quad_tree = interactive_quad_tree_build(interactive_array);
+          }
+     }
+
+     S16 block_index = -1;
+     for(S16 i = 0; i < block_array->count; i++){
+          if(pos_to_coord(block_array->elements[i].pos) == coord){
+               block_index = i;
+               break;
+          }
+     }
+
+     if(block_index >= 0){
+          remove(block_array, block_index);
+     }
+}
+
 using namespace std::chrono;
 
 int main(int argc, char** argv){
@@ -2083,6 +2114,25 @@ int main(int argc, char** argv){
                               editor.mode = EDITOR_MODE_STAMP_SELECT;
                          }
                          break;
+                    case SDL_SCANCODE_RETURN:
+                         if(editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
+                              // clear coords below stamp
+                              for(S16 j = editor.selection_start.y; j <= editor.selection_end.y; j++){
+                                   for(S16 i = editor.selection_start.x; i <= editor.selection_end.x; i++){
+                                        Coord_t coord {i, j};
+                                        coord_clear(coord, &tilemap, &interactive_array, interactive_quad_tree, &block_array);
+                                   }
+                              }
+
+                              for(int i = 0; i < editor.selection.count; i++){
+                                   Coord_t coord = editor.selection_start + editor.selection.elements[i].offset;
+                                   apply_stamp(editor.selection.elements + i, coord,
+                                               &tilemap, &block_array, &interactive_array, &interactive_quad_tree, &sorted_blocks);
+                              }
+
+                              editor.mode = EDITOR_MODE_CATEGORY_SELECT;
+                         }
+                         break;
                     }
                     break;
                case SDL_KEYUP:
@@ -2160,34 +2210,8 @@ int main(int argc, char** argv){
                          case EDITOR_MODE_CATEGORY_SELECT:
                          case EDITOR_MODE_STAMP_SELECT:
                          {
-                              Coord_t select_coord = mouse_select_world(mouse_screen, camera);
-                              Tile_t* tile = tilemap_get_tile(&tilemap, select_coord);
-                              if(tile){
-                                   tile->id = 0;
-                                   tile->flags = 0;
-                              }
-
-                              auto* interactive = interactive_quad_tree_find_at(interactive_quad_tree, select_coord);
-                              if(interactive){
-                                   S16 index = interactive - interactive_array.elements;
-                                   if(index >= 0){
-                                        remove(&interactive_array, index);
-                                        interactive_quad_tree_free(interactive_quad_tree);
-                                        interactive_quad_tree = interactive_quad_tree_build(&interactive_array);
-                                   }
-                              }
-
-                              S16 block_index = -1;
-                              for(S16 i = 0; i < block_array.count; i++){
-                                   if(pos_to_coord(block_array.elements[i].pos) == select_coord){
-                                        block_index = i;
-                                        break;
-                                   }
-                              }
-
-                              if(block_index >= 0){
-                                   remove(&block_array, block_index);
-                              }
+                              coord_clear(mouse_select_world(mouse_screen, camera), &tilemap, &interactive_array,
+                                          interactive_quad_tree, &block_array);
                          } break;
                          }
                          break;
@@ -2218,22 +2242,42 @@ int main(int argc, char** argv){
                               for(S16 j = editor.selection_start.y; j <= editor.selection_end.y; j++){
                                    for(S16 i = editor.selection_start.x; i <= editor.selection_end.x; i++){
                                         Coord_t coord = {i, j};
+                                        Coord_t offset = coord - editor.selection_start;
+
+                                        // tile id
                                         Tile_t* tile = tilemap_get_tile(&tilemap, coord);
                                         editor.selection.elements[stamp_index].type = STAMP_TYPE_TILE_ID;
                                         editor.selection.elements[stamp_index].tile_id = tile->id;
-                                        editor.selection.elements[stamp_index].offset = coord - editor.selection_start;
+                                        editor.selection.elements[stamp_index].offset = offset;
                                         stamp_index++;
-                                   }
-                              }
 
-                              for(S16 j = editor.selection_start.y; j <= editor.selection_end.y; j++){
-                                   for(S16 i = editor.selection_start.x; i <= editor.selection_end.x; i++){
-                                        Coord_t coord = {i, j};
-                                        Tile_t* tile = tilemap_get_tile(&tilemap, coord);
+                                        // tile flags
                                         editor.selection.elements[stamp_index].type = STAMP_TYPE_TILE_FLAGS;
                                         editor.selection.elements[stamp_index].tile_flags = tile->flags;
-                                        editor.selection.elements[stamp_index].offset = coord - editor.selection_start;
+                                        editor.selection.elements[stamp_index].offset = offset;
                                         stamp_index++;
+
+                                        // interactive
+                                        auto* interactive = interactive_quad_tree_find_at(interactive_quad_tree, coord);
+                                        if(interactive){
+                                             resize(&editor.selection, editor.selection.count + 1);
+                                             auto* stamp = editor.selection.elements + (editor.selection.count - 1);
+                                             stamp->type = STAMP_TYPE_INTERACTIVE;
+                                             stamp->interactive = *interactive;
+                                             stamp->offset = offset;
+                                        }
+
+                                        for(S16 b = 0; b < block_array.count; b++){
+                                             auto* block = block_array.elements + b;
+                                             if(pos_to_coord(block->pos) == coord){
+                                                  resize(&editor.selection, editor.selection.count + 1);
+                                                  auto* stamp = editor.selection.elements + (editor.selection.count - 1);
+                                                  stamp->type = STAMP_TYPE_BLOCK;
+                                                  stamp->block.face = block->face;
+                                                  stamp->block.element = block->element;
+                                                  stamp->offset = offset;
+                                             }
+                                        }
                                    }
                               }
 
