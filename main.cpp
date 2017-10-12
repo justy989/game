@@ -438,6 +438,7 @@ bool interactive_is_solid(Interactive_t* interactive){
              (interactive->type == INTERACTIVE_TYPE_DOOR && interactive->door.lift.ticks < DOOR_MAX_HEIGHT));
 }
 
+// TODO: Convert to use Rect_t
 struct InteractiveQuadTreeBounds_t{
      Coord_t min;
      Coord_t max;
@@ -1812,6 +1813,7 @@ int main(int argc, char** argv){
      GLuint player_texture = transparent_texture_from_file("player.bmp");
      if(player_texture == 0) return 1;
 
+#if 0 // TODO: do we want this in the future
      Rect_t rooms[2];
      {
           rooms[0].left = 0;
@@ -1824,24 +1826,18 @@ int main(int argc, char** argv){
           rooms[1].top = 15;
           rooms[1].right = 27;
      }
+#endif
 
      ObjectArray_t<Block_t> block_array;
-     if(!init(&block_array, 3)){
-          return 1;
+     {
+          if(!init(&block_array, 1)){
+               return 1;
+          }
+          block_array.elements[0].pos = coord_to_pos(Coord_t{-1, -1});
      }
 
      Block_t** sorted_blocks;
      {
-          block_array.elements[0].pos = coord_to_pos(Coord_t{6, 6});
-          block_array.elements[1].pos = coord_to_pos(Coord_t{6, 2});
-          block_array.elements[2].pos = coord_to_pos(Coord_t{8, 8});
-          block_array.elements[0].vel = vec_zero();
-          block_array.elements[1].vel = vec_zero();
-          block_array.elements[2].vel = vec_zero();
-          block_array.elements[0].accel = vec_zero();
-          block_array.elements[1].accel = vec_zero();
-          block_array.elements[2].accel = vec_zero();
-
           sorted_blocks = (Block_t**)(calloc(block_array.count, sizeof(*sorted_blocks)));
           for(S16 i = 0; i < block_array.count; ++i){
                sorted_blocks[i] = block_array.elements + i;
@@ -1850,131 +1846,52 @@ int main(int argc, char** argv){
 
      ObjectArray_t<Interactive_t> interactive_array;
      {
-          if(!init(&interactive_array, 8)){
+          if(!init(&interactive_array, 1)){
                return 1;
           }
-
-          interactive_array.elements[0].type = INTERACTIVE_TYPE_LEVER;
-          interactive_array.elements[0].coord = Coord_t{3, 9};
-          interactive_array.elements[1].type = INTERACTIVE_TYPE_POPUP;
-          interactive_array.elements[1].coord = Coord_t{5, 11};
-          interactive_array.elements[1].popup.lift.ticks = 1;
-          interactive_array.elements[2].type = INTERACTIVE_TYPE_POPUP;
-          interactive_array.elements[2].coord = Coord_t{9, 2};
-          interactive_array.elements[2].popup.lift.ticks = HEIGHT_INTERVAL + 1;
-          interactive_array.elements[2].popup.lift.up = true;
-          interactive_array.elements[3].type = INTERACTIVE_TYPE_PRESSURE_PLATE;
-          interactive_array.elements[3].coord = Coord_t{3, 6};
-          interactive_array.elements[4].type = INTERACTIVE_TYPE_DOOR;
-          interactive_array.elements[4].coord = Coord_t{0, 6};
-          interactive_array.elements[4].door.lift.ticks = DOOR_MAX_HEIGHT;
-          interactive_array.elements[4].door.lift.up = true;
-          interactive_array.elements[5].type = INTERACTIVE_TYPE_POPUP;
-          interactive_array.elements[5].coord = Coord_t{13, 10};
-          interactive_array.elements[5].popup.lift.ticks = 1;
-          interactive_array.elements[6].type = INTERACTIVE_TYPE_LEVER;
-          interactive_array.elements[6].coord = Coord_t{12, 12};
-          interactive_array.elements[7].type = INTERACTIVE_TYPE_LEVER;
-          interactive_array.elements[7].coord = Coord_t{12, 8};
+          interactive_array.elements[0].coord.x = -1;
+          interactive_array.elements[0].coord.y = -1;
      }
 
-     auto* interactive_quad_tree = interactive_quad_tree_build(&interactive_array);
-
-#define SOLID_TILE 16
+     InteractiveQuadTreeNode_t* interactive_quad_tree = interactive_quad_tree_build(&interactive_array);
 
      TileMap_t tilemap;
      {
-          init(&tilemap, 34, 17);
+          init(&tilemap, ROOM_TILE_SIZE, ROOM_TILE_SIZE);
 
-          for(S16 i = 0; i < 17; i++){
-               tilemap.tiles[0][i].id = SOLID_TILE;
-               tilemap.tiles[tilemap.height - 1][i].id = SOLID_TILE;
-          }
-
-          for(S16 i = 0; i < 10; i++){
-               tilemap.tiles[5][17 + i].id = SOLID_TILE;
-               tilemap.tiles[15][17 + i].id = SOLID_TILE;
+          for(S16 i = 0; i < tilemap.width; i++){
+               tilemap.tiles[0][i].id = 33;
+               tilemap.tiles[1][i].id = 17;
+               tilemap.tiles[tilemap.height - 1][i].id = 16;
+               tilemap.tiles[tilemap.height - 2][i].id = 32;
           }
 
           for(S16 i = 0; i < tilemap.height; i++){
-               tilemap.tiles[i][0].id = SOLID_TILE;
-               tilemap.tiles[i][16].id = SOLID_TILE;
-               tilemap.tiles[i][17].id = SOLID_TILE;
+               tilemap.tiles[i][0].id = 18;
+               tilemap.tiles[i][1].id = 19;
+               tilemap.tiles[i][tilemap.width - 2].id = 34;
+               tilemap.tiles[i][tilemap.height - 1].id = 35;
           }
 
-          for(S16 i = 0; i < 10; i++){
-               tilemap.tiles[5 + i][27].id = SOLID_TILE;
-          }
+          tilemap.tiles[0][0].id = 36;
+          tilemap.tiles[0][1].id = 37;
+          tilemap.tiles[1][0].id = 20;
+          tilemap.tiles[1][1].id = 21;
 
-          tilemap.tiles[10][17].id = 0;
-          tilemap.tiles[10][16].id = 0;
-          tilemap.tiles[6][0].id = 0;
+          tilemap.tiles[16][0].id = 22;
+          tilemap.tiles[16][1].id = 23;
+          tilemap.tiles[15][0].id = 38;
+          tilemap.tiles[15][1].id = 39;
 
-          tilemap.tiles[3][4].id = SOLID_TILE;
-          tilemap.tiles[4][5].id = SOLID_TILE;
+          tilemap.tiles[15][15].id = 40;
+          tilemap.tiles[15][16].id = 41;
+          tilemap.tiles[16][15].id = 24;
+          tilemap.tiles[16][16].id = 25;
 
-          tilemap.tiles[8][4].id = SOLID_TILE;
-          tilemap.tiles[8][5].id = SOLID_TILE;
-
-          tilemap.tiles[11][10].id = SOLID_TILE;
-          tilemap.tiles[12][10].id = SOLID_TILE;
-
-          tilemap.tiles[5][10].id = SOLID_TILE;
-          tilemap.tiles[7][10].id = SOLID_TILE;
-
-          tilemap.tiles[5][12].id = SOLID_TILE;
-          tilemap.tiles[7][12].id = SOLID_TILE;
-
-          tilemap.tiles[2][14].id = SOLID_TILE;
-
-          tilemap.tiles[8][22].id = SOLID_TILE;
-          tilemap.tiles[9][23].id = SOLID_TILE;
-
-          tilemap.tiles[8][6].flags |= TILE_FLAG_ICED;
-          tilemap.tiles[9][6].flags |= TILE_FLAG_ICED;
-          tilemap.tiles[10][6].flags |= TILE_FLAG_ICED;
-          tilemap.tiles[8][7].flags |= TILE_FLAG_ICED;
-          tilemap.tiles[9][7].flags |= TILE_FLAG_ICED;
-          tilemap.tiles[10][7].flags |= TILE_FLAG_ICED;
-          tilemap.tiles[8][8].flags |= TILE_FLAG_ICED;
-          tilemap.tiles[9][8].flags |= TILE_FLAG_ICED;
-          tilemap.tiles[10][8].flags |= TILE_FLAG_ICED;
-
-          tilemap.tiles[10][3].flags |= TILE_FLAG_WIRE_UP;
-          tilemap.tiles[10][3].flags |= TILE_FLAG_WIRE_DOWN;
-          tilemap.tiles[11][3].flags |= TILE_FLAG_WIRE_RIGHT;
-          tilemap.tiles[11][3].flags |= TILE_FLAG_WIRE_DOWN;
-          tilemap.tiles[11][4].flags |= TILE_FLAG_WIRE_LEFT;
-          tilemap.tiles[11][4].flags |= TILE_FLAG_WIRE_RIGHT;
-
-          tilemap.tiles[5][3].flags |= TILE_FLAG_WIRE_UP;
-          tilemap.tiles[5][3].flags |= TILE_FLAG_WIRE_DOWN;
-          tilemap.tiles[4][3].flags |= TILE_FLAG_WIRE_UP;
-          tilemap.tiles[4][3].flags |= TILE_FLAG_WIRE_DOWN;
-          tilemap.tiles[3][3].flags |= TILE_FLAG_WIRE_UP;
-          tilemap.tiles[3][3].flags |= TILE_FLAG_WIRE_DOWN;
-
-          tilemap.tiles[2][3].flags |= TILE_FLAG_WIRE_UP;
-          tilemap.tiles[2][3].flags |= TILE_FLAG_WIRE_RIGHT;
-
-          tilemap.tiles[2][4].flags |= TILE_FLAG_WIRE_LEFT;
-          tilemap.tiles[2][4].flags |= TILE_FLAG_WIRE_RIGHT;
-          tilemap.tiles[2][5].flags |= TILE_FLAG_WIRE_LEFT;
-          tilemap.tiles[2][5].flags |= TILE_FLAG_WIRE_RIGHT;
-          tilemap.tiles[2][6].flags |= TILE_FLAG_WIRE_LEFT;
-          tilemap.tiles[2][6].flags |= TILE_FLAG_WIRE_RIGHT;
-          tilemap.tiles[2][7].flags |= TILE_FLAG_WIRE_LEFT;
-          tilemap.tiles[2][7].flags |= TILE_FLAG_WIRE_RIGHT;
-          tilemap.tiles[2][8].flags |= TILE_FLAG_WIRE_LEFT;
-          tilemap.tiles[2][8].flags |= TILE_FLAG_WIRE_RIGHT;
-
-          tile_flags_set_cluster_direction(&tilemap.tiles[10][12].flags, DIRECTION_RIGHT);
-          tilemap.tiles[10][12].flags |= TILE_FLAG_WIRE_CLUSTER_LEFT;
-          tilemap.tiles[10][12].flags |= TILE_FLAG_WIRE_CLUSTER_RIGHT;
-          tilemap.tiles[11][12].flags |= TILE_FLAG_WIRE_UP;
-          tilemap.tiles[11][12].flags |= TILE_FLAG_WIRE_DOWN;
-          tilemap.tiles[9][12].flags |= TILE_FLAG_WIRE_UP;
-          tilemap.tiles[9][12].flags |= TILE_FLAG_WIRE_DOWN;
+          tilemap.tiles[0][15].id = 42;
+          tilemap.tiles[0][16].id = 43;
+          tilemap.tiles[1][15].id = 26;
+          tilemap.tiles[1][16].id = 27;
      }
 
      bool quit = false;
@@ -1982,7 +1899,7 @@ int main(int argc, char** argv){
      Vec_t user_movement = {};
 
      Player_t player {};
-     Coord_t player_start {3, 3};
+     Coord_t player_start {2, 8};
      player.pos = coord_to_pos_at_tile_center(player_start);
      player.walk_frame_delta = 1;
      player.radius = 3.5f / 272.0f;
@@ -1993,7 +1910,7 @@ int main(int argc, char** argv){
      auto last_time = system_clock::now();
      auto current_time = last_time;
 
-     Position_t camera {};
+     Position_t camera = coord_to_pos(Coord_t{8, 8});
 
      Block_t* last_block_pushed = nullptr;
      Direction_t last_block_pushed_direction = DIRECTION_LEFT;
@@ -2472,8 +2389,11 @@ int main(int argc, char** argv){
                }
           }
 
-          // figure out what room we should focus on
           Vec_t pos_vec = pos_to_vec(player.pos);
+
+#if 0
+          // TODO: do we want this in the future?
+          // figure out what room we should focus on
           Position_t room_center {};
           for(U32 i = 0; i < ELEM_COUNT(rooms); i++){
                if(coord_in_rect(vec_to_coord(pos_vec), rooms[i])){
@@ -2485,6 +2405,9 @@ int main(int argc, char** argv){
                     break;
                }
           }
+#else
+          Position_t room_center = coord_to_pos(Coord_t{8, 8});
+#endif
 
           Position_t camera_movement = room_center - camera;
           camera += camera_movement * 0.05f;
