@@ -462,6 +462,8 @@ struct InteractiveQuadTreeNode_t{
 bool interactive_quad_tree_insert(InteractiveQuadTreeNode_t* node, Interactive_t* interactive);
 
 bool interactive_quad_tree_subdivide(InteractiveQuadTreeNode_t* node){
+     if(node->bounds.min.x == node->bounds.max.x && node->bounds.min.y == node->bounds.max.y) return false;
+
      node->bottom_left = (InteractiveQuadTreeNode_t*)(calloc(1, sizeof(*node)));
      if(!node->bottom_left) return false;
 
@@ -992,8 +994,8 @@ struct MapInteractiveV1_t{
 };
 #pragma pack(pop)
 
-bool save_map(const TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array, ObjectArray_t<Interactive_t>* interactive_array,
-              const char* filepath){
+bool save_map(Coord_t player_start, const TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array,
+              ObjectArray_t<Interactive_t>* interactive_array, const char* filepath){
      // alloc and convert map elements to map format
      S32 map_tile_count = (S32)(tilemap->width) * (S32)(tilemap->height);
      MapTileV1_t* map_tiles = (MapTileV1_t*)(calloc(map_tile_count, sizeof(*map_tiles)));
@@ -1077,6 +1079,7 @@ bool save_map(const TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array, Obj
 
      U8 map_version = MAP_VERSION;
      fwrite(&map_version, sizeof(map_version), 1, f);
+     fwrite(&player_start, sizeof(player_start), 1, f);
      fwrite(&tilemap->width, sizeof(tilemap->width), 1, f);
      fwrite(&tilemap->height, sizeof(tilemap->height), 1, f);
      fwrite(&block_array->count, sizeof(block_array->count), 1, f);
@@ -1093,8 +1096,8 @@ bool save_map(const TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array, Obj
      return true;
 }
 
-bool load_map(TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array, ObjectArray_t<Interactive_t>* interactive_array,
-              const char* filepath){
+bool load_map(Coord_t* player_start, TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array,
+              ObjectArray_t<Interactive_t>* interactive_array, const char* filepath){
      // read counts from file
      S16 map_width;
      S16 map_height;
@@ -1114,6 +1117,7 @@ bool load_map(TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array, ObjectArr
           return false;
      }
 
+     fread(player_start, sizeof(*player_start), 1, f);
      fread(&map_width, sizeof(map_width), 1, f);
      fread(&map_height, sizeof(map_height), 1, f);
      fread(&block_count, sizeof(block_count), 1, f);
@@ -1970,7 +1974,8 @@ int main(int argc, char** argv){
      Vec_t user_movement = {};
 
      Player_t player {};
-     player.pos = coord_to_pos(Coord_t{3, 3});
+     Coord_t player_start {3, 3};
+     player.pos = coord_to_pos_at_tile_center(player_start);
      player.walk_frame_delta = 1;
      player.radius = 3.5f / 272.0f;
 
@@ -2102,7 +2107,7 @@ int main(int argc, char** argv){
                                                demo_file, frame_count);
                          break;
                     case SDL_SCANCODE_L:
-                         if(load_map(&tilemap, &block_array, &interactive_array, "first.bm")){
+                         if(load_map(&player_start, &tilemap, &block_array, &interactive_array, "first.bm")){
                               // update sort blocks list
                               free(sorted_blocks);
                               sorted_blocks = (Block_t**)(calloc(block_array.count, sizeof(*sorted_blocks)));
@@ -2180,6 +2185,11 @@ int main(int argc, char** argv){
                               destroy(&editor.selection);
                               shallow_copy(&editor.clipboard, &editor.selection);
                               editor.mode = EDITOR_MODE_SELECTION_MANIPULATION;
+                         }
+                         break;
+                    case SDL_SCANCODE_M:
+                         if(editor.mode == EDITOR_MODE_CATEGORY_SELECT){
+                              player_start = mouse_select_world(mouse_screen, camera);
                          }
                          break;
                     }
@@ -2823,6 +2833,9 @@ int main(int argc, char** argv){
           }
           glEnd();
 
+          // player start
+          selection_draw(player_start, player_start, screen_camera, 0.0f, 1.0f, 0.0f);
+
           // editor
           switch(editor.mode){
           default:
@@ -3001,7 +3014,7 @@ int main(int argc, char** argv){
           SDL_GL_SwapWindow(window);
      }
 
-     save_map(&tilemap, &block_array, &interactive_array, "first.bm");
+     save_map(player_start, &tilemap, &block_array, &interactive_array, "first.bm");
      interactive_quad_tree_free(interactive_quad_tree);
 
      destroy(&tilemap);
