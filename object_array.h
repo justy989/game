@@ -47,3 +47,17 @@ void destroy(ObjectArray_t<T>* object_array){
      object_array->elements = nullptr;
      object_array->count = 0;
 }
+
+template <typename T>
+bool shallow_copy(ObjectArray_t<T>* a, ObjectArray_t<T>* b){
+     b->elements = (T*)(malloc(a->count * sizeof(*b->elements)));
+     if(!b->elements){
+          LOG("%s() failed to realloc %d objects\n", __FUNCTION__, a->count);
+          return false;
+     }
+     for(S16 i = 0; i < a->count; i++){
+          b->elements[i] = a->elements[i];
+     }
+     b->count = a->count;
+     return true;
+}

@@ -2133,6 +2133,20 @@ int main(int argc, char** argv){
                               editor.mode = EDITOR_MODE_CATEGORY_SELECT;
                          }
                          break;
+                    case SDL_SCANCODE_X:
+                         if(editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
+                              destroy(&editor.clipboard);
+                              shallow_copy(&editor.selection, &editor.clipboard);
+                              editor.mode = EDITOR_MODE_CATEGORY_SELECT;
+                         }
+                         break;
+                    case SDL_SCANCODE_P:
+                         if(editor.mode == EDITOR_MODE_CATEGORY_SELECT && editor.clipboard.count){
+                              destroy(&editor.selection);
+                              shallow_copy(&editor.clipboard, &editor.selection);
+                              editor.mode = EDITOR_MODE_SELECTION_MANIPULATION;
+                         }
+                         break;
                     }
                     break;
                case SDL_KEYUP:
