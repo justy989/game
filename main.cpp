@@ -1719,6 +1719,24 @@ void coord_clear(Coord_t coord, TileMap_t* tilemap, ObjectArray_t<Interactive_t>
      }
 }
 
+Rect_t editor_selection_bounds(Editor_t* editor){
+     Rect_t rect {};
+     for(S16 i = 0; i < editor->selection.count; i++){
+          auto* stamp = editor->selection.elements + i;
+          if(rect.left > stamp->offset.x) rect.left = stamp->offset.x;
+          if(rect.bottom > stamp->offset.y) rect.bottom = stamp->offset.y;
+          if(rect.right < stamp->offset.x) rect.right = stamp->offset.x;
+          if(rect.top < stamp->offset.y) rect.top = stamp->offset.y;
+     }
+
+     rect.left += editor->selection_start.x;
+     rect.right += editor->selection_start.x;
+     rect.top += editor->selection_start.y;
+     rect.bottom += editor->selection_start.y;
+
+     return rect;
+}
+
 using namespace std::chrono;
 
 int main(int argc, char** argv){
@@ -2117,8 +2135,9 @@ int main(int argc, char** argv){
                     case SDL_SCANCODE_RETURN:
                          if(editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
                               // clear coords below stamp
-                              for(S16 j = editor.selection_start.y; j <= editor.selection_end.y; j++){
-                                   for(S16 i = editor.selection_start.x; i <= editor.selection_end.x; i++){
+                              Rect_t selection_bounds = editor_selection_bounds(&editor);
+                              for(S16 j = selection_bounds.bottom; j <= selection_bounds.top; j++){
+                                   for(S16 i = selection_bounds.left; i <= selection_bounds.right; i++){
                                         Coord_t coord {i, j};
                                         coord_clear(coord, &tilemap, &interactive_array, interactive_quad_tree, &block_array);
                                    }
@@ -2131,6 +2150,22 @@ int main(int argc, char** argv){
                               }
 
                               editor.mode = EDITOR_MODE_CATEGORY_SELECT;
+                         }
+                         break;
+                    case SDL_SCANCODE_T:
+                         if(editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
+                              // TODO: compress selection sort
+                              if(editor.selection_start.x > editor.selection_end.x) SWAP(editor.selection_start.x, editor.selection_end.x);
+                              if(editor.selection_start.y > editor.selection_end.y) SWAP(editor.selection_start.y, editor.selection_end.y);
+
+                              S16 height_offset = (editor.selection_end.y - editor.selection_start.y) - 1;
+
+                              // perform rotation on each offset
+                              for(S16 i = 0; i < editor.selection.count; i++){
+                                   auto* stamp = editor.selection.elements + i;
+                                   Coord_t rot {stamp->offset.y, (S16)(-stamp->offset.x + height_offset)};
+                                   stamp->offset = rot;
+                              }
                          }
                          break;
                     case SDL_SCANCODE_X:
@@ -2923,8 +2958,6 @@ int main(int argc, char** argv){
                break;
           case EDITOR_MODE_SELECTION_MANIPULATION:
           {
-               selection_draw(editor.selection_start, editor.selection_end, screen_camera, 1.0f, 0.0f, 0.0f);
-
                glBindTexture(GL_TEXTURE_2D, theme_texture);
                glBegin(GL_QUADS);
                glColor3f(1.0f, 1.0f, 1.0f);
@@ -2957,6 +2990,11 @@ int main(int argc, char** argv){
                     }
                }
                glEnd();
+
+               Rect_t selection_bounds = editor_selection_bounds(&editor);
+               Coord_t min_coord {selection_bounds.left, selection_bounds.bottom};
+               Coord_t max_coord {selection_bounds.right, selection_bounds.top};
+               selection_draw(min_coord, max_coord, screen_camera, 1.0f, 0.0f, 0.0f);
           } break;
           }
 
