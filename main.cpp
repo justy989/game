@@ -3,6 +3,9 @@
 #include <cfloat>
 #include <cassert>
 
+// linux
+#include <dirent.h>
+
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_opengl.h>
 
@@ -1746,6 +1749,7 @@ using namespace std::chrono;
 int main(int argc, char** argv){
      DemoMode_t demo_mode = DEMO_MODE_NONE;
      const char* demo_filepath = NULL;
+     const char* map_name = "unnamed";
 
      for(int i = 1; i < argc; i++){
           if(strcmp(argv[i], "-play") == 0){
@@ -1758,6 +1762,10 @@ int main(int argc, char** argv){
                if(next >= argc) continue;
                demo_filepath = argv[next];
                demo_mode = DEMO_MODE_RECORD;
+          }else if(strcmp(argv[i], "-name") == 0){
+               int next = i + 1;
+               if(next >= argc) continue;
+               map_name = argv[next];
           }
      }
 
@@ -1980,6 +1988,7 @@ int main(int argc, char** argv){
      player.radius = 3.5f / 272.0f;
 
      PlayerAction_t player_action {};
+     S16 map_number = 0;
 
      auto last_time = system_clock::now();
      auto current_time = last_time;
@@ -2107,7 +2116,24 @@ int main(int argc, char** argv){
                                                demo_file, frame_count);
                          break;
                     case SDL_SCANCODE_L:
-                         if(load_map(&player_start, &tilemap, &block_array, &interactive_array, "first.bm")){
+                    {
+                         // search through directory to find file starting with 3 digit map number
+                         DIR* d = opendir("content");
+                         if(!d) break;
+                         struct dirent* dir;
+                         char filepath[64] = {};
+                         char match[4] = {};
+                         snprintf(match, 4, "%03d", map_number);
+                         while((dir = readdir(d)) != nullptr){
+                              if(strncmp(dir->d_name, match, 3) == 0){
+                                   snprintf(filepath, 64, "content/%s", dir->d_name);
+                                   break;
+                              }
+                         }
+
+                         if(!filepath[0]) break;
+
+                         if(load_map(&player_start, &tilemap, &block_array, &interactive_array, filepath)){
                               // update sort blocks list
                               free(sorted_blocks);
                               sorted_blocks = (Block_t**)(calloc(block_array.count, sizeof(*sorted_blocks)));
@@ -2119,7 +2145,13 @@ int main(int argc, char** argv){
                               interactive_quad_tree_free(interactive_quad_tree);
                               interactive_quad_tree = interactive_quad_tree_build(&interactive_array);
                          }
-                         break;
+                    } break;
+                    case SDL_SCANCODE_V:
+                    {
+                         char filepath[64];
+                         snprintf(filepath, 64, "content/%03d_%s.bm", map_number, map_name);
+                         save_map(player_start, &tilemap, &block_array, &interactive_array, filepath);
+                    } break;
                     // TODO: #ifdef DEBUG
                     case SDL_SCANCODE_GRAVE:
                          if(editor.mode == EDITOR_MODE_OFF){
@@ -3014,7 +3046,6 @@ int main(int argc, char** argv){
           SDL_GL_SwapWindow(window);
      }
 
-     save_map(player_start, &tilemap, &block_array, &interactive_array, "first.bm");
      interactive_quad_tree_free(interactive_quad_tree);
 
      destroy(&tilemap);
