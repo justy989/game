@@ -1312,12 +1312,26 @@ bool init(Editor_t* editor){
      init(&editor->category_array, EDITOR_CATEGORY_COUNT);
 
      auto* tile_category = editor->category_array.elements + EDITOR_CATEGORY_TILE_ID;
-     init(tile_category, 72);
-     for(S16 i = 0; i < tile_category->count; i++){
+     init(tile_category, 16);
+     for(S16 i = 0; i < 14; i++){
           init(&tile_category->elements[i], 1);
           tile_category->elements[i].elements[0].type = STAMP_TYPE_TILE_ID;
           tile_category->elements[i].elements[0].tile_id = (U8)(i);
      }
+
+     init(&tile_category->elements[14], 2);
+     tile_category->elements[14].elements[0].type = STAMP_TYPE_TILE_ID;
+     tile_category->elements[14].elements[0].tile_id = 32;
+     tile_category->elements[14].elements[1].type = STAMP_TYPE_TILE_ID;
+     tile_category->elements[14].elements[1].tile_id = 16;
+     tile_category->elements[14].elements[1].offset = Coord_t{0, 1};
+
+     init(&tile_category->elements[15], 2);
+     tile_category->elements[15].elements[0].type = STAMP_TYPE_TILE_ID;
+     tile_category->elements[15].elements[0].tile_id = 33;
+     tile_category->elements[15].elements[1].type = STAMP_TYPE_TILE_ID;
+     tile_category->elements[15].elements[1].tile_id = 17;
+     tile_category->elements[15].elements[1].offset = Coord_t{0, 1};
 
 #if 0
      auto* tile_flags_category = editor->category_array.elements + EDITOR_CATEGORY_TILE_FLAGS;
@@ -1746,6 +1760,35 @@ Rect_t editor_selection_bounds(Editor_t* editor){
      rect.bottom += editor->selection_start.y;
 
      return rect;
+}
+
+S32 mouse_select_stamp_index(Coord_t screen_coord, ObjectArray_t<ObjectArray_t<Stamp_t>>* stamp_array){
+     S32 index = -1;
+     Rect_t current_rect = {};
+     S16 row_height = 0;
+     for(S16 i = 0; i < stamp_array->count; i++){
+          Coord_t dimensions = stamp_array_dimensions(stamp_array->elements + i);
+
+          if(row_height < dimensions.y) row_height = dimensions.y; // track max
+
+          current_rect.right = current_rect.left + dimensions.x;
+          current_rect.top = current_rect.bottom + dimensions.y;
+
+          if(screen_coord.x >= current_rect.left && screen_coord.x < current_rect.right &&
+             screen_coord.y >= current_rect.bottom && screen_coord.y < current_rect.top){
+               index = i;
+               break;
+          }
+
+          current_rect.left += dimensions.x;
+
+          // wrap around to next row if necessary
+          if(current_rect.left >= ROOM_TILE_SIZE){
+               current_rect.left = 0;
+               current_rect.bottom += row_height;
+          }
+     }
+     return index;
 }
 
 using namespace std::chrono;
@@ -2192,7 +2235,7 @@ int main(int argc, char** argv){
                          case EDITOR_MODE_CATEGORY_SELECT:
                          case EDITOR_MODE_SELECTION_MANIPULATION:
                          {
-                              S32 select_index = mouse_select_index(mouse_screen);
+                              S32 select_index = (mouse_screen.y * ROOM_TILE_SIZE) + mouse_screen.x;
                               if(select_index < EDITOR_CATEGORY_COUNT){
                                    editor.mode = EDITOR_MODE_STAMP_SELECT;
                                    editor.category = select_index;
@@ -2206,8 +2249,9 @@ int main(int argc, char** argv){
                          case EDITOR_MODE_STAMP_SELECT:
                          case EDITOR_MODE_STAMP_HIDE:
                          {
-                              S32 select_index = mouse_select_index(mouse_screen);
-                              if(editor.mode != EDITOR_MODE_STAMP_HIDE && select_index < editor.category_array.elements[editor.category].count){
+                              S32 select_index = mouse_select_stamp_index(vec_to_coord(mouse_screen),
+                                                                          editor.category_array.elements + editor.category);
+                              if(editor.mode != EDITOR_MODE_STAMP_HIDE && select_index < editor.category_array.elements[editor.category].count && select_index >= 0){
                                    editor.stamp = select_index;
                               }else{
                                    Coord_t select_coord = mouse_select_world(mouse_screen, camera);
@@ -2866,10 +2910,10 @@ int main(int argc, char** argv){
                // draw stamp at mouse
                auto* stamp_array = editor.category_array.elements[editor.category].elements + editor.stamp;
                Coord_t mouse_coord = mouse_select_coord(mouse_screen);
-               Vec_t stamp_pos = coord_to_screen_position(mouse_coord);
 
                for(S16 s = 0; s < stamp_array->count; s++){
                     auto* stamp = stamp_array->elements + s;
+                    Vec_t stamp_pos = coord_to_screen_position(mouse_coord + stamp->offset);
                     switch(stamp->type){
                     default:
                          break;
