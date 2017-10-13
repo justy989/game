@@ -1282,11 +1282,11 @@ Coord_t stamp_array_dimensions(ObjectArray_t<Stamp_t>* object_array){
 enum EditorCategory_t : U8{
      EDITOR_CATEGORY_TILE_ID,
      EDITOR_CATEGORY_TILE_FLAGS,
-     // EDITOR_CATEGORY_BLOCK,
-     // EDITOR_CATEGORY_INTERACTIVE_LEVER,
-     // EDITOR_CATEGORY_INTERACTIVE_PRESSURE_PLATE,
-     // EDITOR_CATEGORY_INTERACTIVE_POPUP,
-     // EDITOR_CATEGORY_INTERACTIVE_DOOR,
+     EDITOR_CATEGORY_BLOCK,
+     EDITOR_CATEGORY_INTERACTIVE_LEVER,
+     EDITOR_CATEGORY_INTERACTIVE_PRESSURE_PLATE,
+     EDITOR_CATEGORY_INTERACTIVE_POPUP,
+     EDITOR_CATEGORY_INTERACTIVE_DOOR,
      EDITOR_CATEGORY_COUNT,
 };
 
@@ -1502,55 +1502,60 @@ bool init(Editor_t* editor){
      tile_flags_category->elements[61].elements[0].type = STAMP_TYPE_TILE_FLAGS;
      tile_flags_category->elements[61].elements[0].tile_flags = TILE_FLAG_RESET_IMMUNE;
 
-#if 0
      auto* block_category = editor->category_array.elements + EDITOR_CATEGORY_BLOCK;
      init(block_category, 4);
      for(S16 i = 0; i < block_category->count; i++){
-          block_category->elements[i].type = STAMP_TYPE_BLOCK;
-          block_category->elements[i].block.face = DIRECTION_LEFT;
-          block_category->elements[i].block.element = (Element_t)(i);
+          init(block_category->elements + i, 1);
+          block_category->elements[i].elements[0].type = STAMP_TYPE_BLOCK;
+          block_category->elements[i].elements[0].block.face = DIRECTION_LEFT;
+          block_category->elements[i].elements[0].block.element = (Element_t)(i);
      }
 
      auto* interactive_lever_category = editor->category_array.elements + EDITOR_CATEGORY_INTERACTIVE_LEVER;
      init(interactive_lever_category, 1);
-     interactive_lever_category->elements[0].type = STAMP_TYPE_INTERACTIVE;
-     interactive_lever_category->elements[0].interactive.type = INTERACTIVE_TYPE_LEVER;
+     init(interactive_lever_category->elements, 1);
+     interactive_lever_category->elements[0].elements[0].type = STAMP_TYPE_INTERACTIVE;
+     interactive_lever_category->elements[0].elements[0].interactive.type = INTERACTIVE_TYPE_LEVER;
 
      auto* interactive_pressure_plate_category = editor->category_array.elements + EDITOR_CATEGORY_INTERACTIVE_PRESSURE_PLATE;
      init(interactive_pressure_plate_category, 1);
-     interactive_pressure_plate_category->elements[0].type = STAMP_TYPE_INTERACTIVE;
-     interactive_pressure_plate_category->elements[0].interactive.type = INTERACTIVE_TYPE_PRESSURE_PLATE;
+     init(interactive_pressure_plate_category->elements, 1);
+     interactive_pressure_plate_category->elements[0].elements[0].type = STAMP_TYPE_INTERACTIVE;
+     interactive_pressure_plate_category->elements[0].elements[0].interactive.type = INTERACTIVE_TYPE_PRESSURE_PLATE;
 
      auto* interactive_popup_category = editor->category_array.elements + EDITOR_CATEGORY_INTERACTIVE_POPUP;
      init(interactive_popup_category, 2);
-     interactive_popup_category->elements[0].type = STAMP_TYPE_INTERACTIVE;
-     interactive_popup_category->elements[0].interactive.type = INTERACTIVE_TYPE_POPUP;
-     interactive_popup_category->elements[0].interactive.popup.lift.ticks = HEIGHT_INTERVAL + 1;
-     interactive_popup_category->elements[0].interactive.popup.lift.up = true;
-     interactive_popup_category->elements[1].type = STAMP_TYPE_INTERACTIVE;
-     interactive_popup_category->elements[1].interactive.type = INTERACTIVE_TYPE_POPUP;
-     interactive_popup_category->elements[1].interactive.popup.lift.ticks = 1;
-     interactive_popup_category->elements[1].interactive.popup.lift.up = false;
+     init(interactive_popup_category->elements, 1);
+     interactive_popup_category->elements[0].elements[0].type = STAMP_TYPE_INTERACTIVE;
+     interactive_popup_category->elements[0].elements[0].interactive.type = INTERACTIVE_TYPE_POPUP;
+     interactive_popup_category->elements[0].elements[0].interactive.popup.lift.ticks = HEIGHT_INTERVAL + 1;
+     interactive_popup_category->elements[0].elements[0].interactive.popup.lift.up = true;
+     init(interactive_popup_category->elements + 1, 1);
+     interactive_popup_category->elements[1].elements[0].type = STAMP_TYPE_INTERACTIVE;
+     interactive_popup_category->elements[1].elements[0].interactive.type = INTERACTIVE_TYPE_POPUP;
+     interactive_popup_category->elements[1].elements[0].interactive.popup.lift.ticks = 1;
+     interactive_popup_category->elements[1].elements[0].interactive.popup.lift.up = false;
 
      auto* interactive_door_category = editor->category_array.elements + EDITOR_CATEGORY_INTERACTIVE_DOOR;
      init(interactive_door_category, 8);
      for(S8 j = 0; j < DIRECTION_COUNT; j++){
-          interactive_door_category->elements[j].type = STAMP_TYPE_INTERACTIVE;
-          interactive_door_category->elements[j].interactive.type = INTERACTIVE_TYPE_DOOR;
-          interactive_door_category->elements[j].interactive.door.lift.ticks = DOOR_MAX_HEIGHT;
-          interactive_door_category->elements[j].interactive.door.lift.up = true;
-          interactive_door_category->elements[j].interactive.door.face = (Direction_t)(j);
+          init(interactive_door_category->elements + j, 1);
+          interactive_door_category->elements[j].elements[0].type = STAMP_TYPE_INTERACTIVE;
+          interactive_door_category->elements[j].elements[0].interactive.type = INTERACTIVE_TYPE_DOOR;
+          interactive_door_category->elements[j].elements[0].interactive.door.lift.ticks = DOOR_MAX_HEIGHT;
+          interactive_door_category->elements[j].elements[0].interactive.door.lift.up = true;
+          interactive_door_category->elements[j].elements[0].interactive.door.face = (Direction_t)(j);
      }
 
      for(S8 j = 0; j < DIRECTION_COUNT; j++){
-          interactive_door_category->elements[j + 4].type = STAMP_TYPE_INTERACTIVE;
-          interactive_door_category->elements[j + 4].interactive.type = INTERACTIVE_TYPE_DOOR;
-          interactive_door_category->elements[j + 4].interactive.door.lift.ticks = 0;
-          interactive_door_category->elements[j + 4].interactive.door.lift.up = false;
-          interactive_door_category->elements[j + 4].interactive.door.face = (Direction_t)(j);
+          init(interactive_door_category->elements + j + 4, 1);
+          interactive_door_category->elements[j + 4].elements[0].type = STAMP_TYPE_INTERACTIVE;
+          interactive_door_category->elements[j + 4].elements[0].interactive.type = INTERACTIVE_TYPE_DOOR;
+          interactive_door_category->elements[j + 4].elements[0].interactive.door.lift.ticks = 0;
+          interactive_door_category->elements[j + 4].elements[0].interactive.door.lift.up = false;
+          interactive_door_category->elements[j + 4].elements[0].interactive.door.face = (Direction_t)(j);
 
      }
-#endif
 
      return true;
 }
