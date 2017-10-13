@@ -759,7 +759,9 @@ void activate(TileMap_t* tilemap, InteractiveQuadTreeNode_t* interactive_quad_tr
      if(!interactive) return;
 
      if(interactive->type != INTERACTIVE_TYPE_LEVER &&
-        interactive->type != INTERACTIVE_TYPE_PRESSURE_PLATE) return;
+        interactive->type != INTERACTIVE_TYPE_PRESSURE_PLATE &&
+        interactive->type != INTERACTIVE_TYPE_LIGHT_DETECTOR &&
+        interactive->type != INTERACTIVE_TYPE_ICE_DETECTOR) return;
 
      toggle_electricity(tilemap, interactive_quad_tree, coord, DIRECTION_LEFT);
      toggle_electricity(tilemap, interactive_quad_tree, coord, DIRECTION_RIGHT);
@@ -950,7 +952,7 @@ void illuminate_line(Coord_t start, Coord_t end, U8 value, TileMap_t* tilemap, O
 
                Block_t* block = nullptr;
                for(S16 b = 0; b < block_array->count; b++){
-                    if(pos_to_coord(block_array->elements[b].pos) == coords[i]){
+                    if(block_get_coord(block_array->elements + b) == coords[i]){
                          block = block_array->elements + b;
                          break;
                     }
@@ -1411,6 +1413,7 @@ enum EditorCategory_t : U8{
      EDITOR_CATEGORY_INTERACTIVE_PRESSURE_PLATE,
      EDITOR_CATEGORY_INTERACTIVE_POPUP,
      EDITOR_CATEGORY_INTERACTIVE_DOOR,
+     EDITOR_CATEGORY_INTERACTIVE_LIGHT_DETECTOR,
      EDITOR_CATEGORY_COUNT,
 };
 
@@ -1681,6 +1684,12 @@ bool init(Editor_t* editor){
 
      }
 
+     auto* interactive_light_detector_category = editor->category_array.elements + EDITOR_CATEGORY_INTERACTIVE_LIGHT_DETECTOR;
+     init(interactive_light_detector_category, 1);
+     init(interactive_light_detector_category->elements, 1);
+     interactive_light_detector_category->elements[0].elements[0].type = STAMP_TYPE_INTERACTIVE;
+     interactive_light_detector_category->elements[0].elements[0].interactive.type = INTERACTIVE_TYPE_LIGHT_DETECTOR;
+
      return true;
 }
 
@@ -1846,6 +1855,12 @@ void interactive_draw(Interactive_t* interactive, Vec_t pos_vec){
      case INTERACTIVE_TYPE_DOOR:
           tex_vec = theme_frame(interactive->door.lift.ticks + 8, 11 + interactive->door.face);
           draw_theme_frame(tex_vec, pos_vec);
+          break;
+     case INTERACTIVE_TYPE_LIGHT_DETECTOR:
+          draw_theme_frame(theme_frame(1, 11), pos_vec);
+          if(interactive->detector.on){
+               draw_theme_frame(theme_frame(2, 11), pos_vec);
+          }
           break;
      }
 
@@ -2874,7 +2889,32 @@ int main(int argc, char** argv){
           for(S16 i = 0; i < block_array.count; i++){
                Block_t* block = block_array.elements + i;
                if(block->element == ELEMENT_FIRE){
-                    illuminate(pos_to_coord(block->pos), 255, &tilemap, &block_array);
+                    illuminate(block_get_coord(block), 255, &tilemap, &block_array);
+               }
+          }
+
+          for(S16 i = 0; i < interactive_array.count; i++){
+               Interactive_t* interactive = interactive_array.elements + i;
+               if(interactive->type == INTERACTIVE_TYPE_LIGHT_DETECTOR){
+                    Tile_t* tile = tilemap_get_tile(&tilemap, interactive->coord);
+
+                    Block_t* block = nullptr;
+                    for(S16 b = 0; b < block_array.count; b++){
+                         // blocks on the coordinate and on the ground block light
+                         if(block_get_coord(block_array.elements + b) == interactive->coord &&
+                            block_array.elements[b].pos.z == 0){
+                              block = block_array.elements + b;
+                              break;
+                         }
+                    }
+
+                    if(interactive->detector.on && (tile->light < LIGHT_DETECTOR_THRESHOLD || block)){
+                         activate(&tilemap, interactive_quad_tree, interactive->coord);
+                         interactive->detector.on = false;
+                    }else if(!interactive->detector.on && tile->light >= LIGHT_DETECTOR_THRESHOLD && !block){
+                         activate(&tilemap, interactive_quad_tree, interactive->coord);
+                         interactive->detector.on = true;
+                    }
                }
           }
 
