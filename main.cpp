@@ -1281,17 +1281,17 @@ Coord_t stamp_array_dimensions(ObjectArray_t<Stamp_t>* object_array){
 
 enum EditorCategory_t : U8{
      EDITOR_CATEGORY_TILE_ID,
-     EDITOR_CATEGORY_TILE_FLAGS,
-     EDITOR_CATEGORY_BLOCK,
-     EDITOR_CATEGORY_INTERACTIVE_LEVER,
-     EDITOR_CATEGORY_INTERACTIVE_PRESSURE_PLATE,
-     EDITOR_CATEGORY_INTERACTIVE_POPUP,
-     EDITOR_CATEGORY_INTERACTIVE_DOOR,
+     // EDITOR_CATEGORY_TILE_FLAGS,
+     // EDITOR_CATEGORY_BLOCK,
+     // EDITOR_CATEGORY_INTERACTIVE_LEVER,
+     // EDITOR_CATEGORY_INTERACTIVE_PRESSURE_PLATE,
+     // EDITOR_CATEGORY_INTERACTIVE_POPUP,
+     // EDITOR_CATEGORY_INTERACTIVE_DOOR,
      EDITOR_CATEGORY_COUNT,
 };
 
 struct Editor_t{
-     ObjectArray_t<ObjectArray_t<Stamp_t>> category_array;
+     ObjectArray_t<ObjectArray_t<ObjectArray_t<Stamp_t>>> category_array;
      EditorMode_t mode = EDITOR_MODE_OFF;
 
      S32 category = 0;
@@ -1312,12 +1312,14 @@ bool init(Editor_t* editor){
      init(&editor->category_array, EDITOR_CATEGORY_COUNT);
 
      auto* tile_category = editor->category_array.elements + EDITOR_CATEGORY_TILE_ID;
-     init(tile_category, 48);
+     init(tile_category, 72);
      for(S16 i = 0; i < tile_category->count; i++){
-          tile_category->elements[i].type = STAMP_TYPE_TILE_ID;
-          tile_category->elements[i].tile_id = (U8)(i);
+          init(&tile_category->elements[i], 1);
+          tile_category->elements[i].elements[0].type = STAMP_TYPE_TILE_ID;
+          tile_category->elements[i].elements[0].tile_id = (U8)(i);
      }
 
+#if 0
      auto* tile_flags_category = editor->category_array.elements + EDITOR_CATEGORY_TILE_FLAGS;
      init(tile_flags_category, 62);
      for(S8 i = 0; i < 2; i++){
@@ -1437,6 +1439,7 @@ bool init(Editor_t* editor){
           interactive_door_category->elements[j + 4].interactive.door.face = (Direction_t)(j);
 
      }
+#endif
 
      return true;
 }
@@ -1638,7 +1641,7 @@ Coord_t mouse_select_coord(Vec_t mouse_screen)
 }
 
 Coord_t mouse_select_world(Vec_t mouse_screen, Position_t camera){
-     return mouse_select_coord(mouse_screen) + (pos_to_coord(camera) - Coord_t{ROOM_TILE_SIZE / 2 - 1, ROOM_TILE_SIZE / 2 - 1});
+     return mouse_select_coord(mouse_screen) + (pos_to_coord(camera) - Coord_t{ROOM_TILE_SIZE / 2, ROOM_TILE_SIZE / 2});
 }
 S32 mouse_select_index(Vec_t mouse_screen)
 {
@@ -2052,6 +2055,7 @@ int main(int argc, char** argv){
 
                          if(load_map(&player_start, &tilemap, &block_array, &interactive_array, filepath)){
                               // update sort blocks list
+                              // TODO: compress this code
                               free(sorted_blocks);
                               sorted_blocks = (Block_t**)(calloc(block_array.count, sizeof(*sorted_blocks)));
                               for(S16 i = 0; i < block_array.count; ++i){
@@ -2059,6 +2063,7 @@ int main(int argc, char** argv){
                               }
 
                               // update interactive quad tree
+                              // TODO: compress this code
                               interactive_quad_tree_free(interactive_quad_tree);
                               interactive_quad_tree = interactive_quad_tree_build(&interactive_array);
                          }
@@ -2185,6 +2190,7 @@ int main(int argc, char** argv){
                          case EDITOR_MODE_OFF:
                               break;
                          case EDITOR_MODE_CATEGORY_SELECT:
+                         case EDITOR_MODE_SELECTION_MANIPULATION:
                          {
                               S32 select_index = mouse_select_index(mouse_screen);
                               if(select_index < EDITOR_CATEGORY_COUNT){
@@ -2193,7 +2199,7 @@ int main(int argc, char** argv){
                                    editor.stamp = 0;
                               }else{
                                    editor.mode = EDITOR_MODE_CREATE_SELECTION;
-                                   editor.selection_start = pixel_to_coord(mouse_world.pixel);
+                                   editor.selection_start = mouse_select_world(mouse_screen, camera);
                                    editor.selection_end = editor.selection_start;
                               }
                          } break;
@@ -2205,8 +2211,12 @@ int main(int argc, char** argv){
                                    editor.stamp = select_index;
                               }else{
                                    Coord_t select_coord = mouse_select_world(mouse_screen, camera);
-                                   apply_stamp(editor.category_array.elements[editor.category].elements + editor.stamp, select_coord,
-                                               &tilemap, &block_array, &interactive_array, &interactive_quad_tree, &sorted_blocks);
+                                   auto* stamp_array = editor.category_array.elements[editor.category].elements + editor.stamp;
+                                   for(S16 s = 0; s < stamp_array->count; s++){
+                                        auto* stamp = stamp_array->elements + s;
+                                        apply_stamp(stamp, select_coord + stamp->offset,
+                                                    &tilemap, &block_array, &interactive_array, &interactive_quad_tree, &sorted_blocks);
+                                   }
                               }
                          } break;
                          }
@@ -2242,7 +2252,7 @@ int main(int argc, char** argv){
                               if(editor.selection_start.x > editor.selection_end.x) SWAP(editor.selection_start.x, editor.selection_end.x);
                               if(editor.selection_start.y > editor.selection_end.y) SWAP(editor.selection_start.y, editor.selection_end.y);
 
-                              // destroy(&editor.selection);
+                              destroy(&editor.selection);
 
                               S16 stamp_count = (((editor.selection_end.x - editor.selection_start.x) + 1) * ((editor.selection_end.y - editor.selection_start.y) + 1)) * 2;
                               init(&editor.selection, stamp_count);
@@ -2303,7 +2313,7 @@ int main(int argc, char** argv){
                     default:
                          break;
                     case EDITOR_MODE_CREATE_SELECTION:
-                         if(editor.selection_start.x > 0 && editor.selection_start.y > 0){
+                         if(editor.selection_start.x >= 0 && editor.selection_start.y >= 0){
                               editor.selection_end = pos_to_coord(mouse_world);
                          }
                          break;
@@ -2807,35 +2817,38 @@ int main(int argc, char** argv){
                Vec_t vec = {0.0f, 0.0f};
 
                for(S32 g = 0; g < editor.category_array.count; ++g){
-                    auto* stamp_array = editor.category_array.elements + g;
-                    auto* stamp = stamp_array->elements + 0;
+                    auto* category = editor.category_array.elements + g;
+                    auto* stamp_array = category->elements + 0;
 
-                    if(g && (g % ROOM_TILE_SIZE) == 0){
-                         vec.x = 0.0f;
-                         vec.y += TILE_SIZE;
-                    }
+                    for(S16 s = 0; s < stamp_array->count; s++){
+                         auto* stamp = stamp_array->elements + s;
+                         if(g && (g % ROOM_TILE_SIZE) == 0){
+                              vec.x = 0.0f;
+                              vec.y += TILE_SIZE;
+                         }
 
-                    switch(stamp->type){
-                    default:
-                         break;
-                    case STAMP_TYPE_TILE_ID:
-                         tile_id_draw(stamp->tile_id, vec);
-                         break;
-                    case STAMP_TYPE_TILE_FLAGS:
-                         tile_flags_draw(stamp->tile_flags, vec);
-                         break;
-                    case STAMP_TYPE_BLOCK:
-                    {
-                         Block_t block = {};
-                         block.element = stamp->block.element;
-                         block.face = stamp->block.face;
+                         switch(stamp->type){
+                         default:
+                              break;
+                         case STAMP_TYPE_TILE_ID:
+                              tile_id_draw(stamp->tile_id, vec);
+                              break;
+                         case STAMP_TYPE_TILE_FLAGS:
+                              tile_flags_draw(stamp->tile_flags, vec);
+                              break;
+                         case STAMP_TYPE_BLOCK:
+                         {
+                              Block_t block = {};
+                              block.element = stamp->block.element;
+                              block.face = stamp->block.face;
 
-                         block_draw(&block, vec);
-                    } break;
-                    case STAMP_TYPE_INTERACTIVE:
-                    {
-                         interactive_draw(&stamp->interactive, vec);
-                    } break;
+                              block_draw(&block, vec);
+                         } break;
+                         case STAMP_TYPE_INTERACTIVE:
+                         {
+                              interactive_draw(&stamp->interactive, vec);
+                         } break;
+                         }
                     }
 
                     vec.x += TILE_SIZE;
@@ -2851,68 +2864,74 @@ int main(int argc, char** argv){
                glColor3f(1.0f, 1.0f, 1.0f);
 
                // draw stamp at mouse
-               auto* mouse_stamp = editor.category_array.elements[editor.category].elements + editor.stamp;
+               auto* stamp_array = editor.category_array.elements[editor.category].elements + editor.stamp;
                Coord_t mouse_coord = mouse_select_coord(mouse_screen);
                Vec_t stamp_pos = coord_to_screen_position(mouse_coord);
 
-               switch(mouse_stamp->type){
-               default:
-                    break;
-               case STAMP_TYPE_TILE_ID:
-                    tile_id_draw(mouse_stamp->tile_id, stamp_pos);
-                    break;
-               case STAMP_TYPE_TILE_FLAGS:
-                    tile_flags_draw(mouse_stamp->tile_flags, stamp_pos);
-                    break;
-               case STAMP_TYPE_BLOCK:
-               {
-                    Block_t block = {};
-                    block.element = mouse_stamp->block.element;
-                    block.face = mouse_stamp->block.face;
-                    block_draw(&block, stamp_pos);
-               } break;
-               case STAMP_TYPE_INTERACTIVE:
-               {
-                    interactive_draw(&mouse_stamp->interactive, stamp_pos);
-               } break;
+               for(S16 s = 0; s < stamp_array->count; s++){
+                    auto* stamp = stamp_array->elements + s;
+                    switch(stamp->type){
+                    default:
+                         break;
+                    case STAMP_TYPE_TILE_ID:
+                         tile_id_draw(stamp->tile_id, stamp_pos);
+                         break;
+                    case STAMP_TYPE_TILE_FLAGS:
+                         tile_flags_draw(stamp->tile_flags, stamp_pos);
+                         break;
+                    case STAMP_TYPE_BLOCK:
+                    {
+                         Block_t block = {};
+                         block.element = stamp->block.element;
+                         block.face = stamp->block.face;
+                         block_draw(&block, stamp_pos);
+                    } break;
+                    case STAMP_TYPE_INTERACTIVE:
+                    {
+                         interactive_draw(&stamp->interactive, stamp_pos);
+                    } break;
+                    }
                }
 
                if(editor.mode == EDITOR_MODE_STAMP_SELECT){
                     // draw stamps to select from at the bottom
                     Vec_t pos = {0.0f, 0.0f};
                     int max_stamp_height = 1;
-                    auto* stamp_array = editor.category_array.elements + editor.category;
+                    auto* category = editor.category_array.elements + editor.category;
 
-                    for(S32 g = 0; g < stamp_array->count; ++g){
-                         auto* stamp = stamp_array->elements + g;
-                         Vec_t stamp_vec = pos + coord_to_vec(stamp->offset);
+                    for(S32 g = 0; g < category->count; ++g){
+                         stamp_array = category->elements + g;
+                         for(S32 s = 0; s < stamp_array->count; s++){
+                              auto* stamp = stamp_array->elements + s;
+                              Vec_t stamp_vec = pos + coord_to_vec(stamp->offset);
 
-                         if(g > 0 && (g % ROOM_TILE_SIZE) == 0){
-                              pos.x = 0.0f;
-                              pos.y += max_stamp_height * TILE_SIZE;
-                              // max_stamp_height = 1;
-                         }
+                              if(g > 0 && (g % ROOM_TILE_SIZE) == 0){
+                                   pos.x = 0.0f;
+                                   pos.y += max_stamp_height * TILE_SIZE;
+                                   // max_stamp_height = 1;
+                              }
 
-                         switch(stamp->type){
-                         default:
-                              break;
-                         case STAMP_TYPE_TILE_ID:
-                              tile_id_draw(stamp->tile_id, stamp_vec);
-                              break;
-                         case STAMP_TYPE_TILE_FLAGS:
-                              tile_flags_draw(stamp->tile_flags, stamp_vec);
-                              break;
-                         case STAMP_TYPE_BLOCK:
-                         {
-                              Block_t block = {};
-                              block.element = stamp->block.element;
-                              block.face = stamp->block.face;
-                              block_draw(&block, stamp_vec);
-                         } break;
-                         case STAMP_TYPE_INTERACTIVE:
-                         {
-                              interactive_draw(&stamp->interactive, stamp_vec);
-                         } break;
+                              switch(stamp->type){
+                              default:
+                                   break;
+                              case STAMP_TYPE_TILE_ID:
+                                   tile_id_draw(stamp->tile_id, stamp_vec);
+                                   break;
+                              case STAMP_TYPE_TILE_FLAGS:
+                                   tile_flags_draw(stamp->tile_flags, stamp_vec);
+                                   break;
+                              case STAMP_TYPE_BLOCK:
+                              {
+                                   Block_t block = {};
+                                   block.element = stamp->block.element;
+                                   block.face = stamp->block.face;
+                                   block_draw(&block, stamp_vec);
+                              } break;
+                              case STAMP_TYPE_INTERACTIVE:
+                              {
+                                   interactive_draw(&stamp->interactive, stamp_vec);
+                              } break;
+                              }
                          }
 
                          pos.x += (F32)(max_stamp_height) * TILE_SIZE;
