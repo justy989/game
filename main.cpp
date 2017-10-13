@@ -866,6 +866,130 @@ void player_collide_coord(Position_t player_pos, Coord_t coord, F32 player_radiu
      }
 }
 
+#define LIGHT_MAX_LINE_LEN 8
+
+void illuminate_line(Coord_t start, Coord_t end, U8 value, TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array)
+{
+     Coord_t coords[LIGHT_MAX_LINE_LEN];
+     S8 coord_count = 0;
+
+     // determine line of points using a modified bresenham to be symmetrical
+     {
+          if(start.x == end.x){
+               // build a simple vertical path
+               for(S16 y = start.y; y <= end.y; ++y){
+                    coords[coord_count] = Coord_t{start.x, y};
+                    coord_count++;
+               }
+          }else{
+               F64 error = 0.0;
+               F64 dx = (F64)(end.x) - (F64)(start.x);
+               F64 dy = (F64)(end.y) - (F64)(start.y);
+               F64 derror = fabs(dy / dx);
+
+               S16 step_x = (start.x < end.x) ? 1 : -1;
+               S16 step_y = (end.y - start.y >= 0) ? 1 : -1;
+               S16 end_step_x = end.x + step_x;
+               S16 sy = start.y;
+
+               for(S16 sx = start.x; sx != end_step_x; sx += step_x){
+                    Coord_t coord {sx, sy};
+                    coords[coord_count] = coord;
+                    coord_count++;
+
+                    error += derror;
+                    while(error >= 0.5){
+                         coord = {sx, sy};
+
+                         // only add non-duplicate coords
+                         if(coords[coord_count - 1] != coord){
+                              coords[coord_count] = coord;
+                              coord_count++;
+                         }
+
+                         sy += step_y;
+                         error -= 1.0;
+                    }
+               }
+          }
+     }
+
+     for(S8 i = 0; i < coord_count; ++i){
+          Tile_t* tile = tilemap_get_tile(tilemap, coords[i]);
+          if(!tile) continue;
+
+          S16 diff_x = abs(coords[i].x - start.x);
+          S16 diff_y = abs(coords[i].y - start.y);
+          U8 distance = static_cast<U8>(sqrt(static_cast<F32>(diff_x * diff_x + diff_y * diff_y)));
+
+          U8 new_value = value - (distance * LIGHT_DECAY);
+
+#if 0
+          if(tile->solid.type == SOLID_PORTAL && tile->solid.portal.on){
+               ConnectedPortals_t connected_portals = {};
+               find_connected_portals(tilemap, coords[i], &connected_portals);
+               Coord_t end_offset = end - coords[i];
+               Coord_t prev_offset = coords[i] - coords[i - 1];
+
+               for(S32 p = 0; p < connected_portals.coord_count; ++p){
+                    if(connected_portals.coords[p] != coords[i]){
+                         Coord_t dst_coord = connected_portals.coords[p] + prev_offset;
+                         illuminate_line(dst_coord, dst_coord + end_offset, new_value, tilemap, block_array);
+                    }
+               }
+               break;
+          }
+#endif
+
+          if(tile->light < new_value) tile->light = new_value;
+
+          if(coords[i] != start){
+               if(tile_is_solid(tile)){
+                    break;
+               }
+
+               Block_t* block = nullptr;
+               for(S16 b = 0; b < block_array->count; b++){
+                    if(pos_to_coord(block_array->elements[b].pos) == coords[i]){
+                         block = block_array->elements + b;
+                         break;
+                    }
+               }
+
+               if(block) break;
+          }
+     }
+}
+
+void illuminate(Coord_t coord, U8 value, TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array)
+{
+     if(coord.x < 0 || coord.y < 0 || coord.x >= tilemap->width || coord.y >= tilemap->height) return;
+
+     S16 radius = ((value - BASE_LIGHT) / LIGHT_DECAY) + 1;
+
+     if(radius < 0) return;
+
+     Coord_t delta {radius, radius};
+     Coord_t min = coord - delta;
+     Coord_t max = coord + delta;
+
+     for(S16 j = min.y + 1; j < max.y; ++j) {
+          // bottom of box
+          illuminate_line(coord, Coord_t{min.x, j}, value, tilemap, block_array);
+
+          // top of box
+          illuminate_line(coord, Coord_t{max.x, j}, value, tilemap, block_array);
+     }
+
+     for(S16 i = min.x + 1; i < max.x; ++i) {
+          // left of box
+          illuminate_line(coord, Coord_t{i, min.y,}, value, tilemap, block_array);
+
+          // right of box
+          illuminate_line(coord, Coord_t{i, max.y,}, value, tilemap, block_array);
+     }
+}
+
 enum PlayerActionType_t{
      PLAYER_ACTION_TYPE_MOVE_LEFT_START,
      PLAYER_ACTION_TYPE_MOVE_LEFT_STOP,
@@ -1599,10 +1723,23 @@ void tile_id_draw(U8 id, Vec_t pos){
      draw_theme_frame(theme_frame(id_x, id_y), pos);
 }
 
-void tile_flags_draw(U16 flags, Vec_t tile_pos){
+void tile_flags_draw(U16 flags, Vec_t tile_pos, GLuint theme_texture){
      if(flags == 0) return;
 
      if(flags & TILE_FLAG_ICED){
+          // TODO: this relies too much on knowing how it is called
+          glEnd();
+          glBindTexture(GL_TEXTURE_2D, 0);
+          glBegin(GL_QUADS);
+          glColor4f(196.0f / 255.0f, 217.0f / 255.0f, 1.0f, 0.45f);
+          glVertex2f(tile_pos.x, tile_pos.y);
+          glVertex2f(tile_pos.x, tile_pos.y + TILE_SIZE);
+          glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y + TILE_SIZE);
+          glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y);
+          glEnd();
+          glBindTexture(GL_TEXTURE_2D, theme_texture);
+          glColor3f(1.0f, 1.0f, 1.0f);
+          glBegin(GL_QUADS);
      }else if(flags & TILE_FLAG_CHECKPOINT){
           draw_theme_frame(theme_frame(0, 21), tile_pos);
      }else if(flags & TILE_FLAG_RESET_IMMUNE){
@@ -2726,6 +2863,21 @@ int main(int argc, char** argv){
                }
           }
 
+          // reset base light
+          for(S16 j = 0; j < tilemap.height; j++){
+               for(S16 i = 0; i < tilemap.width; i++){
+                    tilemap.tiles[j][i].light = BASE_LIGHT;
+               }
+          }
+
+          // illuminate
+          for(S16 i = 0; i < block_array.count; i++){
+               Block_t* block = block_array.elements + i;
+               if(block->element == ELEMENT_FIRE){
+                    illuminate(pos_to_coord(block->pos), 255, &tilemap, &block_array);
+               }
+          }
+
           // sort blocks
           {
                // TODO: do we ever need a better sort for this?
@@ -2851,7 +3003,7 @@ int main(int argc, char** argv){
                                     (F32)(y - min.y) * TILE_SIZE + camera_offset.y};
 
                     tile_id_draw(tile->id, tile_pos);
-                    tile_flags_draw(tile->flags, tile_pos);
+                    tile_flags_draw(tile->flags, tile_pos, theme_texture);
                }
           }
           glEnd();
@@ -2920,34 +3072,27 @@ int main(int argc, char** argv){
           glVertex2f(pos_vec.x + HALF_TILE_SIZE, pos_vec.y - HALF_TILE_SIZE);
           glEnd();
 
+          // player start
+          selection_draw(player_start, player_start, screen_camera, 0.0f, 1.0f, 0.0f);
+
+          // light
           glBindTexture(GL_TEXTURE_2D, 0);
-          glBegin(GL_LINES);
-          glColor3f(0.0f, 1.0f, 1.0f);
+          glBegin(GL_QUADS);
           for(S16 y = min.y; y <= max.y; y++){
                for(S16 x = min.x; x <= max.x; x++){
-                    if(!tilemap_is_iced(&tilemap, Coord_t{x, y})) continue;
+                    Tile_t* tile = tilemap.tiles[y] + x;
 
                     Vec_t tile_pos {(F32)(x - min.x) * TILE_SIZE + camera_offset.x,
                                     (F32)(y - min.y) * TILE_SIZE + camera_offset.y};
-
+                    glColor4f(0.0f, 0.0f, 0.0f, (F32)(255 - tile->light) / 255.0f);
                     glVertex2f(tile_pos.x, tile_pos.y);
                     glVertex2f(tile_pos.x, tile_pos.y + TILE_SIZE);
-
-                    glVertex2f(tile_pos.x, tile_pos.y + TILE_SIZE);
-                    glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y + TILE_SIZE);
-
                     glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y + TILE_SIZE);
                     glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y);
-
-                    glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y);
-                    glVertex2f(tile_pos.x, tile_pos.y);
 
                }
           }
           glEnd();
-
-          // player start
-          selection_draw(player_start, player_start, screen_camera, 0.0f, 1.0f, 0.0f);
 
           // editor
           switch(editor.mode){
@@ -2982,7 +3127,7 @@ int main(int argc, char** argv){
                               tile_id_draw(stamp->tile_id, vec);
                               break;
                          case STAMP_TYPE_TILE_FLAGS:
-                              tile_flags_draw(stamp->tile_flags, vec);
+                              tile_flags_draw(stamp->tile_flags, vec, theme_texture);
                               break;
                          case STAMP_TYPE_BLOCK:
                          {
@@ -3025,7 +3170,7 @@ int main(int argc, char** argv){
                          tile_id_draw(stamp->tile_id, stamp_pos);
                          break;
                     case STAMP_TYPE_TILE_FLAGS:
-                         tile_flags_draw(stamp->tile_flags, stamp_pos);
+                         tile_flags_draw(stamp->tile_flags, stamp_pos, theme_texture);
                          break;
                     case STAMP_TYPE_BLOCK:
                     {
@@ -3064,7 +3209,7 @@ int main(int argc, char** argv){
                                    tile_id_draw(stamp->tile_id, stamp_vec);
                                    break;
                               case STAMP_TYPE_TILE_FLAGS:
-                                   tile_flags_draw(stamp->tile_flags, stamp_vec);
+                                   tile_flags_draw(stamp->tile_flags, stamp_vec, theme_texture);
                                    break;
                               case STAMP_TYPE_BLOCK:
                               {
@@ -3112,7 +3257,7 @@ int main(int argc, char** argv){
                          tile_id_draw(stamp->tile_id, stamp_vec);
                          break;
                     case STAMP_TYPE_TILE_FLAGS:
-                         tile_flags_draw(stamp->tile_flags, stamp_vec);
+                         tile_flags_draw(stamp->tile_flags, stamp_vec, theme_texture);
                          break;
                     case STAMP_TYPE_BLOCK:
                     {

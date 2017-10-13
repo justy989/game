@@ -28,6 +28,10 @@ void destroy(TileMap_t* tilemap){
      memset(tilemap, 0, sizeof(*tilemap));
 }
 
+bool tile_is_solid(Tile_t* tile){
+     return tile->id >= TILE_ID_SOLID_START;
+}
+
 Tile_t* tilemap_get_tile(TileMap_t* tilemap, Coord_t coord){
      if(coord.x < 0 || coord.x >= tilemap->width) return NULL;
      if(coord.y < 0 || coord.y >= tilemap->height) return NULL;
@@ -38,7 +42,7 @@ Tile_t* tilemap_get_tile(TileMap_t* tilemap, Coord_t coord){
 bool tilemap_is_solid(TileMap_t* tilemap, Coord_t coord){
      Tile_t* tile = tilemap_get_tile(tilemap, coord);
      if(!tile) return false;
-     return tile->id >= TILE_ID_SOLID_START;
+     return tile_is_solid(tile);
 }
 
 bool tilemap_is_iced(TileMap_t* tilemap, Coord_t coord){
