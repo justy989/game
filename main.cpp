@@ -1312,26 +1312,90 @@ bool init(Editor_t* editor){
      init(&editor->category_array, EDITOR_CATEGORY_COUNT);
 
      auto* tile_category = editor->category_array.elements + EDITOR_CATEGORY_TILE_ID;
-     init(tile_category, 16);
+     init(tile_category, 26);
      for(S16 i = 0; i < 14; i++){
           init(&tile_category->elements[i], 1);
           tile_category->elements[i].elements[0].type = STAMP_TYPE_TILE_ID;
           tile_category->elements[i].elements[0].tile_id = (U8)(i);
      }
 
-     init(&tile_category->elements[14], 2);
-     tile_category->elements[14].elements[0].type = STAMP_TYPE_TILE_ID;
-     tile_category->elements[14].elements[0].tile_id = 32;
-     tile_category->elements[14].elements[1].type = STAMP_TYPE_TILE_ID;
-     tile_category->elements[14].elements[1].tile_id = 16;
-     tile_category->elements[14].elements[1].offset = Coord_t{0, 1};
+     auto* tile_id_array = tile_category->elements + 13;
 
-     init(&tile_category->elements[15], 2);
-     tile_category->elements[15].elements[0].type = STAMP_TYPE_TILE_ID;
-     tile_category->elements[15].elements[0].tile_id = 33;
-     tile_category->elements[15].elements[1].type = STAMP_TYPE_TILE_ID;
-     tile_category->elements[15].elements[1].tile_id = 17;
-     tile_category->elements[15].elements[1].offset = Coord_t{0, 1};
+     tile_id_array++;
+     init(tile_id_array, 2);
+     tile_id_array->elements[0].type = STAMP_TYPE_TILE_ID;
+     tile_id_array->elements[0].tile_id = 32;
+     tile_id_array->elements[1].type = STAMP_TYPE_TILE_ID;
+     tile_id_array->elements[1].tile_id = 16;
+     tile_id_array->elements[1].offset = Coord_t{0, 1};
+
+     tile_id_array++;
+     init(tile_id_array, 2);
+     tile_id_array->elements[0].type = STAMP_TYPE_TILE_ID;
+     tile_id_array->elements[0].tile_id = 33;
+     tile_id_array->elements[1].type = STAMP_TYPE_TILE_ID;
+     tile_id_array->elements[1].tile_id = 17;
+     tile_id_array->elements[1].offset = Coord_t{0, 1};
+
+     tile_id_array++;
+     init(tile_id_array, 2);
+     tile_id_array->elements[0].type = STAMP_TYPE_TILE_ID;
+     tile_id_array->elements[0].tile_id = 18;
+     tile_id_array->elements[1].type = STAMP_TYPE_TILE_ID;
+     tile_id_array->elements[1].tile_id = 19;
+     tile_id_array->elements[1].offset = Coord_t{1, 0};
+
+     tile_id_array++;
+     init(tile_id_array, 2);
+     tile_id_array->elements[0].type = STAMP_TYPE_TILE_ID;
+     tile_id_array->elements[0].tile_id = 34;
+     tile_id_array->elements[1].type = STAMP_TYPE_TILE_ID;
+     tile_id_array->elements[1].tile_id = 35;
+     tile_id_array->elements[1].offset = Coord_t{1, 0};
+
+     for(S16 i = 0; i < 6; i++){
+          tile_id_array++;
+          init(tile_id_array, 4);
+          tile_id_array->elements[0].type = STAMP_TYPE_TILE_ID;
+          tile_id_array->elements[0].tile_id = 36 + (i * 2);
+          tile_id_array->elements[1].type = STAMP_TYPE_TILE_ID;
+          tile_id_array->elements[1].tile_id = 37 + (i * 2);
+          tile_id_array->elements[1].offset = Coord_t{1, 0};
+          tile_id_array->elements[2].type = STAMP_TYPE_TILE_ID;
+          tile_id_array->elements[2].tile_id = 20 + (i * 2);
+          tile_id_array->elements[2].offset = Coord_t{0, 1};
+          tile_id_array->elements[3].type = STAMP_TYPE_TILE_ID;
+          tile_id_array->elements[3].tile_id = 21 + (i * 2);
+          tile_id_array->elements[3].offset = Coord_t{1, 1};
+     }
+
+     tile_id_array++;
+     init(tile_id_array, 4);
+     tile_id_array->elements[0].type = STAMP_TYPE_TILE_ID;
+     tile_id_array->elements[0].tile_id = 50;
+     tile_id_array->elements[1].type = STAMP_TYPE_TILE_ID;
+     tile_id_array->elements[1].tile_id = 51;
+     tile_id_array->elements[1].offset = Coord_t{1, 0};
+     tile_id_array->elements[2].type = STAMP_TYPE_TILE_ID;
+     tile_id_array->elements[2].tile_id = 48;
+     tile_id_array->elements[2].offset = Coord_t{0, 1};
+     tile_id_array->elements[3].type = STAMP_TYPE_TILE_ID;
+     tile_id_array->elements[3].tile_id = 49;
+     tile_id_array->elements[3].offset = Coord_t{1, 1};
+
+     tile_id_array++;
+     init(tile_id_array, 4);
+     tile_id_array->elements[0].type = STAMP_TYPE_TILE_ID;
+     tile_id_array->elements[0].tile_id = 54;
+     tile_id_array->elements[1].type = STAMP_TYPE_TILE_ID;
+     tile_id_array->elements[1].tile_id = 55;
+     tile_id_array->elements[1].offset = Coord_t{1, 0};
+     tile_id_array->elements[2].type = STAMP_TYPE_TILE_ID;
+     tile_id_array->elements[2].tile_id = 52;
+     tile_id_array->elements[2].offset = Coord_t{0, 1};
+     tile_id_array->elements[3].type = STAMP_TYPE_TILE_ID;
+     tile_id_array->elements[3].tile_id = 53;
+     tile_id_array->elements[3].offset = Coord_t{1, 1};
 
 #if 0
      auto* tile_flags_category = editor->category_array.elements + EDITOR_CATEGORY_TILE_FLAGS;
@@ -1998,6 +2062,7 @@ int main(int argc, char** argv){
           F64 dt = (F64)(elapsed_seconds.count());
 
           if(dt < 0.0166666f) continue; // limit 60 fps
+          // TODO: consider 30fps as minimum for random noobs computers
           dt = 0.0166666f; // the game always runs as if a 60th of a frame has occurred.
           frame_count++;
 
@@ -2940,20 +3005,18 @@ int main(int argc, char** argv){
                if(editor.mode == EDITOR_MODE_STAMP_SELECT){
                     // draw stamps to select from at the bottom
                     Vec_t pos = {0.0f, 0.0f};
-                    int max_stamp_height = 1;
+                    S16 row_height = 1;
                     auto* category = editor.category_array.elements + editor.category;
 
                     for(S32 g = 0; g < category->count; ++g){
                          stamp_array = category->elements + g;
+                         Coord_t dimensions = stamp_array_dimensions(stamp_array);
+                         if(dimensions.y > row_height) row_height = dimensions.y;
+
                          for(S32 s = 0; s < stamp_array->count; s++){
                               auto* stamp = stamp_array->elements + s;
                               Vec_t stamp_vec = pos + coord_to_vec(stamp->offset);
 
-                              if(g > 0 && (g % ROOM_TILE_SIZE) == 0){
-                                   pos.x = 0.0f;
-                                   pos.y += max_stamp_height * TILE_SIZE;
-                                   // max_stamp_height = 1;
-                              }
 
                               switch(stamp->type){
                               default:
@@ -2978,7 +3041,12 @@ int main(int argc, char** argv){
                               }
                          }
 
-                         pos.x += (F32)(max_stamp_height) * TILE_SIZE;
+                         pos.x += (dimensions.x * TILE_SIZE);
+                         if(pos.x >= 1.0f){
+                              pos.x = 0.0f;
+                              pos.y += row_height * TILE_SIZE;
+                              row_height = 1;
+                         }
                     }
                }
 
