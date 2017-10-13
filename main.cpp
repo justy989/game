@@ -992,6 +992,52 @@ void illuminate(Coord_t coord, U8 value, TileMap_t* tilemap, ObjectArray_t<Block
      }
 }
 
+void spread_ice(Coord_t center, S16 radius, TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array){
+     Coord_t delta {radius, radius};
+     Coord_t min = center - delta;
+     Coord_t max = center + delta;
+
+     for(S16 y = min.y; y <= max.y; ++y){
+          for(S16 x = min.x; x <= max.x; ++x){
+               Coord_t coord{x, y};
+               Tile_t* tile = tilemap_get_tile(tilemap, coord);
+               if(tile && !tile_is_solid(tile)){
+                    Block_t* block = nullptr;
+                    for(S16 i = 0; i < block_array->count; i++){
+                         if(block_get_coord(block_array->elements + i) == coord && block_array->elements[i].pos.z == 0){
+                              block = block_array->elements + i;
+                              break;
+                         }
+                    }
+                    if(!block) tile->flags |= TILE_FLAG_ICED;
+               }
+          }
+     }
+}
+
+void melt_ice(Coord_t center, S16 radius, TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array){
+     Coord_t delta {radius, radius};
+     Coord_t min = center - delta;
+     Coord_t max = center + delta;
+
+     for(S16 y = min.y; y <= max.y; ++y){
+          for(S16 x = min.x; x <= max.x; ++x){
+               Coord_t coord{x, y};
+               Tile_t* tile = tilemap_get_tile(tilemap, coord);
+               if(tile && !tile_is_solid(tile) && tile->flags & TILE_FLAG_ICED){
+                    Block_t* block = nullptr;
+                    for(S16 i = 0; i < block_array->count; i++){
+                         if(block_get_coord(block_array->elements + i) == coord && block_array->elements[i].pos.z == 0){
+                              block = block_array->elements + i;
+                              break;
+                         }
+                    }
+                    if(!block) tile->flags &= ~TILE_FLAG_ICED;
+               }
+          }
+     }
+}
+
 enum PlayerActionType_t{
      PLAYER_ACTION_TYPE_MOVE_LEFT_START,
      PLAYER_ACTION_TYPE_MOVE_LEFT_STOP,
@@ -2885,11 +2931,21 @@ int main(int argc, char** argv){
                }
           }
 
-          // illuminate
+          // illuminate and ice
           for(S16 i = 0; i < block_array.count; i++){
                Block_t* block = block_array.elements + i;
                if(block->element == ELEMENT_FIRE){
                     illuminate(block_get_coord(block), 255, &tilemap, &block_array);
+               }else if(block->element == ELEMENT_ICE){
+                    spread_ice(block_get_coord(block), 1, &tilemap, &block_array);
+               }
+          }
+
+          // melt ice
+          for(S16 i = 0; i < block_array.count; i++){
+               Block_t* block = block_array.elements + i;
+               if(block->element == ELEMENT_FIRE){
+                    melt_ice(block_get_coord(block), 1, &tilemap, &block_array);
                }
           }
 
