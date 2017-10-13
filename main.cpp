@@ -1460,6 +1460,8 @@ enum EditorCategory_t : U8{
      EDITOR_CATEGORY_INTERACTIVE_POPUP,
      EDITOR_CATEGORY_INTERACTIVE_DOOR,
      EDITOR_CATEGORY_INTERACTIVE_LIGHT_DETECTOR,
+     EDITOR_CATEGORY_INTERACTIVE_ICE_DETECTOR,
+     EDITOR_CATEGORY_INTERACTIVE_BOW,
      EDITOR_CATEGORY_COUNT,
 };
 
@@ -1736,6 +1738,18 @@ bool init(Editor_t* editor){
      interactive_light_detector_category->elements[0].elements[0].type = STAMP_TYPE_INTERACTIVE;
      interactive_light_detector_category->elements[0].elements[0].interactive.type = INTERACTIVE_TYPE_LIGHT_DETECTOR;
 
+     auto* interactive_ice_detector_category = editor->category_array.elements + EDITOR_CATEGORY_INTERACTIVE_ICE_DETECTOR;
+     init(interactive_ice_detector_category, 1);
+     init(interactive_ice_detector_category->elements, 1);
+     interactive_ice_detector_category->elements[0].elements[0].type = STAMP_TYPE_INTERACTIVE;
+     interactive_ice_detector_category->elements[0].elements[0].interactive.type = INTERACTIVE_TYPE_ICE_DETECTOR;
+
+     auto* interactive_bow_category = editor->category_array.elements + EDITOR_CATEGORY_INTERACTIVE_BOW;
+     init(interactive_bow_category, 1);
+     init(interactive_bow_category->elements, 1);
+     interactive_bow_category->elements[0].elements[0].type = STAMP_TYPE_INTERACTIVE;
+     interactive_bow_category->elements[0].elements[0].interactive.type = INTERACTIVE_TYPE_BOW;
+
      return true;
 }
 
@@ -1778,23 +1792,10 @@ void tile_id_draw(U8 id, Vec_t pos){
      draw_theme_frame(theme_frame(id_x, id_y), pos);
 }
 
-void tile_flags_draw(U16 flags, Vec_t tile_pos, GLuint theme_texture){
+void tile_flags_draw(U16 flags, Vec_t tile_pos){
      if(flags == 0) return;
 
      if(flags & TILE_FLAG_ICED){
-          // TODO: this relies too much on knowing how it is called
-          glEnd();
-          glBindTexture(GL_TEXTURE_2D, 0);
-          glBegin(GL_QUADS);
-          glColor4f(196.0f / 255.0f, 217.0f / 255.0f, 1.0f, 0.45f);
-          glVertex2f(tile_pos.x, tile_pos.y);
-          glVertex2f(tile_pos.x, tile_pos.y + TILE_SIZE);
-          glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y + TILE_SIZE);
-          glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y);
-          glEnd();
-          glBindTexture(GL_TEXTURE_2D, theme_texture);
-          glColor3f(1.0f, 1.0f, 1.0f);
-          glBegin(GL_QUADS);
      }else if(flags & TILE_FLAG_CHECKPOINT){
           draw_theme_frame(theme_frame(0, 21), tile_pos);
      }else if(flags & TILE_FLAG_RESET_IMMUNE){
@@ -1894,6 +1895,9 @@ void interactive_draw(Interactive_t* interactive, Vec_t pos_vec){
           tex_vec = theme_frame(0, 12);
           draw_double_theme_frame(tex_vec, pos_vec);
           break;
+     case INTERACTIVE_TYPE_BOW:
+          draw_theme_frame(theme_frame(0, 9), pos_vec);
+          break;
      case INTERACTIVE_TYPE_POPUP:
           tex_vec = theme_frame(interactive->popup.lift.ticks - 1, 8);
           draw_double_theme_frame(tex_vec, pos_vec);
@@ -1906,6 +1910,12 @@ void interactive_draw(Interactive_t* interactive, Vec_t pos_vec){
           draw_theme_frame(theme_frame(1, 11), pos_vec);
           if(interactive->detector.on){
                draw_theme_frame(theme_frame(2, 11), pos_vec);
+          }
+          break;
+     case INTERACTIVE_TYPE_ICE_DETECTOR:
+          draw_theme_frame(theme_frame(1, 12), pos_vec);
+          if(interactive->detector.on){
+               draw_theme_frame(theme_frame(2, 12), pos_vec);
           }
           break;
      }
@@ -2971,6 +2981,17 @@ int main(int argc, char** argv){
                          activate(&tilemap, interactive_quad_tree, interactive->coord);
                          interactive->detector.on = true;
                     }
+               }else if(interactive->type == INTERACTIVE_TYPE_ICE_DETECTOR){
+                    Tile_t* tile = tilemap_get_tile(&tilemap, interactive->coord);
+                    if(tile){
+                         if(interactive->detector.on && (tile->flags & TILE_FLAG_ICED) == 0){
+                              activate(&tilemap, interactive_quad_tree, interactive->coord);
+                              interactive->detector.on = false;
+                         }else if(!interactive->detector.on && tile->flags & TILE_FLAG_ICED){
+                              activate(&tilemap, interactive_quad_tree, interactive->coord);
+                              interactive->detector.on = true;
+                         }
+                    }
                }
           }
 
@@ -3099,18 +3120,8 @@ int main(int argc, char** argv){
                                     (F32)(y - min.y) * TILE_SIZE + camera_offset.y};
 
                     tile_id_draw(tile->id, tile_pos);
-                    tile_flags_draw(tile->flags, tile_pos, theme_texture);
+                    tile_flags_draw(tile->flags, tile_pos);
                }
-          }
-          glEnd();
-
-          // block
-          glBegin(GL_QUADS);
-          for(S16 i = 0; i < block_array.count; i++){
-               Block_t* block = block_array.elements + i;
-               Position_t block_camera_offset = block->pos - screen_camera;
-               block_camera_offset.pixel.y += block->pos.z;
-               block_draw(block, pos_to_vec(block_camera_offset));
           }
           glEnd();
 
@@ -3119,6 +3130,40 @@ int main(int argc, char** argv){
           for(S16 i = 0; i < interactive_array.count; i++){
                Interactive_t* interactive = interactive_array.elements + i;
                interactive_draw(interactive, pos_to_vec(coord_to_pos(interactive->coord) - screen_camera));
+          }
+          glEnd();
+
+          // ice
+          // TODO: this relies too much on knowing how it is called
+          glBindTexture(GL_TEXTURE_2D, 0);
+          glBegin(GL_QUADS);
+          for(S16 y = min.y; y <= max.y; y++){
+               for(S16 x = min.x; x <= max.x; x++){
+                    Tile_t* tile = tilemap.tiles[y] + x;
+                    if(tile && tile->flags & TILE_FLAG_ICED){
+                         // TODO: compress conversion
+                         Vec_t tile_pos {(F32)(x - min.x) * TILE_SIZE + camera_offset.x,
+                                         (F32)(y - min.y) * TILE_SIZE + camera_offset.y};
+
+                         glColor4f(196.0f / 255.0f, 217.0f / 255.0f, 1.0f, 0.45f);
+                         glVertex2f(tile_pos.x, tile_pos.y);
+                         glVertex2f(tile_pos.x, tile_pos.y + TILE_SIZE);
+                         glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y + TILE_SIZE);
+                         glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y);
+                    }
+               }
+          }
+          glEnd();
+
+          // block
+          glBindTexture(GL_TEXTURE_2D, theme_texture);
+          glBegin(GL_QUADS);
+          glColor3f(1.0f, 1.0f, 1.0f);
+          for(S16 i = 0; i < block_array.count; i++){
+               Block_t* block = block_array.elements + i;
+               Position_t block_camera_offset = block->pos - screen_camera;
+               block_camera_offset.pixel.y += block->pos.z;
+               block_draw(block, pos_to_vec(block_camera_offset));
           }
           glEnd();
 
@@ -3168,9 +3213,6 @@ int main(int argc, char** argv){
           glVertex2f(pos_vec.x + HALF_TILE_SIZE, pos_vec.y - HALF_TILE_SIZE);
           glEnd();
 
-          // player start
-          selection_draw(player_start, player_start, screen_camera, 0.0f, 1.0f, 0.0f);
-
           // light
           glBindTexture(GL_TEXTURE_2D, 0);
           glBegin(GL_QUADS);
@@ -3189,6 +3231,9 @@ int main(int argc, char** argv){
                }
           }
           glEnd();
+
+          // player start
+          selection_draw(player_start, player_start, screen_camera, 0.0f, 1.0f, 0.0f);
 
           // editor
           switch(editor.mode){
@@ -3223,7 +3268,7 @@ int main(int argc, char** argv){
                               tile_id_draw(stamp->tile_id, vec);
                               break;
                          case STAMP_TYPE_TILE_FLAGS:
-                              tile_flags_draw(stamp->tile_flags, vec, theme_texture);
+                              tile_flags_draw(stamp->tile_flags, vec);
                               break;
                          case STAMP_TYPE_BLOCK:
                          {
@@ -3266,7 +3311,7 @@ int main(int argc, char** argv){
                          tile_id_draw(stamp->tile_id, stamp_pos);
                          break;
                     case STAMP_TYPE_TILE_FLAGS:
-                         tile_flags_draw(stamp->tile_flags, stamp_pos, theme_texture);
+                         tile_flags_draw(stamp->tile_flags, stamp_pos);
                          break;
                     case STAMP_TYPE_BLOCK:
                     {
@@ -3305,7 +3350,7 @@ int main(int argc, char** argv){
                                    tile_id_draw(stamp->tile_id, stamp_vec);
                                    break;
                               case STAMP_TYPE_TILE_FLAGS:
-                                   tile_flags_draw(stamp->tile_flags, stamp_vec, theme_texture);
+                                   tile_flags_draw(stamp->tile_flags, stamp_vec);
                                    break;
                               case STAMP_TYPE_BLOCK:
                               {
@@ -3353,7 +3398,7 @@ int main(int argc, char** argv){
                          tile_id_draw(stamp->tile_id, stamp_vec);
                          break;
                     case STAMP_TYPE_TILE_FLAGS:
-                         tile_flags_draw(stamp->tile_flags, stamp_vec, theme_texture);
+                         tile_flags_draw(stamp->tile_flags, stamp_vec);
                          break;
                     case STAMP_TYPE_BLOCK:
                     {
