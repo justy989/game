@@ -1051,6 +1051,7 @@ enum PlayerActionType_t{
      PLAYER_ACTION_TYPE_ACTIVATE_STOP,
      PLAYER_ACTION_TYPE_SHOOT_START,
      PLAYER_ACTION_TYPE_SHOOT_STOP,
+     PLAYER_ACTION_TYPE_END_DEMO,
 };
 
 struct PlayerAction_t{
@@ -1170,8 +1171,8 @@ struct MapInteractiveV1_t{
 };
 #pragma pack(pop)
 
-bool save_map(Coord_t player_start, const TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array,
-              ObjectArray_t<Interactive_t>* interactive_array, const char* filepath){
+bool save_map_to_file(FILE* file, Coord_t player_start, const TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array,
+                      ObjectArray_t<Interactive_t>* interactive_array){
      // alloc and convert map elements to map format
      S32 map_tile_count = (S32)(tilemap->width) * (S32)(tilemap->height);
      MapTileV1_t* map_tiles = (MapTileV1_t*)(calloc(map_tile_count, sizeof(*map_tiles)));
@@ -1193,11 +1194,12 @@ bool save_map(Coord_t player_start, const TileMap_t* tilemap, ObjectArray_t<Bloc
      }
 
      // convert to map formats
+     S32 index = 0;
      for(S32 y = 0; y < tilemap->height; y++){
           for(S32 x = 0; x < tilemap->width; x++){
-               int index = y * tilemap->width + x;
                map_tiles[index].id = tilemap->tiles[y][x].id;
                map_tiles[index].flags = tilemap->tiles[y][x].flags;
+               index++;
           }
      }
 
@@ -1246,24 +1248,17 @@ bool save_map(Coord_t player_start, const TileMap_t* tilemap, ObjectArray_t<Bloc
           }
      }
 
-     // write to file
-     FILE* f = fopen(filepath, "wb");
-     if(!f){
-          LOG("%s: fopen() failed\n", __FUNCTION__);
-          return false;
-     }
 
      U8 map_version = MAP_VERSION;
-     fwrite(&map_version, sizeof(map_version), 1, f);
-     fwrite(&player_start, sizeof(player_start), 1, f);
-     fwrite(&tilemap->width, sizeof(tilemap->width), 1, f);
-     fwrite(&tilemap->height, sizeof(tilemap->height), 1, f);
-     fwrite(&block_array->count, sizeof(block_array->count), 1, f);
-     fwrite(&interactive_array->count, sizeof(interactive_array->count), 1, f);
-     fwrite(map_tiles, sizeof(*map_tiles), map_tile_count, f);
-     fwrite(map_blocks, sizeof(*map_blocks), block_array->count, f);
-     fwrite(map_interactives, sizeof(*map_interactives), interactive_array->count, f);
-     fclose(f);
+     fwrite(&map_version, sizeof(map_version), 1, file);
+     fwrite(&player_start, sizeof(player_start), 1, file);
+     fwrite(&tilemap->width, sizeof(tilemap->width), 1, file);
+     fwrite(&tilemap->height, sizeof(tilemap->height), 1, file);
+     fwrite(&block_array->count, sizeof(block_array->count), 1, file);
+     fwrite(&interactive_array->count, sizeof(interactive_array->count), 1, file);
+     fwrite(map_tiles, sizeof(*map_tiles), map_tile_count, file);
+     fwrite(map_blocks, sizeof(*map_blocks), block_array->count, file);
+     fwrite(map_interactives, sizeof(*map_interactives), interactive_array->count, file);
 
      free(map_tiles);
      free(map_blocks);
@@ -1272,35 +1267,42 @@ bool save_map(Coord_t player_start, const TileMap_t* tilemap, ObjectArray_t<Bloc
      return true;
 }
 
-bool load_map(Coord_t* player_start, TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array,
-              ObjectArray_t<Interactive_t>* interactive_array, const char* filepath){
+bool save_map(const char* filepath, Coord_t player_start, const TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array,
+              ObjectArray_t<Interactive_t>* interactive_array){
+     // write to file
+     FILE* f = fopen(filepath, "wb");
+     if(!f){
+          LOG("%s: fopen() failed\n", __FUNCTION__);
+          return false;
+     }
+     bool success = save_map_to_file(f, player_start, tilemap, block_array, interactive_array);
+     fclose(f);
+     return success;
+}
+
+bool load_map_from_file(FILE* file, Coord_t* player_start, TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array,
+                        ObjectArray_t<Interactive_t>* interactive_array, const char* filepath){
      // read counts from file
      S16 map_width;
      S16 map_height;
      S16 interactive_count;
      S16 block_count;
 
-     FILE* f = fopen(filepath, "rb");
-     if(!f){
-          LOG("%s(): fopen() failed\n", __FUNCTION__);
-          return false;
-     }
-
      U8 map_version = MAP_VERSION;
-     fread(&map_version, sizeof(map_version), 1, f);
+     fread(&map_version, sizeof(map_version), 1, file);
      if(map_version != MAP_VERSION){
           LOG("%s(): mismatched version loading '%s', actual %d, expected %d\n", __FUNCTION__, filepath, map_version, MAP_VERSION);
           return false;
      }
 
-     fread(player_start, sizeof(*player_start), 1, f);
-     fread(&map_width, sizeof(map_width), 1, f);
-     fread(&map_height, sizeof(map_height), 1, f);
-     fread(&block_count, sizeof(block_count), 1, f);
-     fread(&interactive_count, sizeof(interactive_count), 1, f);
+     fread(player_start, sizeof(*player_start), 1, file);
+     fread(&map_width, sizeof(map_width), 1, file);
+     fread(&map_height, sizeof(map_height), 1, file);
+     fread(&block_count, sizeof(block_count), 1, file);
+     fread(&interactive_count, sizeof(interactive_count), 1, file);
 
      // alloc and convert map elements to map format
-     S32 map_tile_count = (S32)(tilemap->width) * (S32)(tilemap->height);
+     S32 map_tile_count = (S32)(map_width) * (S32)(map_height);
      MapTileV1_t* map_tiles = (MapTileV1_t*)(calloc(map_tile_count, sizeof(*map_tiles)));
      if(!map_tiles){
           LOG("%s(): failed to allocate %d tiles\n", __FUNCTION__, map_tile_count);
@@ -1313,17 +1315,16 @@ bool load_map(Coord_t* player_start, TileMap_t* tilemap, ObjectArray_t<Block_t>*
           return false;
      }
 
-     MapInteractiveV1_t* map_interactives = (MapInteractiveV1_t*)(calloc(interactive_array->count, sizeof(*map_interactives)));
+     MapInteractiveV1_t* map_interactives = (MapInteractiveV1_t*)(calloc(interactive_count, sizeof(*map_interactives)));
      if(!map_interactives){
-          LOG("%s(): failed to allocate %d interactives\n", __FUNCTION__, interactive_array->count);
+          LOG("%s(): failed to allocate %d interactives\n", __FUNCTION__, interactive_count);
           return false;
      }
 
      // read data from file
-     fread(map_tiles, sizeof(*map_tiles), map_tile_count, f);
-     fread(map_blocks, sizeof(*map_blocks), block_count, f);
-     fread(map_interactives, sizeof(*map_interactives), interactive_array->count, f);
-     fclose(f);
+     fread(map_tiles, sizeof(*map_tiles), map_tile_count, file);
+     fread(map_blocks, sizeof(*map_blocks), block_count, file);
+     fread(map_interactives, sizeof(*map_interactives), interactive_count, file);
 
      destroy(tilemap);
      init(tilemap, map_width, map_height);
@@ -1335,11 +1336,15 @@ bool load_map(Coord_t* player_start, TileMap_t* tilemap, ObjectArray_t<Block_t>*
      init(interactive_array, interactive_count);
 
      // convert to map formats
+     S32 index = 0;
      for(S32 y = 0; y < tilemap->height; y++){
           for(S32 x = 0; x < tilemap->width; x++){
-               int index = y * tilemap->width + x;
                tilemap->tiles[y][x].id = map_tiles[index].id;
                tilemap->tiles[y][x].flags = map_tiles[index].flags;
+               if(map_tiles[index].flags != 0){
+                    LOG("hmmm, %d, %d is %d\n", x, y, map_tiles[index].flags);
+               }
+               index++;
           }
      }
 
@@ -1397,6 +1402,18 @@ bool load_map(Coord_t* player_start, TileMap_t* tilemap, ObjectArray_t<Block_t>*
      free(map_interactives);
 
      return true;
+}
+
+bool load_map(const char* filepath, Coord_t* player_start, TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array,
+              ObjectArray_t<Interactive_t>* interactive_array){
+     FILE* f = fopen(filepath, "rb");
+     if(!f){
+          LOG("%s(): fopen() failed\n", __FUNCTION__);
+          return false;
+     }
+     bool success = load_map_from_file(f, player_start, tilemap, block_array, interactive_array, filepath);
+     fclose(f);
+     return success;
 }
 
 enum StampType_t{
@@ -2107,6 +2124,7 @@ int main(int argc, char** argv){
      DemoMode_t demo_mode = DEMO_MODE_NONE;
      const char* demo_filepath = NULL;
      const char* map_name = "unnamed";
+     bool test = false;
 
      for(int i = 1; i < argc; i++){
           if(strcmp(argv[i], "-play") == 0){
@@ -2123,6 +2141,8 @@ int main(int argc, char** argv){
                int next = i + 1;
                if(next >= argc) continue;
                map_name = argv[next];
+          }else if(strcmp(argv[i], "-test") == 0){
+               test = true;
           }
      }
 
@@ -2145,6 +2165,7 @@ int main(int argc, char** argv){
      int window_width = 1280;
      int window_height = 1024;
 
+     LOG("Create window: %d, %d\n", window_width, window_height);
      SDL_Window* window = SDL_CreateWindow("bryte", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, window_width, window_height, SDL_WINDOW_OPENGL);
      if(!window) return 1;
 
@@ -2308,8 +2329,10 @@ int main(int argc, char** argv){
           F64 dt = (F64)(elapsed_seconds.count());
 
           if(dt < 0.0166666f) continue; // limit 60 fps
+
           // TODO: consider 30fps as minimum for random noobs computers
-          dt = 0.0166666f; // the game always runs as if a 60th of a frame has occurred.
+          if(demo_mode) dt = 0.0166666f; // the game always runs as if a 60th of a frame has occurred.
+
           frame_count++;
 
 #ifdef COUNT_FRAMES
@@ -2330,10 +2353,59 @@ int main(int argc, char** argv){
           player_action.reface = false;
 
           if(demo_mode == DEMO_MODE_PLAY){
-               while(frame_count == demo_entry.frame && !feof(demo_file)){
+               bool end_of_demo = false;
+               while(frame_count == demo_entry.frame && !end_of_demo){
                     player_action_perform(&player_action, &player, demo_entry.player_action_type, demo_mode,
                                           demo_file, frame_count);
                     demo_entry_get(&demo_entry, demo_file);
+                    end_of_demo = (demo_entry.player_action_type == PLAYER_ACTION_TYPE_END_DEMO && frame_count == demo_entry.frame);
+                    if(feof(demo_file) && !end_of_demo){
+                         end_of_demo = true;
+                         LOG("error: demo file doesn't contain PLAYER_ACTION_TYPE_END_DEMO.\n");
+                    }
+               }
+
+               if(end_of_demo){
+                    if(test){
+                         TileMap_t check_tilemap = {};
+                         ObjectArray_t<Block_t> check_block_array = {};
+                         ObjectArray_t<Interactive_t> check_interactive_array = {};
+                         Coord_t check_player_start;
+                         Pixel_t check_player_pixel;
+                         if(!load_map_from_file(demo_file, &check_player_start, &check_tilemap, &check_block_array, &check_interactive_array, demo_filepath)){
+                              LOG("failed to load map state from end of file");
+                         }else{
+                              fread(&check_player_pixel, sizeof(check_player_pixel), 1, demo_file);
+                              if(check_tilemap.width != tilemap.width){
+                                   LOG_MISMATCH("tilemap width", "%d", check_tilemap.width, tilemap.width);
+                              }
+
+                              if(check_tilemap.height != tilemap.height){
+                                   LOG_MISMATCH("tilemap height", "%d", check_tilemap.height, tilemap.height);
+                              }
+
+                              for(S16 j = 0; j < check_tilemap.height; j++){
+                                   for(S16 i = 0; i < check_tilemap.width; i++){
+                                        if(check_tilemap.tiles[j][i].flags != tilemap.tiles[j][i].flags){
+                                             char name[64];
+                                             snprintf(name, 64, "tile %d, %d", i, j);
+                                             LOG_MISMATCH(name, "%d", check_tilemap.tiles[j][i].flags, tilemap.tiles[j][i].flags);
+                                        }
+                                   }
+                              }
+
+                              if(check_player_pixel.x != player.pos.pixel.x){
+                                   LOG_MISMATCH("player pixel x", "%d", check_player_pixel.x, player.pos.pixel.x);
+                              }
+                              if(check_player_pixel.y != player.pos.pixel.y){
+                                   LOG_MISMATCH("player pixel y", "%d", check_player_pixel.y, player.pos.pixel.y);
+                              }
+                         }
+                    }else{
+                         LOG("finished playing demo: %s\n", demo_filepath);
+                    }
+
+                    demo_mode = DEMO_MODE_NONE;
                }
           }
 
@@ -2407,7 +2479,7 @@ int main(int argc, char** argv){
 
                          if(!filepath[0]) break;
 
-                         if(load_map(&player_start, &tilemap, &block_array, &interactive_array, filepath)){
+                         if(load_map(filepath, &player_start, &tilemap, &block_array, &interactive_array)){
                               // update sort blocks list
                               // TODO: compress this code
                               free(sorted_blocks);
@@ -2426,7 +2498,7 @@ int main(int argc, char** argv){
                     {
                          char filepath[64];
                          snprintf(filepath, 64, "content/%03d_%s.bm", map_number, map_name);
-                         save_map(player_start, &tilemap, &block_array, &interactive_array, filepath);
+                         save_map(filepath, player_start, &tilemap, &block_array, &interactive_array);
                     } break;
                     // TODO: #ifdef DEBUG
                     case SDL_SCANCODE_GRAVE:
@@ -3425,6 +3497,23 @@ int main(int argc, char** argv){
           SDL_GL_SwapWindow(window);
      }
 
+     switch(demo_mode){
+     default:
+          break;
+     case DEMO_MODE_RECORD:
+          player_action_perform(&player_action, &player, PLAYER_ACTION_TYPE_END_DEMO, demo_mode,
+                                demo_file, frame_count);
+          // save map and player position
+          save_map_to_file(demo_file, player_start, &tilemap, &block_array, &interactive_array);
+          fwrite(&player.pos.pixel, sizeof(player.pos.pixel), 1, demo_file);
+          LOG("player ended at %d, %d\n", player.pos.pixel.x, player.pos.pixel.y);
+          fclose(demo_file);
+          break;
+     case DEMO_MODE_PLAY:
+          fclose(demo_file);
+          break;
+     }
+
      interactive_quad_tree_free(interactive_quad_tree);
 
      destroy(&tilemap);
@@ -3435,8 +3524,6 @@ int main(int argc, char** argv){
      SDL_GL_DeleteContext(opengl_context);
      SDL_DestroyWindow(window);
      SDL_Quit();
-
-     if(demo_file) fclose(demo_file);
 
      Log_t::destroy();
 

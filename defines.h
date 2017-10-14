@@ -22,6 +22,13 @@
 
 #define TOGGLE_BIT(value, bit){if(value & (1 << bit)){OFF_BIT(value, bit);}else{ON_BIT(value, bit);}}
 
+#define LOG_MISMATCH(name, fmt_spec, chk, act)\
+     {                                                                                                                     \
+          char mismatch_fmt_string[128];                                                                                   \
+          snprintf(mismatch_fmt_string, 128, "mismatched '%s' value. demo '%s', actual '%s'\n", name, fmt_spec, fmt_spec); \
+          LOG(mismatch_fmt_string, chk, act);                                                                              \
+     }
+
 #define PIXEL_SIZE .00367647f
 #define TILE_SIZE (16.0f / 272.0f)
 #define HALF_TILE_SIZE (TILE_SIZE * 0.5f)
