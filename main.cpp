@@ -2122,8 +2122,8 @@ using namespace std::chrono;
 
 int main(int argc, char** argv){
      DemoMode_t demo_mode = DEMO_MODE_NONE;
-     const char* demo_filepath = NULL;
-     const char* map_name = "unnamed";
+     const char* demo_filepath = nullptr;
+     const char* load_map_filepath = nullptr;
      bool test = false;
 
      for(int i = 1; i < argc; i++){
@@ -2137,10 +2137,10 @@ int main(int argc, char** argv){
                if(next >= argc) continue;
                demo_filepath = argv[next];
                demo_mode = DEMO_MODE_RECORD;
-          }else if(strcmp(argv[i], "-name") == 0){
+          }else if(strcmp(argv[i], "-load") == 0){
                int next = i + 1;
                if(next >= argc) continue;
-               map_name = argv[next];
+               load_map_filepath = argv[next];
           }else if(strcmp(argv[i], "-test") == 0){
                test = true;
           }
@@ -2205,35 +2205,16 @@ int main(int argc, char** argv){
      }
 #endif
 
-     ObjectArray_t<Block_t> block_array;
-     {
-          if(!init(&block_array, 1)){
+     TileMap_t tilemap = {};
+     ObjectArray_t<Block_t> block_array = {};
+     ObjectArray_t<Interactive_t> interactive_array = {};
+     Coord_t player_start {2, 8};
+
+     if(load_map_filepath){
+          if(!load_map(load_map_filepath, &player_start, &tilemap, &block_array, &interactive_array)){
                return 1;
           }
-          block_array.elements[0].pos = coord_to_pos(Coord_t{-1, -1});
-     }
-
-     Block_t** sorted_blocks;
-     {
-          sorted_blocks = (Block_t**)(calloc(block_array.count, sizeof(*sorted_blocks)));
-          for(S16 i = 0; i < block_array.count; ++i){
-               sorted_blocks[i] = block_array.elements + i;
-          }
-     }
-
-     ObjectArray_t<Interactive_t> interactive_array;
-     {
-          if(!init(&interactive_array, 1)){
-               return 1;
-          }
-          interactive_array.elements[0].coord.x = -1;
-          interactive_array.elements[0].coord.y = -1;
-     }
-
-     InteractiveQuadTreeNode_t* interactive_quad_tree = interactive_quad_tree_build(&interactive_array);
-
-     TileMap_t tilemap;
-     {
+     }else{
           init(&tilemap, ROOM_TILE_SIZE, ROOM_TILE_SIZE);
 
           for(S16 i = 0; i < tilemap.width; i++){
@@ -2269,14 +2250,33 @@ int main(int argc, char** argv){
           tilemap.tiles[0][16].id = 43;
           tilemap.tiles[1][15].id = 26;
           tilemap.tiles[1][16].id = 27;
+          if(!init(&interactive_array, 1)){
+               return 1;
+          }
+          interactive_array.elements[0].coord.x = -1;
+          interactive_array.elements[0].coord.y = -1;
+
+          if(!init(&block_array, 1)){
+               return 1;
+          }
+          block_array.elements[0].pos = coord_to_pos(Coord_t{-1, -1});
      }
+
+     Block_t** sorted_blocks;
+     {
+          sorted_blocks = (Block_t**)(calloc(block_array.count, sizeof(*sorted_blocks)));
+          for(S16 i = 0; i < block_array.count; ++i){
+               sorted_blocks[i] = block_array.elements + i;
+          }
+     }
+
+     InteractiveQuadTreeNode_t* interactive_quad_tree = interactive_quad_tree_build(&interactive_array);
 
      bool quit = false;
 
      Vec_t user_movement = {};
 
      Player_t player {};
-     Coord_t player_start {2, 8};
      player.pos = coord_to_pos_at_tile_center(player_start);
      player.walk_frame_delta = 1;
      player.radius = 3.5f / 272.0f;
@@ -2497,7 +2497,7 @@ int main(int argc, char** argv){
                     case SDL_SCANCODE_V:
                     {
                          char filepath[64];
-                         snprintf(filepath, 64, "content/%03d_%s.bm", map_number, map_name);
+                         snprintf(filepath, 64, "content/%03d.bm", map_number);
                          save_map(filepath, player_start, &tilemap, &block_array, &interactive_array);
                     } break;
                     // TODO: #ifdef DEBUG
@@ -2654,10 +2654,30 @@ int main(int argc, char** argv){
                          default:
                               break;
                          case EDITOR_MODE_CATEGORY_SELECT:
-                         case EDITOR_MODE_STAMP_SELECT:
-                         {
                               coord_clear(mouse_select_world(mouse_screen, camera), &tilemap, &interactive_array,
                                           interactive_quad_tree, &block_array);
+                              break;
+                         case EDITOR_MODE_STAMP_SELECT:
+                         case EDITOR_MODE_STAMP_HIDE:
+                         {
+                              Coord_t start = mouse_select_world(mouse_screen, camera);
+                              Coord_t end = start + stamp_array_dimensions(editor.category_array.elements[editor.category].elements + editor.stamp);
+                              for(S16 j = start.y; j < end.y; j++){
+                                   for(S16 i = start.x; i < end.x; i++){
+                                        Coord_t coord {i, j};
+                                        coord_clear(coord, &tilemap, &interactive_array, interactive_quad_tree, &block_array);
+                                   }
+                              }
+                         } break;
+                         case EDITOR_MODE_SELECTION_MANIPULATION:
+                         {
+                              Rect_t selection_bounds = editor_selection_bounds(&editor);
+                              for(S16 j = selection_bounds.bottom; j <= selection_bounds.top; j++){
+                                   for(S16 i = selection_bounds.left; i <= selection_bounds.right; i++){
+                                        Coord_t coord {i, j};
+                                        coord_clear(coord, &tilemap, &interactive_array, interactive_quad_tree, &block_array);
+                                   }
+                              }
                          } break;
                          }
                          break;
