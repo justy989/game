@@ -2223,7 +2223,6 @@ int main(int argc, char** argv){
           }
 
           SDL_DisplayMode display_mode;
-
           if(SDL_GetCurrentDisplayMode(0, &display_mode) != 0){
                return 1;
           }
@@ -2583,6 +2582,7 @@ int main(int argc, char** argv){
                                    map_number++;
                                    if(load_map_number(map_number, &player_start, &tilemap, &block_array, &interactive_array)){
                                         player_spawn(&player, player_start);
+                                        player_action = {};
                                         last_block_pushed = nullptr;
                                         last_block_pushed_direction = DIRECTION_LEFT;
                                         block_to_push = nullptr;
@@ -2602,6 +2602,7 @@ int main(int argc, char** argv){
                                              LOG("testing demo %s\n", demo_filepath);
                                              demo_entry_get(&demo_entry, demo_file);
                                              frame_count = 0;
+                                             continue; // reset to the top of the loop
                                         }else{
                                              LOG("missing map %d corresponding demo.\n", map_number);
                                              return 1;
