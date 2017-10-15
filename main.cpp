@@ -1284,6 +1284,7 @@ bool save_map(const char* filepath, Coord_t player_start, const TileMap_t* tilem
           return false;
      }
      bool success = save_map_to_file(f, player_start, tilemap, block_array, interactive_array);
+     LOG("saved map %s\n", filepath);
      fclose(f);
      return success;
 }
@@ -1845,19 +1846,24 @@ void tile_id_draw(U8 id, Vec_t pos){
 void tile_flags_draw(U16 flags, Vec_t tile_pos){
      if(flags == 0) return;
 
-     if(flags & TILE_FLAG_ICED){
-     }else if(flags & TILE_FLAG_CHECKPOINT){
+     if(flags & TILE_FLAG_CHECKPOINT){
           draw_theme_frame(theme_frame(0, 21), tile_pos);
-     }else if(flags & TILE_FLAG_RESET_IMMUNE){
+     }
+
+     if(flags & TILE_FLAG_RESET_IMMUNE){
           draw_theme_frame(theme_frame(1, 21), tile_pos);
-     }else if(flags & (TILE_FLAG_WIRE_LEFT | TILE_FLAG_WIRE_RIGHT | TILE_FLAG_WIRE_UP | TILE_FLAG_WIRE_DOWN)){
+     }
+
+     if(flags & (TILE_FLAG_WIRE_LEFT | TILE_FLAG_WIRE_RIGHT | TILE_FLAG_WIRE_UP | TILE_FLAG_WIRE_DOWN)){
           S16 frame_y = 9;
           S16 frame_x = flags >> 4;
 
           if(flags & TILE_FLAG_WIRE_STATE) frame_y++;
 
           draw_theme_frame(theme_frame(frame_x, frame_y), tile_pos);
-     }else if(flags & (TILE_FLAG_WIRE_CLUSTER_LEFT | TILE_FLAG_WIRE_CLUSTER_MID | TILE_FLAG_WIRE_CLUSTER_RIGHT)){
+     }
+
+     if(flags & (TILE_FLAG_WIRE_CLUSTER_LEFT | TILE_FLAG_WIRE_CLUSTER_MID | TILE_FLAG_WIRE_CLUSTER_RIGHT)){
           S16 frame_y = 17 + tile_flags_cluster_direction(flags);
           S16 frame_x = 0;
 
@@ -2031,7 +2037,7 @@ Vec_t coord_to_screen_position(Coord_t coord)
 }
 
 void apply_stamp(Stamp_t* stamp, Coord_t coord, TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array, ObjectArray_t<Interactive_t>* interactive_array,
-                 InteractiveQuadTreeNode_t** interactive_quad_tree, Block_t*** sorted_blocks){
+                 InteractiveQuadTreeNode_t** interactive_quad_tree, Block_t*** sorted_blocks, bool combine){
      switch(stamp->type){
      default:
           break;
@@ -2043,12 +2049,20 @@ void apply_stamp(Stamp_t* stamp, Coord_t coord, TileMap_t* tilemap, ObjectArray_
      case STAMP_TYPE_TILE_FLAGS:
      {
           Tile_t* tile = tilemap_get_tile(tilemap, coord);
-          if(tile) tile->flags = stamp->tile_flags;
+          if(tile){
+               if(combine){
+                    tile->flags |= stamp->tile_flags;
+               }else{
+                    tile->flags = stamp->tile_flags;
+               }
+          }
      } break;
      case STAMP_TYPE_BLOCK:
      {
           int index = block_array->count;
           resize(block_array, block_array->count + 1);
+          // TODO: Check if block is in the way
+
           Block_t* block = block_array->elements + index;
           block->pos = coord_to_pos(coord);
           block->vel = vec_zero();
@@ -2063,6 +2077,9 @@ void apply_stamp(Stamp_t* stamp, Coord_t coord, TileMap_t* tilemap, ObjectArray_
      } break;
      case STAMP_TYPE_INTERACTIVE:
      {
+          Interactive_t* interactive = interactive_quad_tree_find_at(*interactive_quad_tree, coord);
+          if(interactive) return;
+
           int index = interactive_array->count;
           resize(interactive_array, interactive_array->count + 1);
           interactive_array->elements[index] = stamp->interactive;
@@ -2233,8 +2250,8 @@ int main(int argc, char** argv){
           return 1;
      }
 
-     int window_width = 1600;
-     int window_height = 1600;
+     int window_width = 800;
+     int window_height = 800;
      SDL_Window* window = nullptr;
      SDL_GLContext opengl_context = 0;
      GLuint theme_texture = 0;
@@ -2413,6 +2430,7 @@ int main(int argc, char** argv){
      // bool left_click_down = false;
      Vec_t mouse_screen = {}; // 0.0f to 1.0f
      Position_t mouse_world = {};
+     bool ctrl_down;
 
      Editor_t editor;
      init(&editor);
@@ -2745,7 +2763,8 @@ int main(int argc, char** argv){
                               for(int i = 0; i < editor.selection.count; i++){
                                    Coord_t coord = editor.selection_start + editor.selection.elements[i].offset;
                                    apply_stamp(editor.selection.elements + i, coord,
-                                               &tilemap, &block_array, &interactive_array, &interactive_quad_tree, &sorted_blocks);
+                                               &tilemap, &block_array, &interactive_array, &interactive_quad_tree, &sorted_blocks,
+                                               ctrl_down);
                               }
 
                               editor.mode = EDITOR_MODE_CATEGORY_SELECT;
@@ -2786,6 +2805,9 @@ int main(int argc, char** argv){
                               player_start = mouse_select_world(mouse_screen, camera);
                          }
                          break;
+                    case SDL_SCANCODE_LCTRL:
+                         ctrl_down = true;
+                         break;
                     }
                     break;
                case SDL_KEYUP:
@@ -2814,6 +2836,9 @@ int main(int argc, char** argv){
                     case SDL_SCANCODE_E:
                          player_action_perform(&player_action, &player, PLAYER_ACTION_TYPE_ACTIVATE_STOP, demo_mode,
                                                demo_file, frame_count);
+                         break;
+                    case SDL_SCANCODE_LCTRL:
+                         ctrl_down = false;
                          break;
                     }
                     break;
@@ -2857,7 +2882,8 @@ int main(int argc, char** argv){
                                    for(S16 s = 0; s < stamp_array->count; s++){
                                         auto* stamp = stamp_array->elements + s;
                                         apply_stamp(stamp, select_coord + stamp->offset,
-                                                    &tilemap, &block_array, &interactive_array, &interactive_quad_tree, &sorted_blocks);
+                                                    &tilemap, &block_array, &interactive_array, &interactive_quad_tree, &sorted_blocks,
+                                                    ctrl_down);
                                    }
                               }
                          } break;
