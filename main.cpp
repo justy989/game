@@ -593,6 +593,7 @@ Interactive_t* interactive_quad_tree_find_at(const InteractiveQuadTreeNode_t* no
 }
 
 void interactive_quad_tree_free(InteractiveQuadTreeNode_t* root){
+     if(!root) return;
      if(root->top_left) interactive_quad_tree_free(root->top_left);
      if(root->top_right) interactive_quad_tree_free(root->top_right);
      if(root->bottom_left) interactive_quad_tree_free(root->bottom_left);
@@ -2157,6 +2158,23 @@ FILE* load_demo_number(S32 map_number, const char** demo_filepath){
      return fopen(*demo_filepath, "rb");
 }
 
+void reset_map(Player_t* player, Coord_t player_start, ObjectArray_t<Block_t>* block_array,
+               ObjectArray_t<Interactive_t>* interactive_array, Block_t*** sorted_blocks,
+               InteractiveQuadTreeNode_t** interactive_quad_tree){
+     player_spawn(player, player_start);
+
+     // update sort blocks list
+     free(*sorted_blocks);
+     *sorted_blocks = (Block_t**)(calloc(block_array->count, sizeof(*sorted_blocks)));
+     for(S16 i = 0; i < block_array->count; ++i){
+          (*sorted_blocks)[i] = block_array->elements + i;
+     }
+
+     // update interactive quad tree
+     interactive_quad_tree_free(*interactive_quad_tree);
+     *interactive_quad_tree = interactive_quad_tree_build(interactive_array);
+}
+
 using namespace std::chrono;
 
 int main(int argc, char** argv){
@@ -2168,6 +2186,7 @@ int main(int argc, char** argv){
      bool show_suite = false;
      S16 map_number = 0;
      S16 first_map_number = 0;
+     S16 map_count = 0;
 
      for(int i = 1; i < argc; i++){
           if(strcmp(argv[i], "-play") == 0){
@@ -2196,6 +2215,10 @@ int main(int argc, char** argv){
                if(next >= argc) continue;
                map_number = atoi(argv[next]);
                first_map_number = map_number;
+          }else if(strcmp(argv[i], "-count") == 0){
+               int next = i + 1;
+               if(next >= argc) continue;
+               map_count = atoi(argv[next]);
           }
      }
 
@@ -2367,23 +2390,15 @@ int main(int argc, char** argv){
           block_array.elements[0].pos = coord_to_pos(Coord_t{-1, -1});
      }
 
-     Block_t** sorted_blocks;
-     {
-          sorted_blocks = (Block_t**)(calloc(block_array.count, sizeof(*sorted_blocks)));
-          for(S16 i = 0; i < block_array.count; ++i){
-               sorted_blocks[i] = block_array.elements + i;
-          }
-     }
+     Player_t player;
+     Block_t** sorted_blocks = nullptr;
+     InteractiveQuadTreeNode_t* interactive_quad_tree = nullptr;
 
-     InteractiveQuadTreeNode_t* interactive_quad_tree = interactive_quad_tree_build(&interactive_array);
+     reset_map(&player, player_start, &block_array, &interactive_array, &sorted_blocks, &interactive_quad_tree);
 
      bool quit = false;
 
      Vec_t user_movement = {};
-
-     Player_t player;
-     player_spawn(&player, player_start);
-
      PlayerAction_t player_action {};
 
      auto last_time = system_clock::now();
@@ -2403,7 +2418,7 @@ int main(int argc, char** argv){
      init(&editor);
 
      S64 frame_count = 0;
-     float dt = 0.0f;
+     F32 dt = 0.0f;
 
      while(!quit){
           if(!suite || show_suite){
@@ -2580,21 +2595,19 @@ int main(int argc, char** argv){
                                    if(suite && !show_suite) return 1;
                               }else if(suite){
                                    map_number++;
+                                   S16 maps_tested = map_number - first_map_number;
+                                   if(map_count > 0 && maps_tested >= map_count){
+                                        LOG("Done Testing %d maps.\n", map_count);
+                                        return 0;
+                                   }
                                    if(load_map_number(map_number, &player_start, &tilemap, &block_array, &interactive_array)){
-                                        player_spawn(&player, player_start);
+                                        reset_map(&player, player_start, &block_array, &interactive_array, &sorted_blocks, &interactive_quad_tree);
+
+                                        // reset some vars
                                         player_action = {};
                                         last_block_pushed = nullptr;
                                         last_block_pushed_direction = DIRECTION_LEFT;
                                         block_to_push = nullptr;
-
-                                        // TODO: compress
-                                        free(sorted_blocks);
-                                        sorted_blocks = (Block_t**)(calloc(block_array.count, sizeof(*sorted_blocks)));
-                                        for(S16 i = 0; i < block_array.count; ++i){
-                                             sorted_blocks[i] = block_array.elements + i;
-                                        }
-
-                                        interactive_quad_tree = interactive_quad_tree_build(&interactive_array);
 
                                         fclose(demo_file);
                                         demo_file = load_demo_number(map_number, &demo_filepath);
@@ -2608,7 +2621,7 @@ int main(int argc, char** argv){
                                              return 1;
                                         }
                                    }else{
-                                        LOG("Done Testing %d maps.\n", map_number - first_map_number);
+                                        LOG("Done Testing %d maps.\n", maps_tested);
                                         return 0;
                                    }
                               }else{
@@ -2675,23 +2688,26 @@ int main(int argc, char** argv){
                                                demo_file, frame_count);
                          break;
                     case SDL_SCANCODE_L:
-                    {
                          if(load_map_number(map_number, &player_start, &tilemap, &block_array, &interactive_array)){
-                              player.pos = coord_to_pos_at_tile_center(player_start);
-                              // update sort blocks list
-                              // TODO: compress this code
-                              free(sorted_blocks);
-                              sorted_blocks = (Block_t**)(calloc(block_array.count, sizeof(*sorted_blocks)));
-                              for(S16 i = 0; i < block_array.count; ++i){
-                                   sorted_blocks[i] = block_array.elements + i;
-                              }
-
-                              // update interactive quad tree
-                              // TODO: compress this code
-                              interactive_quad_tree_free(interactive_quad_tree);
-                              interactive_quad_tree = interactive_quad_tree_build(&interactive_array);
+                              reset_map(&player, player_start, &block_array, &interactive_array, &sorted_blocks, &interactive_quad_tree);
                          }
-                    } break;
+                         break;
+                    case SDL_SCANCODE_LEFTBRACKET:
+                         map_number--;
+                         if(load_map_number(map_number, &player_start, &tilemap, &block_array, &interactive_array)){
+                              reset_map(&player, player_start, &block_array, &interactive_array, &sorted_blocks, &interactive_quad_tree);
+                         }else{
+                              map_number++;
+                         }
+                         break;
+                    case SDL_SCANCODE_RIGHTBRACKET:
+                         map_number++;
+                         if(load_map_number(map_number, &player_start, &tilemap, &block_array, &interactive_array)){
+                              reset_map(&player, player_start, &block_array, &interactive_array, &sorted_blocks, &interactive_quad_tree);
+                         }else{
+                              map_number--;
+                         }
+                         break;
                     case SDL_SCANCODE_V:
                     {
                          char filepath[64];
