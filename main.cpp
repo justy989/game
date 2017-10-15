@@ -2188,43 +2188,49 @@ int main(int argc, char** argv){
           return 1;
      }
 
-     if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER) != 0){
-          return 1;
-     }
-
-     SDL_DisplayMode display_mode;
-
-     if(SDL_GetCurrentDisplayMode(0, &display_mode) != 0){
-          return 1;
-     }
-
      int window_width = 1280;
      int window_height = 1024;
+     SDL_Window* window = nullptr;
+     SDL_GLContext opengl_context = 0;
+     GLuint theme_texture = 0;
+     GLuint player_texture = 0;
 
-     LOG("Create window: %d, %d\n", window_width, window_height);
-     SDL_Window* window = SDL_CreateWindow("bryte", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, window_width, window_height, SDL_WINDOW_OPENGL);
-     if(!window) return 1;
+     if(!suite){
+          if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER) != 0){
+               return 1;
+          }
 
-     SDL_GLContext opengl_context = SDL_GL_CreateContext(window);
+          SDL_DisplayMode display_mode;
 
-     SDL_GL_SetSwapInterval(SDL_TRUE);
-     glViewport(0, 0, window_width, window_height);
-     glClearColor(0.0, 0.0, 0.0, 1.0);
-     glEnable(GL_TEXTURE_2D);
-     glViewport(0, 0, window_width, window_height);
-     glMatrixMode(GL_PROJECTION);
-     glLoadIdentity();
-     glOrtho(0.0, 1.0, 0.0, 1.0, 0.0, 1.0);
-     glMatrixMode(GL_MODELVIEW);
-     glLoadIdentity();
-     glEnable(GL_BLEND);
-     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-     glBlendEquation(GL_FUNC_ADD);
+          if(SDL_GetCurrentDisplayMode(0, &display_mode) != 0){
+               return 1;
+          }
 
-     GLuint theme_texture = transparent_texture_from_file("theme.bmp");
-     if(theme_texture == 0) return 1;
-     GLuint player_texture = transparent_texture_from_file("player.bmp");
-     if(player_texture == 0) return 1;
+          LOG("Create window: %d, %d\n", window_width, window_height);
+          window = SDL_CreateWindow("bryte", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, window_width, window_height, SDL_WINDOW_OPENGL);
+          if(!window) return 1;
+
+          opengl_context = SDL_GL_CreateContext(window);
+
+          SDL_GL_SetSwapInterval(SDL_TRUE);
+          glViewport(0, 0, window_width, window_height);
+          glClearColor(0.0, 0.0, 0.0, 1.0);
+          glEnable(GL_TEXTURE_2D);
+          glViewport(0, 0, window_width, window_height);
+          glMatrixMode(GL_PROJECTION);
+          glLoadIdentity();
+          glOrtho(0.0, 1.0, 0.0, 1.0, 0.0, 1.0);
+          glMatrixMode(GL_MODELVIEW);
+          glLoadIdentity();
+          glEnable(GL_BLEND);
+          glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+          glBlendEquation(GL_FUNC_ADD);
+
+          theme_texture = transparent_texture_from_file("theme.bmp");
+          if(theme_texture == 0) return 1;
+          player_texture = transparent_texture_from_file("player.bmp");
+          if(player_texture == 0) return 1;
+     }
 
 #if 0 // TODO: do we want this in the future
      Rect_t rooms[2];
@@ -2387,7 +2393,9 @@ int main(int argc, char** argv){
           duration<double> elapsed_seconds = current_time - last_time;
           F64 dt = (F64)(elapsed_seconds.count());
 
-          if(dt < 0.0166666f) continue; // limit 60 fps
+          if(!suite){
+               if(dt < 0.0166666f) continue; // limit 60 fps
+          }
 
           // TODO: consider 30fps as minimum for random noobs computers
           if(demo_mode) dt = 0.0166666f; // the game always runs as if a 60th of a frame has occurred.
@@ -3368,6 +3376,8 @@ int main(int argc, char** argv){
                player.pos += pos_delta;
           }
 
+          if(suite) continue;
+
           glClear(GL_COLOR_BUFFER_BIT);
 
           Position_t screen_camera = camera - Vec_t{0.5f, 0.5f} + Vec_t{HALF_TILE_SIZE, HALF_TILE_SIZE};
@@ -3717,12 +3727,14 @@ int main(int argc, char** argv){
 
      destroy(&tilemap);
 
-     glDeleteTextures(1, &theme_texture);
-     glDeleteTextures(1, &player_texture);
+     if(!suite){
+          glDeleteTextures(1, &theme_texture);
+          glDeleteTextures(1, &player_texture);
 
-     SDL_GL_DeleteContext(opengl_context);
-     SDL_DestroyWindow(window);
-     SDL_Quit();
+          SDL_GL_DeleteContext(opengl_context);
+          SDL_DestroyWindow(window);
+          SDL_Quit();
+     }
 
      Log_t::destroy();
 
