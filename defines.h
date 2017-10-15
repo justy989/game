@@ -27,6 +27,7 @@
           char mismatch_fmt_string[128];                                                                                   \
           snprintf(mismatch_fmt_string, 128, "mismatched '%s' value. demo '%s', actual '%s'\n", name, fmt_spec, fmt_spec); \
           LOG(mismatch_fmt_string, chk, act);                                                                              \
+          test_passed = false;                                                                                             \
      }
 
 #define PIXEL_SIZE .00367647f

@@ -688,7 +688,7 @@ void toggle_electricity(TileMap_t* tilemap, InteractiveQuadTreeNode_t* interacti
                switch(direction){
                default:
                     break;
-               case DIRECTION_RIGHT:
+               case DIRECTION_LEFT:
                     if(tile->flags & TILE_FLAG_WIRE_CLUSTER_MID) toggle_flag(&tile->flags, TILE_FLAG_WIRE_CLUSTER_MID_ON);
                     break;
                case DIRECTION_UP:
@@ -703,7 +703,7 @@ void toggle_electricity(TileMap_t* tilemap, InteractiveQuadTreeNode_t* interacti
                switch(direction){
                default:
                     break;
-               case DIRECTION_LEFT:
+               case DIRECTION_RIGHT:
                     if(tile->flags & TILE_FLAG_WIRE_CLUSTER_MID) toggle_flag(&tile->flags, TILE_FLAG_WIRE_CLUSTER_MID_ON);
                     break;
                case DIRECTION_DOWN:
@@ -721,10 +721,10 @@ void toggle_electricity(TileMap_t* tilemap, InteractiveQuadTreeNode_t* interacti
                case DIRECTION_UP:
                     if(tile->flags & TILE_FLAG_WIRE_CLUSTER_MID) toggle_flag(&tile->flags, TILE_FLAG_WIRE_CLUSTER_MID_ON);
                     break;
-               case DIRECTION_RIGHT:
+               case DIRECTION_LEFT:
                     if(tile->flags & TILE_FLAG_WIRE_CLUSTER_LEFT) toggle_flag(&tile->flags, TILE_FLAG_WIRE_CLUSTER_LEFT_ON);
                     break;
-               case DIRECTION_LEFT:
+               case DIRECTION_RIGHT:
                     if(tile->flags & TILE_FLAG_WIRE_CLUSTER_RIGHT) toggle_flag(&tile->flags, TILE_FLAG_WIRE_CLUSTER_RIGHT_ON);
                     break;
                }
@@ -736,10 +736,10 @@ void toggle_electricity(TileMap_t* tilemap, InteractiveQuadTreeNode_t* interacti
                case DIRECTION_DOWN:
                     if(tile->flags & TILE_FLAG_WIRE_CLUSTER_MID) toggle_flag(&tile->flags, TILE_FLAG_WIRE_CLUSTER_MID_ON);
                     break;
-               case DIRECTION_LEFT:
+               case DIRECTION_RIGHT:
                     if(tile->flags & TILE_FLAG_WIRE_CLUSTER_LEFT) toggle_flag(&tile->flags, TILE_FLAG_WIRE_CLUSTER_LEFT_ON);
                     break;
-               case DIRECTION_RIGHT:
+               case DIRECTION_LEFT:
                     if(tile->flags & TILE_FLAG_WIRE_CLUSTER_RIGHT) toggle_flag(&tile->flags, TILE_FLAG_WIRE_CLUSTER_RIGHT_ON);
                     break;
                }
@@ -1341,9 +1341,6 @@ bool load_map_from_file(FILE* file, Coord_t* player_start, TileMap_t* tilemap, O
           for(S32 x = 0; x < tilemap->width; x++){
                tilemap->tiles[y][x].id = map_tiles[index].id;
                tilemap->tiles[y][x].flags = map_tiles[index].flags;
-               if(map_tiles[index].flags != 0){
-                    LOG("hmmm, %d, %d is %d\n", x, y, map_tiles[index].flags);
-               }
                index++;
           }
      }
@@ -1414,6 +1411,29 @@ bool load_map(const char* filepath, Coord_t* player_start, TileMap_t* tilemap, O
      bool success = load_map_from_file(f, player_start, tilemap, block_array, interactive_array, filepath);
      fclose(f);
      return success;
+}
+
+bool load_map_number(S32 map_number, Coord_t* player_start, TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array,
+                     ObjectArray_t<Interactive_t>* interactive_array){
+     // search through directory to find file starting with 3 digit map number
+     DIR* d = opendir("content");
+     if(!d) return false;
+     struct dirent* dir;
+     char filepath[64] = {};
+     char match[4] = {};
+     snprintf(match, 4, "%03d", map_number);
+     while((dir = readdir(d)) != nullptr){
+          if(strncmp(dir->d_name, match, 3) == 0 &&
+             strstr(dir->d_name, ".bm")){ // TODO: create strendswith() func for this?
+               snprintf(filepath, 64, "content/%s", dir->d_name);
+               break;
+          }
+     }
+
+     if(!filepath[0]) return false;
+
+     LOG("load map %s\n", filepath);
+     return load_map(filepath, player_start, tilemap, block_array, interactive_array);
 }
 
 enum StampType_t{
@@ -2118,6 +2138,13 @@ S32 mouse_select_stamp_index(Coord_t screen_coord, ObjectArray_t<ObjectArray_t<S
      return index;
 }
 
+FILE* load_demo_number(S32 map_number, const char** demo_filepath){
+     char filepath[64] = {};
+     snprintf(filepath, 64, "content/%03d.bd", map_number);
+     *demo_filepath = strdup(filepath);
+     return fopen(*demo_filepath, "rb");
+}
+
 using namespace std::chrono;
 
 int main(int argc, char** argv){
@@ -2125,6 +2152,7 @@ int main(int argc, char** argv){
      const char* demo_filepath = nullptr;
      const char* load_map_filepath = nullptr;
      bool test = false;
+     bool suite = false;
 
      for(int i = 1; i < argc; i++){
           if(strcmp(argv[i], "-play") == 0){
@@ -2143,6 +2171,9 @@ int main(int argc, char** argv){
                load_map_filepath = argv[next];
           }else if(strcmp(argv[i], "-test") == 0){
                test = true;
+          }else if(strcmp(argv[i], "-suite") == 0){
+               test = true;
+               suite = true;
           }
      }
 
@@ -2150,6 +2181,11 @@ int main(int argc, char** argv){
      if(!Log_t::create(log_path)){
           fprintf(stderr, "failed to create log file: '%s'\n", log_path);
           return -1;
+     }
+
+     if(test && !load_map_filepath && !suite){
+          LOG("cannot test without specifying a map to load\n");
+          return 1;
      }
 
      if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER) != 0){
@@ -2205,15 +2241,55 @@ int main(int argc, char** argv){
      }
 #endif
 
+     FILE* demo_file = NULL;
+     DemoEntry_t demo_entry {};
+     switch(demo_mode){
+     default:
+          break;
+     case DEMO_MODE_RECORD:
+          demo_file = fopen(demo_filepath, "w");
+          if(!demo_file){
+               LOG("failed to open demo file: %s\n", demo_filepath);
+               return 1;
+          }
+          // TODO: write header
+          break;
+     case DEMO_MODE_PLAY:
+          demo_file = fopen(demo_filepath, "r");
+          if(!demo_file){
+               LOG("failed to open demo file: %s\n", demo_filepath);
+               return 1;
+          }
+          LOG("playing demo %s\n", demo_filepath);
+          // TODO: read header
+          demo_entry_get(&demo_entry, demo_file);
+          break;
+     }
+
+
      TileMap_t tilemap = {};
      ObjectArray_t<Block_t> block_array = {};
      ObjectArray_t<Interactive_t> interactive_array = {};
      Coord_t player_start {2, 8};
+     S16 map_number = 0;
 
      if(load_map_filepath){
           if(!load_map(load_map_filepath, &player_start, &tilemap, &block_array, &interactive_array)){
                return 1;
           }
+     }else if(suite){
+          if(!load_map_number(map_number, &player_start, &tilemap, &block_array, &interactive_array)){
+               return 1;
+          }
+
+          demo_mode = DEMO_MODE_PLAY;
+          demo_file = load_demo_number(map_number, &demo_filepath);
+          if(!demo_file){
+               LOG("missing map %d corresponding demo.\n", map_number);
+               return 1;
+          }
+          LOG("testing demo %s\n", demo_filepath);
+          demo_entry_get(&demo_entry, demo_file);
      }else{
           init(&tilemap, ROOM_TILE_SIZE, ROOM_TILE_SIZE);
 
@@ -2282,7 +2358,6 @@ int main(int argc, char** argv){
      player.radius = 3.5f / 272.0f;
 
      PlayerAction_t player_action {};
-     S16 map_number = 0;
 
      auto last_time = system_clock::now();
      auto current_time = last_time;
@@ -2299,22 +2374,6 @@ int main(int argc, char** argv){
 
      Editor_t editor;
      init(&editor);
-
-     FILE* demo_file = NULL;
-     DemoEntry_t demo_entry {};
-     switch(demo_mode){
-     default:
-          break;
-     case DEMO_MODE_RECORD:
-          demo_file = fopen(demo_filepath, "w");
-          // TODO: write header
-          break;
-     case DEMO_MODE_PLAY:
-          demo_file = fopen(demo_filepath, "r");
-          // TODO: read header
-          demo_entry_get(&demo_entry, demo_file);
-          break;
-     }
 
      S64 frame_count = 0;
 
@@ -2354,14 +2413,13 @@ int main(int argc, char** argv){
 
           if(demo_mode == DEMO_MODE_PLAY){
                bool end_of_demo = false;
-               while(frame_count == demo_entry.frame && !end_of_demo){
-                    player_action_perform(&player_action, &player, demo_entry.player_action_type, demo_mode,
-                                          demo_file, frame_count);
-                    demo_entry_get(&demo_entry, demo_file);
-                    end_of_demo = (demo_entry.player_action_type == PLAYER_ACTION_TYPE_END_DEMO && frame_count == demo_entry.frame);
-                    if(feof(demo_file) && !end_of_demo){
-                         end_of_demo = true;
-                         LOG("error: demo file doesn't contain PLAYER_ACTION_TYPE_END_DEMO.\n");
+               if(demo_entry.player_action_type == PLAYER_ACTION_TYPE_END_DEMO){
+                    end_of_demo = (frame_count == demo_entry.frame);
+               }else{
+                    while(frame_count == demo_entry.frame && !feof(demo_file)){
+                         player_action_perform(&player_action, &player, demo_entry.player_action_type, demo_mode,
+                                               demo_file, frame_count);
+                         demo_entry_get(&demo_entry, demo_file);
                     }
                }
 
@@ -2373,23 +2431,24 @@ int main(int argc, char** argv){
                          Coord_t check_player_start;
                          Pixel_t check_player_pixel;
                          if(!load_map_from_file(demo_file, &check_player_start, &check_tilemap, &check_block_array, &check_interactive_array, demo_filepath)){
-                              LOG("failed to load map state from end of file");
+                              LOG("failed to load map state from end of file\n");
+                              demo_mode = DEMO_MODE_NONE;
                          }else{
+                              bool test_passed = true;
+
                               fread(&check_player_pixel, sizeof(check_player_pixel), 1, demo_file);
                               if(check_tilemap.width != tilemap.width){
                                    LOG_MISMATCH("tilemap width", "%d", check_tilemap.width, tilemap.width);
-                              }
-
-                              if(check_tilemap.height != tilemap.height){
+                              }else if(check_tilemap.height != tilemap.height){
                                    LOG_MISMATCH("tilemap height", "%d", check_tilemap.height, tilemap.height);
-                              }
-
-                              for(S16 j = 0; j < check_tilemap.height; j++){
-                                   for(S16 i = 0; i < check_tilemap.width; i++){
-                                        if(check_tilemap.tiles[j][i].flags != tilemap.tiles[j][i].flags){
-                                             char name[64];
-                                             snprintf(name, 64, "tile %d, %d", i, j);
-                                             LOG_MISMATCH(name, "%d", check_tilemap.tiles[j][i].flags, tilemap.tiles[j][i].flags);
+                              }else{
+                                   for(S16 j = 0; j < check_tilemap.height; j++){
+                                        for(S16 i = 0; i < check_tilemap.width; i++){
+                                             if(check_tilemap.tiles[j][i].flags != tilemap.tiles[j][i].flags){
+                                                  char name[64];
+                                                  snprintf(name, 64, "tile %d, %d", i, j);
+                                                  LOG_MISMATCH(name, "%d", check_tilemap.tiles[j][i].flags, tilemap.tiles[j][i].flags);
+                                             }
                                         }
                                    }
                               }
@@ -2397,15 +2456,150 @@ int main(int argc, char** argv){
                               if(check_player_pixel.x != player.pos.pixel.x){
                                    LOG_MISMATCH("player pixel x", "%d", check_player_pixel.x, player.pos.pixel.x);
                               }
+
                               if(check_player_pixel.y != player.pos.pixel.y){
                                    LOG_MISMATCH("player pixel y", "%d", check_player_pixel.y, player.pos.pixel.y);
                               }
+
+                              if(check_block_array.count != block_array.count){
+                                   LOG_MISMATCH("block count", "%d", check_block_array.count, block_array.count);
+                              }else{
+                                   for(S16 i = 0; i < check_block_array.count; i++){
+                                        // TODO: consider checking other things
+                                        Block_t* check_block = check_block_array.elements + i;
+                                        Block_t* block = block_array.elements + i;
+                                        if(check_block->pos.pixel.x != block->pos.pixel.x){
+                                             char name[64];
+                                             snprintf(name, 64, "block %d pos x", i);
+                                             LOG_MISMATCH(name, "%d", check_block->pos.pixel.x, block->pos.pixel.x);
+                                        }
+
+                                        if(check_block->pos.pixel.y != block->pos.pixel.y){
+                                             char name[64];
+                                             snprintf(name, 64, "block %d pos y", i);
+                                             LOG_MISMATCH(name, "%d", check_block->pos.pixel.y, block->pos.pixel.y);
+                                        }
+
+                                        if(check_block->pos.z != block->pos.z){
+                                             char name[64];
+                                             snprintf(name, 64, "block %d pos z", i);
+                                             LOG_MISMATCH(name, "%d", check_block->pos.z, block->pos.z);
+                                        }
+
+                                        if(check_block->element != block->element){
+                                             char name[64];
+                                             snprintf(name, 64, "block %d element", i);
+                                             LOG_MISMATCH(name, "%d", check_block->element, block->element);
+                                        }
+                                   }
+                              }
+
+                              if(check_interactive_array.count != interactive_array.count){
+                                   LOG_MISMATCH("interactive count", "%d", check_interactive_array.count, interactive_array.count);
+                              }else{
+                                   for(S16 i = 0; i < check_interactive_array.count; i++){
+                                        // TODO: consider checking other things
+                                        Interactive_t* check_interactive = check_interactive_array.elements + i;
+                                        Interactive_t* interactive = interactive_array.elements + i;
+
+                                        if(check_interactive->type != interactive->type){
+                                             LOG_MISMATCH("interactive type", "%d", check_interactive->type, interactive->type);
+                                        }else{
+                                             switch(check_interactive->type){
+                                             default:
+                                                  break;
+                                             case INTERACTIVE_TYPE_PRESSURE_PLATE:
+                                                  if(check_interactive->pressure_plate.down != interactive->pressure_plate.down){
+                                                       char name[64];
+                                                       snprintf(name, 64, "interactive at %d, %d pressure plate down",
+                                                                interactive->coord.x, interactive->coord.y);
+                                                       LOG_MISMATCH(name, "%d", check_interactive->pressure_plate.down,
+                                                                    interactive->pressure_plate.down);
+                                                  }
+                                                  break;
+                                             case INTERACTIVE_TYPE_ICE_DETECTOR:
+                                             case INTERACTIVE_TYPE_LIGHT_DETECTOR:
+                                                  if(check_interactive->detector.on != interactive->detector.on){
+                                                       char name[64];
+                                                       snprintf(name, 64, "interactive at %d, %d detector on",
+                                                                interactive->coord.x, interactive->coord.y);
+                                                       LOG_MISMATCH(name, "%d", check_interactive->detector.on,
+                                                                    interactive->detector.on);
+                                                  }
+                                                  break;
+                                             case INTERACTIVE_TYPE_POPUP:
+                                                  if(check_interactive->popup.iced != interactive->popup.iced){
+                                                       char name[64];
+                                                       snprintf(name, 64, "interactive at %d, %d popup iced",
+                                                                interactive->coord.x, interactive->coord.y);
+                                                       LOG_MISMATCH(name, "%d", check_interactive->popup.iced,
+                                                                    interactive->popup.iced);
+                                                  }
+                                                  if(check_interactive->popup.lift.up != interactive->popup.lift.up){
+                                                       char name[64];
+                                                       snprintf(name, 64, "interactive at %d, %d popup lift up",
+                                                                interactive->coord.x, interactive->coord.y);
+                                                       LOG_MISMATCH(name, "%d", check_interactive->popup.lift.up,
+                                                                    interactive->popup.lift.up);
+                                                  }
+                                                  break;
+                                             case INTERACTIVE_TYPE_DOOR:
+                                                  if(check_interactive->door.lift.up != interactive->door.lift.up){
+                                                       char name[64];
+                                                       snprintf(name, 64, "interactive at %d, %d door lift up",
+                                                                interactive->coord.x, interactive->coord.y);
+                                                       LOG_MISMATCH(name, "%d", check_interactive->door.lift.up,
+                                                                    interactive->door.lift.up);
+                                                  }
+                                                  break;
+                                             case INTERACTIVE_TYPE_PORTAL:
+                                                  break;
+                                             }
+                                        }
+                                   }
+                              }
+
+                              if(!test_passed){
+                                   LOG("failed map %s", load_map_filepath);
+                                   demo_mode = DEMO_MODE_NONE;
+                              }else if(suite){
+                                   map_number++;
+                                   if(load_map_number(map_number, &player_start, &tilemap, &block_array, &interactive_array)){
+                                        player.pos = coord_to_pos_at_tile_center(player_start);
+                                        player.vel = {};
+                                        player.accel = {};
+
+                                        // TODO: compress
+                                        free(sorted_blocks);
+                                        sorted_blocks = (Block_t**)(calloc(block_array.count, sizeof(*sorted_blocks)));
+                                        for(S16 i = 0; i < block_array.count; ++i){
+                                             sorted_blocks[i] = block_array.elements + i;
+                                        }
+
+                                        interactive_quad_tree = interactive_quad_tree_build(&interactive_array);
+
+                                        fclose(demo_file);
+                                        demo_file = load_demo_number(map_number, &demo_filepath);
+                                        if(demo_file){
+                                             LOG("testing demo %s\n", demo_filepath);
+                                             demo_entry_get(&demo_entry, demo_file);
+                                             frame_count = 0;
+                                        }else{
+                                             LOG("missing map %d corresponding demo.\n", map_number);
+                                             return 1;
+                                        }
+                                   }else{
+                                        LOG("Done Testing %d maps.\n", map_number);
+                                        return 0;
+                                   }
+                              }else{
+                                   LOG("test passed\n");
+                              }
                          }
                     }else{
-                         LOG("finished playing demo: %s\n", demo_filepath);
+                         demo_mode = DEMO_MODE_NONE;
+                         LOG("end of demo %s\n", demo_filepath);
                     }
-
-                    demo_mode = DEMO_MODE_NONE;
                }
           }
 
@@ -2463,23 +2657,8 @@ int main(int argc, char** argv){
                          break;
                     case SDL_SCANCODE_L:
                     {
-                         // search through directory to find file starting with 3 digit map number
-                         DIR* d = opendir("content");
-                         if(!d) break;
-                         struct dirent* dir;
-                         char filepath[64] = {};
-                         char match[4] = {};
-                         snprintf(match, 4, "%03d", map_number);
-                         while((dir = readdir(d)) != nullptr){
-                              if(strncmp(dir->d_name, match, 3) == 0){
-                                   snprintf(filepath, 64, "content/%s", dir->d_name);
-                                   break;
-                              }
-                         }
-
-                         if(!filepath[0]) break;
-
-                         if(load_map(filepath, &player_start, &tilemap, &block_array, &interactive_array)){
+                         if(load_map_number(map_number, &player_start, &tilemap, &block_array, &interactive_array)){
+                              player.pos = coord_to_pos_at_tile_center(player_start);
                               // update sort blocks list
                               // TODO: compress this code
                               free(sorted_blocks);
@@ -3521,12 +3700,12 @@ int main(int argc, char** argv){
      default:
           break;
      case DEMO_MODE_RECORD:
+          LOG("demo ended at frame: %ld, player ended at %d, %d\n", frame_count, player.pos.pixel.x, player.pos.pixel.y);
           player_action_perform(&player_action, &player, PLAYER_ACTION_TYPE_END_DEMO, demo_mode,
                                 demo_file, frame_count);
           // save map and player position
           save_map_to_file(demo_file, player_start, &tilemap, &block_array, &interactive_array);
           fwrite(&player.pos.pixel, sizeof(player.pos.pixel), 1, demo_file);
-          LOG("player ended at %d, %d\n", player.pos.pixel.x, player.pos.pixel.y);
           fclose(demo_file);
           break;
      case DEMO_MODE_PLAY:
