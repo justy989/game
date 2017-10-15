@@ -35,6 +35,13 @@ struct Player_t{
      F32 walk_frame_time;
 };
 
+void player_spawn(Player_t* player, Coord_t coord){
+     *player = {};
+     player->walk_frame_delta = 1;
+     player->radius = 3.5f / 272.0f;
+     player->pos = coord_to_pos_at_tile_center(coord);
+}
+
 struct Block_t{
      Position_t pos;
      Vec_t accel;
@@ -718,7 +725,7 @@ void toggle_electricity(TileMap_t* tilemap, InteractiveQuadTreeNode_t* interacti
                switch(direction){
                default:
                     break;
-               case DIRECTION_UP:
+               case DIRECTION_DOWN:
                     if(tile->flags & TILE_FLAG_WIRE_CLUSTER_MID) toggle_flag(&tile->flags, TILE_FLAG_WIRE_CLUSTER_MID_ON);
                     break;
                case DIRECTION_LEFT:
@@ -733,7 +740,7 @@ void toggle_electricity(TileMap_t* tilemap, InteractiveQuadTreeNode_t* interacti
                switch(direction){
                default:
                     break;
-               case DIRECTION_DOWN:
+               case DIRECTION_UP:
                     if(tile->flags & TILE_FLAG_WIRE_CLUSTER_MID) toggle_flag(&tile->flags, TILE_FLAG_WIRE_CLUSTER_MID_ON);
                     break;
                case DIRECTION_RIGHT:
@@ -1341,20 +1348,23 @@ bool load_map_from_file(FILE* file, Coord_t* player_start, TileMap_t* tilemap, O
           for(S32 x = 0; x < tilemap->width; x++){
                tilemap->tiles[y][x].id = map_tiles[index].id;
                tilemap->tiles[y][x].flags = map_tiles[index].flags;
+               tilemap->tiles[y][x].light = BASE_LIGHT;
                index++;
           }
      }
 
      for(S16 i = 0; i < block_count; i++){
-          block_array->elements[i].pos.pixel = map_blocks[i].pixel;
-          block_array->elements[i].pos.z = map_blocks[i].z;
-          block_array->elements[i].face = map_blocks[i].face;
-          block_array->elements[i].element = map_blocks[i].element;
+          Block_t* block = block_array->elements + i;
+          block->pos.pixel = map_blocks[i].pixel;
+          block->pos.z = map_blocks[i].z;
+          block->face = map_blocks[i].face;
+          block->element = map_blocks[i].element;
      }
 
      for(S16 i = 0; i < interactive_array->count; i++){
-          interactive_array->elements[i].coord = map_interactives[i].coord;
-          interactive_array->elements[i].type = map_interactives[i].type;
+          Interactive_t* interactive = interactive_array->elements + i;
+          interactive->coord = map_interactives[i].coord;
+          interactive->type = map_interactives[i].type;
 
           switch(map_interactives[i].type){
           default:
@@ -1362,32 +1372,34 @@ bool load_map_from_file(FILE* file, Coord_t* player_start, TileMap_t* tilemap, O
           case INTERACTIVE_TYPE_BOW:
                break;
           case INTERACTIVE_TYPE_PRESSURE_PLATE:
-               interactive_array->elements[i].pressure_plate = map_interactives[i].pressure_plate;
+               interactive->pressure_plate = map_interactives[i].pressure_plate;
                break;
           case INTERACTIVE_TYPE_LIGHT_DETECTOR:
           case INTERACTIVE_TYPE_ICE_DETECTOR:
-               interactive_array->elements[i].detector = map_interactives[i].detector;
+               interactive->detector = map_interactives[i].detector;
                break;
           case INTERACTIVE_TYPE_POPUP:
-               interactive_array->elements[i].popup.lift.up = map_interactives[i].popup.up;
-               interactive_array->elements[i].popup.iced = map_interactives[i].popup.iced;
-               if(interactive_array->elements[i].popup.lift.up){
-                    interactive_array->elements[i].popup.lift.ticks = HEIGHT_INTERVAL + 1;
+               interactive->popup.lift.up = map_interactives[i].popup.up;
+               interactive->popup.lift.timer = 0.0f;
+               interactive->popup.iced = map_interactives[i].popup.iced;
+               if(interactive->popup.lift.up){
+                    interactive->popup.lift.ticks = HEIGHT_INTERVAL + 1;
                }else{
-                    interactive_array->elements[i].popup.lift.ticks = 1;
+                    interactive->popup.lift.ticks = 1;
                }
                break;
           case INTERACTIVE_TYPE_DOOR:
-               interactive_array->elements[i].door.lift.up = map_interactives[i].door.up;
-               interactive_array->elements[i].door.face = map_interactives[i].door.face;
+               interactive->door.lift.up = map_interactives[i].door.up;
+               interactive->door.lift.timer = 0.0f;
+               interactive->door.face = map_interactives[i].door.face;
                break;
           case INTERACTIVE_TYPE_PORTAL:
-               interactive_array->elements[i].portal.face = map_interactives[i].portal.face;
-               interactive_array->elements[i].portal.on = map_interactives[i].portal.on;
+               interactive->portal.face = map_interactives[i].portal.face;
+               interactive->portal.on = map_interactives[i].portal.on;
                break;
           case INTERACTIVE_TYPE_STAIRS:
-               interactive_array->elements[i].stairs.up = map_interactives[i].stairs.up;
-               interactive_array->elements[i].stairs.face = map_interactives[i].stairs.face;
+               interactive->stairs.up = map_interactives[i].stairs.up;
+               interactive->stairs.face = map_interactives[i].stairs.face;
                break;
           case INTERACTIVE_TYPE_PROMPT:
                break;
@@ -2153,6 +2165,9 @@ int main(int argc, char** argv){
      const char* load_map_filepath = nullptr;
      bool test = false;
      bool suite = false;
+     bool show_suite = false;
+     S16 map_number = 0;
+     S16 first_map_number = 0;
 
      for(int i = 1; i < argc; i++){
           if(strcmp(argv[i], "-play") == 0){
@@ -2174,6 +2189,13 @@ int main(int argc, char** argv){
           }else if(strcmp(argv[i], "-suite") == 0){
                test = true;
                suite = true;
+          }else if(strcmp(argv[i], "-show") == 0){
+               show_suite = true;
+          }else if(strcmp(argv[i], "-map") == 0){
+               int next = i + 1;
+               if(next >= argc) continue;
+               map_number = atoi(argv[next]);
+               first_map_number = map_number;
           }
      }
 
@@ -2188,14 +2210,14 @@ int main(int argc, char** argv){
           return 1;
      }
 
-     int window_width = 1280;
-     int window_height = 1024;
+     int window_width = 1600;
+     int window_height = 1600;
      SDL_Window* window = nullptr;
      SDL_GLContext opengl_context = 0;
      GLuint theme_texture = 0;
      GLuint player_texture = 0;
 
-     if(!suite){
+     if(!suite || show_suite){
           if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER) != 0){
                return 1;
           }
@@ -2247,7 +2269,7 @@ int main(int argc, char** argv){
      }
 #endif
 
-     FILE* demo_file = NULL;
+     FILE* demo_file = nullptr;
      DemoEntry_t demo_entry {};
      switch(demo_mode){
      default:
@@ -2272,12 +2294,10 @@ int main(int argc, char** argv){
           break;
      }
 
-
      TileMap_t tilemap = {};
      ObjectArray_t<Block_t> block_array = {};
      ObjectArray_t<Interactive_t> interactive_array = {};
      Coord_t player_start {2, 8};
-     S16 map_number = 0;
 
      if(load_map_filepath){
           if(!load_map(load_map_filepath, &player_start, &tilemap, &block_array, &interactive_array)){
@@ -2296,6 +2316,10 @@ int main(int argc, char** argv){
           }
           LOG("testing demo %s\n", demo_filepath);
           demo_entry_get(&demo_entry, demo_file);
+     }else if(map_number){
+          if(!load_map_number(map_number, &player_start, &tilemap, &block_array, &interactive_array)){
+               return 1;
+          }
      }else{
           init(&tilemap, ROOM_TILE_SIZE, ROOM_TILE_SIZE);
 
@@ -2358,10 +2382,8 @@ int main(int argc, char** argv){
 
      Vec_t user_movement = {};
 
-     Player_t player {};
-     player.pos = coord_to_pos_at_tile_center(player_start);
-     player.walk_frame_delta = 1;
-     player.radius = 3.5f / 272.0f;
+     Player_t player;
+     player_spawn(&player, player_start);
 
      PlayerAction_t player_action {};
 
@@ -2382,18 +2404,13 @@ int main(int argc, char** argv){
      init(&editor);
 
      S64 frame_count = 0;
-
-#ifdef COUNT_FRAMES
-     float time_buildup = 0.0f;
-     S64 last_frame_count = 0;
-#endif
+     float dt = 0.0f;
 
      while(!quit){
-          current_time = system_clock::now();
-          duration<double> elapsed_seconds = current_time - last_time;
-          F64 dt = (F64)(elapsed_seconds.count());
-
-          if(!suite){
+          if(!suite || show_suite){
+               current_time = system_clock::now();
+               duration<double> elapsed_seconds = current_time - last_time;
+               dt = (F64)(elapsed_seconds.count());
                if(dt < 0.0166666f) continue; // limit 60 fps
           }
 
@@ -2401,15 +2418,6 @@ int main(int argc, char** argv){
           if(demo_mode) dt = 0.0166666f; // the game always runs as if a 60th of a frame has occurred.
 
           frame_count++;
-
-#ifdef COUNT_FRAMES
-          time_buildup += dt;
-          if(time_buildup >= 1.0f){
-               LOG("FPS: %ld\n", frame_count, frame_count - last_frame_count);
-               last_frame_count = frame_count;
-               time_buildup -= 1.0f;
-          }
-#endif
 
           last_time = current_time;
 
@@ -2568,14 +2576,16 @@ int main(int argc, char** argv){
                               }
 
                               if(!test_passed){
-                                   LOG("failed map %s", load_map_filepath);
+                                   LOG("test failed\n");
                                    demo_mode = DEMO_MODE_NONE;
+                                   if(suite && !show_suite) return 1;
                               }else if(suite){
                                    map_number++;
                                    if(load_map_number(map_number, &player_start, &tilemap, &block_array, &interactive_array)){
-                                        player.pos = coord_to_pos_at_tile_center(player_start);
-                                        player.vel = {};
-                                        player.accel = {};
+                                        player_spawn(&player, player_start);
+                                        last_block_pushed = nullptr;
+                                        last_block_pushed_direction = DIRECTION_LEFT;
+                                        block_to_push = nullptr;
 
                                         // TODO: compress
                                         free(sorted_blocks);
@@ -2597,7 +2607,7 @@ int main(int argc, char** argv){
                                              return 1;
                                         }
                                    }else{
-                                        LOG("Done Testing %d maps.\n", map_number);
+                                        LOG("Done Testing %d maps.\n", map_number - first_map_number);
                                         return 0;
                                    }
                               }else{
@@ -3376,7 +3386,7 @@ int main(int argc, char** argv){
                player.pos += pos_delta;
           }
 
-          if(suite) continue;
+          if(suite && !show_suite) continue;
 
           glClear(GL_COLOR_BUFFER_BIT);
 
@@ -3710,7 +3720,6 @@ int main(int argc, char** argv){
      default:
           break;
      case DEMO_MODE_RECORD:
-          LOG("demo ended at frame: %ld, player ended at %d, %d\n", frame_count, player.pos.pixel.x, player.pos.pixel.y);
           player_action_perform(&player_action, &player, PLAYER_ACTION_TYPE_END_DEMO, demo_mode,
                                 demo_file, frame_count);
           // save map and player position
