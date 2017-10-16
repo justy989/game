@@ -156,3 +156,46 @@ QuadTreeNode_t<T>* quad_tree_build(ObjectArray_t<T>* array){
 
      return root;
 }
+
+template <typename T>
+S16 quad_tree_count_in(QuadTreeNode_t<T>* node, Rect_t rect){
+     if(!rect_in_rect(rect, node->bounds)) return 0;
+
+     S16 count = node->entry_count;
+     if(node->bottom_left){
+          count += quad_tree_count_in(node->bottom_left, rect);
+          count += quad_tree_count_in(node->bottom_right, rect);
+          count += quad_tree_count_in(node->top_left, rect);
+          count += quad_tree_count_in(node->top_right, rect);
+     }
+
+     return count;
+}
+
+template <typename T>
+void quad_tree_find_in_impl(QuadTreeNode_t<T>* node, Rect_t rect, T** array, S16* count){
+     if(!rect_in_rect(rect, node->bounds)) return;
+
+     for(S8 i = 0; i < node->entry_count; i++){
+          array[*count] = node->entries[i];
+          (*count)++;
+     }
+
+     if(node->bottom_left){
+          quad_tree_find_in_impl(node->bottom_left, rect, array, count);
+          quad_tree_find_in_impl(node->bottom_right, rect, array, count);
+          quad_tree_find_in_impl(node->top_left, rect, array, count);
+          quad_tree_find_in_impl(node->top_right, rect, array, count);
+     }
+}
+
+// NOTE: must free returned array !
+template <typename T>
+T** quad_tree_find_in(QuadTreeNode_t<T>* node, Rect_t rect, S16* count){
+     S16 alloc_count = quad_tree_count_in(node, rect);
+     T** array = (T**)(malloc(sizeof(*array) * alloc_count));
+     *count = 0;
+     quad_tree_find_in_impl(node, rect, array, count);
+     assert(alloc_count >= *count);
+     return array;
+}

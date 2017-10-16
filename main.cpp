@@ -55,11 +55,15 @@ struct Block_t{
 };
 
 S16 get_object_x(Block_t* block){
-     return block->pos.pixel.x;
+     return block->pos.pixel.x + HALF_TILE_SIZE_IN_PIXELS;
 }
 
 S16 get_object_y(Block_t* block){
-     return block->pos.pixel.y;
+     return block->pos.pixel.y + HALF_TILE_SIZE_IN_PIXELS;
+}
+
+Pixel_t block_center_pixel(Block_t* block){
+     return block->pos.pixel + Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS};
 }
 
 Coord_t block_get_coord(Block_t* block){
@@ -86,13 +90,23 @@ bool blocks_at_collidable_height(Block_t* a, Block_t* b){
      return false;
 }
 
-Block_t* block_against_another_block(Block_t* block_to_check, Direction_t direction, ObjectArray_t<Block_t>* block_array){
+Block_t* block_against_another_block(Block_t* block_to_check, Direction_t direction, QuadTreeNode_t<Block_t>* block_quad_tree){
+     Pixel_t center = block_center_pixel(block_to_check);
+     Rect_t rect = {};
+     rect.left = center.x - (2 * TILE_SIZE_IN_PIXELS);
+     rect.right = center.x + (2 * TILE_SIZE_IN_PIXELS);
+     rect.bottom = center.y - (2 * TILE_SIZE_IN_PIXELS);
+     rect.top = center.y + (2 * TILE_SIZE_IN_PIXELS);
+
+     S16 block_count = 0;
+     Block_t** blocks = quad_tree_find_in(block_quad_tree, rect, &block_count);
+
      switch(direction){
      default:
           break;
      case DIRECTION_LEFT:
-          for(S16 i = 0; i < block_array->count; i++){
-               Block_t* block = block_array->elements + i;
+          for(S16 i = 0; i < block_count; i++){
+               Block_t* block = blocks[i];
                if(!blocks_at_collidable_height(block_to_check, block)){
                     continue;
                }
@@ -100,13 +114,14 @@ Block_t* block_against_another_block(Block_t* block_to_check, Direction_t direct
                if((block->pos.pixel.x + TILE_SIZE_IN_PIXELS) == block_to_check->pos.pixel.x &&
                   block->pos.pixel.y >= block_to_check->pos.pixel.y &&
                   block->pos.pixel.y < (block_to_check->pos.pixel.y + TILE_SIZE_IN_PIXELS)){
+                    free(blocks);
                     return block;
                }
           }
           break;
      case DIRECTION_RIGHT:
-          for(S16 i = 0; i < block_array->count; i++){
-               Block_t* block = block_array->elements + i;
+          for(S16 i = 0; i < block_count; i++){
+               Block_t* block = blocks[i];
                if(!blocks_at_collidable_height(block_to_check, block)){
                     continue;
                }
@@ -114,13 +129,14 @@ Block_t* block_against_another_block(Block_t* block_to_check, Direction_t direct
                if(block->pos.pixel.x == (block_to_check->pos.pixel.x + TILE_SIZE_IN_PIXELS) &&
                   block->pos.pixel.y >= block_to_check->pos.pixel.y &&
                   block->pos.pixel.y < (block_to_check->pos.pixel.y + TILE_SIZE_IN_PIXELS)){
+                    free(blocks);
                     return block;
                }
           }
           break;
      case DIRECTION_DOWN:
-          for(S16 i = 0; i < block_array->count; i++){
-               Block_t* block = block_array->elements + i;
+          for(S16 i = 0; i < block_count; i++){
+               Block_t* block = blocks[i];
                if(!blocks_at_collidable_height(block_to_check, block)){
                     continue;
                }
@@ -128,13 +144,14 @@ Block_t* block_against_another_block(Block_t* block_to_check, Direction_t direct
                if((block->pos.pixel.y + TILE_SIZE_IN_PIXELS) == block_to_check->pos.pixel.y &&
                   block->pos.pixel.x >= block_to_check->pos.pixel.x &&
                   block->pos.pixel.x < (block_to_check->pos.pixel.x + TILE_SIZE_IN_PIXELS)){
+                    free(blocks);
                     return block;
                }
           }
           break;
      case DIRECTION_UP:
-          for(S16 i = 0; i < block_array->count; i++){
-               Block_t* block = block_array->elements + i;
+          for(S16 i = 0; i < block_count; i++){
+               Block_t* block = blocks[i];
                if(!blocks_at_collidable_height(block_to_check, block)){
                     continue;
                }
@@ -142,23 +159,32 @@ Block_t* block_against_another_block(Block_t* block_to_check, Direction_t direct
                if(block->pos.pixel.y == (block_to_check->pos.pixel.y + TILE_SIZE_IN_PIXELS) &&
                   block->pos.pixel.x >= block_to_check->pos.pixel.x &&
                   block->pos.pixel.x < (block_to_check->pos.pixel.x + TILE_SIZE_IN_PIXELS)){
+                    free(blocks);
                     return block;
                }
           }
           break;
      }
 
+     free(blocks);
      return nullptr;
 }
 
-Block_t* block_inside_another_block(Block_t* block_to_check, ObjectArray_t<Block_t>* block_array){
+Block_t* block_inside_another_block(Block_t* block_to_check, QuadTreeNode_t<Block_t>* block_quad_tree){
      // TODO: need more complicated function to detect this
+     Pixel_t center = block_center_pixel(block_to_check);
      Rect_t rect = {block_to_check->pos.pixel.x, block_to_check->pos.pixel.y,
                     (S16)(block_to_check->pos.pixel.x + TILE_SIZE_IN_PIXELS - 1),
                     (S16)(block_to_check->pos.pixel.y + TILE_SIZE_IN_PIXELS - 1)};
-     for(S16 i = 0; i < block_array->count; i++){
-          if(block_array->elements + i == block_to_check) continue;
-          Block_t* block = block_array->elements + i;
+     Rect_t surrounding_rect = {(S16)(center.x - (2 * TILE_SIZE_IN_PIXELS)),
+                                (S16)(center.y - (2 * TILE_SIZE_IN_PIXELS)),
+                                (S16)(center.x + (2 * TILE_SIZE_IN_PIXELS)),
+                                (S16)(center.y + (2 * TILE_SIZE_IN_PIXELS))};
+     S16 block_count = 0;
+     Block_t** blocks = quad_tree_find_in(block_quad_tree, surrounding_rect, &block_count);
+     for(S16 i = 0; i < block_count; i++){
+          if(blocks[i] == block_to_check) continue;
+          Block_t* block = blocks[i];
 
           Pixel_t top_left {block->pos.pixel.x, (S16)(block->pos.pixel.y + TILE_SIZE_IN_PIXELS - 1)};
           Pixel_t top_right {(S16)(block->pos.pixel.x + TILE_SIZE_IN_PIXELS - 1), (S16)(block->pos.pixel.y + TILE_SIZE_IN_PIXELS - 1)};
@@ -168,10 +194,12 @@ Block_t* block_inside_another_block(Block_t* block_to_check, ObjectArray_t<Block
              pixel_in_rect(top_left, rect) ||
              pixel_in_rect(top_right, rect) ||
              pixel_in_rect(bottom_right, rect)){
+               free(blocks);
                return block;
           }
      }
 
+     free(blocks);
      return nullptr;
 }
 
@@ -668,11 +696,11 @@ Interactive_t* block_against_solid_interactive(Block_t* block_to_check, Directio
 }
 
 void block_push(Block_t* block, Direction_t direction, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree,
-                ObjectArray_t<Block_t>* block_array, bool pushed_by_player){
-     Block_t* against_block = block_against_another_block(block, direction, block_array);
+                ObjectArray_t<Block_t>* block_array, QuadTreeNode_t<Block_t>* block_quad_tree, bool pushed_by_player){
+     Block_t* against_block = block_against_another_block(block, direction, block_quad_tree);
      if(against_block){
           if(!pushed_by_player && block_on_ice(against_block, tilemap)){
-               block_push(against_block, direction, tilemap, interactive_quad_tree, block_array, false);
+               block_push(against_block, direction, tilemap, interactive_quad_tree, block_array, block_quad_tree, false);
           }
 
           return;
@@ -1225,6 +1253,7 @@ bool load_map_from_file(FILE* file, Coord_t* player_start, TileMap_t* tilemap, O
           }
      }
 
+     // TODO: a lot of maps have -16, -16 as the first block
      for(S16 i = 0; i < block_count; i++){
           Block_t* block = block_array->elements + i;
           block->pos.pixel = map_blocks[i].pixel;
@@ -2974,6 +3003,7 @@ int main(int argc, char** argv){
           for(S16 i = 0; i < block_array.count; i++){
                Block_t* block = block_array.elements + i;
 
+               // TODO: compress with player movement
                Vec_t pos_delta = (block->accel * dt * dt * 0.5f) + (block->vel * dt);
                block->vel += block->accel * dt;
                block->vel *= drag;
@@ -2983,13 +3013,16 @@ int main(int argc, char** argv){
                Position_t pre_move = block->pos;
                block->pos += pos_delta;
 
+               quad_tree_free(block_quad_tree);
+               block_quad_tree = quad_tree_build(&block_array);
+
                bool stop_on_boundary_x = false;
                bool stop_on_boundary_y = false;
                bool held_up = false;
 
                Block_t* inside_block = nullptr;
 
-               while((inside_block = block_inside_another_block(block_array.elements + i, &block_array)) && blocks_at_collidable_height(block, inside_block)){
+               while((inside_block = block_inside_another_block(block_array.elements + i, block_quad_tree)) && blocks_at_collidable_height(block, inside_block)){
                     auto quadrant = relative_quadrant(block->pos.pixel, inside_block->pos.pixel);
 
                     switch(quadrant){
@@ -3021,12 +3054,15 @@ int main(int argc, char** argv){
                          break;
                     }
 
+                    quad_tree_free(block_quad_tree);
+                    block_quad_tree = quad_tree_build(&block_array);
+
                     if(block == last_block_pushed && quadrant == last_block_pushed_direction){
                          player.push_time = 0.0f;
                     }
 
                     if(block_on_ice(inside_block, &tilemap) && block_on_ice(block, &tilemap)){
-                         block_push(inside_block, quadrant, &tilemap, interactive_quad_tree, &block_array, false);
+                         block_push(inside_block, quadrant, &tilemap, interactive_quad_tree, &block_array, block_quad_tree, false);
                     }
                }
 
@@ -3080,6 +3116,9 @@ int main(int argc, char** argv){
                          block->pos.decimal.x = 0.0f;
                          block->vel.x = 0.0f;
                          block->accel.x = 0.0f;
+
+                         quad_tree_free(block_quad_tree);
+                         block_quad_tree = quad_tree_build(&block_array);
                     }
                }
 
@@ -3090,6 +3129,9 @@ int main(int argc, char** argv){
                          block->pos.decimal.y = 0.0f;
                          block->vel.y = 0.0f;
                          block->accel.y = 0.0f;
+
+                         quad_tree_free(block_quad_tree);
+                         block_quad_tree = quad_tree_build(&block_array);
                     }
                }
 
@@ -3257,7 +3299,7 @@ int main(int argc, char** argv){
                if(block_to_push){
                     player.push_time += dt;
                     if(player.push_time > BLOCK_PUSH_TIME){
-                         block_push(block_to_push, player.face, &tilemap, interactive_quad_tree, &block_array, true);
+                         block_push(block_to_push, player.face, &tilemap, interactive_quad_tree, &block_array, block_quad_tree, true);
                          if(block_to_push->pos.z > 0) player.push_time = -0.5f;
                     }
                }else{
