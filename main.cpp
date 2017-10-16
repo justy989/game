@@ -54,6 +54,14 @@ struct Block_t{
      Pixel_t push_start;
 };
 
+S16 get_object_x(Block_t* block){
+     return block->pos.pixel.x;
+}
+
+S16 get_object_y(Block_t* block){
+     return block->pos.pixel.y;
+}
+
 Coord_t block_get_coord(Block_t* block){
      Pixel_t center = block->pos.pixel + Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS};
      return pixel_to_coord(center);
@@ -1899,7 +1907,7 @@ Vec_t coord_to_screen_position(Coord_t coord)
 }
 
 void apply_stamp(Stamp_t* stamp, Coord_t coord, TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array, ObjectArray_t<Interactive_t>* interactive_array,
-                 QuadTreeNode_t<Interactive_t>** interactive_quad_tree, Block_t*** sorted_blocks, bool combine){
+                 QuadTreeNode_t<Interactive_t>** interactive_quad_tree, bool combine){
      switch(stamp->type){
      default:
           break;
@@ -1931,11 +1939,6 @@ void apply_stamp(Stamp_t* stamp, Coord_t coord, TileMap_t* tilemap, ObjectArray_
           block->accel = vec_zero();
           block->element = stamp->block.element;
           block->face = stamp->block.face;
-
-          *sorted_blocks = (Block_t**)(realloc(*sorted_blocks, block_array->count * sizeof(**sorted_blocks)));
-          for(S16 i = 0; i < block_array->count; ++i){
-               (*sorted_blocks)[i] = block_array->elements + i;
-          }
      } break;
      case STAMP_TYPE_INTERACTIVE:
      {
@@ -2037,17 +2040,9 @@ FILE* load_demo_number(S32 map_number, const char** demo_filepath){
      return fopen(*demo_filepath, "rb");
 }
 
-void reset_map(Player_t* player, Coord_t player_start, ObjectArray_t<Block_t>* block_array,
-               ObjectArray_t<Interactive_t>* interactive_array, Block_t*** sorted_blocks,
+void reset_map(Player_t* player, Coord_t player_start, ObjectArray_t<Interactive_t>* interactive_array,
                QuadTreeNode_t<Interactive_t>** interactive_quad_tree){
      player_spawn(player, player_start);
-
-     // update sort blocks list
-     free(*sorted_blocks);
-     *sorted_blocks = (Block_t**)(calloc(block_array->count, sizeof(*sorted_blocks)));
-     for(S16 i = 0; i < block_array->count; ++i){
-          (*sorted_blocks)[i] = block_array->elements + i;
-     }
 
      // update interactive quad tree
      quad_tree_free(*interactive_quad_tree);
@@ -2270,10 +2265,10 @@ int main(int argc, char** argv){
      }
 
      Player_t player;
-     Block_t** sorted_blocks = nullptr;
      QuadTreeNode_t<Interactive_t>* interactive_quad_tree = nullptr;
+     QuadTreeNode_t<Block_t>* block_quad_tree = nullptr;
 
-     reset_map(&player, player_start, &block_array, &interactive_array, &sorted_blocks, &interactive_quad_tree);
+     reset_map(&player, player_start, &interactive_array, &interactive_quad_tree);
 
      bool quit = false;
 
@@ -2310,6 +2305,9 @@ int main(int argc, char** argv){
 
           // TODO: consider 30fps as minimum for random noobs computers
           if(demo_mode) dt = 0.0166666f; // the game always runs as if a 60th of a frame has occurred.
+
+          quad_tree_free(block_quad_tree);
+          block_quad_tree = quad_tree_build(&block_array);
 
           frame_count++;
 
@@ -2481,7 +2479,7 @@ int main(int argc, char** argv){
                                         return 0;
                                    }
                                    if(load_map_number(map_number, &player_start, &tilemap, &block_array, &interactive_array)){
-                                        reset_map(&player, player_start, &block_array, &interactive_array, &sorted_blocks, &interactive_quad_tree);
+                                        reset_map(&player, player_start, &interactive_array, &interactive_quad_tree);
 
                                         // reset some vars
                                         player_action = {};
@@ -2569,13 +2567,13 @@ int main(int argc, char** argv){
                          break;
                     case SDL_SCANCODE_L:
                          if(load_map_number(map_number, &player_start, &tilemap, &block_array, &interactive_array)){
-                              reset_map(&player, player_start, &block_array, &interactive_array, &sorted_blocks, &interactive_quad_tree);
+                              reset_map(&player, player_start, &interactive_array, &interactive_quad_tree);
                          }
                          break;
                     case SDL_SCANCODE_LEFTBRACKET:
                          map_number--;
                          if(load_map_number(map_number, &player_start, &tilemap, &block_array, &interactive_array)){
-                              reset_map(&player, player_start, &block_array, &interactive_array, &sorted_blocks, &interactive_quad_tree);
+                              reset_map(&player, player_start, &interactive_array, &interactive_quad_tree);
                          }else{
                               map_number++;
                          }
@@ -2583,7 +2581,7 @@ int main(int argc, char** argv){
                     case SDL_SCANCODE_RIGHTBRACKET:
                          map_number++;
                          if(load_map_number(map_number, &player_start, &tilemap, &block_array, &interactive_array)){
-                              reset_map(&player, player_start, &block_array, &interactive_array, &sorted_blocks, &interactive_quad_tree);
+                              reset_map(&player, player_start, &interactive_array, &interactive_quad_tree);
                          }else{
                               map_number--;
                          }
@@ -2625,8 +2623,7 @@ int main(int argc, char** argv){
                               for(int i = 0; i < editor.selection.count; i++){
                                    Coord_t coord = editor.selection_start + editor.selection.elements[i].offset;
                                    apply_stamp(editor.selection.elements + i, coord,
-                                               &tilemap, &block_array, &interactive_array, &interactive_quad_tree, &sorted_blocks,
-                                               ctrl_down);
+                                               &tilemap, &block_array, &interactive_array, &interactive_quad_tree, ctrl_down);
                               }
 
                               editor.mode = EDITOR_MODE_CATEGORY_SELECT;
@@ -2744,8 +2741,7 @@ int main(int argc, char** argv){
                                    for(S16 s = 0; s < stamp_array->count; s++){
                                         auto* stamp = stamp_array->elements + s;
                                         apply_stamp(stamp, select_coord + stamp->offset,
-                                                    &tilemap, &block_array, &interactive_array, &interactive_quad_tree, &sorted_blocks,
-                                                    ctrl_down);
+                                                    &tilemap, &block_array, &interactive_array, &interactive_quad_tree, ctrl_down);
                                    }
                               }
                          } break;
@@ -3189,24 +3185,6 @@ int main(int argc, char** argv){
                }
           }
 
-          // sort blocks
-          {
-               // TODO: do we ever need a better sort for this?
-               // bubble sort
-               for(S16 i = 0; i < block_array.count; ++i){
-                    for(S16 j = 0; j < block_array.count - i - 1; ++j){
-                         if(sorted_blocks[j]->pos.pixel.y < sorted_blocks[j + 1]->pos.pixel.y ||
-                            (sorted_blocks[j]->pos.pixel.y == sorted_blocks[j + 1]->pos.pixel.y &&
-                             sorted_blocks[j]->pos.z < sorted_blocks[j + 1]->pos.z)){
-                              // swap
-                              Block_t* tmp = sorted_blocks[j];
-                              sorted_blocks[j] = sorted_blocks[j + 1];
-                              sorted_blocks[j + 1] = tmp;
-                         }
-                    }
-               }
-          }
-
           // player movement
           {
                user_movement = vec_normalize(user_movement);
@@ -3225,7 +3203,7 @@ int main(int argc, char** argv){
                Coord_t player_coord = pos_to_coord(player.pos);
                Coord_t min = player_coord - Coord_t{1, 1};
                Coord_t max = player_coord + Coord_t{1, 1};
-               S8 player_top = player.pos.z + 2 * HEIGHT_INTERVAL;
+               // S8 player_top = player.pos.z + 2 * HEIGHT_INTERVAL;
                min = coord_clamp_zero_to_dim(min, tilemap.width - 1, tilemap.height - 1);
                max = coord_clamp_zero_to_dim(max, tilemap.width - 1, tilemap.height - 1);
 
@@ -3239,11 +3217,9 @@ int main(int argc, char** argv){
                }
 
                for(S16 i = 0; i < block_array.count; i++){
-                    if(sorted_blocks[i]->pos.z >= player_top) continue;
-
                     bool collide_with_block = false;
 
-                    Position_t relative = sorted_blocks[i]->pos - player.pos;
+                    Position_t relative = block_array.elements[i].pos - player.pos;
                     Vec_t bottom_left = pos_to_vec(relative);
                     if(vec_magnitude(bottom_left) > (2 * TILE_SIZE)) continue;
 
@@ -3257,12 +3233,12 @@ int main(int argc, char** argv){
                     pos_delta += collide_circle_with_line(pos_delta, player.radius, bottom_right, top_right, &collide_with_block);
 
                     if(collide_with_block){
-                         auto player_quadrant = relative_quadrant(player.pos.pixel, sorted_blocks[i]->pos.pixel +
+                         auto player_quadrant = relative_quadrant(player.pos.pixel, block_array.elements[i].pos.pixel +
                                                                   Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS});
                          if(player_quadrant == player.face &&
                             (user_movement.x != 0.0f || user_movement.y != 0.0f)){ // also check that the player is actually pushing against the block
                               if(block_to_push == nullptr){
-                                   block_to_push = sorted_blocks[i];
+                                   block_to_push = block_array.elements + i;
                                    last_block_pushed_direction = player.face;
                               }
                          }
