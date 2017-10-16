@@ -10,14 +10,18 @@ struct Rect_t{
      S16 top;
 };
 
+bool xy_in_rect(const Rect_t& rect, S16 x, S16 y){
+     return (x >= rect.left && x <= rect.right &&
+             y >= rect.bottom && y <= rect.top);
+}
+
 Rect_t pixel_range(Pixel_t bottom_left, Pixel_t top_right){
      Rect_t r {bottom_left.x, bottom_left.y, top_right.x, top_right.y};
      return r;
 }
 
 bool pixel_in_rect(Pixel_t p, Rect_t r){
-     return (p.x >= r.left && p.x <= r.right &&
-             p.y >= r.bottom && p.y <= r.top);
+     return xy_in_rect(r, p.x, p.y);
 }
 
 Rect_t coord_range(Coord_t bottom_left, Coord_t top_right){
@@ -26,8 +30,7 @@ Rect_t coord_range(Coord_t bottom_left, Coord_t top_right){
 }
 
 bool coord_in_rect(Coord_t c, Rect_t r){
-     return (c.x >= r.left && c.x <= r.right &&
-             c.y >= r.bottom && c.y <= r.top);
+     return xy_in_rect(r, c.x, c.y);
 }
 
 bool rect_in_rect(Rect_t a, Rect_t b){
