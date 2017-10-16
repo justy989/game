@@ -1678,10 +1678,14 @@ bool init(Editor_t* editor){
      interactive_lever_category->elements[0].elements[0].interactive.type = INTERACTIVE_TYPE_LEVER;
 
      auto* interactive_pressure_plate_category = editor->category_array.elements + EDITOR_CATEGORY_INTERACTIVE_PRESSURE_PLATE;
-     init(interactive_pressure_plate_category, 1);
+     init(interactive_pressure_plate_category, 2);
      init(interactive_pressure_plate_category->elements, 1);
      interactive_pressure_plate_category->elements[0].elements[0].type = STAMP_TYPE_INTERACTIVE;
      interactive_pressure_plate_category->elements[0].elements[0].interactive.type = INTERACTIVE_TYPE_PRESSURE_PLATE;
+     init(interactive_pressure_plate_category->elements + 1, 1);
+     interactive_pressure_plate_category->elements[1].elements[0].type = STAMP_TYPE_INTERACTIVE;
+     interactive_pressure_plate_category->elements[1].elements[0].interactive.type = INTERACTIVE_TYPE_PRESSURE_PLATE;
+     interactive_pressure_plate_category->elements[1].elements[0].interactive.pressure_plate.iced_under = true;
 
      auto* interactive_popup_category = editor->category_array.elements + EDITOR_CATEGORY_INTERACTIVE_POPUP;
      init(interactive_popup_category, 2);
@@ -3398,6 +3402,28 @@ int main(int argc, char** argv){
                     // draw interactive
                     Interactive_t* interactive = quad_tree_find_at(interactive_quad_tree, coord.x, coord.y);
                     if(interactive){
+                         if(interactive->type == INTERACTIVE_TYPE_PRESSURE_PLATE &&
+                            interactive->pressure_plate.iced_under){
+                              // TODO: compress with above ice drawing code
+                              Vec_t tile_pos {(F32)(x - min.x) * TILE_SIZE + camera_offset.x,
+                                              (F32)(y - min.y) * TILE_SIZE + camera_offset.y};
+                              glEnd();
+
+                              // get state ready for ice
+                              glBindTexture(GL_TEXTURE_2D, 0);
+                              glColor4f(196.0f / 255.0f, 217.0f / 255.0f, 1.0f, 0.45f);
+                              glBegin(GL_QUADS);
+                              glVertex2f(tile_pos.x, tile_pos.y);
+                              glVertex2f(tile_pos.x, tile_pos.y + TILE_SIZE);
+                              glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y + TILE_SIZE);
+                              glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y);
+                              glEnd();
+
+                              // reset state back to default
+                              glBindTexture(GL_TEXTURE_2D, theme_texture);
+                              glBegin(GL_QUADS);
+                              glColor3f(1.0f, 1.0f, 1.0f);
+                         }
                          interactive_draw(interactive, pos_to_vec(coord_to_pos(interactive->coord) - screen_camera));
                     }
 
