@@ -3013,9 +3013,6 @@ int main(int argc, char** argv){
                Position_t pre_move = block->pos;
                block->pos += pos_delta;
 
-               quad_tree_free(block_quad_tree);
-               block_quad_tree = quad_tree_build(&block_array);
-
                bool stop_on_boundary_x = false;
                bool stop_on_boundary_y = false;
                bool held_up = false;
@@ -3053,9 +3050,6 @@ int main(int argc, char** argv){
                          block->accel.y = 0.0f;
                          break;
                     }
-
-                    quad_tree_free(block_quad_tree);
-                    block_quad_tree = quad_tree_build(&block_array);
 
                     if(block == last_block_pushed && quadrant == last_block_pushed_direction){
                          player.push_time = 0.0f;
@@ -3116,9 +3110,6 @@ int main(int argc, char** argv){
                          block->pos.decimal.x = 0.0f;
                          block->vel.x = 0.0f;
                          block->accel.x = 0.0f;
-
-                         quad_tree_free(block_quad_tree);
-                         block_quad_tree = quad_tree_build(&block_array);
                     }
                }
 
@@ -3129,9 +3120,6 @@ int main(int argc, char** argv){
                          block->pos.decimal.y = 0.0f;
                          block->vel.y = 0.0f;
                          block->accel.y = 0.0f;
-
-                         quad_tree_free(block_quad_tree);
-                         block_quad_tree = quad_tree_build(&block_array);
                     }
                }
 

@@ -159,7 +159,7 @@ QuadTreeNode_t<T>* quad_tree_build(ObjectArray_t<T>* array){
 
 template <typename T>
 S16 quad_tree_count_in(QuadTreeNode_t<T>* node, Rect_t rect){
-     if(!rect_in_rect(rect, node->bounds)) return 0;
+     if(!rect_in_rect(rect, node->bounds) && !rect_in_rect(node->bounds, rect)) return 0;
 
      S16 count = node->entry_count;
      if(node->bottom_left){
@@ -174,7 +174,7 @@ S16 quad_tree_count_in(QuadTreeNode_t<T>* node, Rect_t rect){
 
 template <typename T>
 void quad_tree_find_in_impl(QuadTreeNode_t<T>* node, Rect_t rect, T** array, S16* count){
-     if(!rect_in_rect(rect, node->bounds)) return;
+     if(!rect_in_rect(rect, node->bounds) && !rect_in_rect(node->bounds, rect)) return;
 
      for(S8 i = 0; i < node->entry_count; i++){
           array[*count] = node->entries[i];
