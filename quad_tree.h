@@ -158,31 +158,21 @@ QuadTreeNode_t<T>* quad_tree_build(ObjectArray_t<T>* array){
 }
 
 template <typename T>
-S16 quad_tree_count_in(QuadTreeNode_t<T>* node, Rect_t rect){
-     if(!rect_in_rect(rect, node->bounds) && !rect_in_rect(node->bounds, rect)) return 0;
-
-     S16 count = node->entry_count;
-     if(node->bottom_left){
-          count += quad_tree_count_in(node->bottom_left, rect);
-          count += quad_tree_count_in(node->bottom_right, rect);
-          count += quad_tree_count_in(node->top_left, rect);
-          count += quad_tree_count_in(node->top_right, rect);
-     }
-
-     return count;
-}
-
-template <typename T>
 void quad_tree_find_in_impl(QuadTreeNode_t<T>* node, Rect_t rect, T** results_array, S16* count, S16 max_array_count){
      if(!rect_in_rect(rect, node->bounds) && !rect_in_rect(node->bounds, rect)) return;
 
      for(S8 i = 0; i < node->entry_count; i++){
           if(*count >= max_array_count){
+               assert(!"hit max array count when querying quad tree!");
                return;
           }
 
-          results_array[*count] = node->entries[i];
-          (*count)++;
+          S16 x = get_object_x(node->entries[i]);
+          S16 y = get_object_y(node->entries[i]);
+          if(xy_in_rect(rect, x, y)){
+               results_array[*count] = node->entries[i];
+               (*count)++;
+          }
      }
 
      if(node->bottom_left){
@@ -196,8 +186,6 @@ void quad_tree_find_in_impl(QuadTreeNode_t<T>* node, Rect_t rect, T** results_ar
 // NOTE: must free returned array !
 template <typename T>
 void quad_tree_find_in(QuadTreeNode_t<T>* node, Rect_t rect, T** results_array, S16* count, S16 max_array_count){
-     S16 alloc_count = quad_tree_count_in(node, rect);
      *count = 0;
      quad_tree_find_in_impl(node, rect, results_array, count, max_array_count);
-     assert(alloc_count >= *count);
 }
