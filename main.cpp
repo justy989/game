@@ -3355,12 +3355,13 @@ int main(int argc, char** argv){
           max = coord_clamp_zero_to_dim(max, tilemap.width - 1, tilemap.height - 1);
           Position_t tile_bottom_left = coord_to_pos(min);
           Vec_t camera_offset = pos_to_vec(tile_bottom_left - screen_camera);
-          Vec_t tex_vec;
+
           glBindTexture(GL_TEXTURE_2D, theme_texture);
           glBegin(GL_QUADS);
           glColor3f(1.0f, 1.0f, 1.0f);
-          for(S16 y = min.y; y <= max.y; y++){
+          for(S16 y = max.y; y >= min.y; y--){
                for(S16 x = min.x; x <= max.x; x++){
+                    // draw tile
                     Tile_t* tile = tilemap.tiles[y] + x;
 
                     Vec_t tile_pos {(F32)(x - min.x) * TILE_SIZE + camera_offset.x,
@@ -3368,49 +3369,82 @@ int main(int argc, char** argv){
 
                     tile_id_draw(tile->id, tile_pos);
                     tile_flags_draw(tile->flags, tile_pos);
-               }
-          }
-          glEnd();
 
-          // interactive
-          glBegin(GL_QUADS);
-          for(S16 i = 0; i < interactive_array.count; i++){
-               Interactive_t* interactive = interactive_array.elements + i;
-               interactive_draw(interactive, pos_to_vec(coord_to_pos(interactive->coord) - screen_camera));
-          }
-          glEnd();
+                    if(tile->flags & TILE_FLAG_ICED){
+                         glEnd();
 
-          // ice
-          // TODO: this relies too much on knowing how it is called
-          glBindTexture(GL_TEXTURE_2D, 0);
-          glBegin(GL_QUADS);
-          for(S16 y = min.y; y <= max.y; y++){
-               for(S16 x = min.x; x <= max.x; x++){
-                    Tile_t* tile = tilemap.tiles[y] + x;
-                    if(tile && tile->flags & TILE_FLAG_ICED){
-                         // TODO: compress conversion
-                         Vec_t tile_pos {(F32)(x - min.x) * TILE_SIZE + camera_offset.x,
-                                         (F32)(y - min.y) * TILE_SIZE + camera_offset.y};
-
+                         // get state ready for ice
+                         glBindTexture(GL_TEXTURE_2D, 0);
                          glColor4f(196.0f / 255.0f, 217.0f / 255.0f, 1.0f, 0.45f);
+                         glBegin(GL_QUADS);
                          glVertex2f(tile_pos.x, tile_pos.y);
                          glVertex2f(tile_pos.x, tile_pos.y + TILE_SIZE);
                          glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y + TILE_SIZE);
                          glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y);
+                         glEnd();
+
+                         // reset state back to default
+                         glBindTexture(GL_TEXTURE_2D, theme_texture);
+                         glBegin(GL_QUADS);
+                         glColor3f(1.0f, 1.0f, 1.0f);
                     }
                }
           }
-          glEnd();
 
-          // block
-          glBindTexture(GL_TEXTURE_2D, theme_texture);
-          glBegin(GL_QUADS);
-          glColor3f(1.0f, 1.0f, 1.0f);
-          for(S16 i = 0; i < block_array.count; i++){
-               Block_t* block = block_array.elements + i;
-               Position_t block_camera_offset = block->pos - screen_camera;
-               block_camera_offset.pixel.y += block->pos.z;
-               block_draw(block, pos_to_vec(block_camera_offset));
+          for(S16 y = max.y; y >= min.y; y--){
+               for(S16 x = min.x; x <= max.x; x++){
+                    Coord_t coord {x, y};
+
+                    // draw interactive
+                    Interactive_t* interactive = quad_tree_find_at(interactive_quad_tree, coord.x, coord.y);
+                    if(interactive){
+                         interactive_draw(interactive, pos_to_vec(coord_to_pos(interactive->coord) - screen_camera));
+                    }
+
+                    // draw block
+                    S16 px = coord.x * TILE_SIZE_IN_PIXELS;
+                    S16 py = coord.y * TILE_SIZE_IN_PIXELS;
+                    Rect_t coord_rect {(S16)(px - 1), (S16)(py - 1), (S16)(px * TILE_SIZE_IN_PIXELS + 1), (S16)(py * TILE_SIZE_IN_PIXELS + 1)};
+
+                    S16 block_count = 0;
+                    Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
+                    quad_tree_find_in(block_quad_tree, coord_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
+
+                    for(S16 i = 0; i < block_count; i++){
+                         Block_t* block = blocks[i];
+                         if(block_get_coord(block) == coord){
+                              Position_t block_camera_offset = block->pos - screen_camera;
+                              block_camera_offset.pixel.y += block->pos.z;
+                              block_draw(block, pos_to_vec(block_camera_offset));
+                         }
+                    }
+
+                    // player
+                    if(pos_to_coord(player.pos) == coord){
+                         S8 player_frame_y = player.face;
+                         if(player.push_time > FLT_EPSILON) player_frame_y += 4;
+                         Vec_t tex_vec = player_frame(player.walk_frame, player_frame_y);
+                         pos_vec.y += (5.0f * PIXEL_SIZE);
+
+                         glEnd();
+                         glBindTexture(GL_TEXTURE_2D, player_texture);
+                         glBegin(GL_QUADS);
+                         glColor3f(1.0f, 1.0f, 1.0f);
+                         glTexCoord2f(tex_vec.x, tex_vec.y);
+                         glVertex2f(pos_vec.x - HALF_TILE_SIZE, pos_vec.y - HALF_TILE_SIZE);
+                         glTexCoord2f(tex_vec.x, tex_vec.y + PLAYER_FRAME_HEIGHT);
+                         glVertex2f(pos_vec.x - HALF_TILE_SIZE, pos_vec.y + HALF_TILE_SIZE);
+                         glTexCoord2f(tex_vec.x + PLAYER_FRAME_WIDTH, tex_vec.y + PLAYER_FRAME_HEIGHT);
+                         glVertex2f(pos_vec.x + HALF_TILE_SIZE, pos_vec.y + HALF_TILE_SIZE);
+                         glTexCoord2f(tex_vec.x + PLAYER_FRAME_WIDTH, tex_vec.y);
+                         glVertex2f(pos_vec.x + HALF_TILE_SIZE, pos_vec.y - HALF_TILE_SIZE);
+                         glEnd();
+
+                         glBindTexture(GL_TEXTURE_2D, theme_texture);
+                         glBegin(GL_QUADS);
+                         glColor3f(1.0f, 1.0f, 1.0f);
+                    }
+               }
           }
           glEnd();
 
@@ -3441,27 +3475,7 @@ int main(int argc, char** argv){
           }
           glEnd();
 
-          S8 player_frame_y = player.face;
-          if(player.push_time > FLT_EPSILON) player_frame_y += 4;
-
-          tex_vec = player_frame(player.walk_frame, player_frame_y);
-
-          pos_vec.y += (5.0f * PIXEL_SIZE);
-          glBindTexture(GL_TEXTURE_2D, player_texture);
-          glBegin(GL_QUADS);
-          glColor3f(1.0f, 1.0f, 1.0f);
-          glTexCoord2f(tex_vec.x, tex_vec.y);
-          glVertex2f(pos_vec.x - HALF_TILE_SIZE, pos_vec.y - HALF_TILE_SIZE);
-          glTexCoord2f(tex_vec.x, tex_vec.y + PLAYER_FRAME_HEIGHT);
-          glVertex2f(pos_vec.x - HALF_TILE_SIZE, pos_vec.y + HALF_TILE_SIZE);
-          glTexCoord2f(tex_vec.x + PLAYER_FRAME_WIDTH, tex_vec.y + PLAYER_FRAME_HEIGHT);
-          glVertex2f(pos_vec.x + HALF_TILE_SIZE, pos_vec.y + HALF_TILE_SIZE);
-          glTexCoord2f(tex_vec.x + PLAYER_FRAME_WIDTH, tex_vec.y);
-          glVertex2f(pos_vec.x + HALF_TILE_SIZE, pos_vec.y - HALF_TILE_SIZE);
-          glEnd();
-
           // light
-#if 0
           glBindTexture(GL_TEXTURE_2D, 0);
           glBegin(GL_QUADS);
           for(S16 y = min.y; y <= max.y; y++){
@@ -3479,7 +3493,6 @@ int main(int argc, char** argv){
                }
           }
           glEnd();
-#endif
 
           // player start
           selection_draw(player_start, player_start, screen_camera, 0.0f, 1.0f, 0.0f);
