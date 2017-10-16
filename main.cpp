@@ -90,6 +90,8 @@ bool blocks_at_collidable_height(Block_t* a, Block_t* b){
      return false;
 }
 
+#define BLOCK_QUAD_TREE_MAX_QUERY 16
+
 Block_t* block_against_another_block(Block_t* block_to_check, Direction_t direction, QuadTreeNode_t<Block_t>* block_quad_tree){
      Pixel_t center = block_center_pixel(block_to_check);
      Rect_t rect = {};
@@ -99,7 +101,8 @@ Block_t* block_against_another_block(Block_t* block_to_check, Direction_t direct
      rect.top = center.y + (2 * TILE_SIZE_IN_PIXELS);
 
      S16 block_count = 0;
-     Block_t** blocks = quad_tree_find_in(block_quad_tree, rect, &block_count);
+     Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
+     quad_tree_find_in(block_quad_tree, rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
 
      switch(direction){
      default:
@@ -114,7 +117,6 @@ Block_t* block_against_another_block(Block_t* block_to_check, Direction_t direct
                if((block->pos.pixel.x + TILE_SIZE_IN_PIXELS) == block_to_check->pos.pixel.x &&
                   block->pos.pixel.y >= block_to_check->pos.pixel.y &&
                   block->pos.pixel.y < (block_to_check->pos.pixel.y + TILE_SIZE_IN_PIXELS)){
-                    free(blocks);
                     return block;
                }
           }
@@ -129,7 +131,6 @@ Block_t* block_against_another_block(Block_t* block_to_check, Direction_t direct
                if(block->pos.pixel.x == (block_to_check->pos.pixel.x + TILE_SIZE_IN_PIXELS) &&
                   block->pos.pixel.y >= block_to_check->pos.pixel.y &&
                   block->pos.pixel.y < (block_to_check->pos.pixel.y + TILE_SIZE_IN_PIXELS)){
-                    free(blocks);
                     return block;
                }
           }
@@ -144,7 +145,6 @@ Block_t* block_against_another_block(Block_t* block_to_check, Direction_t direct
                if((block->pos.pixel.y + TILE_SIZE_IN_PIXELS) == block_to_check->pos.pixel.y &&
                   block->pos.pixel.x >= block_to_check->pos.pixel.x &&
                   block->pos.pixel.x < (block_to_check->pos.pixel.x + TILE_SIZE_IN_PIXELS)){
-                    free(blocks);
                     return block;
                }
           }
@@ -159,29 +159,28 @@ Block_t* block_against_another_block(Block_t* block_to_check, Direction_t direct
                if(block->pos.pixel.y == (block_to_check->pos.pixel.y + TILE_SIZE_IN_PIXELS) &&
                   block->pos.pixel.x >= block_to_check->pos.pixel.x &&
                   block->pos.pixel.x < (block_to_check->pos.pixel.x + TILE_SIZE_IN_PIXELS)){
-                    free(blocks);
                     return block;
                }
           }
           break;
      }
 
-     free(blocks);
      return nullptr;
 }
 
 Block_t* block_inside_another_block(Block_t* block_to_check, QuadTreeNode_t<Block_t>* block_quad_tree){
      // TODO: need more complicated function to detect this
-     Pixel_t center = block_center_pixel(block_to_check);
      Rect_t rect = {block_to_check->pos.pixel.x, block_to_check->pos.pixel.y,
                     (S16)(block_to_check->pos.pixel.x + TILE_SIZE_IN_PIXELS - 1),
                     (S16)(block_to_check->pos.pixel.y + TILE_SIZE_IN_PIXELS - 1)};
+     Pixel_t center = block_center_pixel(block_to_check);
      Rect_t surrounding_rect = {(S16)(center.x - (2 * TILE_SIZE_IN_PIXELS)),
                                 (S16)(center.y - (2 * TILE_SIZE_IN_PIXELS)),
                                 (S16)(center.x + (2 * TILE_SIZE_IN_PIXELS)),
                                 (S16)(center.y + (2 * TILE_SIZE_IN_PIXELS))};
      S16 block_count = 0;
-     Block_t** blocks = quad_tree_find_in(block_quad_tree, surrounding_rect, &block_count);
+     Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
+     quad_tree_find_in(block_quad_tree, surrounding_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
      for(S16 i = 0; i < block_count; i++){
           if(blocks[i] == block_to_check) continue;
           Block_t* block = blocks[i];
@@ -194,23 +193,29 @@ Block_t* block_inside_another_block(Block_t* block_to_check, QuadTreeNode_t<Bloc
              pixel_in_rect(top_left, rect) ||
              pixel_in_rect(top_right, rect) ||
              pixel_in_rect(bottom_right, rect)){
-               free(blocks);
                return block;
           }
      }
 
-     free(blocks);
      return nullptr;
 }
 
-Block_t* block_held_up_by_another_block(Block_t* block_to_check, ObjectArray_t<Block_t>* block_array){
+Block_t* block_held_up_by_another_block(Block_t* block_to_check, QuadTreeNode_t<Block_t>* block_quad_tree){
      // TODO: need more complicated function to detect this
      Rect_t rect = {block_to_check->pos.pixel.x, block_to_check->pos.pixel.y,
                     (S16)(block_to_check->pos.pixel.x + TILE_SIZE_IN_PIXELS - 1),
                     (S16)(block_to_check->pos.pixel.y + TILE_SIZE_IN_PIXELS - 1)};
+     Pixel_t center = block_center_pixel(block_to_check);
+     Rect_t surrounding_rect = {(S16)(center.x - (2 * TILE_SIZE_IN_PIXELS)),
+                                (S16)(center.y - (2 * TILE_SIZE_IN_PIXELS)),
+                                (S16)(center.x + (2 * TILE_SIZE_IN_PIXELS)),
+                                (S16)(center.y + (2 * TILE_SIZE_IN_PIXELS))};
+     S16 block_count = 0;
+     Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
+     quad_tree_find_in(block_quad_tree, surrounding_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
      S8 held_at_height = block_to_check->pos.z - HEIGHT_INTERVAL;
-     for(S16 i = 0; i < block_array->count; i++){
-          Block_t* block = block_array->elements + i;
+     for(S16 i = 0; i < block_count; i++){
+          Block_t* block = blocks[i];
           if(block == block_to_check || block->pos.z != held_at_height) continue;
 
           Pixel_t top_left {block->pos.pixel.x, (S16)(block->pos.pixel.y + TILE_SIZE_IN_PIXELS - 1)};
@@ -696,11 +701,11 @@ Interactive_t* block_against_solid_interactive(Block_t* block_to_check, Directio
 }
 
 void block_push(Block_t* block, Direction_t direction, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree,
-                ObjectArray_t<Block_t>* block_array, QuadTreeNode_t<Block_t>* block_quad_tree, bool pushed_by_player){
+                QuadTreeNode_t<Block_t>* block_quad_tree, bool pushed_by_player){
      Block_t* against_block = block_against_another_block(block, direction, block_quad_tree);
      if(against_block){
           if(!pushed_by_player && block_on_ice(against_block, tilemap)){
-               block_push(against_block, direction, tilemap, interactive_quad_tree, block_array, block_quad_tree, false);
+               block_push(against_block, direction, tilemap, interactive_quad_tree, block_quad_tree, false);
           }
 
           return;
@@ -776,8 +781,7 @@ void player_collide_coord(Position_t player_pos, Coord_t coord, F32 player_radiu
 
 #define LIGHT_MAX_LINE_LEN 8
 
-void illuminate_line(Coord_t start, Coord_t end, U8 value, TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array)
-{
+void illuminate_line(Coord_t start, Coord_t end, U8 value, TileMap_t* tilemap, QuadTreeNode_t<Block_t>* block_quad_tree){
      Coord_t coords[LIGHT_MAX_LINE_LEN];
      S8 coord_count = 0;
 
@@ -856,10 +860,18 @@ void illuminate_line(Coord_t start, Coord_t end, U8 value, TileMap_t* tilemap, O
                     break;
                }
 
+               S16 px = coords[i].x * TILE_SIZE_IN_PIXELS;
+               S16 py = coords[i].y * TILE_SIZE_IN_PIXELS;
+               Rect_t coord_rect {px, py, (S16)(px + TILE_SIZE_IN_PIXELS), (S16)(py + TILE_SIZE_IN_PIXELS)};
+
+               S16 block_count = 0;
+               Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
+               quad_tree_find_in(block_quad_tree, coord_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
+
                Block_t* block = nullptr;
-               for(S16 b = 0; b < block_array->count; b++){
-                    if(block_get_coord(block_array->elements + b) == coords[i]){
-                         block = block_array->elements + b;
+               for(S16 b = 0; b < block_count; b++){
+                    if(block_get_coord(blocks[b]) == coords[i]){
+                         block = blocks[b];
                          break;
                     }
                }
@@ -869,8 +881,7 @@ void illuminate_line(Coord_t start, Coord_t end, U8 value, TileMap_t* tilemap, O
      }
 }
 
-void illuminate(Coord_t coord, U8 value, TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array)
-{
+void illuminate(Coord_t coord, U8 value, TileMap_t* tilemap, QuadTreeNode_t<Block_t>* block_quad_tree){
      if(coord.x < 0 || coord.y < 0 || coord.x >= tilemap->width || coord.y >= tilemap->height) return;
 
      S16 radius = ((value - BASE_LIGHT) / LIGHT_DECAY) + 1;
@@ -883,22 +894,22 @@ void illuminate(Coord_t coord, U8 value, TileMap_t* tilemap, ObjectArray_t<Block
 
      for(S16 j = min.y + 1; j < max.y; ++j) {
           // bottom of box
-          illuminate_line(coord, Coord_t{min.x, j}, value, tilemap, block_array);
+          illuminate_line(coord, Coord_t{min.x, j}, value, tilemap, block_quad_tree);
 
           // top of box
-          illuminate_line(coord, Coord_t{max.x, j}, value, tilemap, block_array);
+          illuminate_line(coord, Coord_t{max.x, j}, value, tilemap, block_quad_tree);
      }
 
      for(S16 i = min.x + 1; i < max.x; ++i) {
           // left of box
-          illuminate_line(coord, Coord_t{i, min.y,}, value, tilemap, block_array);
+          illuminate_line(coord, Coord_t{i, min.y,}, value, tilemap, block_quad_tree);
 
           // right of box
-          illuminate_line(coord, Coord_t{i, max.y,}, value, tilemap, block_array);
+          illuminate_line(coord, Coord_t{i, max.y,}, value, tilemap, block_quad_tree);
      }
 }
 
-void spread_ice(Coord_t center, S16 radius, TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array){
+void spread_ice(Coord_t center, S16 radius, TileMap_t* tilemap, QuadTreeNode_t<Block_t>* block_quad_tree){
      Coord_t delta {radius, radius};
      Coord_t min = center - delta;
      Coord_t max = center + delta;
@@ -908,20 +919,32 @@ void spread_ice(Coord_t center, S16 radius, TileMap_t* tilemap, ObjectArray_t<Bl
                Coord_t coord{x, y};
                Tile_t* tile = tilemap_get_tile(tilemap, coord);
                if(tile && !tile_is_solid(tile)){
+                    S16 px = coord.x * TILE_SIZE_IN_PIXELS;
+                    S16 py = coord.y * TILE_SIZE_IN_PIXELS;
+                    Rect_t coord_rect {(S16)(px - HALF_TILE_SIZE_IN_PIXELS),
+                                       (S16)(py - HALF_TILE_SIZE_IN_PIXELS),
+                                       (S16)(px + TILE_SIZE_IN_PIXELS + HALF_TILE_SIZE_IN_PIXELS),
+                                       (S16)(py + TILE_SIZE_IN_PIXELS + HALF_TILE_SIZE_IN_PIXELS)};
+
+                    S16 block_count = 0;
+                    Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
+                    quad_tree_find_in(block_quad_tree, coord_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
+
                     Block_t* block = nullptr;
-                    for(S16 i = 0; i < block_array->count; i++){
-                         if(block_get_coord(block_array->elements + i) == coord && block_array->elements[i].pos.z == 0){
-                              block = block_array->elements + i;
+                    for(S16 i = 0; i < block_count; i++){
+                         if(block_get_coord(blocks[i]) == coord && blocks[i]->pos.z == 0){
+                              block = blocks[i];
                               break;
                          }
                     }
+
                     if(!block) tile->flags |= TILE_FLAG_ICED;
                }
           }
      }
 }
 
-void melt_ice(Coord_t center, S16 radius, TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array){
+void melt_ice(Coord_t center, S16 radius, TileMap_t* tilemap, QuadTreeNode_t<Block_t>* block_quad_tree){
      Coord_t delta {radius, radius};
      Coord_t min = center - delta;
      Coord_t max = center + delta;
@@ -931,13 +954,25 @@ void melt_ice(Coord_t center, S16 radius, TileMap_t* tilemap, ObjectArray_t<Bloc
                Coord_t coord{x, y};
                Tile_t* tile = tilemap_get_tile(tilemap, coord);
                if(tile && !tile_is_solid(tile) && tile->flags & TILE_FLAG_ICED){
+                    S16 px = coord.x * TILE_SIZE_IN_PIXELS;
+                    S16 py = coord.y * TILE_SIZE_IN_PIXELS;
+                    Rect_t coord_rect {(S16)(px - HALF_TILE_SIZE_IN_PIXELS),
+                                       (S16)(py - HALF_TILE_SIZE_IN_PIXELS),
+                                       (S16)(px + TILE_SIZE_IN_PIXELS + HALF_TILE_SIZE_IN_PIXELS),
+                                       (S16)(py + TILE_SIZE_IN_PIXELS + HALF_TILE_SIZE_IN_PIXELS)};
+
+                    S16 block_count = 0;
+                    Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
+                    quad_tree_find_in(block_quad_tree, coord_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
+
                     Block_t* block = nullptr;
-                    for(S16 i = 0; i < block_array->count; i++){
-                         if(block_get_coord(block_array->elements + i) == coord && block_array->elements[i].pos.z == 0){
-                              block = block_array->elements + i;
+                    for(S16 i = 0; i < block_count; i++){
+                         if(block_get_coord(blocks[i]) == coord && blocks[i]->pos.z == 0){
+                              block = blocks[i];
                               break;
                          }
                     }
+
                     if(!block) tile->flags &= ~TILE_FLAG_ICED;
                }
           }
@@ -1960,7 +1995,7 @@ void apply_stamp(Stamp_t* stamp, Coord_t coord, TileMap_t* tilemap, ObjectArray_
      {
           int index = block_array->count;
           resize(block_array, block_array->count + 1);
-          // TODO: Check if block is in the way
+          // TODO: Check if block is in the way with the quad tree
 
           Block_t* block = block_array->elements + index;
           block->pos = coord_to_pos(coord);
@@ -3056,7 +3091,7 @@ int main(int argc, char** argv){
                     }
 
                     if(block_on_ice(inside_block, &tilemap) && block_on_ice(block, &tilemap)){
-                         block_push(inside_block, quadrant, &tilemap, interactive_quad_tree, &block_array, block_quad_tree, false);
+                         block_push(inside_block, quadrant, &tilemap, interactive_quad_tree, block_quad_tree, false);
                     }
                }
 
@@ -3123,7 +3158,7 @@ int main(int argc, char** argv){
                     }
                }
 
-               held_up = block_held_up_by_another_block(block, &block_array);
+               held_up = block_held_up_by_another_block(block, block_quad_tree);
 
                // TODO: should we care about the decimal component of the position ?
                Interactive_t* interactive = quad_tree_interactive_find_at(interactive_quad_tree, coord);
@@ -3165,9 +3200,9 @@ int main(int argc, char** argv){
           for(S16 i = 0; i < block_array.count; i++){
                Block_t* block = block_array.elements + i;
                if(block->element == ELEMENT_FIRE){
-                    illuminate(block_get_coord(block), 255, &tilemap, &block_array);
+                    illuminate(block_get_coord(block), 255, &tilemap, block_quad_tree);
                }else if(block->element == ELEMENT_ICE){
-                    spread_ice(block_get_coord(block), 1, &tilemap, &block_array);
+                    spread_ice(block_get_coord(block), 1, &tilemap, block_quad_tree);
                }
           }
 
@@ -3175,7 +3210,7 @@ int main(int argc, char** argv){
           for(S16 i = 0; i < block_array.count; i++){
                Block_t* block = block_array.elements + i;
                if(block->element == ELEMENT_FIRE){
-                    melt_ice(block_get_coord(block), 1, &tilemap, &block_array);
+                    melt_ice(block_get_coord(block), 1, &tilemap, block_quad_tree);
                }
           }
 
@@ -3184,12 +3219,22 @@ int main(int argc, char** argv){
                if(interactive->type == INTERACTIVE_TYPE_LIGHT_DETECTOR){
                     Tile_t* tile = tilemap_get_tile(&tilemap, interactive->coord);
 
+                    S16 px = interactive->coord.x * TILE_SIZE_IN_PIXELS;
+                    S16 py = interactive->coord.y * TILE_SIZE_IN_PIXELS;
+                    Rect_t coord_rect {(S16)(px - HALF_TILE_SIZE_IN_PIXELS),
+                                       (S16)(py - HALF_TILE_SIZE_IN_PIXELS),
+                                       (S16)(px + TILE_SIZE_IN_PIXELS + HALF_TILE_SIZE_IN_PIXELS),
+                                       (S16)(py + TILE_SIZE_IN_PIXELS + HALF_TILE_SIZE_IN_PIXELS)};
+
+                    S16 block_count = 0;
+                    Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
+                    quad_tree_find_in(block_quad_tree, coord_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
+
                     Block_t* block = nullptr;
-                    for(S16 b = 0; b < block_array.count; b++){
+                    for(S16 b = 0; b < block_count; b++){
                          // blocks on the coordinate and on the ground block light
-                         if(block_get_coord(block_array.elements + b) == interactive->coord &&
-                            block_array.elements[b].pos.z == 0){
-                              block = block_array.elements + b;
+                         if(block_get_coord(blocks[b]) == interactive->coord && blocks[b]->pos.z == 0){
+                              block = blocks[b];
                               break;
                          }
                     }
@@ -3287,7 +3332,7 @@ int main(int argc, char** argv){
                if(block_to_push){
                     player.push_time += dt;
                     if(player.push_time > BLOCK_PUSH_TIME){
-                         block_push(block_to_push, player.face, &tilemap, interactive_quad_tree, &block_array, block_quad_tree, true);
+                         block_push(block_to_push, player.face, &tilemap, interactive_quad_tree, block_quad_tree, true);
                          if(block_to_push->pos.z > 0) player.push_time = -0.5f;
                     }
                }else{
