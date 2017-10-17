@@ -2783,6 +2783,9 @@ int main(int argc, char** argv){
                                         apply_stamp(stamp, select_coord + stamp->offset,
                                                     &tilemap, &block_array, &interactive_array, &interactive_quad_tree, ctrl_down);
                                    }
+
+                                   quad_tree_free(block_quad_tree);
+                                   block_quad_tree = quad_tree_build(&block_array);
                               }
                          } break;
                          }
