@@ -909,7 +909,8 @@ void illuminate(Coord_t coord, U8 value, TileMap_t* tilemap, QuadTreeNode_t<Bloc
      }
 }
 
-void spread_ice(Coord_t center, S16 radius, TileMap_t* tilemap, QuadTreeNode_t<Block_t>* block_quad_tree){
+void spread_ice(Coord_t center, S16 radius, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree,
+                QuadTreeNode_t<Block_t>* block_quad_tree){
      Coord_t delta {radius, radius};
      Coord_t min = center - delta;
      Coord_t max = center + delta;
@@ -938,7 +939,22 @@ void spread_ice(Coord_t center, S16 radius, TileMap_t* tilemap, QuadTreeNode_t<B
                          }
                     }
 
-                    if(!block) tile->flags |= TILE_FLAG_ICED;
+                    if(block){
+                         if(block->element == ELEMENT_NONE) block->element = ELEMENT_ONLY_ICED;
+                    }else{
+                         Interactive_t* interactive = quad_tree_find_at(interactive_quad_tree, coord.x, coord.y);
+                         if(interactive){
+                              if(interactive->type == INTERACTIVE_TYPE_POPUP){
+                                   if(interactive->popup.lift.ticks == 1){
+                                        tile->flags |= TILE_FLAG_ICED;
+                                   }else{
+                                        interactive->popup.iced = true;
+                                   }
+                              }
+                         }else{
+                              tile->flags |= TILE_FLAG_ICED;
+                         }
+                    }
                }
           }
      }
@@ -1847,6 +1863,20 @@ void block_draw(Block_t* block, Vec_t pos_vec){
      glVertex2f(pos_vec.x + TILE_SIZE, pos_vec.y + 2.0f * TILE_SIZE);
      glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y);
      glVertex2f(pos_vec.x + TILE_SIZE, pos_vec.y);
+
+     if(block->element == ELEMENT_ONLY_ICED || block->element == ELEMENT_ICE ){
+          tex_vec = theme_frame(4, 12);
+          glColor4f(1.0f, 1.0f, 1.0f, 0.5f);
+          glTexCoord2f(tex_vec.x, tex_vec.y);
+          glVertex2f(pos_vec.x, pos_vec.y);
+          glTexCoord2f(tex_vec.x, tex_vec.y + 2.0f * THEME_FRAME_HEIGHT);
+          glVertex2f(pos_vec.x, pos_vec.y + 2.0f * TILE_SIZE);
+          glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y + 2.0f * THEME_FRAME_HEIGHT);
+          glVertex2f(pos_vec.x + TILE_SIZE, pos_vec.y + 2.0f * TILE_SIZE);
+          glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y);
+          glVertex2f(pos_vec.x + TILE_SIZE, pos_vec.y);
+          glColor3f(1.0f, 1.0f, 1.0f);
+     }
 
      if(block->element == ELEMENT_FIRE){
           tex_vec = theme_frame(1, 6);
@@ -3206,7 +3236,7 @@ int main(int argc, char** argv){
                if(block->element == ELEMENT_FIRE){
                     illuminate(block_get_coord(block), 255, &tilemap, block_quad_tree);
                }else if(block->element == ELEMENT_ICE){
-                    spread_ice(block_get_coord(block), 1, &tilemap, block_quad_tree);
+                    spread_ice(block_get_coord(block), 1, &tilemap, interactive_quad_tree, block_quad_tree);
                }
           }
 
@@ -3424,7 +3454,25 @@ int main(int argc, char** argv){
                               glBegin(GL_QUADS);
                               glColor3f(1.0f, 1.0f, 1.0f);
                          }
+
                          interactive_draw(interactive, pos_to_vec(coord_to_pos(interactive->coord) - screen_camera));
+
+                         if(interactive->type == INTERACTIVE_TYPE_POPUP && interactive->popup.iced){
+                              Vec_t tile_pos {(F32)(x - min.x) * TILE_SIZE + camera_offset.x,
+                                              (F32)(y - min.y) * TILE_SIZE + camera_offset.y};
+                              tile_pos.y += interactive->popup.lift.ticks * PIXEL_SIZE;
+                              Vec_t tex_vec = theme_frame(3, 12);
+                              glColor4f(1.0f, 1.0f, 1.0f, 0.5f);
+                              glTexCoord2f(tex_vec.x, tex_vec.y);
+                              glVertex2f(tile_pos.x, tile_pos.y);
+                              glTexCoord2f(tex_vec.x, tex_vec.y + THEME_FRAME_HEIGHT);
+                              glVertex2f(tile_pos.x, tile_pos.y + TILE_SIZE);
+                              glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y + THEME_FRAME_HEIGHT);
+                              glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y + TILE_SIZE);
+                              glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y);
+                              glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y);
+                              glColor3f(1.0f, 1.0f, 1.0f);
+                         }
                     }
 
                     // draw block
