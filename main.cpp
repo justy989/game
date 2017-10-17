@@ -18,6 +18,7 @@
 #include "tile.h"
 #include "element.h"
 #include "object_array.h"
+#include "interactive.h"
 #include "quad_tree.h"
 
 #define PLAYER_SPEED 5.5f
@@ -41,6 +42,19 @@ void player_spawn(Player_t* player, Coord_t coord){
      player->walk_frame_delta = 1;
      player->radius = 3.5f / 272.0f;
      player->pos = coord_to_pos_at_tile_center(coord);
+}
+
+Interactive_t* quad_tree_interactive_find_at(QuadTreeNode_t<Interactive_t>* root, Coord_t coord){
+     return quad_tree_find_at(root, coord.x, coord.y);
+}
+
+Interactive_t* quad_tree_interactive_solid_at(QuadTreeNode_t<Interactive_t>* root, Coord_t coord){
+     Interactive_t* interactive = quad_tree_find_at(root, coord.x, coord.y);
+     if(interactive && interactive_is_solid(interactive)){
+          return interactive;
+     }
+
+     return nullptr;
 }
 
 struct Block_t{
@@ -71,8 +85,22 @@ Coord_t block_get_coord(Block_t* block){
      return pixel_to_coord(center);
 }
 
-bool block_on_ice(Block_t* block, TileMap_t* tilemap){
-     return tilemap_is_iced(tilemap, block_get_coord(block));
+bool block_on_ice(Block_t* block, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree){
+     if(block->pos.z == 0){
+          Coord_t coord = block_get_coord(block);
+          Interactive_t* interactive = quad_tree_interactive_find_at(interactive_quad_tree, coord);
+          if(interactive){
+               if(interactive->type == INTERACTIVE_TYPE_POPUP){
+                    if(interactive->popup.lift.ticks == 1 && interactive->popup.iced){
+                         return true;
+                    }
+               }
+          }
+          return tilemap_is_iced(tilemap, coord);
+     }
+
+     // TODO: check for blocks below
+     return false;
 }
 
 bool blocks_at_collidable_height(Block_t* a, Block_t* b){
@@ -393,126 +421,6 @@ Vec_t player_frame(S8 x, S8 y){
      return Vec_t{(F32)(x) * PLAYER_FRAME_WIDTH, (F32)(y) * PLAYER_FRAME_HEIGHT};
 }
 
-struct Lift_t{
-     U8 ticks; // start at 1
-     bool up;
-     F32 timer;
-};
-
-void lift_update(Lift_t* lift, float tick_delay, float dt, S8 min_tick, S8 max_tick){
-     lift->timer += dt;
-
-     if(lift->timer > tick_delay){
-          lift->timer -= tick_delay;
-
-          if(lift->up){
-               if(lift->ticks < max_tick) lift->ticks++;
-          }else{
-               if(lift->ticks > min_tick) lift->ticks--;
-          }
-     }
-}
-
-#define POPUP_TICK_DELAY 0.1f
-
-enum InteractiveType_t{
-     INTERACTIVE_TYPE_NONE,
-     INTERACTIVE_TYPE_PRESSURE_PLATE,
-     INTERACTIVE_TYPE_LIGHT_DETECTOR,
-     INTERACTIVE_TYPE_ICE_DETECTOR,
-     INTERACTIVE_TYPE_POPUP,
-     INTERACTIVE_TYPE_LEVER,
-     INTERACTIVE_TYPE_DOOR,
-     INTERACTIVE_TYPE_PORTAL,
-     INTERACTIVE_TYPE_BOW,
-     INTERACTIVE_TYPE_STAIRS,
-     INTERACTIVE_TYPE_PROMPT,
-};
-
-struct PressurePlate_t{
-     bool down;
-     bool iced_under;
-};
-
-struct Detector_t{
-     bool on;
-};
-
-struct Popup_t{
-     Lift_t lift;
-     bool iced;
-};
-
-struct Stairs_t{
-     bool up;
-     Direction_t face;
-};
-
-struct Lever_t{
-     Direction_t activated_from;
-     S8 ticks;
-     F32 timer;
-};
-
-#define DOOR_MAX_HEIGHT 7
-
-struct Door_t{
-     Lift_t lift;
-     Direction_t face;
-};
-
-struct Portal_t{
-     Direction_t face;
-     bool on;
-};
-
-struct Interactive_t{
-     InteractiveType_t type;
-     Coord_t coord;
-
-     union{
-          PressurePlate_t pressure_plate;
-          Detector_t detector;
-          Popup_t popup;
-          Stairs_t stairs;
-          Lever_t lever;
-          Door_t door;
-          Portal_t portal;
-     };
-};
-
-bool interactive_is_solid(Interactive_t* interactive){
-     return (interactive->type == INTERACTIVE_TYPE_LEVER ||
-             (interactive->type == INTERACTIVE_TYPE_POPUP && interactive->popup.lift.ticks > 1) ||
-             (interactive->type == INTERACTIVE_TYPE_DOOR && interactive->door.lift.ticks < DOOR_MAX_HEIGHT));
-}
-
-bool interactive_quad_tree_bounds_contains(const Rect_t* bounds, Coord_t coord){
-     return (coord.x >= bounds->left && coord.x <= bounds->right &&
-             coord.y >= bounds->bottom && coord.y <= bounds->top);
-}
-
-S16 get_object_x(const Interactive_t* interactive){
-     return interactive->coord.x;
-}
-
-S16 get_object_y(const Interactive_t* interactive){
-     return interactive->coord.y;
-}
-
-Interactive_t* quad_tree_interactive_find_at(QuadTreeNode_t<Interactive_t>* root, Coord_t coord){
-     return quad_tree_find_at(root, coord.x, coord.y);
-}
-
-Interactive_t* quad_tree_interactive_solid_at(QuadTreeNode_t<Interactive_t>* root, Coord_t coord){
-     Interactive_t* interactive = quad_tree_find_at(root, coord.x, coord.y);
-     if(interactive && interactive_is_solid(interactive)){
-          return interactive;
-     }
-
-     return nullptr;
-}
-
 void toggle_flag(U16* flags, U16 flag){
      if(*flags & flag){
           *flags &= ~flag;
@@ -532,8 +440,12 @@ void toggle_electricity(TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* inter
           default:
                break;
           case INTERACTIVE_TYPE_POPUP:
+          {
                interactive->popup.lift.up = !interactive->popup.lift.up;
-               break;
+               if(tile->flags & TILE_FLAG_ICED){
+                    tile->flags &= ~TILE_FLAG_ICED;
+               }
+          } break;
           case INTERACTIVE_TYPE_DOOR:
                interactive->door.lift.up = !interactive->door.lift.up;
                break;
@@ -704,7 +616,7 @@ void block_push(Block_t* block, Direction_t direction, TileMap_t* tilemap, QuadT
                 QuadTreeNode_t<Block_t>* block_quad_tree, bool pushed_by_player){
      Block_t* against_block = block_against_another_block(block, direction, block_quad_tree);
      if(against_block){
-          if(!pushed_by_player && block_on_ice(against_block, tilemap)){
+          if(!pushed_by_player && block_on_ice(against_block, tilemap, interactive_quad_tree)){
                block_push(against_block, direction, tilemap, interactive_quad_tree, block_quad_tree, false);
           }
 
@@ -946,11 +858,17 @@ void spread_ice(Coord_t center, S16 radius, TileMap_t* tilemap, QuadTreeNode_t<I
                          if(interactive){
                               if(interactive->type == INTERACTIVE_TYPE_POPUP){
                                    if(interactive->popup.lift.ticks == 1){
+                                        interactive->popup.iced = false;
                                         tile->flags |= TILE_FLAG_ICED;
                                    }else{
                                         interactive->popup.iced = true;
                                    }
                               }else if(interactive->type == INTERACTIVE_TYPE_PRESSURE_PLATE){
+                                   tile->flags |= TILE_FLAG_ICED;
+                              }
+
+                              if(interactive->type == INTERACTIVE_TYPE_ICE_DETECTOR ||
+                                 interactive->type == INTERACTIVE_TYPE_LIGHT_DETECTOR){
                                    tile->flags |= TILE_FLAG_ICED;
                               }
                          }else{
@@ -1005,6 +923,9 @@ void melt_ice(Coord_t center, S16 radius, TileMap_t* tilemap, QuadTreeNode_t<Int
                                    }
                               }else if(interactive->type == INTERACTIVE_TYPE_PRESSURE_PLATE){
                                    interactive->pressure_plate.iced_under = false;
+                                   tile->flags &= ~TILE_FLAG_ICED;
+                              }else if(interactive->type == INTERACTIVE_TYPE_ICE_DETECTOR ||
+                                       interactive->type == INTERACTIVE_TYPE_LIGHT_DETECTOR){
                                    tile->flags &= ~TILE_FLAG_ICED;
                               }
                          }else{
@@ -2473,7 +2394,7 @@ int main(int argc, char** argv){
                                         for(S16 i = 0; i < check_tilemap.width; i++){
                                              if(check_tilemap.tiles[j][i].flags != tilemap.tiles[j][i].flags){
                                                   char name[64];
-                                                  snprintf(name, 64, "tile %d, %d", i, j);
+                                                  snprintf(name, 64, "tile %d, %d flags", i, j);
                                                   LOG_MISMATCH(name, "%d", check_tilemap.tiles[j][i].flags, tilemap.tiles[j][i].flags);
                                              }
                                         }
@@ -3002,7 +2923,7 @@ int main(int argc, char** argv){
                     }else{
                          Tile_t* tile = tilemap_get_tile(&tilemap, interactive->coord);
                          if(tile){
-                              if(!(tile->flags & TILE_FLAG_ICED)){
+                              if(!tile_is_iced(tile)){
                                    Pixel_t center = coord_to_pixel(interactive->coord) + Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS};
                                    Rect_t rect = {};
                                    rect.left = center.x - (2 * TILE_SIZE_IN_PIXELS);
@@ -3161,7 +3082,7 @@ int main(int argc, char** argv){
                          player.push_time = 0.0f;
                     }
 
-                    if(block_on_ice(inside_block, &tilemap) && block_on_ice(block, &tilemap)){
+                    if(block_on_ice(inside_block, &tilemap, interactive_quad_tree) && block_on_ice(block, &tilemap, interactive_quad_tree)){
                          block_push(inside_block, quadrant, &tilemap, interactive_quad_tree, block_quad_tree, false);
                     }
                }
@@ -3203,7 +3124,7 @@ int main(int argc, char** argv){
                     }
                }
 
-               if(block != last_block_pushed && !tilemap_is_iced(&tilemap, coord)){
+               if(block != last_block_pushed && !block_on_ice(block, &tilemap, interactive_quad_tree)){
                     stop_on_boundary_x = true;
                     stop_on_boundary_y = true;
                }
@@ -3320,10 +3241,10 @@ int main(int argc, char** argv){
                }else if(interactive->type == INTERACTIVE_TYPE_ICE_DETECTOR){
                     Tile_t* tile = tilemap_get_tile(&tilemap, interactive->coord);
                     if(tile){
-                         if(interactive->detector.on && (tile->flags & TILE_FLAG_ICED) == 0){
+                         if(interactive->detector.on && !tile_is_iced(tile)){
                               activate(&tilemap, interactive_quad_tree, interactive->coord);
                               interactive->detector.on = false;
-                         }else if(!interactive->detector.on && tile->flags & TILE_FLAG_ICED){
+                         }else if(!interactive->detector.on && tile_is_iced(tile)){
                               activate(&tilemap, interactive_quad_tree, interactive->coord);
                               interactive->detector.on = true;
                          }
@@ -3441,9 +3362,9 @@ int main(int argc, char** argv){
                     tile_id_draw(tile->id, tile_pos);
                     tile_flags_draw(tile->flags, tile_pos);
 
-                    if(tile->flags & TILE_FLAG_ICED){
+                    if(tile_is_iced(tile)){
                          Interactive_t* interactive = quad_tree_find_at(interactive_quad_tree, x, y);
-                         if(interactive && interactive->type == INTERACTIVE_TYPE_PRESSURE_PLATE){
+                         if(interactive && (interactive->type == INTERACTIVE_TYPE_PRESSURE_PLATE || interactive->type == INTERACTIVE_TYPE_POPUP)){
                               continue;
                          }
 
@@ -3476,7 +3397,7 @@ int main(int argc, char** argv){
                     if(interactive){
                          if(interactive->type == INTERACTIVE_TYPE_PRESSURE_PLATE){
                               Tile_t* tile = tilemap_get_tile(&tilemap, coord);
-                              if(tile && (tile->flags & TILE_FLAG_ICED)){
+                              if(tile && tile_is_iced(tile)){
                                    // pass because we are going to draw ice later
                               }else if(interactive->pressure_plate.iced_under){
                                    // TODO: compress with above ice drawing code
@@ -3518,9 +3439,13 @@ int main(int argc, char** argv){
                               glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y);
                               glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y);
                               glColor3f(1.0f, 1.0f, 1.0f);
-                         }else if(interactive->type == INTERACTIVE_TYPE_PRESSURE_PLATE){
+                         }else if(interactive->type == INTERACTIVE_TYPE_PRESSURE_PLATE ||
+                                  (interactive->type == INTERACTIVE_TYPE_POPUP &&
+                                   interactive->popup.lift.ticks == 1) ||
+                                  interactive->type == INTERACTIVE_TYPE_ICE_DETECTOR ||
+                                  interactive->type == INTERACTIVE_TYPE_LIGHT_DETECTOR){
                               Tile_t* tile = tilemap_get_tile(&tilemap, coord);
-                              if(tile && tile->flags & TILE_FLAG_ICED){
+                              if(tile && tile_is_iced(tile)){
                                    Vec_t tile_pos {(F32)(x - min.x) * TILE_SIZE + camera_offset.x,
                                                    (F32)(y - min.y) * TILE_SIZE + camera_offset.y};
                                    glEnd();
