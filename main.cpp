@@ -24,6 +24,7 @@
 #define PLAYER_SPEED 5.5f
 #define PLAYER_WALK_DELAY 0.15f
 #define PLAYER_IDLE_SPEED 0.0025f
+#define PLAYER_BOW_DRAW_DELAY 0.3f
 
 struct Player_t{
      Position_t pos;
@@ -35,6 +36,8 @@ struct Player_t{
      S8 walk_frame;
      S8 walk_frame_delta;
      F32 walk_frame_time;
+     bool has_bow;
+     F32 bow_draw_time;
 };
 
 void player_spawn(Player_t* player, Coord_t coord){
@@ -333,6 +336,43 @@ Tile_t* block_against_solid_tile(Block_t* block_to_check, Direction_t direction,
      tile_coord = pixel_to_coord(pixel_b);
      tile = tilemap_get_tile(tilemap, tile_coord);
      if(tile && tile->id) return tile;
+
+     return nullptr;
+}
+
+struct Arrow_t{
+     Position_t pos;
+     Direction_t face;
+     Element_t element;
+
+     bool alive;
+     bool stuck;
+};
+
+#define ARROW_ARRAY_MAX 32
+
+struct ArrowArray_t{
+     Arrow_t arrows[ARROW_ARRAY_MAX];
+};
+
+bool init(ArrowArray_t* arrow_array){
+     for(S16 i = 0; i < ARROW_ARRAY_MAX; i++){
+          arrow_array->arrows[i].alive = false;
+     }
+
+     return true;
+}
+
+Arrow_t* arrow_array_spawn(ArrowArray_t* arrow_array, Position_t pos, Direction_t face){
+     for(S16 i = 0; i < ARROW_ARRAY_MAX; i++){
+          if(!arrow_array->arrows[i].alive){
+               arrow_array->arrows[i].pos = pos;
+               arrow_array->arrows[i].face = face;
+               arrow_array->arrows[i].alive = true;
+               arrow_array->arrows[i].stuck = false;
+               return arrow_array->arrows + i;
+          }
+     }
 
      return nullptr;
 }
@@ -960,6 +1000,7 @@ struct PlayerAction_t{
      bool move_down;
      bool activate;
      bool last_activate;
+     bool shoot;
      bool reface;
 };
 
@@ -1021,6 +1062,12 @@ void player_action_perform(PlayerAction_t* player_action, Player_t* player, Play
           break;
      case PLAYER_ACTION_TYPE_ACTIVATE_STOP:
           player_action->activate = false;
+          break;
+     case PLAYER_ACTION_TYPE_SHOOT_START:
+          player_action->shoot = true;
+          break;
+     case PLAYER_ACTION_TYPE_SHOOT_STOP:
+          player_action->shoot = false;
           break;
      }
 
@@ -2153,6 +2200,7 @@ int main(int argc, char** argv){
      SDL_GLContext opengl_context = 0;
      GLuint theme_texture = 0;
      GLuint player_texture = 0;
+     GLuint arrow_texture = 0;
 
      if(!suite || show_suite){
           if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER) != 0){
@@ -2184,10 +2232,12 @@ int main(int argc, char** argv){
           glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
           glBlendEquation(GL_FUNC_ADD);
 
-          theme_texture = transparent_texture_from_file("theme.bmp");
+          theme_texture = transparent_texture_from_file("content/theme.bmp");
           if(theme_texture == 0) return 1;
-          player_texture = transparent_texture_from_file("player.bmp");
+          player_texture = transparent_texture_from_file("content/player.bmp");
           if(player_texture == 0) return 1;
+          arrow_texture = transparent_texture_from_file("content/arrow.bmp");
+          if(arrow_texture == 0) return 1;
      }
 
 #if 0 // TODO: do we want this in the future
@@ -2233,6 +2283,7 @@ int main(int argc, char** argv){
      TileMap_t tilemap = {};
      ObjectArray_t<Block_t> block_array = {};
      ObjectArray_t<Interactive_t> interactive_array = {};
+     ArrowArray_t arrow_array = {};
      Coord_t player_start {2, 8};
 
      if(load_map_filepath){
@@ -2309,6 +2360,8 @@ int main(int argc, char** argv){
      QuadTreeNode_t<Block_t>* block_quad_tree = nullptr;
 
      reset_map(&player, player_start, &interactive_array, &interactive_quad_tree);
+
+     player.has_bow = true;
 
      bool quit = false;
 
@@ -2605,6 +2658,10 @@ int main(int argc, char** argv){
                          player_action_perform(&player_action, &player, PLAYER_ACTION_TYPE_ACTIVATE_START, demo_mode,
                                                demo_file, frame_count);
                          break;
+                    case SDL_SCANCODE_SPACE:
+                         player_action_perform(&player_action, &player, PLAYER_ACTION_TYPE_SHOOT_START, demo_mode,
+                                               demo_file, frame_count);
+                         break;
                     case SDL_SCANCODE_L:
                          if(load_map_number(map_number, &player_start, &tilemap, &block_array, &interactive_array)){
                               reset_map(&player, player_start, &interactive_array, &interactive_quad_tree);
@@ -2734,6 +2791,10 @@ int main(int argc, char** argv){
                          break;
                     case SDL_SCANCODE_E:
                          player_action_perform(&player_action, &player, PLAYER_ACTION_TYPE_ACTIVATE_STOP, demo_mode,
+                                               demo_file, frame_count);
+                         break;
+                    case SDL_SCANCODE_SPACE:
+                         player_action_perform(&player_action, &player, PLAYER_ACTION_TYPE_SHOOT_STOP, demo_mode,
                                                demo_file, frame_count);
                          break;
                     case SDL_SCANCODE_LCTRL:
@@ -2956,6 +3017,34 @@ int main(int argc, char** argv){
                }
           }
 
+          // update arrows
+          for(S16 i = 0; i < ARROW_ARRAY_MAX; i++){
+               Arrow_t* arrow = arrow_array.arrows + i;
+               if(!arrow->alive) continue;
+               if(arrow->stuck) continue;
+
+               Vec_t direction = {};
+
+               switch(arrow->face){
+               default:
+                    break;
+               case DIRECTION_LEFT:
+                    direction.x = -1;
+                    break;
+               case DIRECTION_RIGHT:
+                    direction.x = 1;
+                    break;
+               case DIRECTION_DOWN:
+                    direction.y = -1;
+                    break;
+               case DIRECTION_UP:
+                    direction.y = 1;
+                    break;
+               }
+
+               arrow->pos += (direction * dt);
+          }
+
           // update player
           user_movement = vec_zero();
 
@@ -2981,6 +3070,15 @@ int main(int argc, char** argv){
 
           if(player_action.activate && !player_action.last_activate){
                activate(&tilemap, interactive_quad_tree, pos_to_coord(player.pos) + player.face);
+          }
+
+          if(player.has_bow && player_action.shoot && player.bow_draw_time < PLAYER_BOW_DRAW_DELAY){
+               player.bow_draw_time += dt;
+          }else if(!player_action.shoot){
+               if(player.bow_draw_time >= PLAYER_BOW_DRAW_DELAY){
+                    arrow_array_spawn(&arrow_array, player.pos, player.face);
+               }
+               player.bow_draw_time = 0.0f;
           }
 
           if(!player_action.move_left && !player_action.move_right && !player_action.move_up && !player_action.move_down){
@@ -3493,6 +3591,15 @@ int main(int argc, char** argv){
                     if(pos_to_coord(player.pos) == coord){
                          S8 player_frame_y = player.face;
                          if(player.push_time > FLT_EPSILON) player_frame_y += 4;
+                         if(player.has_bow){
+                              player_frame_y += 8;
+                              if(player.bow_draw_time > (PLAYER_BOW_DRAW_DELAY / 2.0f)){
+                                   player_frame_y += 8;
+                                   if(player.bow_draw_time >= PLAYER_BOW_DRAW_DELAY){
+                                        player_frame_y += 4;
+                                   }
+                              }
+                         }
                          Vec_t tex_vec = player_frame(player.walk_frame, player_frame_y);
                          pos_vec.y += (5.0f * PIXEL_SIZE);
 
@@ -3513,6 +3620,12 @@ int main(int argc, char** argv){
                          glBindTexture(GL_TEXTURE_2D, theme_texture);
                          glBegin(GL_QUADS);
                          glColor3f(1.0f, 1.0f, 1.0f);
+                    }
+
+                    for(S16 a = 0; a < ARROW_ARRAY_MAX; a++){
+                         Arrow_t* arrow = arrow_array.arrows + a;
+                         if(!arrow->alive) continue;
+
                     }
                }
           }
@@ -3780,6 +3893,7 @@ int main(int argc, char** argv){
      if(!suite){
           glDeleteTextures(1, &theme_texture);
           glDeleteTextures(1, &player_texture);
+          glDeleteTextures(1, &arrow_texture);
 
           SDL_GL_DeleteContext(opengl_context);
           SDL_DestroyWindow(window);
