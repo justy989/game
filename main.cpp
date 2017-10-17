@@ -950,6 +950,8 @@ void spread_ice(Coord_t center, S16 radius, TileMap_t* tilemap, QuadTreeNode_t<I
                                    }else{
                                         interactive->popup.iced = true;
                                    }
+                              }else if(interactive->type == INTERACTIVE_TYPE_PRESSURE_PLATE){
+                                   tile->flags |= TILE_FLAG_ICED;
                               }
                          }else{
                               tile->flags |= TILE_FLAG_ICED;
@@ -960,7 +962,8 @@ void spread_ice(Coord_t center, S16 radius, TileMap_t* tilemap, QuadTreeNode_t<I
      }
 }
 
-void melt_ice(Coord_t center, S16 radius, TileMap_t* tilemap, QuadTreeNode_t<Block_t>* block_quad_tree){
+void melt_ice(Coord_t center, S16 radius, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree,
+              QuadTreeNode_t<Block_t>* block_quad_tree){
      Coord_t delta {radius, radius};
      Coord_t min = center - delta;
      Coord_t max = center + delta;
@@ -969,7 +972,7 @@ void melt_ice(Coord_t center, S16 radius, TileMap_t* tilemap, QuadTreeNode_t<Blo
           for(S16 x = min.x; x <= max.x; ++x){
                Coord_t coord{x, y};
                Tile_t* tile = tilemap_get_tile(tilemap, coord);
-               if(tile && !tile_is_solid(tile) && tile->flags & TILE_FLAG_ICED){
+               if(tile && !tile_is_solid(tile)){
                     S16 px = coord.x * TILE_SIZE_IN_PIXELS;
                     S16 py = coord.y * TILE_SIZE_IN_PIXELS;
                     Rect_t coord_rect {(S16)(px - HALF_TILE_SIZE_IN_PIXELS),
@@ -989,7 +992,25 @@ void melt_ice(Coord_t center, S16 radius, TileMap_t* tilemap, QuadTreeNode_t<Blo
                          }
                     }
 
-                    if(!block) tile->flags &= ~TILE_FLAG_ICED;
+                    if(block){
+                         if(block->element == ELEMENT_ONLY_ICED) block->element = ELEMENT_NONE;
+                    }else{
+                         Interactive_t* interactive = quad_tree_find_at(interactive_quad_tree, coord.x, coord.y);
+                         if(interactive){
+                              if(interactive->type == INTERACTIVE_TYPE_POPUP){
+                                   if(interactive->popup.lift.ticks == 1){
+                                        tile->flags &= ~TILE_FLAG_ICED;
+                                   }else{
+                                        interactive->popup.iced = false;
+                                   }
+                              }else if(interactive->type == INTERACTIVE_TYPE_PRESSURE_PLATE){
+                                   interactive->pressure_plate.iced_under = false;
+                                   tile->flags &= ~TILE_FLAG_ICED;
+                              }
+                         }else{
+                              tile->flags &= ~TILE_FLAG_ICED;
+                         }
+                    }
                }
           }
      }
@@ -2979,11 +3000,27 @@ int main(int argc, char** argv){
                     if(interactive->coord == player_coord){
                          should_be_down = true;
                     }else{
-                         for(S16 b = 0; b < block_array.count; b++){
-                              Coord_t block_coord = block_get_coord(block_array.elements + b);
-                              if(interactive->coord == block_coord){
-                                   should_be_down = true;
-                                   break;
+                         Tile_t* tile = tilemap_get_tile(&tilemap, interactive->coord);
+                         if(tile){
+                              if(!(tile->flags & TILE_FLAG_ICED)){
+                                   Pixel_t center = coord_to_pixel(interactive->coord) + Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS};
+                                   Rect_t rect = {};
+                                   rect.left = center.x - (2 * TILE_SIZE_IN_PIXELS);
+                                   rect.right = center.x + (2 * TILE_SIZE_IN_PIXELS);
+                                   rect.bottom = center.y - (2 * TILE_SIZE_IN_PIXELS);
+                                   rect.top = center.y + (2 * TILE_SIZE_IN_PIXELS);
+
+                                   S16 block_count = 0;
+                                   Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
+                                   quad_tree_find_in(block_quad_tree, rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
+
+                                   for(S16 b = 0; b < block_count; b++){
+                                        Coord_t block_coord = block_get_coord(blocks[b]);
+                                        if(interactive->coord == block_coord){
+                                             should_be_down = true;
+                                             break;
+                                        }
+                                   }
                               }
                          }
                     }
@@ -3244,7 +3281,7 @@ int main(int argc, char** argv){
           for(S16 i = 0; i < block_array.count; i++){
                Block_t* block = block_array.elements + i;
                if(block->element == ELEMENT_FIRE){
-                    melt_ice(block_get_coord(block), 1, &tilemap, block_quad_tree);
+                    melt_ice(block_get_coord(block), 1, &tilemap, interactive_quad_tree, block_quad_tree);
                }
           }
 
@@ -3405,6 +3442,11 @@ int main(int argc, char** argv){
                     tile_flags_draw(tile->flags, tile_pos);
 
                     if(tile->flags & TILE_FLAG_ICED){
+                         Interactive_t* interactive = quad_tree_find_at(interactive_quad_tree, x, y);
+                         if(interactive && interactive->type == INTERACTIVE_TYPE_PRESSURE_PLATE){
+                              continue;
+                         }
+
                          glEnd();
 
                          // get state ready for ice
@@ -3432,27 +3474,31 @@ int main(int argc, char** argv){
                     // draw interactive
                     Interactive_t* interactive = quad_tree_find_at(interactive_quad_tree, coord.x, coord.y);
                     if(interactive){
-                         if(interactive->type == INTERACTIVE_TYPE_PRESSURE_PLATE &&
-                            interactive->pressure_plate.iced_under){
-                              // TODO: compress with above ice drawing code
-                              Vec_t tile_pos {(F32)(x - min.x) * TILE_SIZE + camera_offset.x,
-                                              (F32)(y - min.y) * TILE_SIZE + camera_offset.y};
-                              glEnd();
+                         if(interactive->type == INTERACTIVE_TYPE_PRESSURE_PLATE){
+                              Tile_t* tile = tilemap_get_tile(&tilemap, coord);
+                              if(tile && (tile->flags & TILE_FLAG_ICED)){
+                                   // pass because we are going to draw ice later
+                              }else if(interactive->pressure_plate.iced_under){
+                                   // TODO: compress with above ice drawing code
+                                   Vec_t tile_pos {(F32)(x - min.x) * TILE_SIZE + camera_offset.x,
+                                                   (F32)(y - min.y) * TILE_SIZE + camera_offset.y};
+                                   glEnd();
 
-                              // get state ready for ice
-                              glBindTexture(GL_TEXTURE_2D, 0);
-                              glColor4f(196.0f / 255.0f, 217.0f / 255.0f, 1.0f, 0.45f);
-                              glBegin(GL_QUADS);
-                              glVertex2f(tile_pos.x, tile_pos.y);
-                              glVertex2f(tile_pos.x, tile_pos.y + TILE_SIZE);
-                              glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y + TILE_SIZE);
-                              glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y);
-                              glEnd();
+                                   // get state ready for ice
+                                   glBindTexture(GL_TEXTURE_2D, 0);
+                                   glColor4f(196.0f / 255.0f, 217.0f / 255.0f, 1.0f, 0.45f);
+                                   glBegin(GL_QUADS);
+                                   glVertex2f(tile_pos.x, tile_pos.y);
+                                   glVertex2f(tile_pos.x, tile_pos.y + TILE_SIZE);
+                                   glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y + TILE_SIZE);
+                                   glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y);
+                                   glEnd();
 
-                              // reset state back to default
-                              glBindTexture(GL_TEXTURE_2D, theme_texture);
-                              glBegin(GL_QUADS);
-                              glColor3f(1.0f, 1.0f, 1.0f);
+                                   // reset state back to default
+                                   glBindTexture(GL_TEXTURE_2D, theme_texture);
+                                   glBegin(GL_QUADS);
+                                   glColor3f(1.0f, 1.0f, 1.0f);
+                              }
                          }
 
                          interactive_draw(interactive, pos_to_vec(coord_to_pos(interactive->coord) - screen_camera));
@@ -3472,6 +3518,28 @@ int main(int argc, char** argv){
                               glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y);
                               glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y);
                               glColor3f(1.0f, 1.0f, 1.0f);
+                         }else if(interactive->type == INTERACTIVE_TYPE_PRESSURE_PLATE){
+                              Tile_t* tile = tilemap_get_tile(&tilemap, coord);
+                              if(tile && tile->flags & TILE_FLAG_ICED){
+                                   Vec_t tile_pos {(F32)(x - min.x) * TILE_SIZE + camera_offset.x,
+                                                   (F32)(y - min.y) * TILE_SIZE + camera_offset.y};
+                                   glEnd();
+
+                                   // get state ready for ice
+                                   glBindTexture(GL_TEXTURE_2D, 0);
+                                   glColor4f(196.0f / 255.0f, 217.0f / 255.0f, 1.0f, 0.45f);
+                                   glBegin(GL_QUADS);
+                                   glVertex2f(tile_pos.x, tile_pos.y);
+                                   glVertex2f(tile_pos.x, tile_pos.y + TILE_SIZE);
+                                   glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y + TILE_SIZE);
+                                   glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y);
+                                   glEnd();
+
+                                   // reset state back to default
+                                   glBindTexture(GL_TEXTURE_2D, theme_texture);
+                                   glBegin(GL_QUADS);
+                                   glColor3f(1.0f, 1.0f, 1.0f);
+                              }
                          }
                     }
 
