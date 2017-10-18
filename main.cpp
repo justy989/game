@@ -64,11 +64,11 @@ struct Block_t{
      Position_t pos;
      Vec_t accel;
      Vec_t vel;
-     F32 fall_time;
      DirectionMask_t force;
      Direction_t face;
      Element_t element;
      Pixel_t push_start;
+     F32 fall_time;
 };
 
 S16 get_object_x(Block_t* block){
@@ -341,15 +341,19 @@ Tile_t* block_against_solid_tile(Block_t* block_to_check, Direction_t direction,
 }
 
 #define ARROW_DISINTEGRATE_DELAY 4.0f
+#define ARROW_SHOOT_HEIGHT 7
+#define ARROW_FALL_DELAY 2.0f
 
 struct Arrow_t{
      Position_t pos;
      Direction_t face;
      Element_t element;
+     F32 vel;
      S16 element_from_block;
 
      bool alive;
      F32 stuck_time;
+     F32 fall_time;
 };
 
 #define ARROW_ARRAY_MAX 32
@@ -374,6 +378,7 @@ Arrow_t* arrow_array_spawn(ArrowArray_t* arrow_array, Position_t pos, Direction_
                arrow_array->arrows[i].alive = true;
                arrow_array->arrows[i].stuck_time = 0.0f;
                arrow_array->arrows[i].element = ELEMENT_NONE;
+               arrow_array->arrows[i].vel = 1.25f;
                return arrow_array->arrows + i;
           }
      }
@@ -3056,8 +3061,20 @@ int main(int argc, char** argv){
                     continue;
                }
 
-               Vec_t direction = {};
+               F32 arrow_friction = 0.9999f;
 
+               if(arrow->pos.z > 0){
+                    // TODO: fall based on the timer !
+                    arrow->fall_time += dt;
+                    if(arrow->fall_time > ARROW_FALL_DELAY){
+                         arrow->fall_time -= ARROW_FALL_DELAY;
+                         arrow->pos.z--;
+                    }
+               }else{
+                    arrow_friction = 0.9f;
+               }
+
+               Vec_t direction = {};
                switch(arrow->face){
                default:
                     break;
@@ -3075,8 +3092,10 @@ int main(int argc, char** argv){
                     break;
                }
 
-               arrow->pos += (direction * dt);
+               arrow->pos += (direction * dt * arrow->vel);
+               arrow->vel *= arrow_friction;
                Coord_t post_move_coord = pos_to_coord(arrow->pos);
+
 
                Rect_t coord_rect {(S16)(arrow->pos.pixel.x - TILE_SIZE_IN_PIXELS),
                                   (S16)(arrow->pos.pixel.y - TILE_SIZE_IN_PIXELS),
@@ -3172,7 +3191,27 @@ int main(int argc, char** argv){
                player.bow_draw_time += dt;
           }else if(!player_action.shoot){
                if(player.bow_draw_time >= PLAYER_BOW_DRAW_DELAY){
-                    arrow_array_spawn(&arrow_array, player.pos, player.face);
+                    Position_t arrow_pos = player.pos;
+                    switch(player.face){
+                    default:
+                         break;
+                    case DIRECTION_LEFT:
+                         arrow_pos.pixel.y -= 2;
+                         arrow_pos.pixel.x -= 8;
+                         break;
+                    case DIRECTION_RIGHT:
+                         arrow_pos.pixel.y -= 2;
+                         arrow_pos.pixel.x += 8;
+                         break;
+                    case DIRECTION_UP:
+                         arrow_pos.pixel.y += 7;
+                         break;
+                    case DIRECTION_DOWN:
+                         arrow_pos.pixel.y -= 11;
+                         break;
+                    }
+                    arrow_pos.z += ARROW_SHOOT_HEIGHT;
+                    arrow_array_spawn(&arrow_array, arrow_pos, player.face);
                }
                player.bow_draw_time = 0.0f;
           }
@@ -3728,10 +3767,9 @@ int main(int argc, char** argv){
                          glBegin(GL_QUADS);
                          glColor3f(1.0f, 1.0f, 1.0f);
 
-                         S8 y_frame = 0;
-                         if(arrow->element) y_frame = 2 + ((arrow->element - 1) * 4);
-
-                         Vec_t tex_vec = arrow_frame(arrow->face, y_frame);
+                         // shadow
+                         //arrow_vec.y -= (arrow->pos.z * PIXEL_SIZE);
+                         Vec_t tex_vec = arrow_frame(arrow->face, 1);
                          glTexCoord2f(tex_vec.x, tex_vec.y);
                          glVertex2f(arrow_vec.x, arrow_vec.y);
                          glTexCoord2f(tex_vec.x, tex_vec.y + ARROW_FRAME_HEIGHT);
@@ -3740,6 +3778,22 @@ int main(int argc, char** argv){
                          glVertex2f(arrow_vec.x + TILE_SIZE, arrow_vec.y + TILE_SIZE);
                          glTexCoord2f(tex_vec.x + ARROW_FRAME_WIDTH, tex_vec.y);
                          glVertex2f(arrow_vec.x + TILE_SIZE, arrow_vec.y);
+
+                         arrow_vec.y += (arrow->pos.z * PIXEL_SIZE);
+
+                         S8 y_frame = 0;
+                         if(arrow->element) y_frame = 2 + ((arrow->element - 1) * 4);
+
+                         tex_vec = arrow_frame(arrow->face, y_frame);
+                         glTexCoord2f(tex_vec.x, tex_vec.y);
+                         glVertex2f(arrow_vec.x, arrow_vec.y);
+                         glTexCoord2f(tex_vec.x, tex_vec.y + ARROW_FRAME_HEIGHT);
+                         glVertex2f(arrow_vec.x, arrow_vec.y + TILE_SIZE);
+                         glTexCoord2f(tex_vec.x + ARROW_FRAME_WIDTH, tex_vec.y + ARROW_FRAME_HEIGHT);
+                         glVertex2f(arrow_vec.x + TILE_SIZE, arrow_vec.y + TILE_SIZE);
+                         glTexCoord2f(tex_vec.x + ARROW_FRAME_WIDTH, tex_vec.y);
+                         glVertex2f(arrow_vec.x + TILE_SIZE, arrow_vec.y);
+
                          glEnd();
 
                          glBindTexture(GL_TEXTURE_2D, theme_texture);
