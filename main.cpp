@@ -344,6 +344,7 @@ struct Arrow_t{
      Position_t pos;
      Direction_t face;
      Element_t element;
+     S16 element_from_block;
 
      bool alive;
      bool stuck;
@@ -445,6 +446,16 @@ GLuint transparent_texture_from_file(const char* filepath){
 Vec_t theme_frame(S16 x, S16 y){
      y = (THEME_FRAMES_TALL - 1) - y;
      return Vec_t{(F32)(x) * THEME_FRAME_WIDTH, (F32)(y) * THEME_FRAME_HEIGHT};
+}
+
+#define ARROW_FRAME_WIDTH 0.25f
+#define ARROW_FRAME_HEIGHT 0.0625f
+#define ARROW_FRAMES_TALL 16
+#define ARROW_FRAMES_WIDE 4
+
+Vec_t arrow_frame(S8 x, S8 y) {
+     y = (ARROW_FRAMES_TALL - 1) - y;
+     return Vec_t{(F32)(x) * ARROW_FRAME_WIDTH, (F32)(y) * ARROW_FRAME_HEIGHT};
 }
 
 #define PLAYER_FRAME_WIDTH 0.25f
@@ -3042,7 +3053,71 @@ int main(int argc, char** argv){
                     break;
                }
 
+               Coord_t pre_move_coord = pos_to_coord(arrow->pos);
                arrow->pos += (direction * dt);
+               Coord_t post_move_coord = pos_to_coord(arrow->pos);
+
+               Rect_t coord_rect {(S16)(arrow->pos.pixel.x - TILE_SIZE_IN_PIXELS),
+                                  (S16)(arrow->pos.pixel.y - TILE_SIZE_IN_PIXELS),
+                                  (S16)(arrow->pos.pixel.x + TILE_SIZE_IN_PIXELS),
+                                  (S16)(arrow->pos.pixel.y + TILE_SIZE_IN_PIXELS)};
+
+               S16 block_count = 0;
+               Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
+               quad_tree_find_in(block_quad_tree, coord_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
+               for(S16 b = 0; b < block_count; b++){
+                    // blocks on the coordinate and on the ground block light
+                    Rect_t block_rect = {blocks[b]->pos.pixel.x, blocks[b]->pos.pixel.y,
+                                         (S16)(blocks[b]->pos.pixel.x + TILE_SIZE_IN_PIXELS),
+                                         (S16)(blocks[b]->pos.pixel.y + TILE_SIZE_IN_PIXELS)};
+                    S16 block_index = blocks[b] - block_array.elements;
+                    if(pixel_in_rect(arrow->pos.pixel, block_rect) && arrow->element_from_block != block_index){
+                         arrow->element_from_block = block_index;
+                         if(arrow->element != blocks[b]->element){
+                              if(arrow->element){
+                                   blocks[b]->element = transition_element(blocks[b]->element, arrow->element);
+                              }else{
+                                   arrow->element = blocks[b]->element;
+                              }
+                         }
+                         break;
+                    }
+               }
+
+               if(block_count == 0){
+                    arrow->element_from_block = -1;
+               }
+
+               if(pre_move_coord != post_move_coord){
+                    Tile_t* tile = tilemap_get_tile(&tilemap, post_move_coord);
+                    if(tile_is_solid(tile)){
+                         switch(arrow->face){
+                         default:
+                              break;
+                         case DIRECTION_LEFT:
+                              arrow->pos.pixel.x = (post_move_coord.x + 1) * TILE_SIZE_IN_PIXELS;
+                              arrow->pos.decimal.x = 0.0f;
+                              break;
+                         case DIRECTION_RIGHT:
+                              arrow->pos.pixel.x = post_move_coord.x * TILE_SIZE_IN_PIXELS;
+                              arrow->pos.decimal.x = 0.0f;
+                              break;
+                         case DIRECTION_DOWN:
+                              break;
+                         case DIRECTION_UP:
+                              break;
+                         }
+
+                         arrow->stuck = true;
+                    }
+
+                    // catch or give elements
+                    if(arrow->element == ELEMENT_FIRE){
+                         melt_ice(post_move_coord, 0, &tilemap, interactive_quad_tree, block_quad_tree);
+                    }else if(arrow->element == ELEMENT_ICE){
+                         spread_ice(post_move_coord, 0, &tilemap, interactive_quad_tree, block_quad_tree);
+                    }
+               }
           }
 
           // update player
@@ -3625,7 +3700,30 @@ int main(int argc, char** argv){
                     for(S16 a = 0; a < ARROW_ARRAY_MAX; a++){
                          Arrow_t* arrow = arrow_array.arrows + a;
                          if(!arrow->alive) continue;
+                         Vec_t arrow_vec = pos_to_vec(arrow->pos - screen_camera);
 
+                         glEnd();
+                         glBindTexture(GL_TEXTURE_2D, arrow_texture);
+                         glBegin(GL_QUADS);
+                         glColor3f(1.0f, 1.0f, 1.0f);
+
+                         S8 y_frame = 0;
+                         if(arrow->element) y_frame = 2 + ((arrow->element - 1) * 4);
+
+                         Vec_t tex_vec = arrow_frame(arrow->face, y_frame);
+                         glTexCoord2f(tex_vec.x, tex_vec.y);
+                         glVertex2f(arrow_vec.x - HALF_TILE_SIZE, arrow_vec.y - HALF_TILE_SIZE);
+                         glTexCoord2f(tex_vec.x, tex_vec.y + PLAYER_FRAME_HEIGHT);
+                         glVertex2f(arrow_vec.x - HALF_TILE_SIZE, arrow_vec.y + HALF_TILE_SIZE);
+                         glTexCoord2f(tex_vec.x + PLAYER_FRAME_WIDTH, tex_vec.y + PLAYER_FRAME_HEIGHT);
+                         glVertex2f(arrow_vec.x + HALF_TILE_SIZE, arrow_vec.y + HALF_TILE_SIZE);
+                         glTexCoord2f(tex_vec.x + PLAYER_FRAME_WIDTH, tex_vec.y);
+                         glVertex2f(arrow_vec.x + HALF_TILE_SIZE, arrow_vec.y - HALF_TILE_SIZE);
+                         glEnd();
+
+                         glBindTexture(GL_TEXTURE_2D, theme_texture);
+                         glBegin(GL_QUADS);
+                         glColor3f(1.0f, 1.0f, 1.0f);
                     }
                }
           }
