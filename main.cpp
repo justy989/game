@@ -340,6 +340,8 @@ Tile_t* block_against_solid_tile(Block_t* block_to_check, Direction_t direction,
      return nullptr;
 }
 
+#define ARROW_DISINTEGRATE_DELAY 4.0f
+
 struct Arrow_t{
      Position_t pos;
      Direction_t face;
@@ -347,7 +349,7 @@ struct Arrow_t{
      S16 element_from_block;
 
      bool alive;
-     bool stuck;
+     F32 stuck_time;
 };
 
 #define ARROW_ARRAY_MAX 32
@@ -370,7 +372,8 @@ Arrow_t* arrow_array_spawn(ArrowArray_t* arrow_array, Position_t pos, Direction_
                arrow_array->arrows[i].pos = pos;
                arrow_array->arrows[i].face = face;
                arrow_array->arrows[i].alive = true;
-               arrow_array->arrows[i].stuck = false;
+               arrow_array->arrows[i].stuck_time = 0.0f;
+               arrow_array->arrows[i].element = ELEMENT_NONE;
                return arrow_array->arrows + i;
           }
      }
@@ -816,8 +819,7 @@ void illuminate_line(Coord_t start, Coord_t end, U8 value, TileMap_t* tilemap, Q
           }
 #endif
 
-          if(tile->light < new_value) tile->light = new_value;
-
+          Block_t* block = nullptr;
           if(coords[i] != start){
                if(tile_is_solid(tile)){
                     break;
@@ -831,16 +833,16 @@ void illuminate_line(Coord_t start, Coord_t end, U8 value, TileMap_t* tilemap, Q
                Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
                quad_tree_find_in(block_quad_tree, coord_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
 
-               Block_t* block = nullptr;
                for(S16 b = 0; b < block_count; b++){
                     if(block_get_coord(blocks[b]) == coords[i]){
                          block = blocks[b];
                          break;
                     }
                }
-
-               if(block) break;
           }
+
+          if(tile->light < new_value) tile->light = new_value;
+          if(block) break;
      }
 }
 
@@ -2983,6 +2985,13 @@ int main(int argc, char** argv){
                }
           }
 
+          // reset base light
+          for(S16 j = 0; j < tilemap.height; j++){
+               for(S16 i = 0; i < tilemap.width; i++){
+                    tilemap.tiles[j][i].light = BASE_LIGHT;
+               }
+          }
+
           // update interactives
           for(S16 i = 0; i < interactive_array.count; i++){
                Interactive_t* interactive = interactive_array.elements + i;
@@ -3032,7 +3041,20 @@ int main(int argc, char** argv){
           for(S16 i = 0; i < ARROW_ARRAY_MAX; i++){
                Arrow_t* arrow = arrow_array.arrows + i;
                if(!arrow->alive) continue;
-               if(arrow->stuck) continue;
+
+               Coord_t pre_move_coord = pos_to_coord(arrow->pos);
+
+               if(arrow->element == ELEMENT_FIRE){
+                    illuminate(pre_move_coord, 255 - LIGHT_DECAY, &tilemap, block_quad_tree);
+               }
+
+               if(arrow->stuck_time > 0.0f){
+                    arrow->stuck_time += dt;
+                    if(arrow->stuck_time > ARROW_DISINTEGRATE_DELAY){
+                         arrow->alive = false;
+                    }
+                    continue;
+               }
 
                Vec_t direction = {};
 
@@ -3053,7 +3075,6 @@ int main(int argc, char** argv){
                     break;
                }
 
-               Coord_t pre_move_coord = pos_to_coord(arrow->pos);
                arrow->pos += (direction * dt);
                Coord_t post_move_coord = pos_to_coord(arrow->pos);
 
@@ -3067,7 +3088,7 @@ int main(int argc, char** argv){
                quad_tree_find_in(block_quad_tree, coord_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
                for(S16 b = 0; b < block_count; b++){
                     // blocks on the coordinate and on the ground block light
-                    Rect_t block_rect = {blocks[b]->pos.pixel.x, blocks[b]->pos.pixel.y,
+                    Rect_t block_rect = {(S16)(blocks[b]->pos.pixel.x), (S16)(blocks[b]->pos.pixel.y),
                                          (S16)(blocks[b]->pos.pixel.x + TILE_SIZE_IN_PIXELS),
                                          (S16)(blocks[b]->pos.pixel.y + TILE_SIZE_IN_PIXELS)};
                     S16 block_index = blocks[b] - block_array.elements;
@@ -3108,7 +3129,7 @@ int main(int argc, char** argv){
                               break;
                          }
 
-                         arrow->stuck = true;
+                         arrow->stuck_time = dt;
                     }
 
                     // catch or give elements
@@ -3357,13 +3378,6 @@ int main(int argc, char** argv){
                }
           }
 
-          // reset base light
-          for(S16 j = 0; j < tilemap.height; j++){
-               for(S16 i = 0; i < tilemap.width; i++){
-                    tilemap.tiles[j][i].light = BASE_LIGHT;
-               }
-          }
-
           // illuminate and ice
           for(S16 i = 0; i < block_array.count; i++){
                Block_t* block = block_array.elements + i;
@@ -3538,12 +3552,55 @@ int main(int argc, char** argv){
                     tile_id_draw(tile->id, tile_pos);
                     tile_flags_draw(tile->flags, tile_pos);
 
-                    if(tile_is_iced(tile)){
-                         Interactive_t* interactive = quad_tree_find_at(interactive_quad_tree, x, y);
-                         if(interactive && (interactive->type == INTERACTIVE_TYPE_PRESSURE_PLATE || interactive->type == INTERACTIVE_TYPE_POPUP)){
-                              continue;
-                         }
+                    // draw flat interactives that could be covered by ice
+                    Interactive_t* interactive = quad_tree_find_at(interactive_quad_tree, x, y);
+                    if(interactive){
+                         if(interactive->type == INTERACTIVE_TYPE_PRESSURE_PLATE){
+                              if(!tile_is_iced(tile) && interactive->pressure_plate.iced_under){
+                                   // TODO: compress with above ice drawing code
+                                   glEnd();
 
+                                   // get state ready for ice
+                                   glBindTexture(GL_TEXTURE_2D, 0);
+                                   glColor4f(196.0f / 255.0f, 217.0f / 255.0f, 1.0f, 0.45f);
+                                   glBegin(GL_QUADS);
+                                   glVertex2f(tile_pos.x, tile_pos.y);
+                                   glVertex2f(tile_pos.x, tile_pos.y + TILE_SIZE);
+                                   glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y + TILE_SIZE);
+                                   glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y);
+                                   glEnd();
+
+                                   // reset state back to default
+                                   glBindTexture(GL_TEXTURE_2D, theme_texture);
+                                   glBegin(GL_QUADS);
+                                   glColor3f(1.0f, 1.0f, 1.0f);
+                              }
+
+                              interactive_draw(interactive, pos_to_vec(coord_to_pos(interactive->coord) - screen_camera));
+                         }else if(interactive->type == INTERACTIVE_TYPE_POPUP && interactive->popup.lift.ticks == 1){
+                              if(interactive->popup.iced){
+                                   tile_pos.y += interactive->popup.lift.ticks * PIXEL_SIZE;
+                                   Vec_t tex_vec = theme_frame(3, 12);
+                                   glColor4f(1.0f, 1.0f, 1.0f, 0.5f);
+                                   glTexCoord2f(tex_vec.x, tex_vec.y);
+                                   glVertex2f(tile_pos.x, tile_pos.y);
+                                   glTexCoord2f(tex_vec.x, tex_vec.y + THEME_FRAME_HEIGHT);
+                                   glVertex2f(tile_pos.x, tile_pos.y + TILE_SIZE);
+                                   glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y + THEME_FRAME_HEIGHT);
+                                   glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y + TILE_SIZE);
+                                   glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y);
+                                   glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y);
+                                   glColor3f(1.0f, 1.0f, 1.0f);
+                              }
+
+                              interactive_draw(interactive, pos_to_vec(coord_to_pos(interactive->coord) - screen_camera));
+                         }else if(interactive->type == INTERACTIVE_TYPE_LIGHT_DETECTOR ||
+                                  interactive->type == INTERACTIVE_TYPE_ICE_DETECTOR){
+                              interactive_draw(interactive, pos_to_vec(coord_to_pos(interactive->coord) - screen_camera));
+                         }
+                    }
+
+                    if(tile_is_iced(tile)){
                          glEnd();
 
                          // get state ready for ice
@@ -3571,74 +3628,28 @@ int main(int argc, char** argv){
                     // draw interactive
                     Interactive_t* interactive = quad_tree_find_at(interactive_quad_tree, coord.x, coord.y);
                     if(interactive){
-                         if(interactive->type == INTERACTIVE_TYPE_PRESSURE_PLATE){
-                              Tile_t* tile = tilemap_get_tile(&tilemap, coord);
-                              if(tile && tile_is_iced(tile)){
-                                   // pass because we are going to draw ice later
-                              }else if(interactive->pressure_plate.iced_under){
-                                   // TODO: compress with above ice drawing code
+                         if(interactive->type == INTERACTIVE_TYPE_PRESSURE_PLATE ||
+                            interactive->type == INTERACTIVE_TYPE_ICE_DETECTOR ||
+                            interactive->type == INTERACTIVE_TYPE_LIGHT_DETECTOR ||
+                            (interactive->type == INTERACTIVE_TYPE_POPUP && interactive->popup.lift.ticks == 1)){
+                              // pass, these are flat
+                         }else{
+                              interactive_draw(interactive, pos_to_vec(coord_to_pos(interactive->coord) - screen_camera));
+
+                              if(interactive->type == INTERACTIVE_TYPE_POPUP && interactive->popup.iced){
                                    Vec_t tile_pos {(F32)(x - min.x) * TILE_SIZE + camera_offset.x,
                                                    (F32)(y - min.y) * TILE_SIZE + camera_offset.y};
-                                   glEnd();
-
-                                   // get state ready for ice
-                                   glBindTexture(GL_TEXTURE_2D, 0);
-                                   glColor4f(196.0f / 255.0f, 217.0f / 255.0f, 1.0f, 0.45f);
-                                   glBegin(GL_QUADS);
+                                   tile_pos.y += interactive->popup.lift.ticks * PIXEL_SIZE;
+                                   Vec_t tex_vec = theme_frame(3, 12);
+                                   glColor4f(1.0f, 1.0f, 1.0f, 0.5f);
+                                   glTexCoord2f(tex_vec.x, tex_vec.y);
                                    glVertex2f(tile_pos.x, tile_pos.y);
+                                   glTexCoord2f(tex_vec.x, tex_vec.y + THEME_FRAME_HEIGHT);
                                    glVertex2f(tile_pos.x, tile_pos.y + TILE_SIZE);
+                                   glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y + THEME_FRAME_HEIGHT);
                                    glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y + TILE_SIZE);
+                                   glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y);
                                    glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y);
-                                   glEnd();
-
-                                   // reset state back to default
-                                   glBindTexture(GL_TEXTURE_2D, theme_texture);
-                                   glBegin(GL_QUADS);
-                                   glColor3f(1.0f, 1.0f, 1.0f);
-                              }
-                         }
-
-                         interactive_draw(interactive, pos_to_vec(coord_to_pos(interactive->coord) - screen_camera));
-
-                         if(interactive->type == INTERACTIVE_TYPE_POPUP && interactive->popup.iced){
-                              Vec_t tile_pos {(F32)(x - min.x) * TILE_SIZE + camera_offset.x,
-                                              (F32)(y - min.y) * TILE_SIZE + camera_offset.y};
-                              tile_pos.y += interactive->popup.lift.ticks * PIXEL_SIZE;
-                              Vec_t tex_vec = theme_frame(3, 12);
-                              glColor4f(1.0f, 1.0f, 1.0f, 0.5f);
-                              glTexCoord2f(tex_vec.x, tex_vec.y);
-                              glVertex2f(tile_pos.x, tile_pos.y);
-                              glTexCoord2f(tex_vec.x, tex_vec.y + THEME_FRAME_HEIGHT);
-                              glVertex2f(tile_pos.x, tile_pos.y + TILE_SIZE);
-                              glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y + THEME_FRAME_HEIGHT);
-                              glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y + TILE_SIZE);
-                              glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y);
-                              glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y);
-                              glColor3f(1.0f, 1.0f, 1.0f);
-                         }else if(interactive->type == INTERACTIVE_TYPE_PRESSURE_PLATE ||
-                                  (interactive->type == INTERACTIVE_TYPE_POPUP &&
-                                   interactive->popup.lift.ticks == 1) ||
-                                  interactive->type == INTERACTIVE_TYPE_ICE_DETECTOR ||
-                                  interactive->type == INTERACTIVE_TYPE_LIGHT_DETECTOR){
-                              Tile_t* tile = tilemap_get_tile(&tilemap, coord);
-                              if(tile && tile_is_iced(tile)){
-                                   Vec_t tile_pos {(F32)(x - min.x) * TILE_SIZE + camera_offset.x,
-                                                   (F32)(y - min.y) * TILE_SIZE + camera_offset.y};
-                                   glEnd();
-
-                                   // get state ready for ice
-                                   glBindTexture(GL_TEXTURE_2D, 0);
-                                   glColor4f(196.0f / 255.0f, 217.0f / 255.0f, 1.0f, 0.45f);
-                                   glBegin(GL_QUADS);
-                                   glVertex2f(tile_pos.x, tile_pos.y);
-                                   glVertex2f(tile_pos.x, tile_pos.y + TILE_SIZE);
-                                   glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y + TILE_SIZE);
-                                   glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y);
-                                   glEnd();
-
-                                   // reset state back to default
-                                   glBindTexture(GL_TEXTURE_2D, theme_texture);
-                                   glBegin(GL_QUADS);
                                    glColor3f(1.0f, 1.0f, 1.0f);
                               }
                          }
@@ -3697,10 +3708,20 @@ int main(int argc, char** argv){
                          glColor3f(1.0f, 1.0f, 1.0f);
                     }
 
+                    // draw arrows
+                    static Vec_t arrow_tip_offset[DIRECTION_COUNT] = {
+                         {0.0f,               9.0f * PIXEL_SIZE},
+                         {8.0f * PIXEL_SIZE,  16.0f * PIXEL_SIZE},
+                         {16.0f * PIXEL_SIZE, 9.0f * PIXEL_SIZE},
+                         {8.0f * PIXEL_SIZE,  0.0f * PIXEL_SIZE},
+                    };
+
                     for(S16 a = 0; a < ARROW_ARRAY_MAX; a++){
                          Arrow_t* arrow = arrow_array.arrows + a;
                          if(!arrow->alive) continue;
                          Vec_t arrow_vec = pos_to_vec(arrow->pos - screen_camera);
+                         arrow_vec.x -= arrow_tip_offset[arrow->face].x;
+                         arrow_vec.y -= arrow_tip_offset[arrow->face].y;
 
                          glEnd();
                          glBindTexture(GL_TEXTURE_2D, arrow_texture);
@@ -3712,13 +3733,13 @@ int main(int argc, char** argv){
 
                          Vec_t tex_vec = arrow_frame(arrow->face, y_frame);
                          glTexCoord2f(tex_vec.x, tex_vec.y);
-                         glVertex2f(arrow_vec.x - HALF_TILE_SIZE, arrow_vec.y - HALF_TILE_SIZE);
-                         glTexCoord2f(tex_vec.x, tex_vec.y + PLAYER_FRAME_HEIGHT);
-                         glVertex2f(arrow_vec.x - HALF_TILE_SIZE, arrow_vec.y + HALF_TILE_SIZE);
-                         glTexCoord2f(tex_vec.x + PLAYER_FRAME_WIDTH, tex_vec.y + PLAYER_FRAME_HEIGHT);
-                         glVertex2f(arrow_vec.x + HALF_TILE_SIZE, arrow_vec.y + HALF_TILE_SIZE);
-                         glTexCoord2f(tex_vec.x + PLAYER_FRAME_WIDTH, tex_vec.y);
-                         glVertex2f(arrow_vec.x + HALF_TILE_SIZE, arrow_vec.y - HALF_TILE_SIZE);
+                         glVertex2f(arrow_vec.x, arrow_vec.y);
+                         glTexCoord2f(tex_vec.x, tex_vec.y + ARROW_FRAME_HEIGHT);
+                         glVertex2f(arrow_vec.x, arrow_vec.y + TILE_SIZE);
+                         glTexCoord2f(tex_vec.x + ARROW_FRAME_WIDTH, tex_vec.y + ARROW_FRAME_HEIGHT);
+                         glVertex2f(arrow_vec.x + TILE_SIZE, arrow_vec.y + TILE_SIZE);
+                         glTexCoord2f(tex_vec.x + ARROW_FRAME_WIDTH, tex_vec.y);
+                         glVertex2f(arrow_vec.x + TILE_SIZE, arrow_vec.y);
                          glEnd();
 
                          glBindTexture(GL_TEXTURE_2D, theme_texture);
