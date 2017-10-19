@@ -45,6 +45,7 @@ void player_spawn(Player_t* player, Coord_t coord){
      player->walk_frame_delta = 1;
      player->radius = 3.5f / 272.0f;
      player->pos = coord_to_pos_at_tile_center(coord);
+     player->has_bow = true;
 }
 
 Interactive_t* quad_tree_interactive_find_at(QuadTreeNode_t<Interactive_t>* root, Coord_t coord){
@@ -2379,8 +2380,6 @@ int main(int argc, char** argv){
 
      reset_map(&player, player_start, &interactive_array, &interactive_quad_tree);
 
-     player.has_bow = true;
-
      bool quit = false;
 
      Vec_t user_movement = {};
@@ -2706,6 +2705,15 @@ int main(int argc, char** argv){
                          char filepath[64];
                          snprintf(filepath, 64, "content/%03d.bm", map_number);
                          save_map(filepath, player_start, &tilemap, &block_array, &interactive_array);
+                    } break;
+                    case SDL_SCANCODE_N:
+                    {
+                         Tile_t* tile = tilemap_get_tile(&tilemap, mouse_select_world(mouse_screen, camera));
+                         if(tile){
+                              if(tile->flags & TILE_FLAG_WIRE_CLUSTER_LEFT) tile->flags |= TILE_FLAG_WIRE_CLUSTER_LEFT_ON;
+                              if(tile->flags & TILE_FLAG_WIRE_CLUSTER_MID) tile->flags |= TILE_FLAG_WIRE_CLUSTER_MID_ON;
+                              if(tile->flags & TILE_FLAG_WIRE_CLUSTER_RIGHT) tile->flags |= TILE_FLAG_WIRE_CLUSTER_RIGHT_ON;
+                         }
                     } break;
                     // TODO: #ifdef DEBUG
                     case SDL_SCANCODE_GRAVE:
@@ -3047,7 +3055,7 @@ int main(int argc, char** argv){
                Arrow_t* arrow = arrow_array.arrows + i;
                if(!arrow->alive) continue;
 
-               Coord_t pre_move_coord = pos_to_coord(arrow->pos);
+               Coord_t pre_move_coord = pixel_to_coord(arrow->pos.pixel + Pixel_t{0, arrow->pos.z});
 
                if(arrow->element == ELEMENT_FIRE){
                     illuminate(pre_move_coord, 255 - LIGHT_DECAY, &tilemap, block_quad_tree);
@@ -3094,8 +3102,7 @@ int main(int argc, char** argv){
 
                arrow->pos += (direction * dt * arrow->vel);
                arrow->vel *= arrow_friction;
-               Coord_t post_move_coord = pos_to_coord(arrow->pos);
-
+               Coord_t post_move_coord = pixel_to_coord(arrow->pos.pixel + Pixel_t{0, arrow->pos.z});
 
                Rect_t coord_rect {(S16)(arrow->pos.pixel.x - TILE_SIZE_IN_PIXELS),
                                   (S16)(arrow->pos.pixel.y - TILE_SIZE_IN_PIXELS),
@@ -3131,23 +3138,6 @@ int main(int argc, char** argv){
                if(pre_move_coord != post_move_coord){
                     Tile_t* tile = tilemap_get_tile(&tilemap, post_move_coord);
                     if(tile_is_solid(tile)){
-                         switch(arrow->face){
-                         default:
-                              break;
-                         case DIRECTION_LEFT:
-                              arrow->pos.pixel.x = (post_move_coord.x + 1) * TILE_SIZE_IN_PIXELS;
-                              arrow->pos.decimal.x = 0.0f;
-                              break;
-                         case DIRECTION_RIGHT:
-                              arrow->pos.pixel.x = post_move_coord.x * TILE_SIZE_IN_PIXELS;
-                              arrow->pos.decimal.x = 0.0f;
-                              break;
-                         case DIRECTION_DOWN:
-                              break;
-                         case DIRECTION_UP:
-                              break;
-                         }
-
                          arrow->stuck_time = dt;
                     }
 
@@ -3156,6 +3146,11 @@ int main(int argc, char** argv){
                          melt_ice(post_move_coord, 0, &tilemap, interactive_quad_tree, block_quad_tree);
                     }else if(arrow->element == ELEMENT_ICE){
                          spread_ice(post_move_coord, 0, &tilemap, interactive_quad_tree, block_quad_tree);
+                    }
+
+                    Interactive_t* interactive = quad_tree_interactive_find_at(interactive_quad_tree, post_move_coord);
+                    if(interactive && interactive->type == INTERACTIVE_TYPE_LEVER){
+                         activate(&tilemap, interactive_quad_tree, post_move_coord);
                     }
                }
           }
