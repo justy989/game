@@ -3125,10 +3125,10 @@ int main(int argc, char** argv){
                     if(pixel_in_rect(arrow->pos.pixel, block_rect) && arrow->element_from_block != block_index){
                          arrow->element_from_block = block_index;
                          if(arrow->element != blocks[b]->element){
-                              if(arrow->element){
-                                   blocks[b]->element = transition_element(blocks[b]->element, arrow->element);
-                              }else{
-                                   arrow->element = blocks[b]->element;
+                              Element_t arrow_element = arrow->element;
+                              arrow->element = transition_element(arrow->element, blocks[b]->element);
+                              if(arrow_element){
+                                   blocks[b]->element = transition_element(blocks[b]->element, arrow_element);
                               }
                          }
                          break;
