@@ -353,7 +353,7 @@ struct Arrow_t{
      S16 element_from_block;
 
      bool alive;
-     F32 stuck_time;
+     F32 stuck_time; // TODO: track objects we are stuck in
      F32 fall_time;
 };
 
@@ -489,7 +489,8 @@ void toggle_flag(U16* flags, U16 flag){
      }
 }
 
-void toggle_electricity(TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree,  Coord_t coord, Direction_t direction){
+void toggle_electricity(TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree, Coord_t coord,
+                        Direction_t direction, bool activated_by_door){
      Coord_t adjacent_coord = coord + direction;
      Tile_t* tile = tilemap_get_tile(tilemap, adjacent_coord);
      if(!tile) return;
@@ -508,6 +509,9 @@ void toggle_electricity(TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* inter
           } break;
           case INTERACTIVE_TYPE_DOOR:
                interactive->door.lift.up = !interactive->door.lift.up;
+               if(!activated_by_door) toggle_electricity(tilemap, interactive_quad_tree,
+                                                         coord_move(coord, interactive->door.face, 3),
+                                                         interactive->door.face, true);
                break;
           }
      }
@@ -546,19 +550,19 @@ void toggle_electricity(TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* inter
           }
 
           if(tile->flags & TILE_FLAG_WIRE_LEFT && direction != DIRECTION_RIGHT){
-               toggle_electricity(tilemap, interactive_quad_tree, adjacent_coord, DIRECTION_LEFT);
+               toggle_electricity(tilemap, interactive_quad_tree, adjacent_coord, DIRECTION_LEFT, false);
           }
 
           if(tile->flags & TILE_FLAG_WIRE_RIGHT && direction != DIRECTION_LEFT){
-               toggle_electricity(tilemap, interactive_quad_tree, adjacent_coord, DIRECTION_RIGHT);
+               toggle_electricity(tilemap, interactive_quad_tree, adjacent_coord, DIRECTION_RIGHT, false);
           }
 
           if(tile->flags & TILE_FLAG_WIRE_DOWN && direction != DIRECTION_UP){
-               toggle_electricity(tilemap, interactive_quad_tree, adjacent_coord, DIRECTION_DOWN);
+               toggle_electricity(tilemap, interactive_quad_tree, adjacent_coord, DIRECTION_DOWN, false);
           }
 
           if(tile->flags & TILE_FLAG_WIRE_UP && direction != DIRECTION_DOWN){
-               toggle_electricity(tilemap, interactive_quad_tree, adjacent_coord, DIRECTION_UP);
+               toggle_electricity(tilemap, interactive_quad_tree, adjacent_coord, DIRECTION_UP, false);
           }
      }else if(tile->flags & (TILE_FLAG_WIRE_CLUSTER_LEFT | TILE_FLAG_WIRE_CLUSTER_MID | TILE_FLAG_WIRE_CLUSTER_RIGHT)){
           bool all_on_before = tile_flags_cluster_all_on(tile->flags);
@@ -632,7 +636,7 @@ void toggle_electricity(TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* inter
           bool all_on_after = tile_flags_cluster_all_on(tile->flags);
 
           if(all_on_before != all_on_after){
-               toggle_electricity(tilemap, interactive_quad_tree, adjacent_coord, cluster_direction);
+               toggle_electricity(tilemap, interactive_quad_tree, adjacent_coord, cluster_direction, false);
           }
      }
 }
@@ -646,10 +650,10 @@ void activate(TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qua
         interactive->type != INTERACTIVE_TYPE_LIGHT_DETECTOR &&
         interactive->type != INTERACTIVE_TYPE_ICE_DETECTOR) return;
 
-     toggle_electricity(tilemap, interactive_quad_tree, coord, DIRECTION_LEFT);
-     toggle_electricity(tilemap, interactive_quad_tree, coord, DIRECTION_RIGHT);
-     toggle_electricity(tilemap, interactive_quad_tree, coord, DIRECTION_UP);
-     toggle_electricity(tilemap, interactive_quad_tree, coord, DIRECTION_DOWN);
+     toggle_electricity(tilemap, interactive_quad_tree, coord, DIRECTION_LEFT, false);
+     toggle_electricity(tilemap, interactive_quad_tree, coord, DIRECTION_RIGHT, false);
+     toggle_electricity(tilemap, interactive_quad_tree, coord, DIRECTION_UP, false);
+     toggle_electricity(tilemap, interactive_quad_tree, coord, DIRECTION_DOWN, false);
 }
 
 Interactive_t* block_against_solid_interactive(Block_t* block_to_check, Direction_t direction,
@@ -3149,8 +3153,18 @@ int main(int argc, char** argv){
                     }
 
                     Interactive_t* interactive = quad_tree_interactive_find_at(interactive_quad_tree, post_move_coord);
-                    if(interactive && interactive->type == INTERACTIVE_TYPE_LEVER){
-                         activate(&tilemap, interactive_quad_tree, post_move_coord);
+                    if(interactive){
+                         if(interactive->type == INTERACTIVE_TYPE_LEVER){
+                              if(arrow->pos.z >= HEIGHT_INTERVAL){
+                                   activate(&tilemap, interactive_quad_tree, post_move_coord);
+                              }else{
+                                   arrow->stuck_time = dt;
+                              }
+                         }else if(interactive->type == INTERACTIVE_TYPE_DOOR){
+                              if(interactive->door.lift.ticks < arrow->pos.z){
+                                   arrow->stuck_time = dt;
+                              }
+                         }
                     }
                }
           }
@@ -3826,6 +3840,7 @@ int main(int argc, char** argv){
           }
           glEnd();
 
+#if 0
           // light
           glBindTexture(GL_TEXTURE_2D, 0);
           glBegin(GL_QUADS);
@@ -3844,6 +3859,7 @@ int main(int argc, char** argv){
                }
           }
           glEnd();
+#endif
 
           // player start
           selection_draw(player_start, player_start, screen_camera, 0.0f, 1.0f, 0.0f);
