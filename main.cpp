@@ -1831,7 +1831,7 @@ bool init(UndoHistory_t* undo_history, U32 history_size){
      return true;
 }
 
-#define ASSERT_BELOW_HISTORY_SIZE(history) assert((char*)(history->current) - (char*)(history->start) > history->size)
+#define ASSERT_BELOW_HISTORY_SIZE(history) assert((char*)(history->current) - (char*)(history->start) < history->size)
 
 void undo_history_add(UndoHistory_t* undo_history, UndoDiffType_t type, S32 index){
      switch(type){
@@ -2019,10 +2019,60 @@ void undo_commit(Undo_t* undo, Player_t* player, TileMap_t* tilemap, ObjectArray
      undo_snapshot(undo, player, tilemap, block_array, interactive_array);
 }
 
-// void undo_revert(Undo_t* undo, Player_t* player, TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array,
-//                  ObjectArray_t<Interactive_t>* interactive_array){
-// 
-// }
+void undo_revert(Undo_t* undo, Player_t* player, TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array,
+                 ObjectArray_t<Interactive_t>* interactive_array){
+     if(undo->history.current <= undo->history.start) return;
+
+     auto* ptr = (char*)(undo->history.current);
+     S32 diff_count = 0;
+     ptr -= sizeof(diff_count);
+     diff_count = *(S32*)(ptr);
+
+     for(S32 i = 0; i < diff_count; i++){
+          ptr -= sizeof(UndoDiffHeader_t);
+          auto* diff_header = (UndoDiffHeader_t*)(ptr);
+
+          switch(diff_header->type){
+          default:
+               assert(!"memory probably corrupted, or new unsupported diff type");
+               return;
+          case UNDO_DIFF_TYPE_PLAYER:
+          {
+               ptr -= sizeof(UndoPlayer_t);
+               auto* player_entry = (UndoPlayer_t*)(ptr);
+               *player = {};
+               player->pos.pixel = player_entry->pixel;
+               player->pos.z = player_entry->z;
+               player->face = player_entry->face;
+          } break;
+          case UNDO_DIFF_TYPE_TILE_FLAGS:
+          {
+               int x = diff_header->index % tilemap->width;
+               int y = diff_header->index / tilemap->width;
+
+               ptr -= sizeof(U16);
+               auto* tile_flags_entry = (U16*)(ptr);
+               tilemap->tiles[y][x].flags = *tile_flags_entry;
+          } break;
+          case UNDO_DIFF_TYPE_BLOCK:
+          {
+               ptr -= sizeof(UndoBlock_t);
+               auto* block_entry = (UndoBlock_t*)(ptr);
+               block_array->elements[i].pos.pixel = block_entry->pixel;
+               block_array->elements[i].pos.z = block_entry->z;
+               block_array->elements[i].element = block_entry->element;
+               block_array->elements[i].accel = block_entry->accel;
+               block_array->elements[i].vel = block_entry->vel;
+          } break;
+          case UNDO_DIFF_TYPE_INTERACTIVE:
+          {
+               ptr -= sizeof(Interactive_t);
+               auto* interactive_entry = (Interactive_t*)(ptr);
+               interactive_array->elements[i] = *interactive_entry;
+          } break;
+          }
+     }
+}
 
 void draw_theme_frame(Vec_t tex_vec, Vec_t pos_vec){
      glTexCoord2f(tex_vec.x, tex_vec.y);
@@ -2628,6 +2678,11 @@ int main(int argc, char** argv){
 
      reset_map(&player, player_start, &interactive_array, &interactive_quad_tree);
 
+     Undo_t undo = {};
+     init(&undo, 4 * 1024 * 1024, tilemap.width, tilemap.height, block_array.count, interactive_array.count);
+
+     undo_snapshot(&undo, &player, &tilemap, &block_array, &interactive_array);
+
      bool quit = false;
 
      Vec_t user_movement = {};
@@ -2954,6 +3009,9 @@ int main(int argc, char** argv){
                          snprintf(filepath, 64, "content/%03d.bm", map_number);
                          save_map(filepath, player_start, &tilemap, &block_array, &interactive_array);
                     } break;
+                    case SDL_SCANCODE_U:
+                         undo_revert(&undo, &player, &tilemap, &block_array, &interactive_array);
+                         break;
                     case SDL_SCANCODE_N:
                     {
                          Tile_t* tile = tilemap_get_tile(&tilemap, mouse_select_world(mouse_screen, camera));
@@ -3806,6 +3864,7 @@ int main(int argc, char** argv){
                if(block_to_push){
                     player.push_time += dt;
                     if(player.push_time > BLOCK_PUSH_TIME){
+                         undo_commit(&undo, &player, &tilemap, &block_array, &interactive_array);
                          block_push(block_to_push, player.face, &tilemap, interactive_quad_tree, block_quad_tree, true);
                          if(block_to_push->pos.z > 0) player.push_time = -0.5f;
                     }
@@ -4316,6 +4375,7 @@ int main(int argc, char** argv){
 
      quad_tree_free(interactive_quad_tree);
 
+     destroy(&undo);
      destroy(&tilemap);
 
      if(!suite){
