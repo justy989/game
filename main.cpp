@@ -1927,6 +1927,10 @@ void undo_snapshot(Undo_t* undo, Player_t* player, TileMap_t* tilemap, ObjectArr
           undo_block->vel = block->vel;
      }
 
+     if(undo->interactive_array.count != interactive_array->count){
+          resize(&undo->interactive_array, interactive_array->count);
+     }
+
      for(S16 i = 0; i < interactive_array->count; i++){
           undo->interactive_array.elements[i] = interactive_array->elements[i];
      }
