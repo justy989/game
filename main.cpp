@@ -1804,6 +1804,7 @@ enum UndoDiffType_t : U8{
      UNDO_DIFF_TYPE_TILE_FLAGS,
      UNDO_DIFF_TYPE_BLOCK,
      UNDO_DIFF_TYPE_INTERACTIVE,
+     UNDO_DIFF_TYPE_BLOCK_REMOVE,
 };
 
 struct UndoDiffHeader_t{
@@ -1854,6 +1855,9 @@ void undo_history_add(UndoHistory_t* undo_history, UndoDiffType_t type, S32 inde
           break;
      case UNDO_DIFF_TYPE_INTERACTIVE:
           undo_history->current = (char*)(undo_history->current) + sizeof(Interactive_t);
+          break;
+     case UNDO_DIFF_TYPE_BLOCK_REMOVE:
+          // NOTE: no need to add any more data
           break;
      }
 
@@ -1908,6 +1912,10 @@ void undo_snapshot(Undo_t* undo, Player_t* player, TileMap_t* tilemap, ObjectArr
           }
      }
 
+     if(undo->block_array.count != block_array->count){
+          resize(&undo->block_array, block_array->count);
+     }
+
      for(S16 i = 0; i < block_array->count; i++){
           UndoBlock_t* undo_block = undo->block_array.elements + i;
           Block_t* block = block_array->elements + i;
@@ -1947,7 +1955,26 @@ void undo_commit(Undo_t* undo, Player_t* player, TileMap_t* tilemap, ObjectArray
           }
      }
 
-     for(S16 i = 0; i < block_array->count; i++){
+     S16 min_block_count = block_array->count;
+     if(block_array->count > undo->block_array.count){
+          min_block_count = undo->block_array.count;
+
+          // remove a new blocks
+          for(S16 i = undo->block_array.count; i < block_array->count; i++){
+               undo_history_add(&undo->history, UNDO_DIFF_TYPE_BLOCK_REMOVE, i);
+               diff_count++;
+          }
+     }else{
+          // insert a new blocks
+          for(S16 i = block_array->count; i < undo->block_array.count; i++){
+               auto* undo_block_entry = (UndoBlock_t*)(undo->history.current);
+               *undo_block_entry = undo->block_array.elements[i];
+               undo_history_add(&undo->history, UNDO_DIFF_TYPE_BLOCK, i);
+               diff_count++;
+          }
+     }
+
+     for(S16 i = 0; i < min_block_count; i++){
           UndoBlock_t* undo_block = undo->block_array.elements + i;
           Block_t* block = block_array->elements + i;
 
@@ -2068,12 +2095,22 @@ void undo_revert(Undo_t* undo, Player_t* player, TileMap_t* tilemap, ObjectArray
           {
                ptr -= sizeof(UndoBlock_t);
                auto* block_entry = (UndoBlock_t*)(ptr);
-               Block_t* block = block_array->elements + diff_header->index;
+               S16 index = diff_header->index;
+               if(index >= block_array->count){
+                    index = block_array->count;
+                    resize(block_array, block_array->count + 1);
+               }
+
+               Block_t* block = block_array->elements + index;
                block->pos.pixel = block_entry->pixel;
                block->pos.z = block_entry->z;
                block->element = block_entry->element;
                block->accel = block_entry->accel;
                block->vel = block_entry->vel;
+          } break;
+          case UNDO_DIFF_TYPE_BLOCK_REMOVE:
+          {
+               remove(block_array, diff_header->index);
           } break;
           case UNDO_DIFF_TYPE_INTERACTIVE:
           {
@@ -3055,6 +3092,8 @@ int main(int argc, char** argv){
                          break;
                     case SDL_SCANCODE_RETURN:
                          if(editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
+                              undo_commit(&undo, &player, &tilemap, &block_array, &interactive_array);
+
                               // clear coords below stamp
                               Rect_t selection_bounds = editor_selection_bounds(&editor);
                               for(S16 j = selection_bounds.bottom; j <= selection_bounds.top; j++){
@@ -3184,6 +3223,7 @@ int main(int argc, char** argv){
                               if(editor.mode != EDITOR_MODE_STAMP_HIDE && select_index < editor.category_array.elements[editor.category].count && select_index >= 0){
                                    editor.stamp = select_index;
                               }else{
+                                   undo_commit(&undo, &player, &tilemap, &block_array, &interactive_array);
                                    Coord_t select_coord = mouse_select_world(mouse_screen, camera);
                                    auto* stamp_array = editor.category_array.elements[editor.category].elements + editor.stamp;
                                    for(S16 s = 0; s < stamp_array->count; s++){
