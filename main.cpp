@@ -3510,6 +3510,7 @@ int main(int argc, char** argv){
           }
 
           if(player_action.activate && !player_action.last_activate){
+               undo_commit(&undo, &player, &tilemap, &block_array, &interactive_array);
                activate(&tilemap, interactive_quad_tree, pos_to_coord(player.pos) + player.face);
           }
 
@@ -3523,6 +3524,7 @@ int main(int argc, char** argv){
                player.bow_draw_time += dt;
           }else if(!player_action.shoot){
                if(player.bow_draw_time >= PLAYER_BOW_DRAW_DELAY){
+                    undo_commit(&undo, &player, &tilemap, &block_array, &interactive_array);
                     Position_t arrow_pos = player.pos;
                     switch(player.face){
                     default:
