@@ -2011,12 +2011,14 @@ void undo_commit(Undo_t* undo, Player_t* player, TileMap_t* tilemap, ObjectArray
           }
      }
 
-     auto* count_entry = (S32*)(undo->history.current);
-     *count_entry = diff_count;
-     undo->history.current = (char*)(undo->history.current) + sizeof(S32);
-     ASSERT_BELOW_HISTORY_SIZE((&undo->history));
+     if(diff_count){
+          auto* count_entry = (S32*)(undo->history.current);
+          *count_entry = diff_count;
+          undo->history.current = (char*)(undo->history.current) + sizeof(S32);
+          ASSERT_BELOW_HISTORY_SIZE((&undo->history));
 
-     undo_snapshot(undo, player, tilemap, block_array, interactive_array);
+          undo_snapshot(undo, player, tilemap, block_array, interactive_array);
+     }
 }
 
 void undo_revert(Undo_t* undo, Player_t* player, TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array,
@@ -2078,6 +2080,7 @@ void undo_revert(Undo_t* undo, Player_t* player, TileMap_t* tilemap, ObjectArray
      }
 
      undo->history.current = ptr;
+     undo_snapshot(undo, player, tilemap, block_array, interactive_array);
 }
 
 void draw_theme_frame(Vec_t tex_vec, Vec_t pos_vec){
@@ -3016,6 +3019,7 @@ int main(int argc, char** argv){
                          save_map(filepath, player_start, &tilemap, &block_array, &interactive_array);
                     } break;
                     case SDL_SCANCODE_U:
+                         undo_commit(&undo, &player, &tilemap, &block_array, &interactive_array);
                          undo_revert(&undo, &player, &tilemap, &block_array, &interactive_array);
                          break;
                     case SDL_SCANCODE_N:
