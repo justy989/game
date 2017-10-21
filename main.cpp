@@ -1946,8 +1946,8 @@ void undo_commit(Undo_t* undo, Player_t* player, TileMap_t* tilemap, ObjectArray
           UndoBlock_t* undo_block = undo->block_array.elements + i;
           Block_t* block = block_array->elements + i;
 
-          if(undo_block->pixel != block->pos.pixel &&
-             undo_block->z != block->pos.z &&
+          if(undo_block->pixel != block->pos.pixel ||
+             undo_block->z != block->pos.z ||
              undo_block->element != block->element){
                auto* undo_block_entry = (UndoBlock_t*)(undo->history.current);
                *undo_block_entry = *undo_block;
@@ -2041,6 +2041,9 @@ void undo_revert(Undo_t* undo, Player_t* player, TileMap_t* tilemap, ObjectArray
                ptr -= sizeof(UndoPlayer_t);
                auto* player_entry = (UndoPlayer_t*)(ptr);
                *player = {};
+               // TODO fix these numbers as they are important
+               player->walk_frame_delta = 1;
+               player->radius = 3.5f / 272.0f;
                player->pos.pixel = player_entry->pixel;
                player->pos.z = player_entry->z;
                player->face = player_entry->face;
@@ -2058,20 +2061,23 @@ void undo_revert(Undo_t* undo, Player_t* player, TileMap_t* tilemap, ObjectArray
           {
                ptr -= sizeof(UndoBlock_t);
                auto* block_entry = (UndoBlock_t*)(ptr);
-               block_array->elements[i].pos.pixel = block_entry->pixel;
-               block_array->elements[i].pos.z = block_entry->z;
-               block_array->elements[i].element = block_entry->element;
-               block_array->elements[i].accel = block_entry->accel;
-               block_array->elements[i].vel = block_entry->vel;
+               Block_t* block = block_array->elements + diff_header->index;
+               block->pos.pixel = block_entry->pixel;
+               block->pos.z = block_entry->z;
+               block->element = block_entry->element;
+               block->accel = block_entry->accel;
+               block->vel = block_entry->vel;
           } break;
           case UNDO_DIFF_TYPE_INTERACTIVE:
           {
                ptr -= sizeof(Interactive_t);
                auto* interactive_entry = (Interactive_t*)(ptr);
-               interactive_array->elements[i] = *interactive_entry;
+               interactive_array->elements[diff_header->index] = *interactive_entry;
           } break;
           }
      }
+
+     undo->history.current = ptr;
 }
 
 void draw_theme_frame(Vec_t tex_vec, Vec_t pos_vec){
@@ -3862,9 +3868,11 @@ int main(int argc, char** argv){
                }
 
                if(block_to_push){
+                    F32 before_time = player.push_time;
+
                     player.push_time += dt;
                     if(player.push_time > BLOCK_PUSH_TIME){
-                         undo_commit(&undo, &player, &tilemap, &block_array, &interactive_array);
+                         if(before_time <= BLOCK_PUSH_TIME) undo_commit(&undo, &player, &tilemap, &block_array, &interactive_array);
                          block_push(block_to_push, player.face, &tilemap, interactive_quad_tree, block_quad_tree, true);
                          if(block_to_push->pos.z > 0) player.push_time = -0.5f;
                     }
