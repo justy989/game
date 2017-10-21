@@ -1780,6 +1780,250 @@ void destroy(Editor_t* editor){
      destroy(&editor->clipboard);
 }
 
+struct UndoBlock_t{
+     Pixel_t pixel;
+     S8 z;
+     Element_t element;
+     Vec_t accel;
+     Vec_t vel;
+};
+
+struct UndoPlayer_t{
+     Pixel_t pixel;
+     S8 z;
+     Direction_t face;
+};
+
+enum UndoDiffType_t : U8{
+     UNDO_DIFF_TYPE_PLAYER,
+     UNDO_DIFF_TYPE_TILE_FLAGS,
+     UNDO_DIFF_TYPE_BLOCK,
+     UNDO_DIFF_TYPE_INTERACTIVE,
+};
+
+struct UndoDiffHeader_t{
+     S32 index;
+     UndoDiffType_t type;
+};
+
+struct UndoHistory_t{
+     U32 size;
+     void* start;
+     void* current;
+};
+
+struct Undo_t{
+     S16 width;
+     S16 height;
+     U16** tile_flags;
+     ObjectArray_t<UndoBlock_t> block_array;
+     ObjectArray_t<Interactive_t> interactive_array;
+     UndoPlayer_t player;
+
+     UndoHistory_t history;
+};
+
+bool init(UndoHistory_t* undo_history, U32 history_size){
+     undo_history->start = malloc(history_size);
+     if(!undo_history->start) return false;
+     undo_history->current = undo_history->start;
+     undo_history->size = history_size;
+     return true;
+}
+
+#define ASSERT_BELOW_HISTORY_SIZE(history) assert((char*)(history->current) - (char*)(history->start) > history->size)
+
+void undo_history_add(UndoHistory_t* undo_history, UndoDiffType_t type, S32 index){
+     switch(type){
+     default:
+          assert(!"unsupported diff type");
+          return;
+     case UNDO_DIFF_TYPE_PLAYER:
+          undo_history->current = (char*)(undo_history->current) + sizeof(UndoPlayer_t);
+          break;
+     case UNDO_DIFF_TYPE_TILE_FLAGS:
+          undo_history->current = (char*)(undo_history->current) + sizeof(U16);
+          break;
+     case UNDO_DIFF_TYPE_BLOCK:
+          undo_history->current = (char*)(undo_history->current) + sizeof(UndoBlock_t);
+          break;
+     case UNDO_DIFF_TYPE_INTERACTIVE:
+          undo_history->current = (char*)(undo_history->current) + sizeof(Interactive_t);
+          break;
+     }
+
+     ASSERT_BELOW_HISTORY_SIZE(undo_history);
+
+     auto* undo_header = (UndoDiffHeader_t*)(undo_history->current);
+     undo_header->type = type;
+     undo_header->index = index;
+     undo_history->current = (char*)(undo_history->current) + sizeof(*undo_header);
+
+     ASSERT_BELOW_HISTORY_SIZE(undo_history);
+}
+
+bool init(Undo_t* undo, U32 history_size, S16 map_width, S16 map_height, S16 block_count, S16 interactive_count){
+     undo->tile_flags = (U16**)calloc(map_height, sizeof(*undo->tile_flags));
+     if(!undo->tile_flags) return false;
+     for(S16 i = 0; i < map_height; i++){
+          undo->tile_flags[i] = (U16*)calloc(map_width, sizeof(*undo->tile_flags[i]));
+          if(!undo->tile_flags[i]) return false;
+     }
+     undo->width = map_width;
+     undo->height = map_height;
+
+     if(!init(&undo->block_array, block_count)) return false;
+     if(!init(&undo->interactive_array, interactive_count)) return false;
+     if(!init(&undo->history, history_size)) return false;
+
+     return true;
+}
+
+void destroy(Undo_t* undo){
+     for(int i = 0; i < undo->height; i++){
+          free(undo->tile_flags[i]);
+     }
+     free(undo->tile_flags);
+     undo->tile_flags = nullptr;
+     undo->width = 0;
+     undo->height = 0;
+     destroy(&undo->block_array);
+     destroy(&undo->interactive_array);
+}
+
+void undo_snapshot(Undo_t* undo, Player_t* player, TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array,
+                   ObjectArray_t<Interactive_t>* interactive_array){
+     undo->player.pixel = player->pos.pixel;
+     undo->player.z = player->pos.z;
+     undo->player.face = player->face;
+
+     for(S16 y = 0; y < tilemap->height; y++){
+          for(S16 x = 0; x < tilemap->width; x++){
+               undo->tile_flags[y][x] = tilemap->tiles[y][x].flags;
+          }
+     }
+
+     for(S16 i = 0; i < block_array->count; i++){
+          UndoBlock_t* undo_block = undo->block_array.elements + i;
+          Block_t* block = block_array->elements + i;
+          undo_block->pixel = block->pos.pixel;
+          undo_block->z = block->pos.z;
+          undo_block->element = block->element;
+          undo_block->accel = block->accel;
+          undo_block->vel = block->vel;
+     }
+
+     for(S16 i = 0; i < interactive_array->count; i++){
+          undo->interactive_array.elements[i] = interactive_array->elements[i];
+     }
+}
+
+void undo_commit(Undo_t* undo, Player_t* player, TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array,
+                 ObjectArray_t<Interactive_t>* interactive_array){
+     U32 diff_count = 0;
+     if(player->pos.pixel != undo->player.pixel ||
+        player->pos.z != undo->player.z ||
+        player->face != undo->player.face){
+          auto* undo_player = (UndoPlayer_t*)(undo->history.current);
+          *undo_player = undo->player;
+          undo_history_add(&undo->history, UNDO_DIFF_TYPE_PLAYER, 0);
+          diff_count++;
+     }
+
+     for(S16 y = 0; y < tilemap->height; y++){
+          for(S16 x = 0; x < tilemap->width; x++){
+               if(undo->tile_flags[y][x] != tilemap->tiles[y][x].flags){
+                    auto* undo_tile_flags = (U16*)(undo->history.current);
+                    *undo_tile_flags = undo->tile_flags[y][x];
+                    undo_history_add(&undo->history, UNDO_DIFF_TYPE_TILE_FLAGS, y * tilemap->width + x);
+                    diff_count++;
+
+               }
+          }
+     }
+
+     for(S16 i = 0; i < block_array->count; i++){
+          UndoBlock_t* undo_block = undo->block_array.elements + i;
+          Block_t* block = block_array->elements + i;
+
+          if(undo_block->pixel != block->pos.pixel &&
+             undo_block->z != block->pos.z &&
+             undo_block->element != block->element){
+               auto* undo_block_entry = (UndoBlock_t*)(undo->history.current);
+               *undo_block_entry = *undo_block;
+               undo_history_add(&undo->history, UNDO_DIFF_TYPE_BLOCK, i);
+               diff_count++;
+          }
+     }
+
+     for(S16 i = 0; i < interactive_array->count; i++){
+          Interactive_t* undo_interactive = undo->interactive_array.elements + i;
+          Interactive_t* interactive = interactive_array->elements + i;
+          assert(undo_interactive->type == interactive->type);
+
+          bool diff = false;
+
+          switch(interactive->type){
+          default:
+               break;
+          case INTERACTIVE_TYPE_PRESSURE_PLATE:
+               if(undo_interactive->pressure_plate.down != interactive->pressure_plate.down ||
+                  undo_interactive->pressure_plate.iced_under != interactive->pressure_plate.iced_under){
+                    diff = true;
+               }
+               break;
+          case INTERACTIVE_TYPE_ICE_DETECTOR:
+          case INTERACTIVE_TYPE_LIGHT_DETECTOR:
+               if(undo_interactive->detector.on != interactive->detector.on){
+                    diff = true;
+               }
+               break;
+          case INTERACTIVE_TYPE_POPUP:
+               if(undo_interactive->popup.iced != interactive->popup.iced ||
+                  undo_interactive->popup.lift.up != interactive->popup.lift.up ||
+                  undo_interactive->popup.lift.ticks != interactive->popup.lift.ticks){
+                    diff = true;
+               }
+               break;
+          case INTERACTIVE_TYPE_LEVER:
+               // TODO
+               break;
+          case INTERACTIVE_TYPE_DOOR:
+               if(undo_interactive->door.lift.up != interactive->door.lift.up ||
+                  undo_interactive->door.lift.ticks != interactive->door.lift.ticks){
+                    diff = true;
+               }
+               break;
+          case INTERACTIVE_TYPE_PORTAL:
+               if(undo_interactive->portal.on != interactive->portal.on){
+                    diff = true;
+               }
+               break;
+          case INTERACTIVE_TYPE_BOW:
+               break;
+          }
+
+          if(diff){
+               auto* undo_interactive_entry = (Interactive_t*)(undo->history.current);
+               *undo_interactive_entry = *undo_interactive;
+               undo_history_add(&undo->history, UNDO_DIFF_TYPE_INTERACTIVE, i);
+               diff_count++;
+          }
+     }
+
+     auto* count_entry = (S32*)(undo->history.current);
+     *count_entry = diff_count;
+     undo->history.current = (char*)(undo->history.current) + sizeof(S32);
+     ASSERT_BELOW_HISTORY_SIZE((&undo->history));
+
+     undo_snapshot(undo, player, tilemap, block_array, interactive_array);
+}
+
+// void undo_revert(Undo_t* undo, Player_t* player, TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array,
+//                  ObjectArray_t<Interactive_t>* interactive_array){
+// 
+// }
+
 void draw_theme_frame(Vec_t tex_vec, Vec_t pos_vec){
      glTexCoord2f(tex_vec.x, tex_vec.y);
      glVertex2f(pos_vec.x, pos_vec.y);
