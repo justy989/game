@@ -1014,6 +1014,7 @@ enum PlayerActionType_t{
      PLAYER_ACTION_TYPE_SHOOT_START,
      PLAYER_ACTION_TYPE_SHOOT_STOP,
      PLAYER_ACTION_TYPE_END_DEMO,
+     PLAYER_ACTION_TYPE_UNDO,
 };
 
 struct PlayerAction_t{
@@ -1025,6 +1026,7 @@ struct PlayerAction_t{
      bool last_activate;
      bool shoot;
      bool reface;
+     bool undo;
 };
 
 enum DemoMode_t{
@@ -1091,6 +1093,9 @@ void player_action_perform(PlayerAction_t* player_action, Player_t* player, Play
           break;
      case PLAYER_ACTION_TYPE_SHOOT_STOP:
           player_action->shoot = false;
+          break;
+     case PLAYER_ACTION_TYPE_UNDO:
+          player_action->undo = true;
           break;
      }
 
@@ -3019,8 +3024,8 @@ int main(int argc, char** argv){
                          save_map(filepath, player_start, &tilemap, &block_array, &interactive_array);
                     } break;
                     case SDL_SCANCODE_U:
-                         undo_commit(&undo, &player, &tilemap, &block_array, &interactive_array);
-                         undo_revert(&undo, &player, &tilemap, &block_array, &interactive_array);
+                         player_action_perform(&player_action, &player, PLAYER_ACTION_TYPE_UNDO, demo_mode,
+                                               demo_file, frame_count);
                          break;
                     case SDL_SCANCODE_N:
                     {
@@ -3506,6 +3511,12 @@ int main(int argc, char** argv){
 
           if(player_action.activate && !player_action.last_activate){
                activate(&tilemap, interactive_quad_tree, pos_to_coord(player.pos) + player.face);
+          }
+
+          if(player_action.undo){
+               undo_commit(&undo, &player, &tilemap, &block_array, &interactive_array);
+               undo_revert(&undo, &player, &tilemap, &block_array, &interactive_array);
+               player_action.undo = false;
           }
 
           if(player.has_bow && player_action.shoot && player.bow_draw_time < PLAYER_BOW_DRAW_DELAY){
