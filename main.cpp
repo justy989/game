@@ -1527,6 +1527,9 @@ void interactive_draw(Interactive_t* interactive, Vec_t pos_vec){
                draw_theme_frame(theme_frame(2, 12), pos_vec);
           }
           break;
+     case INTERACTIVE_TYPE_PORTAL:
+          draw_theme_frame(theme_frame(interactive->portal.face, 26 + interactive->portal.on), pos_vec);
+          break;
      }
 
 }
@@ -2157,6 +2160,13 @@ int main(int argc, char** argv){
                                                   }
                                                   break;
                                              case INTERACTIVE_TYPE_PORTAL:
+                                                  if(check_interactive->portal.on != interactive->portal.on){
+                                                       char name[64];
+                                                       snprintf(name, 64, "interactive at %d, %d portal on",
+                                                                interactive->coord.x, interactive->coord.y);
+                                                       LOG_MISMATCH(name, "%d", check_interactive->portal.on,
+                                                                    interactive->portal.on);
+                                                  }
                                                   break;
                                              }
                                         }
@@ -2312,9 +2322,40 @@ int main(int argc, char** argv){
                     {
                          Tile_t* tile = tilemap_get_tile(&tilemap, mouse_select_world(mouse_screen, camera));
                          if(tile){
-                              if(tile->flags & TILE_FLAG_WIRE_CLUSTER_LEFT) tile->flags |= TILE_FLAG_WIRE_CLUSTER_LEFT_ON;
-                              if(tile->flags & TILE_FLAG_WIRE_CLUSTER_MID) tile->flags |= TILE_FLAG_WIRE_CLUSTER_MID_ON;
-                              if(tile->flags & TILE_FLAG_WIRE_CLUSTER_RIGHT) tile->flags |= TILE_FLAG_WIRE_CLUSTER_RIGHT_ON;
+                              if(tile->flags & TILE_FLAG_WIRE_CLUSTER_LEFT){
+                                   if(tile->flags & TILE_FLAG_WIRE_CLUSTER_LEFT_ON){
+                                        tile->flags &= ~TILE_FLAG_WIRE_CLUSTER_LEFT_ON;
+                                   }else{
+                                        tile->flags |= TILE_FLAG_WIRE_CLUSTER_LEFT_ON;
+                                   }
+                              }
+
+                              if(tile->flags & TILE_FLAG_WIRE_CLUSTER_MID){
+                                   if(tile->flags & TILE_FLAG_WIRE_CLUSTER_MID_ON){
+                                        tile->flags &= ~TILE_FLAG_WIRE_CLUSTER_MID_ON;
+                                   }else{
+                                        tile->flags |= TILE_FLAG_WIRE_CLUSTER_MID_ON;
+                                   }
+                              }
+
+                              if(tile->flags & TILE_FLAG_WIRE_CLUSTER_RIGHT){
+                                   if(tile->flags & TILE_FLAG_WIRE_CLUSTER_RIGHT_ON){
+                                        tile->flags &= ~TILE_FLAG_WIRE_CLUSTER_RIGHT_ON;
+                                   }else{
+                                        tile->flags |= TILE_FLAG_WIRE_CLUSTER_RIGHT_ON;
+                                   }
+                              }
+
+                              if(tile->flags & TILE_FLAG_WIRE_LEFT ||
+                                 tile->flags & TILE_FLAG_WIRE_UP ||
+                                 tile->flags & TILE_FLAG_WIRE_RIGHT ||
+                                 tile->flags & TILE_FLAG_WIRE_DOWN){
+                                   if(tile->flags & TILE_FLAG_WIRE_STATE){
+                                        tile->flags &= ~TILE_FLAG_WIRE_STATE;
+                                   }else{
+                                        tile->flags |= TILE_FLAG_WIRE_STATE;
+                                   }
+                              }
                          }
                     } break;
                     // TODO: #ifdef DEBUG
@@ -2394,6 +2435,18 @@ int main(int argc, char** argv){
                     case SDL_SCANCODE_LCTRL:
                          ctrl_down = true;
                          break;
+                    case SDL_SCANCODE_B:
+                    {
+                         undo_commit(&undo, &player, &tilemap, &block_array, &interactive_array);
+                         Coord_t min = pos_to_coord(player.pos) - Coord_t{1, 1};
+                         Coord_t max = pos_to_coord(player.pos) + Coord_t{1, 1};
+                         for(S16 y = min.y; y <= max.y; y++){
+                              for(S16 x = min.x; x <= max.x; x++){
+                                   Coord_t coord {x, y};
+                                   coord_clear(coord, &tilemap, &interactive_array, interactive_quad_tree, &block_array);
+                              }
+                         }
+                    } break;
                     }
                     break;
                case SDL_KEYUP:
@@ -3589,7 +3642,6 @@ int main(int argc, char** argv){
                          for(S32 s = 0; s < stamp_array->count; s++){
                               auto* stamp = stamp_array->elements + s;
                               Vec_t stamp_vec = pos + coord_to_vec(stamp->offset);
-
 
                               switch(stamp->type){
                               default:

@@ -100,91 +100,71 @@ bool init(Editor_t* editor){
      }
 
      auto* tile_flags_category = editor->category_array.elements + EDITOR_CATEGORY_TILE_FLAGS;
-     init(tile_flags_category, 62);
-     for(S8 i = 0; i < 2; i++){
-          S8 index_offset = i * 15;
-          init(&tile_flags_category->elements[index_offset], 1);
-          tile_flags_category->elements[index_offset].elements[0].type = STAMP_TYPE_TILE_FLAGS;
-          tile_flags_category->elements[index_offset].elements[0].tile_flags = TILE_FLAG_WIRE_LEFT;
-          index_offset++;
-          init(&tile_flags_category->elements[index_offset], 1);
-          tile_flags_category->elements[index_offset].elements[0].type = STAMP_TYPE_TILE_FLAGS;
-          tile_flags_category->elements[index_offset].elements[0].tile_flags = TILE_FLAG_WIRE_UP;
-          index_offset++;
-          init(&tile_flags_category->elements[index_offset], 1);
-          tile_flags_category->elements[index_offset].elements[0].type = STAMP_TYPE_TILE_FLAGS;
-          tile_flags_category->elements[index_offset].elements[0].tile_flags = TILE_FLAG_WIRE_RIGHT;
-          index_offset++;
-          init(&tile_flags_category->elements[index_offset], 1);
-          tile_flags_category->elements[index_offset].elements[0].type = STAMP_TYPE_TILE_FLAGS;
-          tile_flags_category->elements[index_offset].elements[0].tile_flags = TILE_FLAG_WIRE_DOWN;
-          index_offset++;
-          init(&tile_flags_category->elements[index_offset], 1);
-          tile_flags_category->elements[index_offset].elements[0].type = STAMP_TYPE_TILE_FLAGS;
-          tile_flags_category->elements[index_offset].elements[0].tile_flags = TILE_FLAG_WIRE_LEFT | TILE_FLAG_WIRE_DOWN;
-          index_offset++;
-          init(&tile_flags_category->elements[index_offset], 1);
-          tile_flags_category->elements[index_offset].elements[0].type = STAMP_TYPE_TILE_FLAGS;
-          tile_flags_category->elements[index_offset].elements[0].tile_flags = TILE_FLAG_WIRE_LEFT | TILE_FLAG_WIRE_RIGHT;
-          index_offset++;
-          init(&tile_flags_category->elements[index_offset], 1);
-          tile_flags_category->elements[index_offset].elements[0].type = STAMP_TYPE_TILE_FLAGS;
-          tile_flags_category->elements[index_offset].elements[0].tile_flags = TILE_FLAG_WIRE_LEFT | TILE_FLAG_WIRE_UP;
-          index_offset++;
-          init(&tile_flags_category->elements[index_offset], 1);
-          tile_flags_category->elements[index_offset].elements[0].type = STAMP_TYPE_TILE_FLAGS;
-          tile_flags_category->elements[index_offset].elements[0].tile_flags = TILE_FLAG_WIRE_LEFT | TILE_FLAG_WIRE_UP | TILE_FLAG_WIRE_RIGHT;
-          index_offset++;
-          init(&tile_flags_category->elements[index_offset], 1);
-          tile_flags_category->elements[index_offset].elements[0].type = STAMP_TYPE_TILE_FLAGS;
-          tile_flags_category->elements[index_offset].elements[0].tile_flags = TILE_FLAG_WIRE_LEFT | TILE_FLAG_WIRE_UP | TILE_FLAG_WIRE_DOWN;
-          index_offset++;
-          init(&tile_flags_category->elements[index_offset], 1);
-          tile_flags_category->elements[index_offset].elements[0].type = STAMP_TYPE_TILE_FLAGS;
-          tile_flags_category->elements[index_offset].elements[0].tile_flags = TILE_FLAG_WIRE_LEFT | TILE_FLAG_WIRE_DOWN | TILE_FLAG_WIRE_RIGHT;
-          index_offset++;
-          init(&tile_flags_category->elements[index_offset], 1);
-          tile_flags_category->elements[index_offset].elements[0].type = STAMP_TYPE_TILE_FLAGS;
-          tile_flags_category->elements[index_offset].elements[0].tile_flags = TILE_FLAG_WIRE_LEFT | TILE_FLAG_WIRE_UP | TILE_FLAG_WIRE_DOWN | TILE_FLAG_WIRE_RIGHT;
-          index_offset++;
-          init(&tile_flags_category->elements[index_offset], 1);
-          tile_flags_category->elements[index_offset].elements[0].type = STAMP_TYPE_TILE_FLAGS;
-          tile_flags_category->elements[index_offset].elements[0].tile_flags = TILE_FLAG_WIRE_UP | TILE_FLAG_WIRE_RIGHT;
-          index_offset++;
-          init(&tile_flags_category->elements[index_offset], 1);
-          tile_flags_category->elements[index_offset].elements[0].type = STAMP_TYPE_TILE_FLAGS;
-          tile_flags_category->elements[index_offset].elements[0].tile_flags = TILE_FLAG_WIRE_UP | TILE_FLAG_WIRE_DOWN;
-          index_offset++;
-          init(&tile_flags_category->elements[index_offset], 1);
-          tile_flags_category->elements[index_offset].elements[0].type = STAMP_TYPE_TILE_FLAGS;
-          tile_flags_category->elements[index_offset].elements[0].tile_flags = TILE_FLAG_WIRE_UP | TILE_FLAG_WIRE_DOWN | TILE_FLAG_WIRE_RIGHT;
-          index_offset++;
-          init(&tile_flags_category->elements[index_offset], 1);
-          tile_flags_category->elements[index_offset].elements[0].type = STAMP_TYPE_TILE_FLAGS;
-          tile_flags_category->elements[index_offset].elements[0].tile_flags = TILE_FLAG_WIRE_RIGHT | TILE_FLAG_WIRE_DOWN;
-     }
+     init(tile_flags_category, 35);
 
-     for(S8 i = 0; i < 15; i++){
-          tile_flags_category->elements[15 + i].elements[0].tile_flags |= TILE_FLAG_WIRE_STATE;
-     }
+     S16 index_offset = 0;
+     init(&tile_flags_category->elements[index_offset], 1);
+     tile_flags_category->elements[index_offset].elements[0].type = STAMP_TYPE_TILE_FLAGS;
+     tile_flags_category->elements[index_offset].elements[0].tile_flags = TILE_FLAG_WIRE_LEFT;
+     index_offset++;
+     init(&tile_flags_category->elements[index_offset], 1);
+     tile_flags_category->elements[index_offset].elements[0].type = STAMP_TYPE_TILE_FLAGS;
+     tile_flags_category->elements[index_offset].elements[0].tile_flags = TILE_FLAG_WIRE_UP;
+     index_offset++;
+     init(&tile_flags_category->elements[index_offset], 1);
+     tile_flags_category->elements[index_offset].elements[0].type = STAMP_TYPE_TILE_FLAGS;
+     tile_flags_category->elements[index_offset].elements[0].tile_flags = TILE_FLAG_WIRE_RIGHT;
+     index_offset++;
+     init(&tile_flags_category->elements[index_offset], 1);
+     tile_flags_category->elements[index_offset].elements[0].type = STAMP_TYPE_TILE_FLAGS;
+     tile_flags_category->elements[index_offset].elements[0].tile_flags = TILE_FLAG_WIRE_DOWN;
+     index_offset++;
+     init(&tile_flags_category->elements[index_offset], 1);
+     tile_flags_category->elements[index_offset].elements[0].type = STAMP_TYPE_TILE_FLAGS;
+     tile_flags_category->elements[index_offset].elements[0].tile_flags = TILE_FLAG_WIRE_LEFT | TILE_FLAG_WIRE_DOWN;
+     index_offset++;
+     init(&tile_flags_category->elements[index_offset], 1);
+     tile_flags_category->elements[index_offset].elements[0].type = STAMP_TYPE_TILE_FLAGS;
+     tile_flags_category->elements[index_offset].elements[0].tile_flags = TILE_FLAG_WIRE_LEFT | TILE_FLAG_WIRE_RIGHT;
+     index_offset++;
+     init(&tile_flags_category->elements[index_offset], 1);
+     tile_flags_category->elements[index_offset].elements[0].type = STAMP_TYPE_TILE_FLAGS;
+     tile_flags_category->elements[index_offset].elements[0].tile_flags = TILE_FLAG_WIRE_LEFT | TILE_FLAG_WIRE_UP;
+     index_offset++;
+     init(&tile_flags_category->elements[index_offset], 1);
+     tile_flags_category->elements[index_offset].elements[0].type = STAMP_TYPE_TILE_FLAGS;
+     tile_flags_category->elements[index_offset].elements[0].tile_flags = TILE_FLAG_WIRE_LEFT | TILE_FLAG_WIRE_UP | TILE_FLAG_WIRE_RIGHT;
+     index_offset++;
+     init(&tile_flags_category->elements[index_offset], 1);
+     tile_flags_category->elements[index_offset].elements[0].type = STAMP_TYPE_TILE_FLAGS;
+     tile_flags_category->elements[index_offset].elements[0].tile_flags = TILE_FLAG_WIRE_LEFT | TILE_FLAG_WIRE_UP | TILE_FLAG_WIRE_DOWN;
+     index_offset++;
+     init(&tile_flags_category->elements[index_offset], 1);
+     tile_flags_category->elements[index_offset].elements[0].type = STAMP_TYPE_TILE_FLAGS;
+     tile_flags_category->elements[index_offset].elements[0].tile_flags = TILE_FLAG_WIRE_LEFT | TILE_FLAG_WIRE_DOWN | TILE_FLAG_WIRE_RIGHT;
+     index_offset++;
+     init(&tile_flags_category->elements[index_offset], 1);
+     tile_flags_category->elements[index_offset].elements[0].type = STAMP_TYPE_TILE_FLAGS;
+     tile_flags_category->elements[index_offset].elements[0].tile_flags = TILE_FLAG_WIRE_LEFT | TILE_FLAG_WIRE_UP | TILE_FLAG_WIRE_DOWN | TILE_FLAG_WIRE_RIGHT;
+     index_offset++;
+     init(&tile_flags_category->elements[index_offset], 1);
+     tile_flags_category->elements[index_offset].elements[0].type = STAMP_TYPE_TILE_FLAGS;
+     tile_flags_category->elements[index_offset].elements[0].tile_flags = TILE_FLAG_WIRE_UP | TILE_FLAG_WIRE_RIGHT;
+     index_offset++;
+     init(&tile_flags_category->elements[index_offset], 1);
+     tile_flags_category->elements[index_offset].elements[0].type = STAMP_TYPE_TILE_FLAGS;
+     tile_flags_category->elements[index_offset].elements[0].tile_flags = TILE_FLAG_WIRE_UP | TILE_FLAG_WIRE_DOWN;
+     index_offset++;
+     init(&tile_flags_category->elements[index_offset], 1);
+     tile_flags_category->elements[index_offset].elements[0].type = STAMP_TYPE_TILE_FLAGS;
+     tile_flags_category->elements[index_offset].elements[0].tile_flags = TILE_FLAG_WIRE_UP | TILE_FLAG_WIRE_DOWN | TILE_FLAG_WIRE_RIGHT;
+     index_offset++;
+     init(&tile_flags_category->elements[index_offset], 1);
+     tile_flags_category->elements[index_offset].elements[0].type = STAMP_TYPE_TILE_FLAGS;
+     tile_flags_category->elements[index_offset].elements[0].tile_flags = TILE_FLAG_WIRE_RIGHT | TILE_FLAG_WIRE_DOWN;
 
      for(S8 i = 0; i < DIRECTION_COUNT; i++){
-          S8 index_offset = 30 + (i * 7);
-          init(tile_flags_category->elements + index_offset, 1);
-          tile_flags_category->elements[index_offset].elements[0].type = STAMP_TYPE_TILE_FLAGS;
-          tile_flags_category->elements[index_offset].elements[0].tile_flags = TILE_FLAG_WIRE_CLUSTER_LEFT;
-          tile_flags_set_cluster_direction(&tile_flags_category->elements[index_offset].elements[0].tile_flags, (Direction_t)(i));
-          index_offset++;
-          init(tile_flags_category->elements + index_offset, 1);
-          tile_flags_category->elements[index_offset].elements[0].type = STAMP_TYPE_TILE_FLAGS;
-          tile_flags_category->elements[index_offset].elements[0].tile_flags = TILE_FLAG_WIRE_CLUSTER_MID;
-          tile_flags_set_cluster_direction(&tile_flags_category->elements[index_offset].elements[0].tile_flags, (Direction_t)(i));
-          index_offset++;
-          init(tile_flags_category->elements + index_offset, 1);
-          tile_flags_category->elements[index_offset].elements[0].type = STAMP_TYPE_TILE_FLAGS;
-          tile_flags_category->elements[index_offset].elements[0].tile_flags = TILE_FLAG_WIRE_CLUSTER_RIGHT;
-          tile_flags_set_cluster_direction(&tile_flags_category->elements[index_offset].elements[0].tile_flags, (Direction_t)(i));
-          index_offset++;
+          index_offset = 15 + (i * 4);
           init(tile_flags_category->elements + index_offset, 1);
           tile_flags_category->elements[index_offset].elements[0].type = STAMP_TYPE_TILE_FLAGS;
           tile_flags_category->elements[index_offset].elements[0].tile_flags = TILE_FLAG_WIRE_CLUSTER_LEFT | TILE_FLAG_WIRE_CLUSTER_MID;
@@ -206,15 +186,15 @@ bool init(Editor_t* editor){
           tile_flags_set_cluster_direction(&tile_flags_category->elements[index_offset].elements[0].tile_flags, (Direction_t)(i));
      }
 
-     init(tile_flags_category->elements + 59, 1);
-     tile_flags_category->elements[59].elements[0].type = STAMP_TYPE_TILE_FLAGS;
-     tile_flags_category->elements[59].elements[0].tile_flags = TILE_FLAG_ICED;
-     init(tile_flags_category->elements + 60, 1);
-     tile_flags_category->elements[60].elements[0].type = STAMP_TYPE_TILE_FLAGS;
-     tile_flags_category->elements[60].elements[0].tile_flags = TILE_FLAG_CHECKPOINT;
-     init(tile_flags_category->elements + 61, 1);
-     tile_flags_category->elements[61].elements[0].type = STAMP_TYPE_TILE_FLAGS;
-     tile_flags_category->elements[61].elements[0].tile_flags = TILE_FLAG_RESET_IMMUNE;
+     init(tile_flags_category->elements + 32, 1);
+     tile_flags_category->elements[32].elements[0].type = STAMP_TYPE_TILE_FLAGS;
+     tile_flags_category->elements[32].elements[0].tile_flags = TILE_FLAG_ICED;
+     init(tile_flags_category->elements + 33, 1);
+     tile_flags_category->elements[33].elements[0].type = STAMP_TYPE_TILE_FLAGS;
+     tile_flags_category->elements[33].elements[0].tile_flags = TILE_FLAG_CHECKPOINT;
+     init(tile_flags_category->elements + 34, 1);
+     tile_flags_category->elements[34].elements[0].type = STAMP_TYPE_TILE_FLAGS;
+     tile_flags_category->elements[34].elements[0].tile_flags = TILE_FLAG_RESET_IMMUNE;
 
      auto* block_category = editor->category_array.elements + EDITOR_CATEGORY_BLOCK;
      init(block_category, 4);
@@ -292,6 +272,25 @@ bool init(Editor_t* editor){
      init(interactive_bow_category->elements, 1);
      interactive_bow_category->elements[0].elements[0].type = STAMP_TYPE_INTERACTIVE;
      interactive_bow_category->elements[0].elements[0].interactive.type = INTERACTIVE_TYPE_BOW;
+
+     auto* interactive_portal_category = editor->category_array.elements + EDITOR_CATEGORY_INTERACTIVE_PORTAL;
+     init(interactive_portal_category, 8);
+     for(S8 i = 0; i < DIRECTION_COUNT; i++){
+          init(interactive_portal_category->elements + i, 1);
+          interactive_portal_category->elements[i].elements[0].type = STAMP_TYPE_INTERACTIVE;
+          interactive_portal_category->elements[i].elements[0].interactive.type = INTERACTIVE_TYPE_PORTAL;
+          interactive_portal_category->elements[i].elements[0].interactive.portal.face = (Direction_t)(i);
+          interactive_portal_category->elements[i].elements[0].interactive.portal.on = false;
+     }
+
+     for(S8 i = 0; i < DIRECTION_COUNT; i++){
+          S8 index = i + DIRECTION_COUNT;
+          init(interactive_portal_category->elements + index, 1);
+          interactive_portal_category->elements[index].elements[0].type = STAMP_TYPE_INTERACTIVE;
+          interactive_portal_category->elements[index].elements[0].interactive.type = INTERACTIVE_TYPE_PORTAL;
+          interactive_portal_category->elements[index].elements[0].interactive.portal.face = (Direction_t)(i);
+          interactive_portal_category->elements[index].elements[0].interactive.portal.on = true;
+     }
 
      return true;
 }
