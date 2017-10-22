@@ -22,6 +22,7 @@
 #include "quad_tree.h"
 #include "player.h"
 #include "block.h"
+#include "arrow.h"
 #include "undo.h"
 #include "editor.h"
 
@@ -273,52 +274,6 @@ Tile_t* block_against_solid_tile(Block_t* block_to_check, Direction_t direction,
      tile_coord = pixel_to_coord(pixel_b);
      tile = tilemap_get_tile(tilemap, tile_coord);
      if(tile && tile->id) return tile;
-
-     return nullptr;
-}
-
-#define ARROW_DISINTEGRATE_DELAY 4.0f
-#define ARROW_SHOOT_HEIGHT 7
-#define ARROW_FALL_DELAY 2.0f
-
-struct Arrow_t{
-     Position_t pos;
-     Direction_t face;
-     Element_t element;
-     F32 vel;
-     S16 element_from_block;
-
-     bool alive;
-     F32 stuck_time; // TODO: track objects we are stuck in
-     F32 fall_time;
-};
-
-#define ARROW_ARRAY_MAX 32
-
-struct ArrowArray_t{
-     Arrow_t arrows[ARROW_ARRAY_MAX];
-};
-
-bool init(ArrowArray_t* arrow_array){
-     for(S16 i = 0; i < ARROW_ARRAY_MAX; i++){
-          arrow_array->arrows[i].alive = false;
-     }
-
-     return true;
-}
-
-Arrow_t* arrow_array_spawn(ArrowArray_t* arrow_array, Position_t pos, Direction_t face){
-     for(S16 i = 0; i < ARROW_ARRAY_MAX; i++){
-          if(!arrow_array->arrows[i].alive){
-               arrow_array->arrows[i].pos = pos;
-               arrow_array->arrows[i].face = face;
-               arrow_array->arrows[i].alive = true;
-               arrow_array->arrows[i].stuck_time = 0.0f;
-               arrow_array->arrows[i].element = ELEMENT_NONE;
-               arrow_array->arrows[i].vel = 1.25f;
-               return arrow_array->arrows + i;
-          }
-     }
 
      return nullptr;
 }
@@ -2889,7 +2844,7 @@ int main(int argc, char** argv){
                          break;
                     }
                     arrow_pos.z += ARROW_SHOOT_HEIGHT;
-                    arrow_array_spawn(&arrow_array, arrow_pos, player.face);
+                    arrow_spawn(&arrow_array, arrow_pos, player.face);
                }
                player.bow_draw_time = 0.0f;
           }
@@ -3217,6 +3172,11 @@ int main(int argc, char** argv){
                               }
                          }
                     }
+               }
+
+               Interactive_t* interactive = quad_tree_interactive_find_at(interactive_quad_tree, player_coord);
+               if(interactive && interactive->type == INTERACTIVE_TYPE_PORTAL){
+
                }
 
                for(S16 y = min.y; y <= max.y; y++){
