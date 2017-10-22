@@ -20,35 +20,10 @@
 #include "object_array.h"
 #include "interactive.h"
 #include "quad_tree.h"
+#include "player.h"
+#include "block.h"
 
 #define UNDO_MEMORY (4 * 1024 * 1024)
-
-#define PLAYER_SPEED 5.5f
-#define PLAYER_WALK_DELAY 0.15f
-#define PLAYER_IDLE_SPEED 0.0025f
-#define PLAYER_BOW_DRAW_DELAY 0.3f
-
-struct Player_t{
-     Position_t pos;
-     Vec_t accel;
-     Vec_t vel;
-     Direction_t face;
-     F32 radius;
-     F32 push_time;
-     S8 walk_frame;
-     S8 walk_frame_delta;
-     F32 walk_frame_time;
-     bool has_bow;
-     F32 bow_draw_time;
-};
-
-void player_spawn(Player_t* player, Coord_t coord){
-     *player = {};
-     player->walk_frame_delta = 1;
-     player->radius = 3.5f / 272.0f;
-     player->pos = coord_to_pos_at_tile_center(coord);
-     player->has_bow = true;
-}
 
 Interactive_t* quad_tree_interactive_find_at(QuadTreeNode_t<Interactive_t>* root, Coord_t coord){
      return quad_tree_find_at(root, coord.x, coord.y);
@@ -63,32 +38,7 @@ Interactive_t* quad_tree_interactive_solid_at(QuadTreeNode_t<Interactive_t>* roo
      return nullptr;
 }
 
-struct Block_t{
-     Position_t pos;
-     Vec_t accel;
-     Vec_t vel;
-     Direction_t face;
-     Element_t element;
-     Pixel_t push_start;
-     F32 fall_time;
-};
-
-S16 get_object_x(Block_t* block){
-     return block->pos.pixel.x + HALF_TILE_SIZE_IN_PIXELS;
-}
-
-S16 get_object_y(Block_t* block){
-     return block->pos.pixel.y + HALF_TILE_SIZE_IN_PIXELS;
-}
-
-Pixel_t block_center_pixel(Block_t* block){
-     return block->pos.pixel + Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS};
-}
-
-Coord_t block_get_coord(Block_t* block){
-     Pixel_t center = block->pos.pixel + Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS};
-     return pixel_to_coord(center);
-}
+#define BLOCK_QUAD_TREE_MAX_QUERY 16
 
 bool block_on_ice(Block_t* block, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree){
      if(block->pos.z == 0){
@@ -107,23 +57,6 @@ bool block_on_ice(Block_t* block, TileMap_t* tilemap, QuadTreeNode_t<Interactive
      // TODO: check for blocks below
      return false;
 }
-
-bool blocks_at_collidable_height(Block_t* a, Block_t* b){
-     S8 a_top = a->pos.z + HEIGHT_INTERVAL - 1;
-     S8 b_top = b->pos.z + HEIGHT_INTERVAL - 1;
-
-     if(a_top >= b->pos.z && a_top <= b_top){
-          return true;
-     }
-
-     if(a->pos.z >= b->pos.z && a->pos.z <= b_top){
-          return true;
-     }
-
-     return false;
-}
-
-#define BLOCK_QUAD_TREE_MAX_QUERY 16
 
 Block_t* block_against_another_block(Block_t* block_to_check, Direction_t direction, QuadTreeNode_t<Block_t>* block_quad_tree){
      Pixel_t center = block_center_pixel(block_to_check);
@@ -2122,7 +2055,6 @@ void undo_revert(Undo_t* undo, Player_t* player, TileMap_t* tilemap, ObjectArray
                *player = {};
                // TODO fix these numbers as they are important
                player->walk_frame_delta = 1;
-               player->radius = 3.5f / 272.0f;
                player->pos.pixel = player_entry->pixel;
                player->pos.z = player_entry->z;
                player->face = player_entry->face;
@@ -2570,7 +2502,10 @@ FILE* load_demo_number(S32 map_number, const char** demo_filepath){
 
 void reset_map(Player_t* player, Coord_t player_start, ObjectArray_t<Interactive_t>* interactive_array,
                QuadTreeNode_t<Interactive_t>** interactive_quad_tree){
-     player_spawn(player, player_start);
+     *player = {};
+     player->walk_frame_delta = 1;
+     player->pos = coord_to_pos_at_tile_center(player_start);
+     player->has_bow = true;
 
      // update interactive quad tree
      quad_tree_free(*interactive_quad_tree);
@@ -3973,7 +3908,7 @@ int main(int argc, char** argv){
                     for(S16 x = min.x; x <= max.x; x++){
                          if(tilemap.tiles[y][x].id){
                               Coord_t coord {x, y};
-                              player_collide_coord(player.pos, coord, player.radius, &pos_delta, &collide_with_tile);
+                              player_collide_coord(player.pos, coord, PLAYER_RADIUS, &pos_delta, &collide_with_tile);
                          }
                     }
                }
@@ -3989,10 +3924,10 @@ int main(int argc, char** argv){
                     Vec_t top_right {bottom_left.x + TILE_SIZE, bottom_left.y + TILE_SIZE};
                     Vec_t bottom_right {bottom_left.x + TILE_SIZE, bottom_left.y};
 
-                    pos_delta += collide_circle_with_line(pos_delta, player.radius, bottom_left, top_left, &collide_with_block);
-                    pos_delta += collide_circle_with_line(pos_delta, player.radius, top_left, top_right, &collide_with_block);
-                    pos_delta += collide_circle_with_line(pos_delta, player.radius, bottom_left, bottom_right, &collide_with_block);
-                    pos_delta += collide_circle_with_line(pos_delta, player.radius, bottom_right, top_right, &collide_with_block);
+                    pos_delta += collide_circle_with_line(pos_delta, PLAYER_RADIUS, bottom_left, top_left, &collide_with_block);
+                    pos_delta += collide_circle_with_line(pos_delta, PLAYER_RADIUS, top_left, top_right, &collide_with_block);
+                    pos_delta += collide_circle_with_line(pos_delta, PLAYER_RADIUS, bottom_left, bottom_right, &collide_with_block);
+                    pos_delta += collide_circle_with_line(pos_delta, PLAYER_RADIUS, bottom_right, top_right, &collide_with_block);
 
                     if(collide_with_block){
                          auto player_quadrant = relative_quadrant(player.pos.pixel, block_array.elements[i].pos.pixel +
@@ -4011,7 +3946,7 @@ int main(int argc, char** argv){
                     for(S16 x = min.x; x <= max.x; x++){
                          Coord_t coord {x, y};
                          if(quad_tree_interactive_solid_at(interactive_quad_tree, coord)){
-                              player_collide_coord(player.pos, coord, player.radius, &pos_delta, &collide_with_tile);
+                              player_collide_coord(player.pos, coord, PLAYER_RADIUS, &pos_delta, &collide_with_tile);
                          }
                     }
                }
@@ -4284,13 +4219,13 @@ int main(int argc, char** argv){
           }else{
                glColor3f(1.0f, 1.0f, 1.0f);
           }
-          Vec_t prev_vec {pos_vec.x + player.radius, pos_vec.y};
+          Vec_t prev_vec {pos_vec.x + PLAYER_RADIUS, pos_vec.y};
           S32 segments = 32;
           F32 delta = 3.14159f * 2.0f / (F32)(segments);
           F32 angle = 0.0f  + delta;
           for(S32 i = 0; i <= segments; i++){
-               F32 dx = cos(angle) * player.radius;
-               F32 dy = sin(angle) * player.radius;
+               F32 dx = cos(angle) * PLAYER_RADIUS;
+               F32 dy = sin(angle) * PLAYER_RADIUS;
 
                glVertex2f(prev_vec.x, prev_vec.y);
                glVertex2f(pos_vec.x + dx, pos_vec.y + dy);
