@@ -1803,7 +1803,9 @@ enum UndoDiffType_t : U8{
      UNDO_DIFF_TYPE_TILE_FLAGS,
      UNDO_DIFF_TYPE_BLOCK,
      UNDO_DIFF_TYPE_INTERACTIVE,
+     UNDO_DIFF_TYPE_BLOCK_INSERT,
      UNDO_DIFF_TYPE_BLOCK_REMOVE,
+     UNDO_DIFF_TYPE_INTERACTIVE_INSERT,
      UNDO_DIFF_TYPE_INTERACTIVE_REMOVE,
 };
 
@@ -1851,9 +1853,11 @@ void undo_history_add(UndoHistory_t* undo_history, UndoDiffType_t type, S32 inde
           undo_history->current = (char*)(undo_history->current) + sizeof(U16);
           break;
      case UNDO_DIFF_TYPE_BLOCK:
+     case UNDO_DIFF_TYPE_BLOCK_INSERT:
           undo_history->current = (char*)(undo_history->current) + sizeof(UndoBlock_t);
           break;
      case UNDO_DIFF_TYPE_INTERACTIVE:
+     case UNDO_DIFF_TYPE_INTERACTIVE_INSERT:
           undo_history->current = (char*)(undo_history->current) + sizeof(Interactive_t);
           break;
      case UNDO_DIFF_TYPE_BLOCK_REMOVE:
@@ -1973,34 +1977,56 @@ void undo_commit(Undo_t* undo, Player_t* player, TileMap_t* tilemap, ObjectArray
      S16 min_block_count = block_array->count;
      if(block_array->count > undo->block_array.count){
           min_block_count = undo->block_array.count;
-
           // remove a new blocks
           for(S16 i = undo->block_array.count; i < block_array->count; i++){
                undo_history_add(&undo->history, UNDO_DIFF_TYPE_BLOCK_REMOVE, i);
                diff_count++;
           }
-     }else{
+     }else if(block_array->count < undo->block_array.count){
           // insert a new blocks
-          for(S16 i = block_array->count; i < undo->block_array.count; i++){
-               auto* undo_block_entry = (UndoBlock_t*)(undo->history.current);
-               *undo_block_entry = undo->block_array.elements[i];
-               undo_history_add(&undo->history, UNDO_DIFF_TYPE_BLOCK, i);
-               diff_count++;
+          S16 diff = undo->block_array.count - block_array->count;
+          for(S16 d = 0; d < diff; d++){
+               S16 last_index = (undo->block_array.count - 1) - d;
+               UndoBlock_t* last_block = undo->block_array.elements + last_index;
+               bool found = false;
+
+               for(S16 i = 0; i < block_array->count; i++){
+                    Block_t* block = block_array->elements + i;
+
+                    if(last_block->pixel == block->pos.pixel &&
+                       last_block->z == block->pos.z &&
+                       last_block->element == block->element){
+                         found = true;
+                         auto* undo_block_entry = (UndoBlock_t*)(undo->history.current);
+                         *undo_block_entry = undo->block_array.elements[i];
+                         undo_history_add(&undo->history, UNDO_DIFF_TYPE_BLOCK_INSERT, i);
+                         diff_count++;
+                         break;
+                    }
+               }
+
+               // it must have been that last element
+               if(!found){
+                    auto* undo_block_entry = (UndoBlock_t*)(undo->history.current);
+                    *undo_block_entry = *last_block;
+                    undo_history_add(&undo->history, UNDO_DIFF_TYPE_BLOCK_INSERT, last_index);
+                    diff_count++;
+               }
           }
-     }
+     }else{
+          // blocks
+          for(S16 i = 0; i < min_block_count; i++){
+               UndoBlock_t* undo_block = undo->block_array.elements + i;
+               Block_t* block = block_array->elements + i;
 
-     // blocks
-     for(S16 i = 0; i < min_block_count; i++){
-          UndoBlock_t* undo_block = undo->block_array.elements + i;
-          Block_t* block = block_array->elements + i;
-
-          if(undo_block->pixel != block->pos.pixel ||
-             undo_block->z != block->pos.z ||
-             undo_block->element != block->element){
-               auto* undo_block_entry = (UndoBlock_t*)(undo->history.current);
-               *undo_block_entry = *undo_block;
-               undo_history_add(&undo->history, UNDO_DIFF_TYPE_BLOCK, i);
-               diff_count++;
+               if(undo_block->pixel != block->pos.pixel ||
+                  undo_block->z != block->pos.z ||
+                  undo_block->element != block->element){
+                    auto* undo_block_entry = (UndoBlock_t*)(undo->history.current);
+                    *undo_block_entry = *undo_block;
+                    undo_history_add(&undo->history, UNDO_DIFF_TYPE_BLOCK, i);
+                    diff_count++;
+               }
           }
      }
 
@@ -2014,69 +2040,48 @@ void undo_commit(Undo_t* undo, Player_t* player, TileMap_t* tilemap, ObjectArray
                undo_history_add(&undo->history, UNDO_DIFF_TYPE_INTERACTIVE_REMOVE, i);
                diff_count++;
           }
+     }else if(interactive_array->count < undo->interactive_array.count){
+          // insert a new interactives
+          S16 diff = undo->interactive_array.count - interactive_array->count;
+          for(S16 d = 0; d < diff; d++){
+               S16 last_index = (undo->interactive_array.count - 1) - d;
+               Interactive_t* last_interactive = undo->interactive_array.elements + last_index;
+               bool found = false;
+
+               for(S16 i = 0; i < interactive_array->count; i++){
+                    Interactive_t* interactive = interactive_array->elements + i;
+
+                    if(interactive_equal(last_interactive, interactive)){
+                         found = true;
+                         auto* undo_interactive_entry = (Interactive_t*)(undo->history.current);
+                         *undo_interactive_entry = undo->interactive_array.elements[i];
+                         undo_history_add(&undo->history, UNDO_DIFF_TYPE_INTERACTIVE_INSERT, i);
+                         diff_count++;
+                         break;
+                    }
+               }
+
+               // it must have been that last element
+               if(!found){
+                    auto* undo_interactive_entry = (Interactive_t*)(undo->history.current);
+                    *undo_interactive_entry = *last_interactive;
+                    undo_history_add(&undo->history, UNDO_DIFF_TYPE_INTERACTIVE_INSERT, last_index);
+                    diff_count++;
+               }
+          }
      }else{
-          // insert a new interactive
-          for(S16 i = interactive_array->count; i < undo->interactive_array.count; i++){
-               auto* undo_interactive_entry = (Interactive_t*)(undo->history.current);
-               *undo_interactive_entry = undo->interactive_array.elements[i];
-               undo_history_add(&undo->history, UNDO_DIFF_TYPE_INTERACTIVE, i);
-               diff_count++;
-          }
-     }
+          // interactives
+          for(S16 i = 0; i < min_interactive_count; i++){
+               Interactive_t* undo_interactive = undo->interactive_array.elements + i;
+               Interactive_t* interactive = interactive_array->elements + i;
+               assert(undo_interactive->type == interactive->type);
 
-     // interactives
-     for(S16 i = 0; i < min_interactive_count; i++){
-          Interactive_t* undo_interactive = undo->interactive_array.elements + i;
-          Interactive_t* interactive = interactive_array->elements + i;
-          assert(undo_interactive->type == interactive->type);
-
-          bool diff = false;
-
-          switch(interactive->type){
-          default:
-               break;
-          case INTERACTIVE_TYPE_PRESSURE_PLATE:
-               if(undo_interactive->pressure_plate.down != interactive->pressure_plate.down ||
-                  undo_interactive->pressure_plate.iced_under != interactive->pressure_plate.iced_under){
-                    diff = true;
+               if(!interactive_equal(undo_interactive, interactive)){
+                    auto* undo_interactive_entry = (Interactive_t*)(undo->history.current);
+                    *undo_interactive_entry = *undo_interactive;
+                    undo_history_add(&undo->history, UNDO_DIFF_TYPE_INTERACTIVE, i);
+                    diff_count++;
                }
-               break;
-          case INTERACTIVE_TYPE_ICE_DETECTOR:
-          case INTERACTIVE_TYPE_LIGHT_DETECTOR:
-               if(undo_interactive->detector.on != interactive->detector.on){
-                    diff = true;
-               }
-               break;
-          case INTERACTIVE_TYPE_POPUP:
-               if(undo_interactive->popup.iced != interactive->popup.iced ||
-                  undo_interactive->popup.lift.up != interactive->popup.lift.up ||
-                  undo_interactive->popup.lift.ticks != interactive->popup.lift.ticks){
-                    diff = true;
-               }
-               break;
-          case INTERACTIVE_TYPE_LEVER:
-               // TODO
-               break;
-          case INTERACTIVE_TYPE_DOOR:
-               if(undo_interactive->door.lift.up != interactive->door.lift.up ||
-                  undo_interactive->door.lift.ticks != interactive->door.lift.ticks){
-                    diff = true;
-               }
-               break;
-          case INTERACTIVE_TYPE_PORTAL:
-               if(undo_interactive->portal.on != interactive->portal.on){
-                    diff = true;
-               }
-               break;
-          case INTERACTIVE_TYPE_BOW:
-               break;
-          }
-
-          if(diff){
-               auto* undo_interactive_entry = (Interactive_t*)(undo->history.current);
-               *undo_interactive_entry = *undo_interactive;
-               undo_history_add(&undo->history, UNDO_DIFF_TYPE_INTERACTIVE, i);
-               diff_count++;
           }
      }
 
@@ -2133,13 +2138,26 @@ void undo_revert(Undo_t* undo, Player_t* player, TileMap_t* tilemap, ObjectArray
           {
                ptr -= sizeof(UndoBlock_t);
                auto* block_entry = (UndoBlock_t*)(ptr);
-               S16 index = diff_header->index;
-               if(index >= block_array->count){
-                    index = block_array->count;
-                    resize(block_array, block_array->count + 1);
-               }
+               Block_t* block = block_array->elements + diff_header->index;
+               *block = {};
+               block->pos.pixel = block_entry->pixel;
+               block->pos.z = block_entry->z;
+               block->element = block_entry->element;
+               block->accel = block_entry->accel;
+               block->vel = block_entry->vel;
+          } break;
+          case UNDO_DIFF_TYPE_BLOCK_INSERT:
+          {
+               ptr -= sizeof(UndoBlock_t);
+               auto* block_entry = (UndoBlock_t*)(ptr);
+               S16 last_index = block_array->count;
+               resize(block_array, block_array->count + 1);
 
-               Block_t* block = block_array->elements + index;
+               // move the block at that index back to the end of the list
+               block_array->elements[last_index] = block_array->elements[diff_header->index];
+
+               // override it with the insert
+               Block_t* block = block_array->elements + diff_header->index;
                *block = {};
                block->pos.pixel = block_entry->pixel;
                block->pos.z = block_entry->z;
@@ -2155,12 +2173,16 @@ void undo_revert(Undo_t* undo, Player_t* player, TileMap_t* tilemap, ObjectArray
           {
                ptr -= sizeof(Interactive_t);
                auto* interactive_entry = (Interactive_t*)(ptr);
-               S16 index = diff_header->index;
-               if(index >= interactive_array->count){
-                    index = interactive_array->count;
-                    resize(interactive_array, interactive_array->count + 1);
-               }
-               interactive_array->elements[index] = *interactive_entry;
+               interactive_array->elements[diff_header->index] = *interactive_entry;
+          } break;
+          case UNDO_DIFF_TYPE_INTERACTIVE_INSERT:
+          {
+               ptr -= sizeof(Interactive_t);
+               auto* interactive_entry = (Interactive_t*)(ptr);
+               S16 last_index = interactive_array->count;
+               resize(interactive_array, interactive_array->count + 1);
+               interactive_array->elements[last_index] = interactive_array->elements[diff_header->index];
+               interactive_array->elements[diff_header->index] = *interactive_entry;
           } break;
           case UNDO_DIFF_TYPE_INTERACTIVE_REMOVE:
           {
@@ -2437,6 +2459,7 @@ void apply_stamp(Stamp_t* stamp, Coord_t coord, TileMap_t* tilemap, ObjectArray_
           // TODO: Check if block is in the way with the quad tree
 
           Block_t* block = block_array->elements + index;
+          *block = {};
           block->pos = coord_to_pos(coord);
           block->vel = vec_zero();
           block->accel = vec_zero();

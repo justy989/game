@@ -11,5 +11,5 @@ Pixel_t operator+(Pixel_t a, Pixel_t b);
 Pixel_t operator-(Pixel_t a, Pixel_t b);
 void operator+=(Pixel_t& a, Pixel_t b);
 void operator-=(Pixel_t& a, Pixel_t b);
-bool operator!=(Pixel_t& a, Pixel_t b);
-bool operator==(Pixel_t& a, Pixel_t b);
+bool operator!=(Pixel_t a, Pixel_t b);
+bool operator==(Pixel_t a, Pixel_t b);

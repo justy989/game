@@ -19,6 +19,10 @@ bool init(ObjectArray_t<T>* object_array, S16 count){
 
 template <typename T>
 bool resize(ObjectArray_t<T>* object_array, S16 new_count){
+     if(new_count == 0){
+          destroy(object_array);
+          return true;
+     }
      object_array->elements = (T*)(realloc(object_array->elements, new_count * sizeof(*object_array->elements)));
      if(!object_array->elements){
           LOG("%s() failed to realloc %d objects\n", __FUNCTION__, new_count);

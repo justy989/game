@@ -82,3 +82,4 @@ struct Interactive_t{
 bool interactive_is_solid(const Interactive_t* interactive);
 S16 get_object_x(const Interactive_t* interactive);
 S16 get_object_y(const Interactive_t* interactive);
+bool interactive_equal(const Interactive_t* a, const Interactive_t* b);

@@ -24,10 +24,10 @@ void operator-=(Pixel_t& a, Pixel_t b){
      a.y -= b.y;
 }
 
-bool operator!=(Pixel_t& a, Pixel_t b){
+bool operator!=(Pixel_t a, Pixel_t b){
      return (a.x != b.x || a.y != b.y);
 }
 
-bool operator==(Pixel_t& a, Pixel_t b){
-     return (a.x == b.x || a.y == b.y);
+bool operator==(Pixel_t a, Pixel_t b){
+     return (a.x == b.x && a.y == b.y);
 }
