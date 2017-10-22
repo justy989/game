@@ -1,5 +1,9 @@
 #pragma once
 
+#include <stdlib.h>
+
+#include "log.h"
+
 template <typename T>
 struct ObjectArray_t{
      T* elements;
