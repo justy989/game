@@ -21,6 +21,8 @@
 #include "interactive.h"
 #include "quad_tree.h"
 
+#define UNDO_MEMORY (4 * 1024 * 1024)
+
 #define PLAYER_SPEED 5.5f
 #define PLAYER_WALK_DELAY 0.15f
 #define PLAYER_IDLE_SPEED 0.0025f
@@ -2801,7 +2803,7 @@ int main(int argc, char** argv){
      reset_map(&player, player_start, &interactive_array, &interactive_quad_tree);
 
      Undo_t undo = {};
-     init(&undo, 4 * 1024 * 1024, tilemap.width, tilemap.height, block_array.count, interactive_array.count);
+     init(&undo, UNDO_MEMORY, tilemap.width, tilemap.height, block_array.count, interactive_array.count);
 
      undo_snapshot(&undo, &player, &tilemap, &block_array, &interactive_array);
 
@@ -3015,6 +3017,9 @@ int main(int argc, char** argv){
                                    }
                                    if(load_map_number(map_number, &player_start, &tilemap, &block_array, &interactive_array)){
                                         reset_map(&player, player_start, &interactive_array, &interactive_quad_tree);
+                                        destroy(&undo);
+                                        init(&undo, UNDO_MEMORY, tilemap.width, tilemap.height, block_array.count, interactive_array.count);
+                                        undo_snapshot(&undo, &player, &tilemap, &block_array, &interactive_array);
 
                                         // reset some vars
                                         player_action = {};
@@ -3107,12 +3112,18 @@ int main(int argc, char** argv){
                     case SDL_SCANCODE_L:
                          if(load_map_number(map_number, &player_start, &tilemap, &block_array, &interactive_array)){
                               reset_map(&player, player_start, &interactive_array, &interactive_quad_tree);
+                              destroy(&undo);
+                              init(&undo, UNDO_MEMORY, tilemap.width, tilemap.height, block_array.count, interactive_array.count);
+                              undo_snapshot(&undo, &player, &tilemap, &block_array, &interactive_array);
                          }
                          break;
                     case SDL_SCANCODE_LEFTBRACKET:
                          map_number--;
                          if(load_map_number(map_number, &player_start, &tilemap, &block_array, &interactive_array)){
                               reset_map(&player, player_start, &interactive_array, &interactive_quad_tree);
+                              destroy(&undo);
+                              init(&undo, UNDO_MEMORY, tilemap.width, tilemap.height, block_array.count, interactive_array.count);
+                              undo_snapshot(&undo, &player, &tilemap, &block_array, &interactive_array);
                          }else{
                               map_number++;
                          }
@@ -3121,6 +3132,9 @@ int main(int argc, char** argv){
                          map_number++;
                          if(load_map_number(map_number, &player_start, &tilemap, &block_array, &interactive_array)){
                               reset_map(&player, player_start, &interactive_array, &interactive_quad_tree);
+                              destroy(&undo);
+                              init(&undo, UNDO_MEMORY, tilemap.width, tilemap.height, block_array.count, interactive_array.count);
+                              undo_snapshot(&undo, &player, &tilemap, &block_array, &interactive_array);
                          }else{
                               map_number--;
                          }
