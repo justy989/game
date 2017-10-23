@@ -3239,31 +3239,6 @@ int main(int argc, char** argv){
                               skip_coord[d] = player_coord + (Direction_t)(d);
                          }
                     }
-#if 0
-                    LOG("left %d: ", portal_exit.left_count);
-                    for(S8 c = 0; c < portal_exit.left_count; c++){
-                         LOG("(%d, %d) ", portal_exit.left[c].x, portal_exit.left[c].y);
-                    }
-                    LOG("\n");
-
-                    LOG("right %d: ", portal_exit.right_count);
-                    for(S8 c = 0; c < portal_exit.right_count; c++){
-                         LOG("(%d, %d) ", portal_exit.right[c].x, portal_exit.right[c].y);
-                    }
-                    LOG("\n");
-
-                    LOG("up %d: ", portal_exit.up_count);
-                    for(S8 c = 0; c < portal_exit.up_count; c++){
-                         LOG("(%d, %d) ", portal_exit.up[c].x, portal_exit.up[c].y);
-                    }
-                    LOG("\n");
-
-                    LOG("down %d: ", portal_exit.down_count);
-                    for(S8 c = 0; c < portal_exit.down_count; c++){
-                         LOG("(%d, %d) ", portal_exit.down[c].x, portal_exit.down[c].y);
-                    }
-                    LOG("\n");
-#endif
                }
 
                // if we crossed the boundary, check if we were in a portal
@@ -3276,7 +3251,19 @@ int main(int argc, char** argv){
                               for(S8 d = 0; d < DIRECTION_COUNT; d++){
                                    for(S8 i = 0; i < portal_exit.directions[d].count; i++){
                                         if(portal_exit.directions[d].coords[i] != player_previous_coord){
-                                             player.pos = coord_to_pos_at_tile_center(portal_exit.directions[d].coords[i]) + offset_from_center;
+                                             Position_t final_offset = offset_from_center;
+                                             U8 rotations_between = direction_rotations_between(interactive->portal.face,
+                                                                                                direction_opposite((Direction_t)(d)));
+                                             for(U8 r = 0; r < rotations_between; r++){
+                                                  auto save_pixel_x = final_offset.pixel.x;
+                                                  final_offset.pixel.x = -final_offset.pixel.y;
+                                                  final_offset.pixel.y = save_pixel_x;
+
+                                                  auto save_decimal_x = final_offset.decimal.x;
+                                                  final_offset.decimal.x = -final_offset.decimal.y;
+                                                  final_offset.decimal.y = save_decimal_x;
+                                             }
+                                             player.pos = coord_to_pos_at_tile_center(portal_exit.directions[d].coords[i]) + final_offset;
                                              break;
                                         }
                                    }
@@ -3284,7 +3271,6 @@ int main(int argc, char** argv){
                          }
                     }
                }
-
 
                for(S16 y = min.y; y <= max.y; y++){
                     for(S16 x = min.x; x <= max.x; x++){
