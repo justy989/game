@@ -1,3 +1,7 @@
+/*
+http://www.simonstalenhag.se/
+*/
+
 #include <iostream>
 #include <chrono>
 #include <cfloat>
@@ -1694,7 +1698,112 @@ void reset_map(Player_t* player, Coord_t player_start, ObjectArray_t<Interactive
      *interactive_quad_tree = quad_tree_build(interactive_array);
 }
 
+#define MAX_PORTAL_EXITS 4
+
+struct PortalExit_t{
+     Coord_t left[MAX_PORTAL_EXITS];
+     Coord_t right[MAX_PORTAL_EXITS];
+     Coord_t up[MAX_PORTAL_EXITS];
+     Coord_t down[MAX_PORTAL_EXITS];
+
+     S16 left_count;
+     S16 right_count;
+     S16 up_count;
+     S16 down_count;
+};
+
+void portal_exit_add(PortalExit_t* portal_exit, Direction_t direction, Coord_t coord){
+     switch(direction){
+     default:
+          break;
+     case DIRECTION_LEFT:
+          if(portal_exit->left_count < MAX_PORTAL_EXITS){
+               portal_exit->left[portal_exit->left_count] = coord;
+               portal_exit->left_count++;
+          }
+          break;
+     case DIRECTION_RIGHT:
+          if(portal_exit->right_count < MAX_PORTAL_EXITS){
+               portal_exit->right[portal_exit->right_count] = coord;
+               portal_exit->right_count++;
+          }
+          break;
+     case DIRECTION_UP:
+          if(portal_exit->up_count < MAX_PORTAL_EXITS){
+               portal_exit->up[portal_exit->up_count] = coord;
+               portal_exit->up_count++;
+          }
+          break;
+     case DIRECTION_DOWN:
+          if(portal_exit->down_count < MAX_PORTAL_EXITS){
+               portal_exit->down[portal_exit->down_count] = coord;
+               portal_exit->down_count++;
+          }
+          break;
+     }
+}
+
+void find_portal_exits_impl(Coord_t coord, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree,
+                            PortalExit_t* portal_exit, Direction_t from){
+     Interactive_t* interactive = quad_tree_interactive_find_at(interactive_quad_tree, coord);
+     if(interactive && interactive->type == INTERACTIVE_TYPE_PORTAL && interactive->portal.on){
+          portal_exit_add(portal_exit, interactive->portal.face, coord);
+          return;
+     }
+
+     Tile_t* tile = tilemap_get_tile(tilemap, coord);
+     if(!tile) return;
+     if((tile->flags & TILE_FLAG_WIRE_STATE) == 0) return;
+
+     if((tile->flags & TILE_FLAG_WIRE_LEFT) && from != DIRECTION_LEFT){
+          find_portal_exits_impl(coord + DIRECTION_LEFT, tilemap, interactive_quad_tree, portal_exit, DIRECTION_RIGHT);
+     }
+
+     if((tile->flags & TILE_FLAG_WIRE_RIGHT) && from != DIRECTION_RIGHT){
+          find_portal_exits_impl(coord + DIRECTION_RIGHT, tilemap, interactive_quad_tree, portal_exit, DIRECTION_LEFT);
+     }
+
+     if((tile->flags & TILE_FLAG_WIRE_UP) && from != DIRECTION_UP){
+          find_portal_exits_impl(coord + DIRECTION_UP, tilemap, interactive_quad_tree, portal_exit, DIRECTION_DOWN);
+     }
+
+     if((tile->flags & TILE_FLAG_WIRE_DOWN) && from != DIRECTION_DOWN){
+          find_portal_exits_impl(coord + DIRECTION_DOWN, tilemap, interactive_quad_tree, portal_exit, DIRECTION_UP);
+     }
+}
+
+PortalExit_t find_portal_exits(Coord_t coord, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree){
+     PortalExit_t portal_exit = {};
+     Interactive_t* interactive = quad_tree_interactive_find_at(interactive_quad_tree, coord);
+     if(interactive && interactive->type == INTERACTIVE_TYPE_PORTAL){
+          portal_exit_add(&portal_exit, interactive->portal.face, coord);
+          find_portal_exits_impl(coord + direction_opposite(interactive->portal.face), tilemap, interactive_quad_tree,
+                                 &portal_exit, interactive->portal.face);
+     }
+     return portal_exit;
+}
+
 using namespace std::chrono;
+
+Direction_t direction_between(Coord_t a, Coord_t b){
+     if(a == b) return DIRECTION_COUNT;
+
+     Coord_t diff = a - b;
+
+     if(abs(diff.x) > abs(diff.y)){
+          if(diff.x > 0){
+               return DIRECTION_LEFT;
+          }else{
+               return DIRECTION_RIGHT;
+          }
+     }
+
+     if(diff.y > 0){
+          return DIRECTION_DOWN;
+     }
+
+     return DIRECTION_UP;
+}
 
 int main(int argc, char** argv){
      DemoMode_t demo_mode = DEMO_MODE_NONE;
@@ -3116,6 +3225,8 @@ int main(int argc, char** argv){
 
           // player movement
           {
+               Coord_t player_previous_coord = pos_to_coord(player.pos);
+
                user_movement = vec_normalize(user_movement);
                player.accel = user_movement * PLAYER_SPEED;
 
@@ -3129,17 +3240,102 @@ int main(int argc, char** argv){
 
                // figure out tiles that are close by
                bool collide_with_tile = false;
-               Coord_t player_coord = pos_to_coord(player.pos);
+               Position_t final_player_pos = player.pos + pos_delta;
+               Coord_t player_coord = pos_to_coord(final_player_pos);
                Coord_t min = player_coord - Coord_t{1, 1};
                Coord_t max = player_coord + Coord_t{1, 1};
                // S8 player_top = player.pos.z + 2 * HEIGHT_INTERVAL;
                min = coord_clamp_zero_to_dim(min, tilemap.width - 1, tilemap.height - 1);
                max = coord_clamp_zero_to_dim(max, tilemap.width - 1, tilemap.height - 1);
 
+               Coord_t skip_coord[DIRECTION_COUNT] = {
+                    {-1, -1},
+                    {-1, -1},
+                    {-1, -1},
+                    {-1, -1}
+               };
+
+               PortalExit_t portal_exit = {};
+
+               Interactive_t* interactive = quad_tree_interactive_find_at(interactive_quad_tree, player_coord);
+               if(interactive && interactive->type == INTERACTIVE_TYPE_PORTAL){
+                    portal_exit = find_portal_exits(player_coord, &tilemap, interactive_quad_tree);
+                    if(portal_exit.left_count){
+                         skip_coord[DIRECTION_LEFT] = player_coord + DIRECTION_LEFT;
+                    }
+                    if(portal_exit.right_count){
+                         skip_coord[DIRECTION_RIGHT] = player_coord + DIRECTION_RIGHT;
+                    }
+                    if(portal_exit.up_count){
+                         skip_coord[DIRECTION_UP] = player_coord + DIRECTION_UP;
+                    }
+                    if(portal_exit.down_count){
+                         skip_coord[DIRECTION_DOWN] = player_coord + DIRECTION_DOWN;
+                    }
+#if 0
+                    LOG("left %d: ", portal_exit.left_count);
+                    for(S8 c = 0; c < portal_exit.left_count; c++){
+                         LOG("(%d, %d) ", portal_exit.left[c].x, portal_exit.left[c].y);
+                    }
+                    LOG("\n");
+
+                    LOG("right %d: ", portal_exit.right_count);
+                    for(S8 c = 0; c < portal_exit.right_count; c++){
+                         LOG("(%d, %d) ", portal_exit.right[c].x, portal_exit.right[c].y);
+                    }
+                    LOG("\n");
+
+                    LOG("up %d: ", portal_exit.up_count);
+                    for(S8 c = 0; c < portal_exit.up_count; c++){
+                         LOG("(%d, %d) ", portal_exit.up[c].x, portal_exit.up[c].y);
+                    }
+                    LOG("\n");
+
+                    LOG("down %d: ", portal_exit.down_count);
+                    for(S8 c = 0; c < portal_exit.down_count; c++){
+                         LOG("(%d, %d) ", portal_exit.down[c].x, portal_exit.down[c].y);
+                    }
+                    LOG("\n");
+#endif
+               }
+
+               // if we crossed the boundary, check if we were in a portal
+               if(player_previous_coord != player_coord){
+                    interactive = quad_tree_interactive_find_at(interactive_quad_tree, player_previous_coord);
+                    if(interactive && interactive->type == INTERACTIVE_TYPE_PORTAL){
+                         if(interactive->portal.face == direction_opposite(direction_between(player_coord, player_previous_coord))){
+                              Position_t offset_from_center = final_player_pos - coord_to_pos_at_tile_center(player_previous_coord);
+                              portal_exit = find_portal_exits(player_previous_coord, &tilemap, interactive_quad_tree);
+                              for(S8 i = 0; i < portal_exit.right_count; i++){
+                                   if(portal_exit.right[i] != player_previous_coord){
+                                        player.pos = coord_to_pos_at_tile_center(portal_exit.right[i]) + offset_from_center;
+                                        break;
+                                   }
+                              }
+
+                              for(S8 i = 0; i < portal_exit.left_count; i++){
+                                   if(portal_exit.left[i] != player_previous_coord){
+                                        player.pos = coord_to_pos_at_tile_center(portal_exit.left[i]) + offset_from_center;
+                                        break;
+                                   }
+                              }
+                         }
+                    }
+               }
+
+
                for(S16 y = min.y; y <= max.y; y++){
                     for(S16 x = min.x; x <= max.x; x++){
                          if(tilemap.tiles[y][x].id){
                               Coord_t coord {x, y};
+                              bool skip = false;
+                              for(S16 d = 0; d < DIRECTION_COUNT; d++){
+                                   if(skip_coord[d] == coord){
+                                        skip = true;
+                                        break;
+                                   }
+                              }
+                              if(skip) continue;
                               player_collide_coord(player.pos, coord, PLAYER_RADIUS, &pos_delta, &collide_with_tile);
                          }
                     }
@@ -3174,14 +3370,10 @@ int main(int argc, char** argv){
                     }
                }
 
-               Interactive_t* interactive = quad_tree_interactive_find_at(interactive_quad_tree, player_coord);
-               if(interactive && interactive->type == INTERACTIVE_TYPE_PORTAL){
-
-               }
-
                for(S16 y = min.y; y <= max.y; y++){
                     for(S16 x = min.x; x <= max.x; x++){
                          Coord_t coord {x, y};
+
                          if(quad_tree_interactive_solid_at(interactive_quad_tree, coord)){
                               player_collide_coord(player.pos, coord, PLAYER_RADIUS, &pos_delta, &collide_with_tile);
                          }
