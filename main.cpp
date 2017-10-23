@@ -1700,46 +1700,20 @@ void reset_map(Player_t* player, Coord_t player_start, ObjectArray_t<Interactive
 
 #define MAX_PORTAL_EXITS 4
 
-struct PortalExit_t{
-     Coord_t left[MAX_PORTAL_EXITS];
-     Coord_t right[MAX_PORTAL_EXITS];
-     Coord_t up[MAX_PORTAL_EXITS];
-     Coord_t down[MAX_PORTAL_EXITS];
+struct PortalExitCoords_t{
+     Coord_t coords[MAX_PORTAL_EXITS];
+     S8 count;
+};
 
-     S16 left_count;
-     S16 right_count;
-     S16 up_count;
-     S16 down_count;
+struct PortalExit_t{
+     PortalExitCoords_t directions[DIRECTION_COUNT];
 };
 
 void portal_exit_add(PortalExit_t* portal_exit, Direction_t direction, Coord_t coord){
-     switch(direction){
-     default:
-          break;
-     case DIRECTION_LEFT:
-          if(portal_exit->left_count < MAX_PORTAL_EXITS){
-               portal_exit->left[portal_exit->left_count] = coord;
-               portal_exit->left_count++;
-          }
-          break;
-     case DIRECTION_RIGHT:
-          if(portal_exit->right_count < MAX_PORTAL_EXITS){
-               portal_exit->right[portal_exit->right_count] = coord;
-               portal_exit->right_count++;
-          }
-          break;
-     case DIRECTION_UP:
-          if(portal_exit->up_count < MAX_PORTAL_EXITS){
-               portal_exit->up[portal_exit->up_count] = coord;
-               portal_exit->up_count++;
-          }
-          break;
-     case DIRECTION_DOWN:
-          if(portal_exit->down_count < MAX_PORTAL_EXITS){
-               portal_exit->down[portal_exit->down_count] = coord;
-               portal_exit->down_count++;
-          }
-          break;
+     S8* count = &portal_exit->directions[direction].count;
+     if(*count < MAX_PORTAL_EXITS){
+          portal_exit->directions[direction].coords[*count] = coord;
+          (*count)++;
      }
 }
 
@@ -3260,17 +3234,10 @@ int main(int argc, char** argv){
                Interactive_t* interactive = quad_tree_interactive_find_at(interactive_quad_tree, player_coord);
                if(interactive && interactive->type == INTERACTIVE_TYPE_PORTAL){
                     portal_exit = find_portal_exits(player_coord, &tilemap, interactive_quad_tree);
-                    if(portal_exit.left_count){
-                         skip_coord[DIRECTION_LEFT] = player_coord + DIRECTION_LEFT;
-                    }
-                    if(portal_exit.right_count){
-                         skip_coord[DIRECTION_RIGHT] = player_coord + DIRECTION_RIGHT;
-                    }
-                    if(portal_exit.up_count){
-                         skip_coord[DIRECTION_UP] = player_coord + DIRECTION_UP;
-                    }
-                    if(portal_exit.down_count){
-                         skip_coord[DIRECTION_DOWN] = player_coord + DIRECTION_DOWN;
+                    for(S8 d = 0; d < DIRECTION_COUNT; d++){
+                         if(portal_exit.directions[d].count){
+                              skip_coord[d] = player_coord + (Direction_t)(d);
+                         }
                     }
 #if 0
                     LOG("left %d: ", portal_exit.left_count);
@@ -3306,17 +3273,12 @@ int main(int argc, char** argv){
                          if(interactive->portal.face == direction_opposite(direction_between(player_coord, player_previous_coord))){
                               Position_t offset_from_center = final_player_pos - coord_to_pos_at_tile_center(player_previous_coord);
                               portal_exit = find_portal_exits(player_previous_coord, &tilemap, interactive_quad_tree);
-                              for(S8 i = 0; i < portal_exit.right_count; i++){
-                                   if(portal_exit.right[i] != player_previous_coord){
-                                        player.pos = coord_to_pos_at_tile_center(portal_exit.right[i]) + offset_from_center;
-                                        break;
-                                   }
-                              }
-
-                              for(S8 i = 0; i < portal_exit.left_count; i++){
-                                   if(portal_exit.left[i] != player_previous_coord){
-                                        player.pos = coord_to_pos_at_tile_center(portal_exit.left[i]) + offset_from_center;
-                                        break;
+                              for(S8 d = 0; d < DIRECTION_COUNT; d++){
+                                   for(S8 i = 0; i < portal_exit.directions[d].count; i++){
+                                        if(portal_exit.directions[d].coords[i] != player_previous_coord){
+                                             player.pos = coord_to_pos_at_tile_center(portal_exit.directions[d].coords[i]) + offset_from_center;
+                                             break;
+                                        }
                                    }
                               }
                          }
