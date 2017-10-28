@@ -104,6 +104,21 @@ PortalExit_t find_portal_exits(Coord_t coord, TileMap_t* tilemap, QuadTreeNode_t
      return portal_exit;
 }
 
+// NOTE: skip_coord needs to be DIRECTION_COUNT size
+void find_portal_adjacents_to_skip_collision_check(Coord_t coord, QuadTreeNode_t<Interactive_t>* interactive_quad_tree,
+                                                   TileMap_t* tilemap, Coord_t* skip_coord){
+     // figure out which coords we can skip collision checking on, because they have portal exits
+     PortalExit_t portal_exit = {};
+     Interactive_t* interactive = quad_tree_interactive_find_at(interactive_quad_tree, coord);
+     if(interactive && interactive->type == INTERACTIVE_TYPE_PORTAL){
+          portal_exit = find_portal_exits(coord, tilemap, interactive_quad_tree);
+          for(S8 d = 0; d < DIRECTION_COUNT; d++){
+               if(portal_exit.directions[d].count){
+                    skip_coord[d] = coord + (Direction_t)(d);
+               }
+          }
+     }
+}
 
 #define BLOCK_QUAD_TREE_MAX_QUERY 16
 
@@ -339,18 +354,7 @@ Tile_t* block_against_solid_tile(Block_t* block_to_check, Direction_t direction,
           {-1, -1}
      };
 
-     // figure out which coords we can skip collision checking on, because they have portal exits
-     PortalExit_t portal_exit = {};
-     Coord_t coord = pixel_to_coord(block_to_check->pos.pixel);
-     Interactive_t* interactive = quad_tree_interactive_find_at(interactive_quad_tree, coord);
-     if(interactive && interactive->type == INTERACTIVE_TYPE_PORTAL){
-          portal_exit = find_portal_exits(coord, tilemap, interactive_quad_tree);
-          for(S8 d = 0; d < DIRECTION_COUNT; d++){
-               if(portal_exit.directions[d].count){
-                    skip_coord[d] = coord + (Direction_t)(d);
-               }
-          }
-     }
+     find_portal_adjacents_to_skip_collision_check(block_get_coord(block_to_check), interactive_quad_tree, tilemap, skip_coord);
 
      Coord_t tile_coord = pixel_to_coord(pixel_a);
 
@@ -3096,17 +3100,7 @@ int main(int argc, char** argv){
                     {-1, -1}
                };
 
-               // figure out which coords we can skip collision checking on, because they have portal exits
-               PortalExit_t portal_exit = {};
-               Interactive_t* interactive = quad_tree_interactive_find_at(interactive_quad_tree, coord);
-               if(interactive && interactive->type == INTERACTIVE_TYPE_PORTAL){
-                    portal_exit = find_portal_exits(coord, &tilemap, interactive_quad_tree);
-                    for(S8 d = 0; d < DIRECTION_COUNT; d++){
-                         if(portal_exit.directions[d].count){
-                              skip_coord[d] = coord + (Direction_t)(d);
-                         }
-                    }
-               }
+               find_portal_adjacents_to_skip_collision_check(coord, interactive_quad_tree, tilemap, skip_coord);
 
                // check for adjacent walls
                if(block->vel.x > 0.0f){
@@ -3330,15 +3324,7 @@ int main(int argc, char** argv){
 
                PortalExit_t portal_exit = {};
 
-               Interactive_t* interactive = quad_tree_interactive_find_at(interactive_quad_tree, player_coord);
-               if(interactive && interactive->type == INTERACTIVE_TYPE_PORTAL){
-                    portal_exit = find_portal_exits(player_coord, &tilemap, interactive_quad_tree);
-                    for(S8 d = 0; d < DIRECTION_COUNT; d++){
-                         if(portal_exit.directions[d].count){
-                              skip_coord[d] = player_coord + (Direction_t)(d);
-                         }
-                    }
-               }
+               find_portal_adjacents_to_skip_collision_check(player_coord, interactive_quad_tree, tilemap, skip_coord);
 
                // if we crossed the boundary, check if we were in a portal
                if(player_previous_coord != player_coord){
