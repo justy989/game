@@ -2989,10 +2989,28 @@ int main(int argc, char** argv){
                     arrow->element_from_block = -1;
                }
 
+               Coord_t skip_coord[DIRECTION_COUNT] = {
+                    {-1, -1},
+                    {-1, -1},
+                    {-1, -1},
+                    {-1, -1}
+               };
+
+               find_portal_adjacents_to_skip_collision_check(pre_move_coord, interactive_quad_tree, skip_coord);
+
                if(pre_move_coord != post_move_coord){
-                    Tile_t* tile = tilemap_get_tile(&tilemap, post_move_coord);
-                    if(tile_is_solid(tile)){
-                         arrow->stuck_time = dt;
+                    bool skip = false;
+                    for(S8 d = 0; d < DIRECTION_COUNT; d++){
+                         if(post_move_coord == skip_coord[d]){
+                              skip = true;
+                         }
+                    }
+
+                    if(!skip){
+                         Tile_t* tile = tilemap_get_tile(&tilemap, post_move_coord);
+                         if(tile_is_solid(tile)){
+                              arrow->stuck_time = dt;
+                         }
                     }
 
                     // catch or give elements
@@ -3015,6 +3033,12 @@ int main(int argc, char** argv){
                                    arrow->stuck_time = dt;
                               }
                          }
+                    }
+
+                    Direction_t teleport_dir = teleport_position_across_portal(&arrow->pos, interactive_quad_tree, &tilemap, pre_move_coord,
+                                                                               post_move_coord);
+                    if(teleport_dir < DIRECTION_COUNT){
+                         arrow->face = direction_opposite(teleport_dir);
                     }
                }
           }
