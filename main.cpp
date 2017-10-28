@@ -30,6 +30,26 @@ http://www.simonstalenhag.se/
 #include "undo.h"
 #include "editor.h"
 
+Direction_t direction_between(Coord_t a, Coord_t b){
+     if(a == b) return DIRECTION_COUNT;
+
+     Coord_t diff = a - b;
+
+     if(abs(diff.x) > abs(diff.y)){
+          if(diff.x > 0){
+               return DIRECTION_LEFT;
+          }else{
+               return DIRECTION_RIGHT;
+          }
+     }
+
+     if(diff.y > 0){
+          return DIRECTION_DOWN;
+     }
+
+     return DIRECTION_UP;
+}
+
 #define UNDO_MEMORY (4 * 1024 * 1024)
 
 Interactive_t* quad_tree_interactive_find_at(QuadTreeNode_t<Interactive_t>* root, Coord_t coord){
@@ -120,6 +140,43 @@ PortalExit_t find_portal_adjacents_to_skip_collision_check(Coord_t coord, QuadTr
      }
 
      return portal_exit;
+}
+
+bool teleport_position_across_portal(Position_t* position, QuadTreeNode_t<Interactive_t>* interactive_quad_tree,
+                                     TileMap_t* tilemap, Coord_t premove_coord, Coord_t postmove_coord){
+     if(postmove_coord != premove_coord){
+          auto* interactive = quad_tree_interactive_find_at(interactive_quad_tree, premove_coord);
+          if(interactive && interactive->type == INTERACTIVE_TYPE_PORTAL){
+               if(interactive->portal.face == direction_opposite(direction_between(postmove_coord, premove_coord))){
+                    Position_t offset_from_center = *position - coord_to_pos_at_tile_center(premove_coord);
+                    PortalExit_t portal_exit = find_portal_exits(premove_coord, tilemap, interactive_quad_tree);
+
+                    for(S8 d = 0; d < DIRECTION_COUNT; d++){
+                         for(S8 p = 0; p < portal_exit.directions[d].count; p++){
+                              if(portal_exit.directions[d].coords[p] != premove_coord){
+                                   Position_t final_offset = offset_from_center;
+                                   U8 rotations_between = direction_rotations_between(interactive->portal.face,
+                                                                                      direction_opposite((Direction_t)(d)));
+                                   for(U8 r = 0; r < rotations_between; r++){
+                                        auto save_pixel_x = final_offset.pixel.x;
+                                        final_offset.pixel.x = -final_offset.pixel.y;
+                                        final_offset.pixel.y = save_pixel_x;
+
+                                        auto save_decimal_x = final_offset.decimal.x;
+                                        final_offset.decimal.x = -final_offset.decimal.y;
+                                        final_offset.decimal.y = save_decimal_x;
+                                   }
+
+                                   *position = coord_to_pos_at_tile_center(portal_exit.directions[d].coords[p]) + final_offset;
+                                   return true;;
+                              }
+                         }
+                    }
+               }
+          }
+     }
+
+     return false;
 }
 
 #define BLOCK_QUAD_TREE_MAX_QUERY 16
@@ -1809,26 +1866,6 @@ void reset_map(Player_t* player, Coord_t player_start, ObjectArray_t<Interactive
 
 using namespace std::chrono;
 
-Direction_t direction_between(Coord_t a, Coord_t b){
-     if(a == b) return DIRECTION_COUNT;
-
-     Coord_t diff = a - b;
-
-     if(abs(diff.x) > abs(diff.y)){
-          if(diff.x > 0){
-               return DIRECTION_LEFT;
-          }else{
-               return DIRECTION_RIGHT;
-          }
-     }
-
-     if(diff.y > 0){
-          return DIRECTION_DOWN;
-     }
-
-     return DIRECTION_UP;
-}
-
 int main(int argc, char** argv){
      DemoMode_t demo_mode = DEMO_MODE_NONE;
      const char* demo_filepath = nullptr;
@@ -3196,36 +3233,8 @@ int main(int argc, char** argv){
                coord = pixel_to_coord(block->pos.pixel + Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS});
                Coord_t premove_coord = pixel_to_coord(pre_move.pixel + Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS});
 
-               if(coord != premove_coord){
-                    // TODO: compress with player teleport
-                    interactive = quad_tree_interactive_find_at(interactive_quad_tree, premove_coord);
-                    if(interactive && interactive->type == INTERACTIVE_TYPE_PORTAL){
-                         if(interactive->portal.face == direction_opposite(direction_between(coord, premove_coord))){
-                              Position_t offset_from_center = block->pos - coord_to_pos_at_tile_center(premove_coord);
-                              PortalExit_t portal_exit = find_portal_exits(premove_coord, &tilemap, interactive_quad_tree);
-                              for(S8 d = 0; d < DIRECTION_COUNT; d++){
-                                   for(S8 p = 0; p < portal_exit.directions[d].count; p++){
-                                        if(portal_exit.directions[d].coords[p] != premove_coord){
-                                             Position_t final_offset = offset_from_center;
-                                             U8 rotations_between = direction_rotations_between(interactive->portal.face,
-                                                                                                direction_opposite((Direction_t)(d)));
-                                             for(U8 r = 0; r < rotations_between; r++){
-                                                  auto save_pixel_x = final_offset.pixel.x;
-                                                  final_offset.pixel.x = -final_offset.pixel.y;
-                                                  final_offset.pixel.y = save_pixel_x;
-
-                                                  auto save_decimal_x = final_offset.decimal.x;
-                                                  final_offset.decimal.x = -final_offset.decimal.y;
-                                                  final_offset.decimal.y = save_decimal_x;
-                                             }
-                                             block->pos = coord_to_pos_at_tile_center(portal_exit.directions[d].coords[p]) + final_offset;
-                                             break;
-                                        }
-                                   }
-                              }
-                         }
-                    }
-               }
+               teleport_position_across_portal(&block->pos, interactive_quad_tree, &tilemap, premove_coord,
+                                               coord);
           }
 
           // illuminate and ice
@@ -3324,38 +3333,9 @@ int main(int argc, char** argv){
                     {-1, -1}
                };
 
-               auto portal_exit = find_portal_adjacents_to_skip_collision_check(player_coord, interactive_quad_tree, &tilemap, skip_coord);
-
-               // if we crossed the boundary, check if we were in a portal
-               if(player_previous_coord != player_coord){
-                    auto* interactive = quad_tree_interactive_find_at(interactive_quad_tree, player_previous_coord);
-                    if(interactive && interactive->type == INTERACTIVE_TYPE_PORTAL){
-                         if(interactive->portal.face == direction_opposite(direction_between(player_coord, player_previous_coord))){
-                              Position_t offset_from_center = final_player_pos - coord_to_pos_at_tile_center(player_previous_coord);
-                              portal_exit = find_portal_exits(player_previous_coord, &tilemap, interactive_quad_tree);
-                              for(S8 d = 0; d < DIRECTION_COUNT; d++){
-                                   for(S8 i = 0; i < portal_exit.directions[d].count; i++){
-                                        if(portal_exit.directions[d].coords[i] != player_previous_coord){
-                                             Position_t final_offset = offset_from_center;
-                                             U8 rotations_between = direction_rotations_between(interactive->portal.face,
-                                                                                                direction_opposite((Direction_t)(d)));
-                                             for(U8 r = 0; r < rotations_between; r++){
-                                                  auto save_pixel_x = final_offset.pixel.x;
-                                                  final_offset.pixel.x = -final_offset.pixel.y;
-                                                  final_offset.pixel.y = save_pixel_x;
-
-                                                  auto save_decimal_x = final_offset.decimal.x;
-                                                  final_offset.decimal.x = -final_offset.decimal.y;
-                                                  final_offset.decimal.y = save_decimal_x;
-                                             }
-                                             player.pos = coord_to_pos_at_tile_center(portal_exit.directions[d].coords[i]) + final_offset;
-                                             break;
-                                        }
-                                   }
-                              }
-                         }
-                    }
-               }
+               find_portal_adjacents_to_skip_collision_check(player_coord, interactive_quad_tree, &tilemap, skip_coord);
+               teleport_position_across_portal(&player.pos, interactive_quad_tree, &tilemap, player_previous_coord,
+                                               player_coord);
 
                for(S16 y = min.y; y <= max.y; y++){
                     for(S16 x = min.x; x <= max.x; x++){
