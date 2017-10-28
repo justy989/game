@@ -126,24 +126,19 @@ PortalExit_t find_portal_exits(Coord_t coord, TileMap_t* tilemap, QuadTreeNode_t
 
 // NOTE: skip_coord needs to be DIRECTION_COUNT size
 PortalExit_t find_portal_adjacents_to_skip_collision_check(Coord_t coord, QuadTreeNode_t<Interactive_t>* interactive_quad_tree,
-                                                   TileMap_t* tilemap, Coord_t* skip_coord){
+                                                           Coord_t* skip_coord){
      // figure out which coords we can skip collision checking on, because they have portal exits
      PortalExit_t portal_exit = {};
      Interactive_t* interactive = quad_tree_interactive_find_at(interactive_quad_tree, coord);
-     if(interactive && interactive->type == INTERACTIVE_TYPE_PORTAL){
-          portal_exit = find_portal_exits(coord, tilemap, interactive_quad_tree);
-          for(S8 d = 0; d < DIRECTION_COUNT; d++){
-               if(portal_exit.directions[d].count){
-                    skip_coord[d] = coord + (Direction_t)(d);
-               }
-          }
+     if(interactive && interactive->type == INTERACTIVE_TYPE_PORTAL && interactive->portal.on){
+          skip_coord[interactive->portal.face] = coord + interactive->portal.face;
      }
 
      return portal_exit;
 }
 
-bool teleport_position_across_portal(Position_t* position, QuadTreeNode_t<Interactive_t>* interactive_quad_tree,
-                                     TileMap_t* tilemap, Coord_t premove_coord, Coord_t postmove_coord){
+Direction_t teleport_position_across_portal(Position_t* position, QuadTreeNode_t<Interactive_t>* interactive_quad_tree,
+                                            TileMap_t* tilemap, Coord_t premove_coord, Coord_t postmove_coord){
      if(postmove_coord != premove_coord){
           auto* interactive = quad_tree_interactive_find_at(interactive_quad_tree, premove_coord);
           if(interactive && interactive->type == INTERACTIVE_TYPE_PORTAL){
@@ -168,7 +163,7 @@ bool teleport_position_across_portal(Position_t* position, QuadTreeNode_t<Intera
                                    }
 
                                    *position = coord_to_pos_at_tile_center(portal_exit.directions[d].coords[p]) + final_offset;
-                                   return true;;
+                                   return (Direction_t)(d);
                               }
                          }
                     }
@@ -176,7 +171,7 @@ bool teleport_position_across_portal(Position_t* position, QuadTreeNode_t<Intera
           }
      }
 
-     return false;
+     return DIRECTION_COUNT;
 }
 
 #define BLOCK_QUAD_TREE_MAX_QUERY 16
@@ -413,7 +408,7 @@ Tile_t* block_against_solid_tile(Block_t* block_to_check, Direction_t direction,
           {-1, -1}
      };
 
-     find_portal_adjacents_to_skip_collision_check(block_get_coord(block_to_check), interactive_quad_tree, tilemap, skip_coord);
+     find_portal_adjacents_to_skip_collision_check(block_get_coord(block_to_check), interactive_quad_tree, skip_coord);
 
      Coord_t tile_coord = pixel_to_coord(pixel_a);
 
@@ -3139,7 +3134,7 @@ int main(int argc, char** argv){
                     {-1, -1}
                };
 
-               find_portal_adjacents_to_skip_collision_check(coord, interactive_quad_tree, &tilemap, skip_coord);
+               find_portal_adjacents_to_skip_collision_check(coord, interactive_quad_tree, skip_coord);
 
                // check for adjacent walls
                if(block->vel.x > 0.0f){
@@ -3233,8 +3228,38 @@ int main(int argc, char** argv){
                coord = pixel_to_coord(block->pos.pixel + Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS});
                Coord_t premove_coord = pixel_to_coord(pre_move.pixel + Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS});
 
-               teleport_position_across_portal(&block->pos, interactive_quad_tree, &tilemap, premove_coord,
-                                               coord);
+               Position_t block_center = block->pos;
+               block_center.pixel += Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS};
+               Direction_t teleport_dir = teleport_position_across_portal(&block_center, interactive_quad_tree, &tilemap, premove_coord,
+                                                                          coord);
+               if(teleport_dir < DIRECTION_COUNT){
+                    block->pos = block_center;
+                    block->pos.pixel -= Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS};
+
+                    F32 push_vel_mag = vec_magnitude(block->vel);
+                    F32 push_accel_mag = vec_magnitude(block->accel);
+
+                    switch(direction_opposite(teleport_dir)){
+                    default:
+                         break;
+                    case DIRECTION_LEFT:
+                         block->vel = vec_left() * push_vel_mag;
+                         block->accel = vec_left() * push_accel_mag;
+                         break;
+                    case DIRECTION_RIGHT:
+                         block->vel = vec_right() * push_vel_mag;
+                         block->accel = vec_right() * push_accel_mag;
+                         break;
+                    case DIRECTION_UP:
+                         block->vel = vec_up() * push_vel_mag;
+                         block->accel = vec_up() * push_accel_mag;
+                         break;
+                    case DIRECTION_DOWN:
+                         block->vel = vec_down() * push_vel_mag;
+                         block->accel = vec_down() * push_accel_mag;
+                         break;
+                    }
+               }
           }
 
           // illuminate and ice
@@ -3333,7 +3358,7 @@ int main(int argc, char** argv){
                     {-1, -1}
                };
 
-               find_portal_adjacents_to_skip_collision_check(player_coord, interactive_quad_tree, &tilemap, skip_coord);
+               find_portal_adjacents_to_skip_collision_check(player_coord, interactive_quad_tree, skip_coord);
                teleport_position_across_portal(&player.pos, interactive_quad_tree, &tilemap, player_previous_coord,
                                                player_coord);
 
