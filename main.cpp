@@ -1852,6 +1852,21 @@ void reset_map(Player_t* player, Coord_t player_start, ObjectArray_t<Interactive
      *interactive_quad_tree = quad_tree_build(interactive_array);
 }
 
+void position_move_against_block(Position_t pos, Position_t block_pos, Vec_t* pos_delta, bool* collide_with_block){
+     Position_t relative = block_pos - pos;
+     Vec_t bottom_left = pos_to_vec(relative);
+     if(vec_magnitude(bottom_left) > (2 * TILE_SIZE)) return;
+
+     Vec_t top_left {bottom_left.x, bottom_left.y + TILE_SIZE};
+     Vec_t top_right {bottom_left.x + TILE_SIZE, bottom_left.y + TILE_SIZE};
+     Vec_t bottom_right {bottom_left.x + TILE_SIZE, bottom_left.y};
+
+     *pos_delta += collide_circle_with_line(*pos_delta, PLAYER_RADIUS, bottom_left, top_left, collide_with_block);
+     *pos_delta += collide_circle_with_line(*pos_delta, PLAYER_RADIUS, top_left, top_right, collide_with_block);
+     *pos_delta += collide_circle_with_line(*pos_delta, PLAYER_RADIUS, bottom_left, bottom_right, collide_with_block);
+     *pos_delta += collide_circle_with_line(*pos_delta, PLAYER_RADIUS, bottom_right, top_right, collide_with_block);
+}
+
 Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, Coord_t* skip_coord,
                                          Player_t* player, TileMap_t* tilemap,
                                          QuadTreeNode_t<Interactive_t>* interactive_quad_tree, ObjectArray_t<Block_t>* block_array,
@@ -1889,22 +1904,27 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, C
      // TODO: convert to use quad tree
      for(S16 i = 0; i < block_array->count; i++){
           bool collide_with_block = false;
+          Position_t block_pos = block_array->elements[i].pos;
+          position_move_against_block(position, block_pos, &pos_delta, &collide_with_block);
+          Coord_t block_coord = pos_to_coord(block_array->elements[i].pos);
+          Vec_t coord_offset = pos_to_vec(block_array->elements[i].pos - coord_to_pos_at_tile_center(block_coord));
 
-          Position_t relative = block_array->elements[i].pos - position;
-          Vec_t bottom_left = pos_to_vec(relative);
-          if(vec_magnitude(bottom_left) > (2 * TILE_SIZE)) continue;
+          if(!collide_with_block){
+               // check if the block is in a portal and try to collide with it
+               PortalExit_t portal_exits = find_portal_exits(block_coord, tilemap, interactive_quad_tree);
+               for(S8 d = 0; d < DIRECTION_COUNT; d++){
+                    for(S8 p = 0; p < portal_exits.directions[d].count; p++){
+                         if(portal_exits.directions[d].coords[p] == block_coord) continue;
 
-          Vec_t top_left {bottom_left.x, bottom_left.y + TILE_SIZE};
-          Vec_t top_right {bottom_left.x + TILE_SIZE, bottom_left.y + TILE_SIZE};
-          Vec_t bottom_right {bottom_left.x + TILE_SIZE, bottom_left.y};
-
-          pos_delta += collide_circle_with_line(pos_delta, PLAYER_RADIUS, bottom_left, top_left, &collide_with_block);
-          pos_delta += collide_circle_with_line(pos_delta, PLAYER_RADIUS, top_left, top_right, &collide_with_block);
-          pos_delta += collide_circle_with_line(pos_delta, PLAYER_RADIUS, bottom_left, bottom_right, &collide_with_block);
-          pos_delta += collide_circle_with_line(pos_delta, PLAYER_RADIUS, bottom_right, top_right, &collide_with_block);
+                         Position_t portal_pos = coord_to_pos_at_tile_center(portal_exits.directions[d].coords[p]) + coord_offset;
+                         position_move_against_block(position, portal_pos, &pos_delta, &collide_with_block);
+                         block_pos = portal_pos;
+                    }
+               }
+          }
 
           if(collide_with_block){
-               auto player_quadrant = relative_quadrant(position.pixel, block_array->elements[i].pos.pixel +
+               auto player_quadrant = relative_quadrant(position.pixel, block_pos.pixel +
                                                         Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS});
                if(player_quadrant == player->face &&
                   (player->accel.x != 0.0f || player->accel.y != 0.0f)){ // also check that the player is actually pushing against the block
