@@ -127,6 +127,8 @@ PortalExit_t find_portal_exits(Coord_t coord, TileMap_t* tilemap, QuadTreeNode_t
 // NOTE: skip_coord needs to be DIRECTION_COUNT size
 void find_portal_adjacents_to_skip_collision_check(Coord_t coord, QuadTreeNode_t<Interactive_t>* interactive_quad_tree,
                                                    Coord_t* skip_coord){
+     for(int i = 0; i < DIRECTION_COUNT; i++) skip_coord[i] = {-1, -1};
+
      // figure out which coords we can skip collision checking on, because they have portal exits
      Interactive_t* interactive = quad_tree_interactive_find_at(interactive_quad_tree, coord);
      if(interactive && interactive->type == INTERACTIVE_TYPE_PORTAL && interactive->portal.on){
@@ -398,13 +400,7 @@ Tile_t* block_against_solid_tile(Block_t* block_to_check, Direction_t direction,
           return nullptr;
      }
 
-     Coord_t skip_coord[DIRECTION_COUNT] = {
-          {-1, -1},
-          {-1, -1},
-          {-1, -1},
-          {-1, -1}
-     };
-
+     Coord_t skip_coord[DIRECTION_COUNT];
      find_portal_adjacents_to_skip_collision_check(block_get_coord(block_to_check), interactive_quad_tree, skip_coord);
 
      Coord_t tile_coord = pixel_to_coord(pixel_a);
@@ -1859,7 +1855,8 @@ void reset_map(Player_t* player, Coord_t player_start, ObjectArray_t<Interactive
 Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, Coord_t* skip_coord,
                                          Player_t* player, TileMap_t* tilemap,
                                          QuadTreeNode_t<Interactive_t>* interactive_quad_tree, ObjectArray_t<Block_t>* block_array,
-                                         Block_t** block_to_push, Direction_t* last_block_pushed_direction){
+                                         Block_t** block_to_push, Direction_t* last_block_pushed_direction,
+                                         bool* collide_with_interactive){
      // figure out tiles that are close by
      Position_t final_player_pos = position + pos_delta;
      Coord_t player_coord = pos_to_coord(final_player_pos);
@@ -1919,12 +1916,13 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, C
           }
      }
 
+     *collide_with_interactive = false;
      for(S16 y = min.y; y <= max.y; y++){
           for(S16 x = min.x; x <= max.x; x++){
                Coord_t coord {x, y};
 
                if(quad_tree_interactive_solid_at(interactive_quad_tree, coord)){
-                    player_collide_coord(position, coord, PLAYER_RADIUS, &pos_delta, &collide_with_tile);
+                    player_collide_coord(position, coord, PLAYER_RADIUS, &pos_delta, collide_with_interactive);
                }
           }
      }
@@ -2989,13 +2987,7 @@ int main(int argc, char** argv){
                     arrow->element_from_block = -1;
                }
 
-               Coord_t skip_coord[DIRECTION_COUNT] = {
-                    {-1, -1},
-                    {-1, -1},
-                    {-1, -1},
-                    {-1, -1}
-               };
-
+               Coord_t skip_coord[DIRECTION_COUNT];
                find_portal_adjacents_to_skip_collision_check(pre_move_coord, interactive_quad_tree, skip_coord);
 
                if(pre_move_coord != post_move_coord){
@@ -3224,13 +3216,7 @@ int main(int argc, char** argv){
                Pixel_t center = block->pos.pixel + Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS};
                Coord_t coord = pixel_to_coord(center);
 
-               Coord_t skip_coord[DIRECTION_COUNT] = {
-                    {-1, -1},
-                    {-1, -1},
-                    {-1, -1},
-                    {-1, -1}
-               };
-
+               Coord_t skip_coord[DIRECTION_COUNT];
                find_portal_adjacents_to_skip_collision_check(coord, interactive_quad_tree, skip_coord);
 
                // check for adjacent walls
@@ -3423,6 +3409,7 @@ int main(int argc, char** argv){
                }
           }
 
+          bool use_portal_delta = false;
 
           // player movement
           {
@@ -3437,13 +3424,7 @@ int main(int argc, char** argv){
                     player.vel = vec_normalize(player.vel) * PLAYER_SPEED;
                }
 
-               Coord_t skip_coord[DIRECTION_COUNT] = {
-                    {-1, -1},
-                    {-1, -1},
-                    {-1, -1},
-                    {-1, -1}
-               };
-
+               Coord_t skip_coord[DIRECTION_COUNT];
                Coord_t player_previous_coord = pos_to_coord(player.pos);
                Coord_t player_coord = pos_to_coord(player.pos + pos_delta);
 
@@ -3451,11 +3432,13 @@ int main(int argc, char** argv){
                teleport_position_across_portal(&player.pos, interactive_quad_tree, &tilemap, player_previous_coord,
                                                player_coord);
 
+               bool collide_with_interactive = false;
                Vec_t player_delta_pos = move_player_position_through_world(player.pos, pos_delta, skip_coord,
                                                                            &player, &tilemap, interactive_quad_tree,
                                                                            &block_array, &block_to_push,
-                                                                           &last_block_pushed_direction);
-               F32 player_delta_mag = vec_magnitude(player_delta_pos);
+                                                                           &last_block_pushed_direction,
+                                                                           &collide_with_interactive);
+               // F32 player_delta_mag = vec_magnitude(player_delta_pos);
                Vec_t coord_offset = pos_to_vec(player.pos - coord_to_pos_at_tile_center(player_coord));
                auto portal_exit = find_portal_exits(player_previous_coord, &tilemap, interactive_quad_tree);
 
@@ -3463,17 +3446,20 @@ int main(int argc, char** argv){
                     for(S8 i = 0; i < portal_exit.directions[d].count; i++){
                          if(portal_exit.directions[d].coords[i] == player_previous_coord) continue;
 
+                         find_portal_adjacents_to_skip_collision_check(portal_exit.directions[d].coords[i], interactive_quad_tree, skip_coord);
+
+                         Block_t* previous_block_to_push = block_to_push;
                          Position_t portal_pos = coord_to_pos_at_tile_center(portal_exit.directions[d].coords[i]) + coord_offset;
                          Vec_t portal_delta = move_player_position_through_world(portal_pos, pos_delta, skip_coord,
                                                                                  &player, &tilemap, interactive_quad_tree,
                                                                                  &block_array, &block_to_push,
-                                                                                 &last_block_pushed_direction);
+                                                                                 &last_block_pushed_direction,
+                                                                                 &collide_with_interactive);
 
-                         // overwrite player_delta_pos with lowest magnitude
-                         F32 portal_delta_mag = vec_magnitude(portal_delta);
-                         if(portal_delta_mag < player_delta_mag){
-                              player_delta_mag = portal_delta_mag;
-                              player_delta_pos = vec_normalize(player_delta_pos) * player_delta_mag;
+                         // if, through the portal, we collide with an interactive or a block, then use that delta
+                         // TODO: I don't think this is going to work with multiple portal outputs
+                         if(collide_with_interactive || previous_block_to_push != block_to_push){
+                              player_delta_pos = portal_delta;
                          }
                     }
                }
@@ -3741,10 +3727,14 @@ int main(int argc, char** argv){
 
           glBindTexture(GL_TEXTURE_2D, 0);
           glBegin(GL_LINES);
-          if(block_to_push){
-               glColor3f(1.0f, 0.0f, 0.0f);
+          if(use_portal_delta){
+               glColor3f(0.0f, 1.0f, 0.0f);
           }else{
-               glColor3f(1.0f, 1.0f, 1.0f);
+               if(block_to_push){
+                    glColor3f(1.0f, 0.0f, 0.0f);
+               }else{
+                    glColor3f(1.0f, 1.0f, 1.0f);
+               }
           }
           Vec_t prev_vec {pos_vec.x + PLAYER_RADIUS, pos_vec.y};
           S32 segments = 32;
