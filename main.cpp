@@ -3778,7 +3778,27 @@ int main(int argc, char** argv){
           for(S8 d = 0; d < DIRECTION_COUNT; d++){
                for(S8 i = 0; i < portal_exit.directions[d].count; i++){
                     if(portal_exit.directions[d].coords[i] == player_coord) continue;
-                    Position_t portal_pos = coord_to_pos_at_tile_center(portal_exit.directions[d].coords[i]) + coord_offset;
+                    U8 rotations_between = 0;
+                    Vec_t final_coord_offset = coord_offset;
+
+                    Interactive_t* interactive = quad_tree_interactive_find_at(interactive_quad_tree, player_coord);
+                    if(interactive && interactive->type == INTERACTIVE_TYPE_PORTAL && interactive->portal.on
+                       && interactive->portal.face != direction_opposite((Direction_t)(d))){
+                         Direction_t tmp_dir = (Direction_t)(d);
+                         if(tmp_dir == interactive->portal.face){
+                              rotations_between = 2;
+                         }else{
+                              rotations_between = direction_rotations_between(interactive->portal.face, tmp_dir);
+                         }
+
+                         for(U8 r = 0; r < rotations_between; r++){
+                              auto tmp = final_coord_offset.x;
+                              final_coord_offset.x = final_coord_offset.y;
+                              final_coord_offset.y = -tmp;
+                         }
+                    }
+
+                    Position_t portal_pos = coord_to_pos_at_tile_center(portal_exit.directions[d].coords[i]) + final_coord_offset;
                     Position_t portal_camera_offset = portal_pos - screen_camera;
                     pos_vec = pos_to_vec(portal_camera_offset);
                     prev_vec = {pos_vec.x + PLAYER_RADIUS, pos_vec.y};
