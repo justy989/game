@@ -1924,19 +1924,29 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
           bool collide_with_block = false;
           Position_t block_pos = block_array->elements[i].pos;
           position_move_against_block(position, block_pos, &pos_delta, &collide_with_block);
-          Coord_t block_coord = pos_to_coord(block_array->elements[i].pos);
+          Coord_t block_coord = pixel_to_coord(block_array->elements[i].pos.pixel + Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS});
           U8 portal_rotations = 0;
 
           if(!collide_with_block){
                // check if the block is in a portal and try to collide with it
-               Vec_t coord_offset = pos_to_vec(block_array->elements[i].pos - coord_to_pos_at_tile_center(block_coord));
+               Vec_t coord_offset = pos_to_vec(block_array->elements[i].pos +
+                                               pixel_to_pos(Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS}) -
+                                               coord_to_pos_at_tile_center(block_coord));
                PortalExit_t portal_exits = find_portal_exits(block_coord, tilemap, interactive_quad_tree);
                Interactive_t* interactive = quad_tree_interactive_find_at(interactive_quad_tree, block_coord);
 
                for(S8 d = 0; d < DIRECTION_COUNT; d++){
+                    Vec_t final_coord_offset = coord_offset;
+                    if(interactive && interactive->type == INTERACTIVE_TYPE_PORTAL && interactive->portal.on &&
+                       interactive->portal.face != direction_opposite((Direction_t)(d))){
+                         final_coord_offset = rotate_vec_between_dirs(interactive->portal.face, (Direction_t)(d), coord_offset);
+                    }
+
                     for(S8 p = 0; p < portal_exits.directions[d].count; p++){
                          if(portal_exits.directions[d].coords[p] == block_coord) continue;
-                         Position_t portal_pos = coord_to_pos_at_tile_center(portal_exits.directions[d].coords[p]) + coord_offset;
+
+                         Position_t portal_pos = coord_to_pos_at_tile_center(portal_exits.directions[d].coords[p]) + final_coord_offset -
+                                                 pixel_to_pos(Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS});
                          position_move_against_block(position, portal_pos, &pos_delta, &collide_with_block);
                          if(collide_with_block){
                               block_pos = portal_pos;
