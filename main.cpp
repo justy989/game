@@ -952,7 +952,7 @@ void illuminate(Coord_t coord, U8 value, TileMap_t* tilemap, QuadTreeNode_t<Bloc
 }
 
 void spread_ice(Coord_t center, S16 radius, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree,
-                QuadTreeNode_t<Block_t>* block_quad_tree){
+                QuadTreeNode_t<Block_t>* block_quad_tree, bool teleported){
      Coord_t delta {radius, radius};
      Coord_t min = center - delta;
      Coord_t max = center + delta;
@@ -981,11 +981,13 @@ void spread_ice(Coord_t center, S16 radius, TileMap_t* tilemap, QuadTreeNode_t<I
                          }
                     }
 
+                    Interactive_t* interactive = quad_tree_find_at(interactive_quad_tree, coord.x, coord.y);
+
                     if(block){
                          if(block->element == ELEMENT_NONE) block->element = ELEMENT_ONLY_ICED;
                     }else{
-                         Interactive_t* interactive = quad_tree_find_at(interactive_quad_tree, coord.x, coord.y);
                          if(interactive){
+                              // TODO: switch
                               if(interactive->type == INTERACTIVE_TYPE_POPUP){
                                    if(interactive->popup.lift.ticks == 1){
                                         interactive->popup.iced = false;
@@ -1003,6 +1005,22 @@ void spread_ice(Coord_t center, S16 radius, TileMap_t* tilemap, QuadTreeNode_t<I
                               }
                          }else{
                               tile->flags |= TILE_FLAG_ICED;
+                         }
+                    }
+
+                    if(interactive && interactive->type == INTERACTIVE_TYPE_PORTAL && interactive->portal.on && !teleported){
+                         if(!block) tile->flags |= TILE_FLAG_ICED;
+                         auto portal_exits = find_portal_exits(coord, tilemap, interactive_quad_tree);
+                         for(S8 d = 0; d < DIRECTION_COUNT; d++){
+                              for(S8 p = 0; p < portal_exits.directions[d].count; p++){
+                                   if(portal_exits.directions[d].coords[p] == coord) continue;
+                                   S16 x_diff = coord.x - center.x;
+                                   S16 y_diff = coord.y - center.y;
+                                   U8 distance_from_center = (U8)(sqrt(x_diff * x_diff + y_diff * y_diff));
+
+                                   spread_ice(portal_exits.directions[d].coords[p], radius - distance_from_center,
+                                              tilemap, interactive_quad_tree, block_quad_tree, true);
+                              }
                          }
                     }
                }
@@ -3066,7 +3084,7 @@ int main(int argc, char** argv){
                     if(arrow->element == ELEMENT_FIRE){
                          melt_ice(post_move_coord, 0, &tilemap, interactive_quad_tree, block_quad_tree);
                     }else if(arrow->element == ELEMENT_ICE){
-                         spread_ice(post_move_coord, 0, &tilemap, interactive_quad_tree, block_quad_tree);
+                         spread_ice(post_move_coord, 0, &tilemap, interactive_quad_tree, block_quad_tree, false);
                     }
 
                     Interactive_t* interactive = quad_tree_interactive_find_at(interactive_quad_tree, post_move_coord);
@@ -3408,7 +3426,8 @@ int main(int argc, char** argv){
                if(block->element == ELEMENT_FIRE){
                     illuminate(block_get_coord(block), 255, &tilemap, block_quad_tree);
                }else if(block->element == ELEMENT_ICE){
-                    spread_ice(block_get_coord(block), 1, &tilemap, interactive_quad_tree, block_quad_tree);
+                    auto block_coord = block_get_coord(block);
+                    spread_ice(block_coord, 1, &tilemap, interactive_quad_tree, block_quad_tree, false);
                }
           }
 
