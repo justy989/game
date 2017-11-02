@@ -287,7 +287,11 @@ Block_t* block_against_another_block(Block_t* block_to_check, Direction_t direct
      return nullptr;
 }
 
-Block_t* block_inside_another_block(Block_t* block_to_check, QuadTreeNode_t<Block_t>* block_quad_tree){
+Position_t g_teleported_block = {};
+
+Block_t* block_inside_another_block(Block_t* block_to_check, QuadTreeNode_t<Block_t>* block_quad_tree,
+                                    QuadTreeNode_t<Interactive_t>* interactive_quad_tree, TileMap_t* tilemap,
+                                    Position_t* collided_with){
      // TODO: need more complicated function to detect this
      Rect_t rect = {block_to_check->pos.pixel.x, block_to_check->pos.pixel.y,
                     (S16)(block_to_check->pos.pixel.x + TILE_SIZE_IN_PIXELS - 1),
@@ -312,7 +316,58 @@ Block_t* block_inside_another_block(Block_t* block_to_check, QuadTreeNode_t<Bloc
              pixel_in_rect(top_left, rect) ||
              pixel_in_rect(top_right, rect) ||
              pixel_in_rect(bottom_right, rect)){
+               *collided_with = block->pos;
                return block;
+          }
+     }
+
+     // find portals around the block to check
+     auto block_coord = block_get_coord(block_to_check);
+     Coord_t min = block_coord - Coord_t{1, 1};
+     Coord_t max = block_coord + Coord_t{1, 1};
+
+     for(S16 y = min.y; y <= max.y; ++y){
+          for(S16 x = min.x; x <= max.x; ++x){
+               Coord_t coord = {x, y};
+
+               Interactive_t* interactive = quad_tree_interactive_find_at(interactive_quad_tree, coord);
+               if(interactive && interactive->type == INTERACTIVE_TYPE_PORTAL && interactive->portal.on){
+
+                    auto portal_exits = find_portal_exits(coord, tilemap, interactive_quad_tree);
+                    for(S8 d = 0; d < DIRECTION_COUNT; d++){
+                         for(S8 p = 0; p < portal_exits.directions[d].count; p++){
+                              auto portal_coord = portal_exits.directions[d].coords[p];
+
+                              surrounding_rect.left = (portal_coord.x * TILE_SIZE_IN_PIXELS) - HALF_TILE_SIZE_IN_PIXELS;
+                              surrounding_rect.right = (portal_coord.x * TILE_SIZE_IN_PIXELS) + TILE_SIZE_IN_PIXELS + (HALF_TILE_SIZE_IN_PIXELS - 1);
+                              surrounding_rect.bottom = (portal_coord.y * TILE_SIZE_IN_PIXELS) - HALF_TILE_SIZE_IN_PIXELS;
+                              surrounding_rect.top = (portal_coord.y * TILE_SIZE_IN_PIXELS) + TILE_SIZE_IN_PIXELS + (HALF_TILE_SIZE_IN_PIXELS - 1);
+
+                              // anything this query hits will be colliding with the block
+                              quad_tree_find_in(block_quad_tree, surrounding_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
+                              for(S16 i = 0; i < block_count; i++){
+                                   if(blocks[i] == block_to_check) continue;
+                                   auto coord_offset = blocks[i]->pos -
+                                                       coord_to_pos_at_tile_center(portal_coord);
+                                   auto portal_block_pos = coord_to_pos_at_tile_center(coord) + coord_offset;
+                                   g_teleported_block = portal_block_pos;
+
+                                   // if this coord is a portal, check if the block is colliding with it at all
+                                   Pixel_t top_left {portal_block_pos.pixel.x, (S16)(portal_block_pos.pixel.y + TILE_SIZE_IN_PIXELS - 1)};
+                                   Pixel_t top_right {(S16)(portal_block_pos.pixel.x + TILE_SIZE_IN_PIXELS - 1), (S16)(portal_block_pos.pixel.y + TILE_SIZE_IN_PIXELS - 1)};
+                                   Pixel_t bottom_right {(S16)(portal_block_pos.pixel.x + TILE_SIZE_IN_PIXELS - 1), portal_block_pos.pixel.y};
+
+                                   if(pixel_in_rect(portal_block_pos.pixel, rect) ||
+                                      pixel_in_rect(top_left, rect) ||
+                                      pixel_in_rect(top_right, rect) ||
+                                      pixel_in_rect(bottom_right, rect)){
+                                        *collided_with = portal_block_pos;
+                                        return blocks[i];
+                                   }
+                              }
+                         }
+                    }
+               }
           }
      }
 
@@ -957,6 +1012,7 @@ void spread_ice(Coord_t center, S16 radius, TileMap_t* tilemap, QuadTreeNode_t<I
      Coord_t min = center - delta;
      Coord_t max = center + delta;
 
+     // TODO: compress with melt_ice()
      for(S16 y = min.y; y <= max.y; ++y){
           for(S16 x = min.x; x <= max.x; ++x){
                Coord_t coord{x, y};
@@ -1029,7 +1085,7 @@ void spread_ice(Coord_t center, S16 radius, TileMap_t* tilemap, QuadTreeNode_t<I
 }
 
 void melt_ice(Coord_t center, S16 radius, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree,
-              QuadTreeNode_t<Block_t>* block_quad_tree){
+              QuadTreeNode_t<Block_t>* block_quad_tree, bool teleported){
      Coord_t delta {radius, radius};
      Coord_t min = center - delta;
      Coord_t max = center + delta;
@@ -1058,10 +1114,11 @@ void melt_ice(Coord_t center, S16 radius, TileMap_t* tilemap, QuadTreeNode_t<Int
                          }
                     }
 
+                    Interactive_t* interactive = quad_tree_find_at(interactive_quad_tree, coord.x, coord.y);
+
                     if(block){
                          if(block->element == ELEMENT_ONLY_ICED) block->element = ELEMENT_NONE;
                     }else{
-                         Interactive_t* interactive = quad_tree_find_at(interactive_quad_tree, coord.x, coord.y);
                          if(interactive){
                               if(interactive->type == INTERACTIVE_TYPE_POPUP){
                                    if(interactive->popup.lift.ticks == 1){
@@ -1078,6 +1135,22 @@ void melt_ice(Coord_t center, S16 radius, TileMap_t* tilemap, QuadTreeNode_t<Int
                               }
                          }else{
                               tile->flags &= ~TILE_FLAG_ICED;
+                         }
+                    }
+
+                    if(interactive && interactive->type == INTERACTIVE_TYPE_PORTAL && interactive->portal.on && !teleported){
+                         if(!block) tile->flags &= ~TILE_FLAG_ICED;
+                         auto portal_exits = find_portal_exits(coord, tilemap, interactive_quad_tree);
+                         for(S8 d = 0; d < DIRECTION_COUNT; d++){
+                              for(S8 p = 0; p < portal_exits.directions[d].count; p++){
+                                   if(portal_exits.directions[d].coords[p] == coord) continue;
+                                   S16 x_diff = coord.x - center.x;
+                                   S16 y_diff = coord.y - center.y;
+                                   U8 distance_from_center = (U8)(sqrt(x_diff * x_diff + y_diff * y_diff));
+
+                                   melt_ice(portal_exits.directions[d].coords[p], radius - distance_from_center,
+                                            tilemap, interactive_quad_tree, block_quad_tree, true);
+                              }
                          }
                     }
                }
@@ -3082,7 +3155,7 @@ int main(int argc, char** argv){
 
                     // catch or give elements
                     if(arrow->element == ELEMENT_FIRE){
-                         melt_ice(post_move_coord, 0, &tilemap, interactive_quad_tree, block_quad_tree);
+                         melt_ice(post_move_coord, 0, &tilemap, interactive_quad_tree, block_quad_tree, false);
                     }else if(arrow->element == ELEMENT_ICE){
                          spread_ice(post_move_coord, 0, &tilemap, interactive_quad_tree, block_quad_tree, false);
                     }
@@ -3245,33 +3318,36 @@ int main(int argc, char** argv){
                bool held_up = false;
 
                Block_t* inside_block = nullptr;
+               Position_t collided_with = {};
 
-               while((inside_block = block_inside_another_block(block_array.elements + i, block_quad_tree)) && blocks_at_collidable_height(block, inside_block)){
-                    auto quadrant = relative_quadrant(block->pos.pixel, inside_block->pos.pixel);
+               while((inside_block = block_inside_another_block(block_array.elements + i, block_quad_tree,
+                                                                interactive_quad_tree, &tilemap, &collided_with)) &&
+                     blocks_at_collidable_height(block, inside_block)){
+                    auto quadrant = relative_quadrant(block->pos.pixel, collided_with.pixel);
 
                     switch(quadrant){
                     default:
                          break;
                     case DIRECTION_LEFT:
-                         block->pos.pixel.x = inside_block->pos.pixel.x + TILE_SIZE_IN_PIXELS;
+                         block->pos.pixel.x = collided_with.pixel.x + TILE_SIZE_IN_PIXELS;
                          block->pos.decimal.x = 0.0f;
                          block->vel.x = 0.0f;
                          block->accel.x = 0.0f;
                          break;
                     case DIRECTION_RIGHT:
-                         block->pos.pixel.x = inside_block->pos.pixel.x - TILE_SIZE_IN_PIXELS;
+                         block->pos.pixel.x = collided_with.pixel.x - TILE_SIZE_IN_PIXELS;
                          block->pos.decimal.x = 0.0f;
                          block->vel.x = 0.0f;
                          block->accel.x = 0.0f;
                          break;
                     case DIRECTION_DOWN:
-                         block->pos.pixel.y = inside_block->pos.pixel.y + TILE_SIZE_IN_PIXELS;
+                         block->pos.pixel.y = collided_with.pixel.y + TILE_SIZE_IN_PIXELS;
                          block->pos.decimal.y = 0.0f;
                          block->vel.y = 0.0f;
                          block->accel.y = 0.0f;
                          break;
                     case DIRECTION_UP:
-                         block->pos.pixel.y = inside_block->pos.pixel.y - TILE_SIZE_IN_PIXELS;
+                         block->pos.pixel.y = collided_with.pixel.y - TILE_SIZE_IN_PIXELS;
                          block->pos.decimal.y = 0.0f;
                          block->vel.y = 0.0f;
                          block->accel.y = 0.0f;
@@ -3435,7 +3511,7 @@ int main(int argc, char** argv){
           for(S16 i = 0; i < block_array.count; i++){
                Block_t* block = block_array.elements + i;
                if(block->element == ELEMENT_FIRE){
-                    melt_ice(block_get_coord(block), 1, &tilemap, interactive_quad_tree, block_quad_tree);
+                    melt_ice(block_get_coord(block), 1, &tilemap, interactive_quad_tree, block_quad_tree, false);
                }
           }
 
@@ -3877,6 +3953,20 @@ int main(int argc, char** argv){
                }
           }
           glEnd();
+
+          // debug block
+          {
+               glBegin(GL_LINES);
+               Vec_t block_pos = pos_to_vec(g_teleported_block) + camera_offset;
+
+               glColor3f(0.0f, 0.0f, 1.0f);
+               glVertex2f(block_pos.x, block_pos.y);
+               glVertex2f(block_pos.x, block_pos.y + TILE_SIZE);
+               glVertex2f(block_pos.x + TILE_SIZE, block_pos.y + TILE_SIZE);
+               glVertex2f(block_pos.x + TILE_SIZE, block_pos.y);
+
+               glEnd();
+          }
 
           // player start
           selection_draw(player_start, player_start, screen_camera, 0.0f, 1.0f, 0.0f);
