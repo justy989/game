@@ -1995,6 +1995,8 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
      // TODO: convert to use quad tree
      Direction_t collided_block_dir = DIRECTION_COUNT;
      Block_t* collided_block = nullptr;
+     Vec_t pos_delta_save = pos_delta;
+     Vec_t collided_block_delta {};
      for(S16 i = 0; i < block_array->count; i++){
           bool collide_with_block = false;
           Position_t block_pos = block_array->elements[i].pos;
@@ -2035,9 +2037,41 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
           }
 
           if(collide_with_block){
+               Direction_t rel_dir = relative_quadrant(position.pixel, block_pos.pixel +
+                                                       Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS});
+               if(collided_block){
+                    if(rel_dir != DIRECTION_COUNT &&
+                       rel_dir == direction_opposite(collided_block_dir)){
+                         Block_t* new_collided_block = block_array->elements + i;
+                         if(collided_block->accel.x != 0.0f || collided_block->accel.y != 0.0f){
+                              collided_block->pos -= collided_block_delta;
+                         }else{
+                              new_collided_block->pos -= collided_block_delta;
+                         }
+                         switch(collided_block_dir){
+                         default:
+                              break;
+                         case DIRECTION_LEFT:
+                         case DIRECTION_RIGHT:
+                              collided_block->accel.x = 0.0f;
+                              collided_block->vel.x = 0.0f;
+                              new_collided_block->accel.x = 0.0f;
+                              new_collided_block->vel.x = 0.0f;
+                              break;
+                         case DIRECTION_UP:
+                         case DIRECTION_DOWN:
+                              collided_block->accel.y = 0.0f;
+                              collided_block->vel.y = 0.0f;
+                              new_collided_block->accel.y = 0.0f;
+                              new_collided_block->vel.y = 0.0f;
+                              break;
+                         }
+                    }
+               }
+
                collided_block = block_array->elements + i;
-               collided_block_dir = relative_quadrant(position.pixel, block_pos.pixel +
-                                                      Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS});
+               collided_block_dir = rel_dir;
+               collided_block_delta = pos_delta - pos_delta_save;
                auto rotated_player_face = direction_rotate_clockwise(player_face, portal_rotations);
                if(collided_block_dir == rotated_player_face &&
                   (player->accel.x != 0.0f || player->accel.y != 0.0f)){ // also check that the player is actually pushing against the block
@@ -2085,8 +2119,10 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
           }
      }
 
-     if(collided_block_dir == direction_opposite(collided_interactive_dir) ||
-        collided_block_dir == direction_opposite(collided_tile_dir)){
+     if(collided_block_dir != DIRECTION_COUNT &&
+        (collided_block_dir == direction_opposite(collided_interactive_dir) ||
+         collided_block_dir == direction_opposite(collided_tile_dir))){
+          collided_block->pos -= collided_block_delta;
           switch(collided_block_dir){
           default:
                break;

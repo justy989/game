@@ -49,6 +49,7 @@ DirectionMask_t direction_mask_remove(DirectionMask_t mask, Direction_t dir){
 }
 
 Direction_t direction_opposite(Direction_t dir){
+     if(dir == DIRECTION_COUNT) return DIRECTION_COUNT;
      return (Direction_t)(((int)(dir) + 2) % DIRECTION_COUNT);
 }
 
