@@ -1980,7 +1980,7 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
                                          Player_t* player, TileMap_t* tilemap,
                                          QuadTreeNode_t<Interactive_t>* interactive_quad_tree, ObjectArray_t<Block_t>* block_array,
                                          Block_t** block_to_push, Direction_t* last_block_pushed_direction,
-                                         bool* collide_with_interactive){
+                                         bool* collided_with_interactive){
      // figure out tiles that are close by
      Position_t final_player_pos = position + pos_delta;
      Coord_t player_coord = pos_to_coord(final_player_pos);
@@ -1992,25 +1992,9 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
      min = coord_clamp_zero_to_dim(min, tilemap->width - 1, tilemap->height - 1);
      max = coord_clamp_zero_to_dim(max, tilemap->width - 1, tilemap->height - 1);
 
-     bool collide_with_tile = false;
-     for(S16 y = min.y; y <= max.y; y++){
-          for(S16 x = min.x; x <= max.x; x++){
-               if(tilemap->tiles[y][x].id){
-                    Coord_t coord {x, y};
-                    bool skip = false;
-                    for(S16 d = 0; d < DIRECTION_COUNT; d++){
-                         if(skip_coord[d] == coord){
-                              skip = true;
-                              break;
-                         }
-                    }
-                    if(skip) continue;
-                    player_collide_coord(position, coord, PLAYER_RADIUS, &pos_delta, &collide_with_tile);
-               }
-          }
-     }
-
      // TODO: convert to use quad tree
+     Direction_t collided_block_dir = DIRECTION_COUNT;
+     Block_t* collided_block = nullptr;
      for(S16 i = 0; i < block_array->count; i++){
           bool collide_with_block = false;
           Position_t block_pos = block_array->elements[i].pos;
@@ -2051,10 +2035,11 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
           }
 
           if(collide_with_block){
-               auto player_quadrant = relative_quadrant(position.pixel, block_pos.pixel +
-                                                        Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS});
+               collided_block = block_array->elements + i;
+               collided_block_dir = relative_quadrant(position.pixel, block_pos.pixel +
+                                                      Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS});
                auto rotated_player_face = direction_rotate_clockwise(player_face, portal_rotations);
-               if(player_quadrant == rotated_player_face &&
+               if(collided_block_dir == rotated_player_face &&
                   (player->accel.x != 0.0f || player->accel.y != 0.0f)){ // also check that the player is actually pushing against the block
                     if(*block_to_push == nullptr){
                          *block_to_push = block_array->elements + i;
@@ -2064,14 +2049,57 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
           }
      }
 
-     *collide_with_interactive = false;
+     Direction_t collided_tile_dir = DIRECTION_COUNT;
+     for(S16 y = min.y; y <= max.y; y++){
+          for(S16 x = min.x; x <= max.x; x++){
+               if(tilemap->tiles[y][x].id){
+                    Coord_t coord {x, y};
+                    bool skip = false;
+                    for(S16 d = 0; d < DIRECTION_COUNT; d++){
+                         if(skip_coord[d] == coord){
+                              skip = true;
+                              break;
+                         }
+                    }
+                    if(skip) continue;
+                    bool collide_with_tile = false;
+                    player_collide_coord(position, coord, PLAYER_RADIUS, &pos_delta, &collide_with_tile);
+                    if(collide_with_tile) collided_tile_dir = direction_between(player_coord, coord);
+               }
+          }
+     }
+
+     Direction_t collided_interactive_dir = DIRECTION_COUNT;
+     *collided_with_interactive = false;
      for(S16 y = min.y; y <= max.y; y++){
           for(S16 x = min.x; x <= max.x; x++){
                Coord_t coord {x, y};
-
                if(quad_tree_interactive_solid_at(interactive_quad_tree, coord)){
-                    player_collide_coord(position, coord, PLAYER_RADIUS, &pos_delta, collide_with_interactive);
+                    bool collided = false;
+                    player_collide_coord(position, coord, PLAYER_RADIUS, &pos_delta, &collided);
+                    if(collided && !(*collided_with_interactive)){
+                         *collided_with_interactive = true;
+                         collided_interactive_dir = direction_between(player_coord, coord);
+                    }
                }
+          }
+     }
+
+     if(collided_block_dir == direction_opposite(collided_interactive_dir) ||
+        collided_block_dir == direction_opposite(collided_tile_dir)){
+          switch(collided_block_dir){
+          default:
+               break;
+          case DIRECTION_LEFT:
+          case DIRECTION_RIGHT:
+               collided_block->accel.x = 0.0f;
+               collided_block->vel.x = 0.0f;
+               break;
+          case DIRECTION_UP:
+          case DIRECTION_DOWN:
+               collided_block->accel.y = 0.0f;
+               collided_block->vel.y = 0.0f;
+               break;
           }
      }
 
@@ -3935,6 +3963,7 @@ int main(int argc, char** argv){
 
           glEnd();
 
+#if 0
           // light
           glBindTexture(GL_TEXTURE_2D, 0);
           glBegin(GL_QUADS);
@@ -3953,6 +3982,7 @@ int main(int argc, char** argv){
                }
           }
           glEnd();
+#endif
 
           // debug block
           {
