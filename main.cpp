@@ -337,6 +337,7 @@ Block_t* block_inside_another_block(Block_t* block_to_check, QuadTreeNode_t<Bloc
                     for(S8 d = 0; d < DIRECTION_COUNT; d++){
                          for(S8 p = 0; p < portal_exits.directions[d].count; p++){
                               auto portal_coord = portal_exits.directions[d].coords[p];
+                              if(portal_coord == coord) continue;
 
                               surrounding_rect.left = (portal_coord.x * TILE_SIZE_IN_PIXELS) - HALF_TILE_SIZE_IN_PIXELS;
                               surrounding_rect.right = (portal_coord.x * TILE_SIZE_IN_PIXELS) + TILE_SIZE_IN_PIXELS + (HALF_TILE_SIZE_IN_PIXELS - 1);
@@ -347,9 +348,15 @@ Block_t* block_inside_another_block(Block_t* block_to_check, QuadTreeNode_t<Bloc
                               quad_tree_find_in(block_quad_tree, surrounding_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
                               for(S16 i = 0; i < block_count; i++){
                                    if(blocks[i] == block_to_check) continue;
-                                   auto coord_offset = blocks[i]->pos -
-                                                       coord_to_pos_at_tile_center(portal_coord);
-                                   auto portal_block_pos = coord_to_pos_at_tile_center(coord) + coord_offset;
+                                   auto coord_offset = pos_to_vec(blocks[i]->pos +
+                                                                  pixel_to_pos(Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS}) -
+                                                                  coord_to_pos_at_tile_center(portal_coord));
+                                   auto final_coord_offset = coord_offset;
+                                   if(interactive->portal.face != direction_opposite((Direction_t)(d))){
+                                        final_coord_offset = rotate_vec_between_dirs((Direction_t)(d), interactive->portal.face, coord_offset);
+                                   }
+                                   auto portal_block_pos = coord_to_pos_at_tile_center(coord) + final_coord_offset -
+                                                           pixel_to_pos(Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS});
                                    g_teleported_block = portal_block_pos;
 
                                    // if this coord is a portal, check if the block is colliding with it at all

@@ -6,8 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-static bool bitmap_interpret_bytes(Bitmap_t* bitmap)
-{
+static bool bitmap_interpret_bytes(Bitmap_t* bitmap){
      bitmap->header = (BitmapFileHeader_t*)(bitmap->raw.bytes);
      bitmap->info = (BitmapInfoHeader_t*)(bitmap->raw.bytes + sizeof(BitmapFileHeader_t));
 
@@ -34,8 +33,7 @@ static bool bitmap_interpret_bytes(Bitmap_t* bitmap)
      return true;
 }
 
-Bitmap_t bitmap_load_raw(const U8* bytes, U64 byte_count)
-{
+Bitmap_t bitmap_load_raw(const U8* bytes, U64 byte_count){
      Bitmap_t bitmap;
      memset(&bitmap, 0, sizeof(bitmap));
 
@@ -58,8 +56,7 @@ Bitmap_t bitmap_load_raw(const U8* bytes, U64 byte_count)
      return bitmap;
 }
 
-Bitmap_t bitmap_load_from_file(const char* filepath)
-{
+Bitmap_t bitmap_load_from_file(const char* filepath){
      Bitmap_t bitmap;
      memset(&bitmap, 0, sizeof(bitmap));
 
@@ -75,8 +72,7 @@ Bitmap_t bitmap_load_from_file(const char* filepath)
      return bitmap;
 }
 
-AlphaBitmap_t bitmap_to_alpha_bitmap(const Bitmap_t* bitmap, BitmapPixel_t color_key)
-{
+AlphaBitmap_t bitmap_to_alpha_bitmap(const Bitmap_t* bitmap, BitmapPixel_t color_key){
      AlphaBitmap_t alpha_bitmap;
 
      if(!bitmap->pixels) return alpha_bitmap;
