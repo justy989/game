@@ -287,7 +287,10 @@ Block_t* block_against_another_block(Block_t* block_to_check, Direction_t direct
      return nullptr;
 }
 
-Position_t g_teleported_block = {};
+#define MAX_TELEPORTED_DEBUG_BLOCK_COUNT 4
+
+Position_t g_teleported_blocks[MAX_TELEPORTED_DEBUG_BLOCK_COUNT] = {};
+int g_teleported_block_count = 0;
 
 Block_t* block_inside_another_block(Block_t* block_to_check, QuadTreeNode_t<Block_t>* block_quad_tree,
                                     QuadTreeNode_t<Interactive_t>* interactive_quad_tree, TileMap_t* tilemap,
@@ -339,10 +342,14 @@ Block_t* block_inside_another_block(Block_t* block_to_check, QuadTreeNode_t<Bloc
                               auto portal_coord = portal_exits.directions[d].coords[p];
                               if(portal_coord == coord) continue;
 
-                              surrounding_rect.left = (portal_coord.x * TILE_SIZE_IN_PIXELS) - HALF_TILE_SIZE_IN_PIXELS;
-                              surrounding_rect.right = (portal_coord.x * TILE_SIZE_IN_PIXELS) + TILE_SIZE_IN_PIXELS + (HALF_TILE_SIZE_IN_PIXELS - 1);
-                              surrounding_rect.bottom = (portal_coord.y * TILE_SIZE_IN_PIXELS) - HALF_TILE_SIZE_IN_PIXELS;
-                              surrounding_rect.top = (portal_coord.y * TILE_SIZE_IN_PIXELS) + TILE_SIZE_IN_PIXELS + (HALF_TILE_SIZE_IN_PIXELS - 1);
+                              Pixel_t portal_center = {};
+                              portal_center.x = (portal_coord.x * TILE_SIZE_IN_PIXELS) + HALF_TILE_SIZE_IN_PIXELS;
+                              portal_center.y = (portal_coord.y * TILE_SIZE_IN_PIXELS) + HALF_TILE_SIZE_IN_PIXELS;
+
+                              surrounding_rect.left = portal_center.x - TILE_SIZE_IN_PIXELS;
+                              surrounding_rect.right = portal_center.x + TILE_SIZE_IN_PIXELS;
+                              surrounding_rect.bottom = portal_center.y - TILE_SIZE_IN_PIXELS;
+                              surrounding_rect.top = portal_center.y + TILE_SIZE_IN_PIXELS;
 
                               // anything this query hits will be colliding with the block
                               quad_tree_find_in(block_quad_tree, surrounding_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
@@ -357,7 +364,10 @@ Block_t* block_inside_another_block(Block_t* block_to_check, QuadTreeNode_t<Bloc
                                    }
                                    auto portal_block_pos = coord_to_pos_at_tile_center(coord) + final_coord_offset -
                                                            pixel_to_pos(Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS});
-                                   g_teleported_block = portal_block_pos;
+                                   if(g_teleported_block_count < MAX_TELEPORTED_DEBUG_BLOCK_COUNT){
+                                        g_teleported_blocks[g_teleported_block_count] = portal_block_pos;
+                                        g_teleported_block_count++;
+                                   }
 
                                    // if this coord is a portal, check if the block is colliding with it at all
                                    Pixel_t top_left {portal_block_pos.pixel.x, (S16)(portal_block_pos.pixel.y + TILE_SIZE_IN_PIXELS - 1)};
@@ -2417,6 +2427,7 @@ int main(int argc, char** argv){
 
           quad_tree_free(block_quad_tree);
           block_quad_tree = quad_tree_build(&block_array);
+          g_teleported_block_count = 0;
 
           frame_count++;
 
@@ -3394,7 +3405,8 @@ int main(int argc, char** argv){
                while((inside_block = block_inside_another_block(block_array.elements + i, block_quad_tree,
                                                                 interactive_quad_tree, &tilemap, &collided_with)) &&
                      blocks_at_collidable_height(block, inside_block)){
-                    auto quadrant = relative_quadrant(block->pos.pixel, collided_with.pixel);
+                    auto block_center_pixel = block->pos.pixel + Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS};
+                    auto quadrant = relative_quadrant(block_center_pixel, collided_with.pixel + Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS});
 
                     switch(quadrant){
                     default:
@@ -4028,9 +4040,9 @@ int main(int argc, char** argv){
 #endif
 
           // debug block
-          {
-               glBegin(GL_LINES);
-               Vec_t block_pos = pos_to_vec(g_teleported_block) + camera_offset;
+          glBegin(GL_LINES);
+          for(int i = 0; i < g_teleported_block_count; i++){
+               Vec_t block_pos = pos_to_vec(g_teleported_blocks[i]) + camera_offset;
 
                glColor3f(0.0f, 0.0f, 1.0f);
                glVertex2f(block_pos.x, block_pos.y);
@@ -4038,8 +4050,8 @@ int main(int argc, char** argv){
                glVertex2f(block_pos.x + TILE_SIZE, block_pos.y + TILE_SIZE);
                glVertex2f(block_pos.x + TILE_SIZE, block_pos.y);
 
-               glEnd();
           }
+          glEnd();
 
           // player start
           selection_draw(player_start, player_start, screen_camera, 0.0f, 1.0f, 0.0f);
