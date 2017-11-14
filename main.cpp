@@ -156,21 +156,23 @@ void find_portal_adjacents_to_skip_collision_check(Coord_t coord, QuadTreeNode_t
      }
 }
 
-Direction_t teleport_position_across_portal(Position_t* position, QuadTreeNode_t<Interactive_t>* interactive_quad_tree,
+Direction_t teleport_position_across_portal(Position_t* position, Vec_t* pos_delta, QuadTreeNode_t<Interactive_t>* interactive_quad_tree,
                                             TileMap_t* tilemap, Coord_t premove_coord, Coord_t postmove_coord){
      if(postmove_coord != premove_coord){
-          auto* interactive = quad_tree_interactive_find_at(interactive_quad_tree, premove_coord);
+          auto* interactive = quad_tree_interactive_find_at(interactive_quad_tree, postmove_coord);
           if(interactive && interactive->type == INTERACTIVE_TYPE_PORTAL){
                if(interactive->portal.face == direction_opposite(direction_between(postmove_coord, premove_coord))){
-                    Position_t offset_from_center = *position - coord_to_pos_at_tile_center(premove_coord);
-                    PortalExit_t portal_exit = find_portal_exits(premove_coord, tilemap, interactive_quad_tree);
+                    Position_t offset_from_center = *position - coord_to_pos_at_tile_center(postmove_coord);
+                    PortalExit_t portal_exit = find_portal_exits(postmove_coord, tilemap, interactive_quad_tree);
 
                     for(S8 d = 0; d < DIRECTION_COUNT; d++){
                          for(S8 p = 0; p < portal_exit.directions[d].count; p++){
-                              if(portal_exit.directions[d].coords[p] != premove_coord){
+                              if(portal_exit.directions[d].coords[p] != postmove_coord){
                                    Position_t final_offset = offset_from_center;
-                                   U8 rotations_between = direction_rotations_between(interactive->portal.face,
-                                                                                      direction_opposite((Direction_t)(d)));
+                                   Direction_t opposite = direction_opposite((Direction_t)(d));
+                                   U8 rotations_between = direction_rotations_between(interactive->portal.face, opposite);
+
+                                   // TODO: compress these rotations
                                    for(U8 r = 0; r < rotations_between; r++){
                                         auto save_pixel_x = final_offset.pixel.x;
                                         final_offset.pixel.x = -final_offset.pixel.y;
@@ -179,9 +181,15 @@ Direction_t teleport_position_across_portal(Position_t* position, QuadTreeNode_t
                                         auto save_decimal_x = final_offset.decimal.x;
                                         final_offset.decimal.x = -final_offset.decimal.y;
                                         final_offset.decimal.y = save_decimal_x;
+
+                                        if(pos_delta){
+                                             save_decimal_x = pos_delta->x;
+                                             pos_delta->x = -pos_delta->y;
+                                             pos_delta->y = save_decimal_x;
+                                        }
                                    }
 
-                                   *position = coord_to_pos_at_tile_center(portal_exit.directions[d].coords[p]) + final_offset;
+                                   *position = coord_to_pos_at_tile_center(portal_exit.directions[d].coords[p] + opposite) + final_offset;
                                    return (Direction_t)(d);
                               }
                          }
@@ -2020,7 +2028,7 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
           bool collide_with_block = false;
           Position_t block_pos = block_array->elements[i].pos;
           position_move_against_block(position, block_pos, &pos_delta, &collide_with_block);
-          Coord_t block_coord = pixel_to_coord(block_array->elements[i].pos.pixel + Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS});
+          Coord_t block_coord = block_get_coord(block_array->elements + i);
           U8 portal_rotations = 0;
 
           if(!collide_with_block){
@@ -2028,27 +2036,31 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
                Vec_t coord_offset = pos_to_vec(block_array->elements[i].pos +
                                                pixel_to_pos(Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS}) -
                                                coord_to_pos_at_tile_center(block_coord));
-               PortalExit_t portal_exits = find_portal_exits(block_coord, tilemap, interactive_quad_tree);
-               Interactive_t* interactive = quad_tree_interactive_find_at(interactive_quad_tree, block_coord);
+               for(S8 r = 0; r < DIRECTION_COUNT && !collide_with_block; r++){
+                    Coord_t check_coord = block_coord + (Direction_t)(r);
+                    PortalExit_t portal_exits = find_portal_exits(check_coord, tilemap, interactive_quad_tree);
+                    Interactive_t* interactive = quad_tree_interactive_find_at(interactive_quad_tree, check_coord);
 
-               for(S8 d = 0; d < DIRECTION_COUNT; d++){
-                    Vec_t final_coord_offset = coord_offset;
-                    if(interactive && interactive->type == INTERACTIVE_TYPE_PORTAL && interactive->portal.on &&
-                       interactive->portal.face != direction_opposite((Direction_t)(d))){
-                         final_coord_offset = rotate_vec_between_dirs(interactive->portal.face, (Direction_t)(d), coord_offset);
-                    }
+                    for(S8 d = 0; d < DIRECTION_COUNT && !collide_with_block; d++){
+                         Vec_t final_coord_offset = coord_offset;
+                         if(interactive && interactive->type == INTERACTIVE_TYPE_PORTAL && interactive->portal.on &&
+                            interactive->portal.face != direction_opposite((Direction_t)(d))){
+                              final_coord_offset = rotate_vec_between_dirs(interactive->portal.face, (Direction_t)(d), coord_offset);
+                         }
 
-                    for(S8 p = 0; p < portal_exits.directions[d].count; p++){
-                         if(portal_exits.directions[d].coords[p] == block_coord) continue;
+                         for(S8 p = 0; p < portal_exits.directions[d].count; p++){
+                              if(portal_exits.directions[d].coords[p] == check_coord) continue;
 
-                         Position_t portal_pos = coord_to_pos_at_tile_center(portal_exits.directions[d].coords[p]) + final_coord_offset -
-                                                 pixel_to_pos(Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS});
-                         position_move_against_block(position, portal_pos, &pos_delta, &collide_with_block);
-                         if(collide_with_block){
-                              block_pos = portal_pos;
-                              if(interactive && interactive->type == INTERACTIVE_TYPE_PORTAL && interactive->portal.on){
-                                   player_face = direction_opposite(interactive->portal.face);
-                                   portal_rotations = portal_rotations_between(interactive->portal.face, (Direction_t)(d));
+                              Position_t portal_pos = coord_to_pos_at_tile_center(portal_exits.directions[d].coords[p]) + final_coord_offset -
+                                                      pixel_to_pos(Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS});
+                              position_move_against_block(position, portal_pos, &pos_delta, &collide_with_block);
+                              if(collide_with_block){
+                                   block_pos = portal_pos;
+                                   if(interactive && interactive->type == INTERACTIVE_TYPE_PORTAL && interactive->portal.on){
+                                        player_face = direction_opposite(interactive->portal.face);
+                                        portal_rotations = portal_rotations_between(interactive->portal.face, (Direction_t)(d));
+                                        break;
+                                   }
                               }
                          }
                     }
@@ -3259,7 +3271,7 @@ int main(int argc, char** argv){
                          }
                     }
 
-                    Direction_t teleport_dir = teleport_position_across_portal(&arrow->pos, interactive_quad_tree, &tilemap, pre_move_coord,
+                    Direction_t teleport_dir = teleport_position_across_portal(&arrow->pos, NULL, interactive_quad_tree, &tilemap, pre_move_coord,
                                                                                post_move_coord);
                     if(teleport_dir < DIRECTION_COUNT){
                          arrow->face = direction_opposite(teleport_dir);
@@ -3549,7 +3561,7 @@ int main(int argc, char** argv){
 
                Position_t block_center = block->pos;
                block_center.pixel += Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS};
-               Direction_t teleport_dir = teleport_position_across_portal(&block_center, interactive_quad_tree, &tilemap, premove_coord,
+               Direction_t teleport_dir = teleport_position_across_portal(&block_center, NULL, interactive_quad_tree, &tilemap, premove_coord,
                                                                           coord);
                if(teleport_dir < DIRECTION_COUNT){
                     block->pos = block_center;
@@ -3666,8 +3678,10 @@ int main(int argc, char** argv){
                Coord_t player_coord = pos_to_coord(player.pos + pos_delta);
 
                find_portal_adjacents_to_skip_collision_check(player_coord, interactive_quad_tree, skip_coord);
-               teleport_position_across_portal(&player.pos, interactive_quad_tree, &tilemap, player_previous_coord,
+               teleport_position_across_portal(&player.pos, &pos_delta, interactive_quad_tree, &tilemap, player_previous_coord,
                                                player_coord);
+
+               player_coord = pos_to_coord(player.pos + pos_delta);
 
                bool collide_with_interactive = false;
                Vec_t player_delta_pos = move_player_position_through_world(player.pos, pos_delta, player.face, skip_coord,
@@ -3675,49 +3689,6 @@ int main(int argc, char** argv){
                                                                            &block_array, &block_to_push,
                                                                            &last_block_pushed_direction,
                                                                            &collide_with_interactive);
-               // F32 player_delta_mag = vec_magnitude(player_delta_pos);
-               Vec_t coord_offset = pos_to_vec(player.pos - coord_to_pos_at_tile_center(player_coord));
-               auto portal_exit = find_portal_exits(player_previous_coord, &tilemap, interactive_quad_tree);
-               Interactive_t* interactive = quad_tree_interactive_find_at(interactive_quad_tree, player_coord);
-               bool rotate_offset = interactive && interactive->type == INTERACTIVE_TYPE_PORTAL && interactive->portal.on;
-
-               for(S8 d = 0; d < DIRECTION_COUNT; d++){
-                    Vec_t final_coord_offset = coord_offset;
-                    Vec_t final_pos_delta = pos_delta;
-                    if(rotate_offset && interactive->portal.face != direction_opposite((Direction_t)(d))){
-                         final_coord_offset = rotate_vec_between_dirs(interactive->portal.face, (Direction_t)(d), coord_offset);
-                         final_pos_delta = rotate_vec_between_dirs(interactive->portal.face, (Direction_t)(d), pos_delta);
-                    }
-
-                    for(S8 i = 0; i < portal_exit.directions[d].count; i++){
-                         if(portal_exit.directions[d].coords[i] == player_previous_coord) continue;
-
-                         Block_t* previous_block_to_push = block_to_push;
-                         Position_t portal_pos = coord_to_pos_at_tile_center(portal_exit.directions[d].coords[i]) + final_coord_offset;
-
-                         find_portal_adjacents_to_skip_collision_check(portal_exit.directions[d].coords[i], interactive_quad_tree, skip_coord);
-
-                         Vec_t portal_delta = move_player_position_through_world(portal_pos, final_pos_delta,
-                                                                                 direction_opposite((Direction_t)(d)), skip_coord,
-                                                                                 &player, &tilemap, interactive_quad_tree,
-                                                                                 &block_array, &block_to_push,
-                                                                                 &last_block_pushed_direction,
-                                                                                 &collide_with_interactive);
-
-                         portal_player_pos = portal_pos + final_pos_delta;
-
-                         // if, through the portal, we collide with an interactive or a block, then use that delta
-                         // TODO: I don't think this is going to work with multiple portal outputs
-                         if(collide_with_interactive || previous_block_to_push != block_to_push){
-                              auto push_dir = direction_opposite((Direction_t)(d));
-                              if(rotate_offset && interactive->portal.face != push_dir){
-                                   player_delta_pos = rotate_vec_between_dirs(direction_opposite(push_dir), interactive->portal.face, portal_delta);
-                              }else{
-                                   player_delta_pos = portal_delta;
-                              }
-                         }
-                    }
-               }
 
                if(block_to_push){
                     F32 before_time = player.push_time;
