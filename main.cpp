@@ -1790,8 +1790,7 @@ struct Quad_t{
      F32 top;
 };
 
-void draw_quad_wireframe(const Quad_t* quad, F32 red, F32 green, F32 blue)
-{
+void draw_quad_wireframe(const Quad_t* quad, F32 red, F32 green, F32 blue){
      glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
      glBegin(GL_QUADS);
@@ -1805,8 +1804,7 @@ void draw_quad_wireframe(const Quad_t* quad, F32 red, F32 green, F32 blue)
      glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 }
 
-void selection_draw(Coord_t selection_start, Coord_t selection_end, Position_t camera, F32 red, F32 green, F32 blue)
-{
+void selection_draw(Coord_t selection_start, Coord_t selection_end, Position_t camera, F32 red, F32 green, F32 blue){
      if(selection_start.x > selection_end.x) SWAP(selection_start.x, selection_end.x);
      if(selection_start.y > selection_end.y) SWAP(selection_start.y, selection_end.y);
 
@@ -1820,22 +1818,20 @@ void selection_draw(Coord_t selection_start, Coord_t selection_end, Position_t c
      draw_quad_wireframe(&selection_quad, red, green, blue);
 }
 
-Coord_t mouse_select_coord(Vec_t mouse_screen)
-{
+Coord_t mouse_select_coord(Vec_t mouse_screen){
      return {(S16)(mouse_screen.x * (F32)(ROOM_TILE_SIZE)), (S16)(mouse_screen.y * (F32)(ROOM_TILE_SIZE))};
 }
 
 Coord_t mouse_select_world(Vec_t mouse_screen, Position_t camera){
      return mouse_select_coord(mouse_screen) + (pos_to_coord(camera) - Coord_t{ROOM_TILE_SIZE / 2, ROOM_TILE_SIZE / 2});
 }
-S32 mouse_select_index(Vec_t mouse_screen)
-{
+
+S32 mouse_select_index(Vec_t mouse_screen){
      Coord_t coord = mouse_select_coord(mouse_screen);
      return coord.y * ROOM_TILE_SIZE + coord.x;
 }
 
-Vec_t coord_to_screen_position(Coord_t coord)
-{
+Vec_t coord_to_screen_position(Coord_t coord){
      Pixel_t pixel = coord_to_pixel(coord);
      Position_t relative_loc {pixel, 0, {0.0f, 0.0f}};
      return pos_to_vec(relative_loc);
@@ -3690,6 +3686,8 @@ int main(int argc, char** argv){
                                                                            &last_block_pushed_direction,
                                                                            &collide_with_interactive);
 
+               player_coord = pos_to_coord(player.pos + player_delta_pos);
+
                if(block_to_push){
                     F32 before_time = player.push_time;
 
@@ -3702,6 +3700,9 @@ int main(int argc, char** argv){
                }else{
                     player.push_time = 0;
                }
+
+               teleport_position_across_portal(&player.pos, &player_delta_pos, interactive_quad_tree, &tilemap, player_previous_coord,
+                                               player_coord);
 
                player.pos += player_delta_pos;
           }
