@@ -1262,36 +1262,45 @@ void player_action_perform(PlayerAction_t* player_action, Player_t* player, Play
           player->face = DIRECTION_LEFT;
           break;
      case PLAYER_ACTION_TYPE_MOVE_LEFT_STOP:
+          if(player->face == direction_rotate_clockwise(DIRECTION_LEFT, player_action->move_left_rotation)){
+               player_action->reface = true;
+          }
           player_action->move_left = false;
           player_action->move_left_rotation = 0;
-          if(player->face == DIRECTION_LEFT) player_action->reface = true;
           break;
      case PLAYER_ACTION_TYPE_MOVE_UP_START:
           player_action->move_up = true;
           player->face = DIRECTION_UP;
           break;
      case PLAYER_ACTION_TYPE_MOVE_UP_STOP:
+          if(player->face == direction_rotate_clockwise(DIRECTION_UP, player_action->move_up_rotation)){
+               player_action->reface = true;
+          }
           player_action->move_up = false;
           player_action->move_up_rotation = 0;
-          if(player->face == DIRECTION_UP) player_action->reface = true;
           break;
      case PLAYER_ACTION_TYPE_MOVE_RIGHT_START:
           player_action->move_right = true;
           player->face = DIRECTION_RIGHT;
           break;
      case PLAYER_ACTION_TYPE_MOVE_RIGHT_STOP:
+     {
+          if(player->face == direction_rotate_clockwise(DIRECTION_RIGHT, player_action->move_right_rotation)){
+               player_action->reface = true;
+          }
           player_action->move_right = false;
           player_action->move_right_rotation = 0;
-          if(player->face == DIRECTION_RIGHT) player_action->reface = true;
-          break;
+     } break;
      case PLAYER_ACTION_TYPE_MOVE_DOWN_START:
           player_action->move_down = true;
           player->face = DIRECTION_DOWN;
           break;
      case PLAYER_ACTION_TYPE_MOVE_DOWN_STOP:
+          if(player->face == direction_rotate_clockwise(DIRECTION_DOWN, player_action->move_down_rotation)){
+               player_action->reface = true;
+          }
           player_action->move_down = false;
           player_action->move_down_rotation = 0;
-          if(player->face == DIRECTION_DOWN) player_action->reface = true;
           break;
      case PLAYER_ACTION_TYPE_ACTIVATE_START:
           player_action->activate = true;
@@ -3173,7 +3182,7 @@ int main(int argc, char** argv){
                Arrow_t* arrow = arrow_array.arrows + i;
                if(!arrow->alive) continue;
 
-               Coord_t pre_move_coord = pixel_to_coord(arrow->pos.pixel + Pixel_t{0, arrow->pos.z});
+               Coord_t pre_move_coord = pixel_to_coord(arrow->pos.pixel);
 
                if(arrow->element == ELEMENT_FIRE){
                     illuminate(pre_move_coord, 255 - LIGHT_DECAY, &tilemap, block_quad_tree);
@@ -3220,7 +3229,7 @@ int main(int argc, char** argv){
 
                arrow->pos += (direction * dt * arrow->vel);
                arrow->vel *= arrow_friction;
-               Coord_t post_move_coord = pixel_to_coord(arrow->pos.pixel + Pixel_t{0, arrow->pos.z});
+               Coord_t post_move_coord = pixel_to_coord(arrow->pos.pixel);
 
                Rect_t coord_rect {(S16)(arrow->pos.pixel.x - TILE_SIZE_IN_PIXELS),
                                   (S16)(arrow->pos.pixel.y - TILE_SIZE_IN_PIXELS),
@@ -3725,10 +3734,10 @@ int main(int argc, char** argv){
                     player.accel = vec_rotate_quadrants(player.accel, rotations_between);
 
                     // set rotations for each direction the player wants to move
-                    if(player_action.move_left) player_action.move_left_rotation = rotations_between;
-                    if(player_action.move_right) player_action.move_right_rotation = rotations_between;
-                    if(player_action.move_up) player_action.move_up_rotation = rotations_between;
-                    if(player_action.move_down) player_action.move_down_rotation = rotations_between;
+                    if(player_action.move_left) player_action.move_left_rotation = (player_action.move_left_rotation + rotations_between) % DIRECTION_COUNT;
+                    if(player_action.move_right) player_action.move_right_rotation = (player_action.move_right_rotation + rotations_between) % DIRECTION_COUNT;
+                    if(player_action.move_up) player_action.move_up_rotation = (player_action.move_up_rotation + rotations_between) % DIRECTION_COUNT;
+                    if(player_action.move_down) player_action.move_down_rotation = (player_action.move_down_rotation + rotations_between) % DIRECTION_COUNT;
                }
 
                player.pos += player_delta_pos;
