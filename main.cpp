@@ -56,16 +56,19 @@ U8 portal_rotations_between(Direction_t a, Direction_t b){
      return direction_rotations_between(a, b);
 }
 
-Vec_t rotate_vec_between_dirs(Direction_t a, Direction_t b, Vec_t vec){
-     U8 rotations_between = portal_rotations_between(a, b);
-
-     for(U8 r = 0; r < rotations_between; r++){
+Vec_t vec_rotate_quadrants(Vec_t vec, S8 rotations_between){
+     for(S8 r = 0; r < rotations_between; r++){
           auto tmp = vec.x;
           vec.x = vec.y;
           vec.y = -tmp;
      }
 
      return vec;
+}
+
+Vec_t rotate_vec_between_dirs(Direction_t a, Direction_t b, Vec_t vec){
+     U8 rotations_between = portal_rotations_between(a, b);
+     return vec_rotate_quadrants(vec, rotations_between);
 }
 
 #define UNDO_MEMORY (4 * 1024 * 1024)
@@ -156,7 +159,7 @@ void find_portal_adjacents_to_skip_collision_check(Coord_t coord, QuadTreeNode_t
      }
 }
 
-Direction_t teleport_position_across_portal(Position_t* position, Vec_t* pos_delta, QuadTreeNode_t<Interactive_t>* interactive_quad_tree,
+S8 teleport_position_across_portal(Position_t* position, Vec_t* pos_delta, QuadTreeNode_t<Interactive_t>* interactive_quad_tree,
                                             TileMap_t* tilemap, Coord_t premove_coord, Coord_t postmove_coord){
      if(postmove_coord != premove_coord){
           auto* interactive = quad_tree_interactive_find_at(interactive_quad_tree, postmove_coord);
@@ -182,15 +185,16 @@ Direction_t teleport_position_across_portal(Position_t* position, Vec_t* pos_del
                                         final_offset.decimal.x = -final_offset.decimal.y;
                                         final_offset.decimal.y = save_decimal_x;
 
-                                        if(pos_delta){
-                                             save_decimal_x = pos_delta->x;
-                                             pos_delta->x = -pos_delta->y;
-                                             pos_delta->y = save_decimal_x;
-                                        }
+                                   }
+
+                                   rotations_between = portal_rotations_between(interactive->portal.face, (Direction_t)(d));
+
+                                   if(pos_delta){
+                                        *pos_delta = vec_rotate_quadrants(*pos_delta, rotations_between);
                                    }
 
                                    *position = coord_to_pos_at_tile_center(portal_exit.directions[d].coords[p] + opposite) + final_offset;
-                                   return (Direction_t)(d);
+                                   return rotations_between;
                               }
                          }
                     }
@@ -198,7 +202,7 @@ Direction_t teleport_position_across_portal(Position_t* position, Vec_t* pos_del
           }
      }
 
-     return DIRECTION_COUNT;
+     return -1;
 }
 
 #define BLOCK_QUAD_TREE_MAX_QUERY 16
@@ -1078,12 +1082,9 @@ void spread_ice(Coord_t center, S16 radius, TileMap_t* tilemap, QuadTreeNode_t<I
                                    }else{
                                         interactive->popup.iced = true;
                                    }
-                              }else if(interactive->type == INTERACTIVE_TYPE_PRESSURE_PLATE){
-                                   tile->flags |= TILE_FLAG_ICED;
-                              }
-
-                              if(interactive->type == INTERACTIVE_TYPE_ICE_DETECTOR ||
-                                 interactive->type == INTERACTIVE_TYPE_LIGHT_DETECTOR){
+                              }else if(interactive->type == INTERACTIVE_TYPE_PRESSURE_PLATE ||
+                                       interactive->type == INTERACTIVE_TYPE_ICE_DETECTOR ||
+                                       interactive->type == INTERACTIVE_TYPE_LIGHT_DETECTOR){
                                    tile->flags |= TILE_FLAG_ICED;
                               }
                          }else{
@@ -1092,7 +1093,6 @@ void spread_ice(Coord_t center, S16 radius, TileMap_t* tilemap, QuadTreeNode_t<I
                     }
 
                     if(interactive && interactive->type == INTERACTIVE_TYPE_PORTAL && interactive->portal.on && !teleported){
-                         if(!block) tile->flags |= TILE_FLAG_ICED;
                          auto portal_exits = find_portal_exits(coord, tilemap, interactive_quad_tree);
                          for(S8 d = 0; d < DIRECTION_COUNT; d++){
                               for(S8 p = 0; p < portal_exits.directions[d].count; p++){
@@ -1100,8 +1100,9 @@ void spread_ice(Coord_t center, S16 radius, TileMap_t* tilemap, QuadTreeNode_t<I
                                    S16 x_diff = coord.x - center.x;
                                    S16 y_diff = coord.y - center.y;
                                    U8 distance_from_center = (U8)(sqrt(x_diff * x_diff + y_diff * y_diff));
+                                   Direction_t opposite = direction_opposite((Direction_t)(d));
 
-                                   spread_ice(portal_exits.directions[d].coords[p], radius - distance_from_center,
+                                   spread_ice(portal_exits.directions[d].coords[p] + opposite, radius - distance_from_center,
                                               tilemap, interactive_quad_tree, block_quad_tree, true);
                               }
                          }
@@ -3267,10 +3268,10 @@ int main(int argc, char** argv){
                          }
                     }
 
-                    Direction_t teleport_dir = teleport_position_across_portal(&arrow->pos, NULL, interactive_quad_tree, &tilemap, pre_move_coord,
-                                                                               post_move_coord);
-                    if(teleport_dir < DIRECTION_COUNT){
-                         arrow->face = direction_opposite(teleport_dir);
+                    S8 rotations_between = teleport_position_across_portal(&arrow->pos, NULL, interactive_quad_tree, &tilemap, pre_move_coord,
+                                                                           post_move_coord);
+                    if(rotations_between >= 0){
+                         arrow->face = direction_rotate_clockwise(arrow->face, rotations_between);
                     }
                }
           }
@@ -3557,35 +3558,14 @@ int main(int argc, char** argv){
 
                Position_t block_center = block->pos;
                block_center.pixel += Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS};
-               Direction_t teleport_dir = teleport_position_across_portal(&block_center, NULL, interactive_quad_tree, &tilemap, premove_coord,
-                                                                          coord);
-               if(teleport_dir < DIRECTION_COUNT){
+               S8 rotations_between = teleport_position_across_portal(&block_center, NULL, interactive_quad_tree, &tilemap, premove_coord,
+                                                                      coord);
+               if(rotations_between >= 0){
                     block->pos = block_center;
                     block->pos.pixel -= Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS};
 
-                    F32 push_vel_mag = vec_magnitude(block->vel);
-                    F32 push_accel_mag = vec_magnitude(block->accel);
-
-                    switch(direction_opposite(teleport_dir)){
-                    default:
-                         break;
-                    case DIRECTION_LEFT:
-                         block->vel = vec_left() * push_vel_mag;
-                         block->accel = vec_left() * push_accel_mag;
-                         break;
-                    case DIRECTION_RIGHT:
-                         block->vel = vec_right() * push_vel_mag;
-                         block->accel = vec_right() * push_accel_mag;
-                         break;
-                    case DIRECTION_UP:
-                         block->vel = vec_up() * push_vel_mag;
-                         block->accel = vec_up() * push_accel_mag;
-                         break;
-                    case DIRECTION_DOWN:
-                         block->vel = vec_down() * push_vel_mag;
-                         block->accel = vec_down() * push_accel_mag;
-                         break;
-                    }
+                    block->vel = vec_rotate_quadrants(block->vel, rotations_between);
+                    block->accel = vec_rotate_quadrants(block->accel, rotations_between);
                }
           }
 
@@ -3674,8 +3654,8 @@ int main(int argc, char** argv){
                Coord_t player_coord = pos_to_coord(player.pos + pos_delta);
 
                find_portal_adjacents_to_skip_collision_check(player_coord, interactive_quad_tree, skip_coord);
-               teleport_position_across_portal(&player.pos, &pos_delta, interactive_quad_tree, &tilemap, player_previous_coord,
-                                               player_coord);
+               S8 rotations_between = teleport_position_across_portal(&player.pos, &pos_delta, interactive_quad_tree, &tilemap, player_previous_coord,
+                                                                      player_coord);
 
                player_coord = pos_to_coord(player.pos + pos_delta);
 
@@ -3701,8 +3681,16 @@ int main(int argc, char** argv){
                     player.push_time = 0;
                }
 
-               teleport_position_across_portal(&player.pos, &player_delta_pos, interactive_quad_tree, &tilemap, player_previous_coord,
-                                               player_coord);
+               if(rotations_between < 0){
+                    rotations_between = teleport_position_across_portal(&player.pos, &player_delta_pos, interactive_quad_tree, &tilemap, player_previous_coord,
+                                                                        player_coord);
+               }
+
+               if(rotations_between >= 0){
+                    player.face = direction_rotate_clockwise(player.face, rotations_between);
+                    player.vel = vec_rotate_quadrants(player.vel, rotations_between);
+                    player.accel = vec_rotate_quadrants(player.accel, rotations_between);
+               }
 
                player.pos += player_delta_pos;
           }
