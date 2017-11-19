@@ -71,6 +71,23 @@ Vec_t rotate_vec_between_dirs(Direction_t a, Direction_t b, Vec_t vec){
      return vec_rotate_quadrants(vec, rotations_between);
 }
 
+Vec_t direction_to_vec(Direction_t d){
+     switch(d){
+     default:
+          break;
+     case DIRECTION_LEFT:
+          return Vec_t{-1, 0};
+     case DIRECTION_RIGHT:
+          return Vec_t{1, 0};
+     case DIRECTION_UP:
+          return Vec_t{0, 1};
+     case DIRECTION_DOWN:
+          return Vec_t{0, -1};
+     }
+
+     return Vec_t{0, 0};
+}
+
 #define UNDO_MEMORY (4 * 1024 * 1024)
 
 Interactive_t* quad_tree_interactive_find_at(QuadTreeNode_t<Interactive_t>* root, Coord_t coord){
@@ -1213,6 +1230,10 @@ struct PlayerAction_t{
      bool shoot;
      bool reface;
      bool undo;
+     S8 move_left_rotation;
+     S8 move_right_rotation;
+     S8 move_up_rotation;
+     S8 move_down_rotation;
 };
 
 enum DemoMode_t{
@@ -1242,7 +1263,8 @@ void player_action_perform(PlayerAction_t* player_action, Player_t* player, Play
           break;
      case PLAYER_ACTION_TYPE_MOVE_LEFT_STOP:
           player_action->move_left = false;
-          if(player->face == DIRECTION_LEFT) player_action->reface = DIRECTION_LEFT;
+          player_action->move_left_rotation = 0;
+          if(player->face == DIRECTION_LEFT) player_action->reface = true;
           break;
      case PLAYER_ACTION_TYPE_MOVE_UP_START:
           player_action->move_up = true;
@@ -1250,7 +1272,8 @@ void player_action_perform(PlayerAction_t* player_action, Player_t* player, Play
           break;
      case PLAYER_ACTION_TYPE_MOVE_UP_STOP:
           player_action->move_up = false;
-          if(player->face == DIRECTION_UP) player_action->reface = DIRECTION_UP;
+          player_action->move_up_rotation = 0;
+          if(player->face == DIRECTION_UP) player_action->reface = true;
           break;
      case PLAYER_ACTION_TYPE_MOVE_RIGHT_START:
           player_action->move_right = true;
@@ -1258,7 +1281,8 @@ void player_action_perform(PlayerAction_t* player_action, Player_t* player, Play
           break;
      case PLAYER_ACTION_TYPE_MOVE_RIGHT_STOP:
           player_action->move_right = false;
-          if(player->face == DIRECTION_RIGHT) player_action->reface = DIRECTION_RIGHT;
+          player_action->move_right_rotation = 0;
+          if(player->face == DIRECTION_RIGHT) player_action->reface = true;
           break;
      case PLAYER_ACTION_TYPE_MOVE_DOWN_START:
           player_action->move_down = true;
@@ -1266,7 +1290,8 @@ void player_action_perform(PlayerAction_t* player_action, Player_t* player, Play
           break;
      case PLAYER_ACTION_TYPE_MOVE_DOWN_STOP:
           player_action->move_down = false;
-          if(player->face == DIRECTION_DOWN) player_action->reface = DIRECTION_DOWN;
+          player_action->move_down_rotation = 0;
+          if(player->face == DIRECTION_DOWN) player_action->reface = true;
           break;
      case PLAYER_ACTION_TYPE_ACTIVATE_START:
           player_action->activate = true;
@@ -3280,23 +3305,31 @@ int main(int argc, char** argv){
           user_movement = vec_zero();
 
           if(player_action.move_left){
-               user_movement += Vec_t{-1, 0};
-               if(player_action.reface) player.face = DIRECTION_LEFT;
+               Direction_t direction = DIRECTION_LEFT;
+               direction = direction_rotate_clockwise(direction, player_action.move_left_rotation);
+               user_movement += direction_to_vec(direction);
+               if(player_action.reface) player.face = direction;
           }
 
           if(player_action.move_right){
-               user_movement += Vec_t{1, 0};
-               if(player_action.reface) player.face = DIRECTION_RIGHT;
+               Direction_t direction = DIRECTION_RIGHT;
+               direction = direction_rotate_clockwise(direction, player_action.move_right_rotation);
+               user_movement += direction_to_vec(direction);
+               if(player_action.reface) player.face = direction;
           }
 
           if(player_action.move_up){
-               user_movement += Vec_t{0, 1};
-               if(player_action.reface) player.face = DIRECTION_UP;
+               Direction_t direction = DIRECTION_UP;
+               direction = direction_rotate_clockwise(direction, player_action.move_up_rotation);
+               user_movement += direction_to_vec(direction);
+               if(player_action.reface) player.face = direction;
           }
 
           if(player_action.move_down){
-               user_movement += Vec_t{0, -1};
-               if(player_action.reface) player.face = DIRECTION_DOWN;
+               Direction_t direction = DIRECTION_DOWN;
+               direction = direction_rotate_clockwise(direction, player_action.move_down_rotation);
+               user_movement += direction_to_vec(direction);
+               if(player_action.reface) player.face = direction;
           }
 
           if(player_action.activate && !player_action.last_activate){
@@ -3690,6 +3723,12 @@ int main(int argc, char** argv){
                     player.face = direction_rotate_clockwise(player.face, rotations_between);
                     player.vel = vec_rotate_quadrants(player.vel, rotations_between);
                     player.accel = vec_rotate_quadrants(player.accel, rotations_between);
+
+                    // set rotations for each direction the player wants to move
+                    if(player_action.move_left) player_action.move_left_rotation = rotations_between;
+                    if(player_action.move_right) player_action.move_right_rotation = rotations_between;
+                    if(player_action.move_up) player_action.move_up_rotation = rotations_between;
+                    if(player_action.move_down) player_action.move_down_rotation = rotations_between;
                }
 
                player.pos += player_delta_pos;
