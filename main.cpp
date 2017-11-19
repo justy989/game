@@ -1167,7 +1167,6 @@ void melt_ice(Coord_t center, S16 radius, TileMap_t* tilemap, QuadTreeNode_t<Int
                     }
 
                     if(interactive && interactive->type == INTERACTIVE_TYPE_PORTAL && interactive->portal.on && !teleported){
-                         if(!block) tile->flags &= ~TILE_FLAG_ICED;
                          auto portal_exits = find_portal_exits(coord, tilemap, interactive_quad_tree);
                          for(S8 d = 0; d < DIRECTION_COUNT; d++){
                               for(S8 p = 0; p < portal_exits.directions[d].count; p++){
@@ -1175,8 +1174,9 @@ void melt_ice(Coord_t center, S16 radius, TileMap_t* tilemap, QuadTreeNode_t<Int
                                    S16 x_diff = coord.x - center.x;
                                    S16 y_diff = coord.y - center.y;
                                    U8 distance_from_center = (U8)(sqrt(x_diff * x_diff + y_diff * y_diff));
+                                   Direction_t opposite = direction_opposite((Direction_t)(d));
 
-                                   melt_ice(portal_exits.directions[d].coords[p], radius - distance_from_center,
+                                   melt_ice(portal_exits.directions[d].coords[p] + opposite, radius - distance_from_center,
                                             tilemap, interactive_quad_tree, block_quad_tree, true);
                               }
                          }
