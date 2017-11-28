@@ -157,8 +157,17 @@ PortalExit_t find_portal_exits(Coord_t coord, TileMap_t* tilemap, QuadTreeNode_t
      if(interactive && interactive->type == INTERACTIVE_TYPE_PORTAL){
           portal_exit_add(&portal_exit, interactive->portal.face, coord);
           for(S8 d = 0; d < DIRECTION_COUNT; d++){
-               find_portal_exits_impl(coord + (Direction_t)(d), tilemap, interactive_quad_tree,
-                                      &portal_exit, DIRECTION_COUNT);
+               Coord_t adjacent_coord = coord + (Direction_t)(d);
+               Tile_t* tile = tilemap_get_tile(tilemap, adjacent_coord);
+               if(!tile) continue;
+               if((tile->flags & TILE_FLAG_WIRE_STATE) == 0) continue;
+               if((d == DIRECTION_LEFT && tile->flags & TILE_FLAG_WIRE_RIGHT) ||
+                  (d == DIRECTION_UP && tile->flags & TILE_FLAG_WIRE_DOWN) ||
+                  (d == DIRECTION_RIGHT && tile->flags & TILE_FLAG_WIRE_LEFT) ||
+                  (d == DIRECTION_DOWN && tile->flags & TILE_FLAG_WIRE_UP)){
+                    find_portal_exits_impl(adjacent_coord, tilemap, interactive_quad_tree,
+                                           &portal_exit, DIRECTION_COUNT);
+               }
           }
      }
      return portal_exit;
