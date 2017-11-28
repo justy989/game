@@ -54,6 +54,7 @@ struct Undo_t{
 };
 
 bool init(UndoHistory_t* undo_history, U32 history_size);
+void destroy(UndoHistory_t* undo_history);
 void undo_history_add(UndoHistory_t* undo_history, UndoDiffType_t type, S32 index);
 bool init(Undo_t* undo, U32 history_size, S16 map_width, S16 map_height, S16 block_count, S16 interactive_count);
 void destroy(Undo_t* undo);

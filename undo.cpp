@@ -2,6 +2,7 @@
 #include "log.h"
 
 #include <assert.h>
+#include <string.h>
 
 bool init(UndoHistory_t* undo_history, U32 history_size){
      undo_history->start = malloc(history_size);
@@ -9,6 +10,11 @@ bool init(UndoHistory_t* undo_history, U32 history_size){
      undo_history->current = undo_history->start;
      undo_history->size = history_size;
      return true;
+}
+
+void destroy(UndoHistory_t* undo_history){
+     free(undo_history->start);
+     memset(undo_history, 0, sizeof(*undo_history));
 }
 
 #define ASSERT_BELOW_HISTORY_SIZE(history) assert((char*)(history->current) - (char*)(history->start) < history->size)
@@ -75,6 +81,7 @@ void destroy(Undo_t* undo){
      undo->height = 0;
      destroy(&undo->block_array);
      destroy(&undo->interactive_array);
+     destroy(&undo->history);
 }
 
 void undo_snapshot(Undo_t* undo, Player_t* player, TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array,

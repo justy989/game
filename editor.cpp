@@ -297,6 +297,9 @@ bool init(Editor_t* editor){
 
 void destroy(Editor_t* editor){
      for(S16 i = 0; i < editor->category_array.count; i++){
+          for(int j = 0; j < editor->category_array.elements[i].count; j++){
+               destroy(editor->category_array.elements[i].elements + j);
+          }
           destroy(editor->category_array.elements + i);
      }
 

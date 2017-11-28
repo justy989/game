@@ -1640,6 +1640,8 @@ bool load_map_number(S32 map_number, Coord_t* player_start, TileMap_t* tilemap, 
           }
      }
 
+     closedir(d);
+
      if(!filepath[0]) return false;
 
      LOG("load map %s\n", filepath);
@@ -2280,7 +2282,7 @@ int main(int argc, char** argv){
      GLuint arrow_texture = 0;
 
      if(!suite || show_suite){
-          if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER) != 0){
+          if(SDL_Init(SDL_INIT_EVERYTHING) != 0){
                return 1;
           }
 
@@ -2759,6 +2761,8 @@ int main(int argc, char** argv){
                               destroy(&undo);
                               init(&undo, UNDO_MEMORY, tilemap.width, tilemap.height, block_array.count, interactive_array.count);
                               undo_snapshot(&undo, &player, &tilemap, &block_array, &interactive_array);
+                              quad_tree_free(block_quad_tree);
+                              block_quad_tree = quad_tree_build(&block_array);
                          }
                          break;
                     case SDL_SCANCODE_LEFTBRACKET:
@@ -2768,6 +2772,8 @@ int main(int argc, char** argv){
                               destroy(&undo);
                               init(&undo, UNDO_MEMORY, tilemap.width, tilemap.height, block_array.count, interactive_array.count);
                               undo_snapshot(&undo, &player, &tilemap, &block_array, &interactive_array);
+                              quad_tree_free(block_quad_tree);
+                              block_quad_tree = quad_tree_build(&block_array);
                          }else{
                               map_number++;
                          }
@@ -2775,10 +2781,13 @@ int main(int argc, char** argv){
                     case SDL_SCANCODE_RIGHTBRACKET:
                          map_number++;
                          if(load_map_number(map_number, &player_start, &tilemap, &block_array, &interactive_array)){
+                              // TODO: compress with code above
                               reset_map(&player, player_start, &interactive_array, &interactive_quad_tree);
                               destroy(&undo);
                               init(&undo, UNDO_MEMORY, tilemap.width, tilemap.height, block_array.count, interactive_array.count);
                               undo_snapshot(&undo, &player, &tilemap, &block_array, &interactive_array);
+                              quad_tree_free(block_quad_tree);
+                              block_quad_tree = quad_tree_build(&block_array);
                          }else{
                               map_number--;
                          }
@@ -4281,9 +4290,13 @@ int main(int argc, char** argv){
      }
 
      quad_tree_free(interactive_quad_tree);
+     quad_tree_free(block_quad_tree);
 
+     destroy(&block_array);
+     destroy(&interactive_array);
      destroy(&undo);
      destroy(&tilemap);
+     destroy(&editor);
 
      if(!suite){
           glDeleteTextures(1, &theme_texture);
