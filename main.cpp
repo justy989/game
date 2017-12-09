@@ -88,6 +88,18 @@ Vec_t direction_to_vec(Direction_t d){
      return Vec_t{0, 0};
 }
 
+Rect_t rect_surrounding_adjacent_coords(Coord_t coord){
+     Pixel_t pixel = coord_to_pixel(coord);
+
+     Rect_t rect = {};
+     rect.left = pixel.x - TILE_SIZE_IN_PIXELS;
+     rect.right = pixel.x + (2 * TILE_SIZE_IN_PIXELS);
+     rect.bottom = pixel.y - TILE_SIZE_IN_PIXELS;
+     rect.top = pixel.y + (2 * TILE_SIZE_IN_PIXELS);
+
+     return rect;
+}
+
 #define UNDO_MEMORY (4 * 1024 * 1024)
 
 Interactive_t* quad_tree_interactive_find_at(QuadTreeNode_t<Interactive_t>* root, Coord_t coord){
@@ -251,14 +263,17 @@ bool block_on_ice(Block_t* block, TileMap_t* tilemap, QuadTreeNode_t<Interactive
      return false;
 }
 
-Block_t* block_against_another_block(Block_t* block_to_check, Direction_t direction, QuadTreeNode_t<Block_t>* block_quad_tree){
-     Pixel_t center = block_center_pixel(block_to_check);
+Rect_t rect_to_check_surrounding_blocks(Pixel_t center){
      Rect_t rect = {};
      rect.left = center.x - (2 * TILE_SIZE_IN_PIXELS);
      rect.right = center.x + (2 * TILE_SIZE_IN_PIXELS);
      rect.bottom = center.y - (2 * TILE_SIZE_IN_PIXELS);
      rect.top = center.y + (2 * TILE_SIZE_IN_PIXELS);
+     return rect;
+}
 
+Block_t* block_against_another_block(Block_t* block_to_check, Direction_t direction, QuadTreeNode_t<Block_t>* block_quad_tree){
+     Rect_t rect = rect_to_check_surrounding_blocks(block_center_pixel(block_to_check));
      S16 block_count = 0;
      Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
      quad_tree_find_in(block_quad_tree, rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
@@ -339,11 +354,7 @@ Block_t* block_inside_another_block(Block_t* block_to_check, QuadTreeNode_t<Bloc
      Rect_t rect = {block_to_check->pos.pixel.x, block_to_check->pos.pixel.y,
                     (S16)(block_to_check->pos.pixel.x + TILE_SIZE_IN_PIXELS - 1),
                     (S16)(block_to_check->pos.pixel.y + TILE_SIZE_IN_PIXELS - 1)};
-     Pixel_t center = block_center_pixel(block_to_check);
-     Rect_t surrounding_rect = {(S16)(center.x - (2 * TILE_SIZE_IN_PIXELS)),
-                                (S16)(center.y - (2 * TILE_SIZE_IN_PIXELS)),
-                                (S16)(center.x + (2 * TILE_SIZE_IN_PIXELS)),
-                                (S16)(center.y + (2 * TILE_SIZE_IN_PIXELS))};
+     Rect_t surrounding_rect = rect_to_check_surrounding_blocks(block_center_pixel(block_to_check));
      S16 block_count = 0;
      Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
      quad_tree_find_in(block_quad_tree, surrounding_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
@@ -382,14 +393,7 @@ Block_t* block_inside_another_block(Block_t* block_to_check, QuadTreeNode_t<Bloc
                               auto portal_coord = portal_exits.directions[d].coords[p];
                               if(portal_coord == coord) continue;
 
-                              Pixel_t portal_center = {};
-                              portal_center.x = (portal_coord.x * TILE_SIZE_IN_PIXELS) + HALF_TILE_SIZE_IN_PIXELS;
-                              portal_center.y = (portal_coord.y * TILE_SIZE_IN_PIXELS) + HALF_TILE_SIZE_IN_PIXELS;
-
-                              surrounding_rect.left = portal_center.x - TILE_SIZE_IN_PIXELS;
-                              surrounding_rect.right = portal_center.x + TILE_SIZE_IN_PIXELS;
-                              surrounding_rect.bottom = portal_center.y - TILE_SIZE_IN_PIXELS;
-                              surrounding_rect.top = portal_center.y + TILE_SIZE_IN_PIXELS;
+                              surrounding_rect = rect_surrounding_adjacent_coords(portal_coord);
 
                               // anything this query hits will be colliding with the block
                               quad_tree_find_in(block_quad_tree, surrounding_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
@@ -436,11 +440,7 @@ Block_t* block_held_up_by_another_block(Block_t* block_to_check, QuadTreeNode_t<
      Rect_t rect = {block_to_check->pos.pixel.x, block_to_check->pos.pixel.y,
                     (S16)(block_to_check->pos.pixel.x + TILE_SIZE_IN_PIXELS - 1),
                     (S16)(block_to_check->pos.pixel.y + TILE_SIZE_IN_PIXELS - 1)};
-     Pixel_t center = block_center_pixel(block_to_check);
-     Rect_t surrounding_rect = {(S16)(center.x - (2 * TILE_SIZE_IN_PIXELS)),
-                                (S16)(center.y - (2 * TILE_SIZE_IN_PIXELS)),
-                                (S16)(center.x + (2 * TILE_SIZE_IN_PIXELS)),
-                                (S16)(center.y + (2 * TILE_SIZE_IN_PIXELS))};
+     Rect_t surrounding_rect = rect_to_check_surrounding_blocks(block_center_pixel(block_to_check));
      S16 block_count = 0;
      Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
      quad_tree_find_in(block_quad_tree, surrounding_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
@@ -1075,13 +1075,7 @@ void spread_ice(Coord_t center, S16 radius, TileMap_t* tilemap, QuadTreeNode_t<I
                Coord_t coord{x, y};
                Tile_t* tile = tilemap_get_tile(tilemap, coord);
                if(tile && !tile_is_solid(tile)){
-                    S16 px = coord.x * TILE_SIZE_IN_PIXELS;
-                    S16 py = coord.y * TILE_SIZE_IN_PIXELS;
-                    Rect_t coord_rect {(S16)(px - HALF_TILE_SIZE_IN_PIXELS),
-                                       (S16)(py - HALF_TILE_SIZE_IN_PIXELS),
-                                       (S16)(px + TILE_SIZE_IN_PIXELS + HALF_TILE_SIZE_IN_PIXELS),
-                                       (S16)(py + TILE_SIZE_IN_PIXELS + HALF_TILE_SIZE_IN_PIXELS)};
-
+                    Rect_t coord_rect = rect_surrounding_adjacent_coords(coord);
                     S16 block_count = 0;
                     Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
                     quad_tree_find_in(block_quad_tree, coord_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
