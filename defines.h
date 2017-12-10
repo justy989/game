@@ -1,4 +1,5 @@
-#pragma once
+#ifndef DEFINES_H
+#define DEFINES_H
 
 #define SWAP(a, b) {auto c = a; a = b; b = c;}
 
@@ -42,3 +43,5 @@
 #define FALL_TIME 0.03f
 #define BLOCK_PUSH_TIME 0.25f
 #define LIGHT_DETECTOR_THRESHOLD 176
+
+#endif

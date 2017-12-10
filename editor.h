@@ -1,4 +1,5 @@
-#pragma once
+#ifndef EDITOR_H
+#define EDITOR_H
 
 #include "interactive.h"
 #include "element.h"
@@ -74,3 +75,5 @@ struct Editor_t{
 Coord_t stamp_array_dimensions(ObjectArray_t<Stamp_t>* object_array);
 bool init(Editor_t* editor);
 void destroy(Editor_t* editor);
+
+#endif

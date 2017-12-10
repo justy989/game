@@ -1,4 +1,5 @@
-#pragma once
+#ifndef VEC_H
+#define VEC_H
 
 #include "types.h"
 
@@ -35,3 +36,5 @@ void vec_move_x(Vec_t* v, float dx);
 void vec_move_y(Vec_t* v, float dy);
 
 Vec_t vec_project_onto(Vec_t a, Vec_t b);
+
+#endif

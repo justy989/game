@@ -1,4 +1,5 @@
-#pragma once
+#ifndef OBJECT_ARRAY_H
+#define OBJECT_ARRAY_H
 
 #include <stdlib.h>
 
@@ -69,3 +70,5 @@ bool shallow_copy(ObjectArray_t<T>* a, ObjectArray_t<T>* b){
      b->count = a->count;
      return true;
 }
+
+#endif

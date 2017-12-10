@@ -1,4 +1,5 @@
-#pragma once
+#ifndef PLAYER_H
+#define PLAYER_H
 
 #define PLAYER_RADIUS (3.5f / 272.0f)
 #define PLAYER_SPEED 5.5f
@@ -18,3 +19,5 @@ struct Player_t{
      bool has_bow;
      F32 bow_draw_time;
 };
+
+#endif

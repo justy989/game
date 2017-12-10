@@ -1,6 +1,7 @@
-#pragma once
+#ifndef QUAD_TREE_H
+#define QUAD_TREE_H
 
-#include "quad_tree.h"
+#include "rect.h"
 
 #define QUAD_TREE_NODE_ENTRY_COUNT 4
 
@@ -189,3 +190,5 @@ void quad_tree_find_in(QuadTreeNode_t<T>* node, Rect_t rect, T** results_array, 
      *count = 0;
      quad_tree_find_in_impl(node, rect, results_array, count, max_array_count);
 }
+
+#endif

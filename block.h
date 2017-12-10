@@ -1,4 +1,5 @@
-#pragma once
+#ifndef BLOCK_H
+#define BLOCK_H
 
 #include "position.h"
 #include "vec.h"
@@ -6,6 +7,7 @@
 #include "element.h"
 #include "pixel.h"
 #include "coord.h"
+#include "rect.h"
 
 struct Block_t{
      Position_t pos;
@@ -22,3 +24,6 @@ S16 get_object_y(Block_t* block);
 Pixel_t block_center_pixel(Block_t* block);
 Coord_t block_get_coord(Block_t* block);
 bool blocks_at_collidable_height(Block_t* a, Block_t* b);
+Rect_t block_get_rect(Block_t* block);
+
+#endif

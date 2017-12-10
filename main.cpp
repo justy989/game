@@ -18,9 +18,7 @@ http://www.simonstalenhag.se/
 #include "direction.h"
 #include "bitmap.h"
 #include "conversion.h"
-#include "rect.h"
 #include "tile.h"
-#include "element.h"
 #include "object_array.h"
 #include "interactive.h"
 #include "quad_tree.h"
@@ -1143,12 +1141,7 @@ void melt_ice(Coord_t center, S16 radius, TileMap_t* tilemap, QuadTreeNode_t<Int
                Coord_t coord{x, y};
                Tile_t* tile = tilemap_get_tile(tilemap, coord);
                if(tile && !tile_is_solid(tile)){
-                    S16 px = coord.x * TILE_SIZE_IN_PIXELS;
-                    S16 py = coord.y * TILE_SIZE_IN_PIXELS;
-                    Rect_t coord_rect {(S16)(px - HALF_TILE_SIZE_IN_PIXELS),
-                                       (S16)(py - HALF_TILE_SIZE_IN_PIXELS),
-                                       (S16)(px + TILE_SIZE_IN_PIXELS + HALF_TILE_SIZE_IN_PIXELS),
-                                       (S16)(py + TILE_SIZE_IN_PIXELS + HALF_TILE_SIZE_IN_PIXELS)};
+                    Rect_t coord_rect = rect_surrounding_adjacent_coords(coord);
 
                     S16 block_count = 0;
                     Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
@@ -3253,9 +3246,7 @@ int main(int argc, char** argv){
                quad_tree_find_in(block_quad_tree, coord_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
                for(S16 b = 0; b < block_count; b++){
                     // blocks on the coordinate and on the ground block light
-                    Rect_t block_rect = {(S16)(blocks[b]->pos.pixel.x), (S16)(blocks[b]->pos.pixel.y),
-                                         (S16)(blocks[b]->pos.pixel.x + TILE_SIZE_IN_PIXELS),
-                                         (S16)(blocks[b]->pos.pixel.y + TILE_SIZE_IN_PIXELS)};
+                    Rect_t block_rect = block_get_rect(blocks[b]);
                     S16 block_index = blocks[b] - block_array.elements;
                     if(pixel_in_rect(arrow->pos.pixel, block_rect) && arrow->element_from_block != block_index){
                          arrow->element_from_block = block_index;
@@ -3646,13 +3637,7 @@ int main(int argc, char** argv){
                Interactive_t* interactive = interactive_array.elements + i;
                if(interactive->type == INTERACTIVE_TYPE_LIGHT_DETECTOR){
                     Tile_t* tile = tilemap_get_tile(&tilemap, interactive->coord);
-
-                    S16 px = interactive->coord.x * TILE_SIZE_IN_PIXELS;
-                    S16 py = interactive->coord.y * TILE_SIZE_IN_PIXELS;
-                    Rect_t coord_rect {(S16)(px - HALF_TILE_SIZE_IN_PIXELS),
-                                       (S16)(py - HALF_TILE_SIZE_IN_PIXELS),
-                                       (S16)(px + TILE_SIZE_IN_PIXELS + HALF_TILE_SIZE_IN_PIXELS),
-                                       (S16)(py + TILE_SIZE_IN_PIXELS + HALF_TILE_SIZE_IN_PIXELS)};
+                    Rect_t coord_rect = rect_surrounding_adjacent_coords(interactive->coord);
 
                     S16 block_count = 0;
                     Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];

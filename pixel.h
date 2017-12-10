@@ -1,4 +1,5 @@
-#pragma once
+#ifndef PIXEL_H
+#define PIXEL_H
 
 #include "types.h"
 
@@ -13,3 +14,5 @@ void operator+=(Pixel_t& a, Pixel_t b);
 void operator-=(Pixel_t& a, Pixel_t b);
 bool operator!=(Pixel_t a, Pixel_t b);
 bool operator==(Pixel_t a, Pixel_t b);
+
+#endif

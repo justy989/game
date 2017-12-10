@@ -1,4 +1,5 @@
-#pragma once
+#ifndef COORD_H
+#define COORD_H
 
 #include "types.h"
 #include "direction.h"
@@ -32,3 +33,5 @@ void coord_move_x(Coord_t* c, S16 dx);
 void coord_move_y(Coord_t* c, S16 dy);
 
 bool coord_after(Coord_t a, Coord_t b);
+
+#endif
