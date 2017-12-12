@@ -41,4 +41,3 @@ Rect_t block_get_rect(Block_t* b){
                           (S16)(b->pos.pixel.y + TILE_SIZE_IN_PIXELS)};
      return block_rect;
 }
-
