@@ -22,6 +22,7 @@ struct Block_t{
 S16 get_object_x(Block_t* block);
 S16 get_object_y(Block_t* block);
 Pixel_t block_center_pixel(Block_t* block);
+Position_t block_get_center(Block_t* block);
 Coord_t block_get_coord(Block_t* block);
 bool blocks_at_collidable_height(Block_t* a, Block_t* b);
 Rect_t block_get_rect(Block_t* block);

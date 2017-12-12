@@ -375,7 +375,7 @@ void search_portal_destination_for_blocks(QuadTreeNode_t<Block_t>* block_quad_tr
 }
 
 Block_t* block_against_another_block(Block_t* block_to_check, Direction_t direction, QuadTreeNode_t<Block_t>* block_quad_tree,
-                                     QuadTreeNode_t<Interactive_t>* interactive_quad_tree, TileMap_t* tilemap){
+                                     QuadTreeNode_t<Interactive_t>* interactive_quad_tree, TileMap_t* tilemap, Direction_t* push_dir){
      Rect_t rect = rect_to_check_surrounding_blocks(block_center_pixel(block_to_check));
 
      S16 block_count = 0;
@@ -389,7 +389,10 @@ Block_t* block_against_another_block(Block_t* block_to_check, Direction_t direct
      }
 
      Block_t* collided_block = block_against_block_in_list(block_to_check, blocks, block_count, direction, portal_offsets);
-     if(collided_block) return collided_block;
+     if(collided_block){
+          *push_dir = direction;
+          return collided_block;
+     }
 
      // check adjacent portals
      auto block_coord = block_get_coord(block_to_check);
@@ -411,7 +414,11 @@ Block_t* block_against_another_block(Block_t* block_to_check, Direction_t direct
                                                                    portal_coord, blocks, &block_count, portal_offsets);
 
                               collided_block = block_against_block_in_list(block_to_check, blocks, block_count, direction, portal_offsets);
-                              if(collided_block) return collided_block;
+                              if(collided_block){
+                                   U8 rotations = portal_rotations_between(interactive->portal.face, (Direction_t)(d));
+                                   *push_dir = direction_rotate_clockwise(direction, rotations);
+                                   return collided_block;
+                              }
                          }
                     }
                }
@@ -453,7 +460,7 @@ Block_t* block_inside_block_list(Block_t* block_to_check, Block_t** blocks, S16 
 
 Block_t* block_inside_another_block(Block_t* block_to_check, QuadTreeNode_t<Block_t>* block_quad_tree,
                                     QuadTreeNode_t<Interactive_t>* interactive_quad_tree, TileMap_t* tilemap,
-                                    Position_t* collided_with){
+                                    Position_t* collided_with, U8* through_portal_rotations){
      // TODO: need more complicated function to detect this
      Rect_t surrounding_rect = rect_to_check_surrounding_blocks(block_center_pixel(block_to_check));
      S16 block_count = 0;
@@ -467,7 +474,10 @@ Block_t* block_inside_another_block(Block_t* block_to_check, QuadTreeNode_t<Bloc
      }
 
      Block_t* collided_block = block_inside_block_list(block_to_check, blocks, block_count, collided_with, portal_offsets);
-     if(collided_block) return collided_block;
+     if(collided_block){
+          *through_portal_rotations = 0;
+          return collided_block;
+     }
 
      // find portals around the block to check
      auto block_coord = block_get_coord(block_to_check);
@@ -491,7 +501,10 @@ Block_t* block_inside_another_block(Block_t* block_to_check, QuadTreeNode_t<Bloc
                                                                    portal_coord, blocks, &block_count, portal_offsets);
 
                               collided_block = block_inside_block_list(block_to_check, blocks, block_count, collided_with, portal_offsets);
-                              if(collided_block) return collided_block;
+                              if(collided_block){
+                                   *through_portal_rotations = portal_rotations_between(interactive->portal.face, (Direction_t)(d));
+                                   return collided_block;
+                              }
                          }
                     }
                }
@@ -923,10 +936,12 @@ Interactive_t* block_against_solid_interactive(Block_t* block_to_check, Directio
 
 void block_push(Block_t* block, Direction_t direction, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree,
                 QuadTreeNode_t<Block_t>* block_quad_tree, bool pushed_by_player){
-     Block_t* against_block = block_against_another_block(block, direction, block_quad_tree, interactive_quad_tree, tilemap);
+     Direction_t against_block_push_dir = DIRECTION_COUNT;
+     Block_t* against_block = block_against_another_block(block, direction, block_quad_tree, interactive_quad_tree, tilemap,
+                                                          &against_block_push_dir);
      if(against_block){
           if(!pushed_by_player && block_on_ice(against_block, tilemap, interactive_quad_tree)){
-               block_push(against_block, direction, tilemap, interactive_quad_tree, block_quad_tree, false);
+               block_push(against_block, against_block_push_dir, tilemap, interactive_quad_tree, block_quad_tree, false);
           }
 
           return;
@@ -2103,6 +2118,7 @@ void position_move_against_block(Position_t pos, Position_t block_pos, Vec_t* po
 Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, Direction_t player_face, Coord_t* skip_coord,
                                          Player_t* player, TileMap_t* tilemap,
                                          QuadTreeNode_t<Interactive_t>* interactive_quad_tree, ObjectArray_t<Block_t>* block_array,
+                                         QuadTreeNode_t<Block_t>* block_quad_tree,
                                          Block_t** block_to_push, Direction_t* last_block_pushed_direction,
                                          bool* collided_with_interactive){
      // figure out tiles that are close by
@@ -2172,12 +2188,40 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
                        rel_dir == direction_opposite(collided_block_dir)){
 
                          Block_t* new_collided_block = block_array->elements + i;
-                         if(collided_block->accel.x != 0.0f || collided_block->accel.y != 0.0f){
-                              collided_block->pos -= collided_block_delta;
-                         }else{
-                              new_collided_block->pos -= collided_block_delta;
+
+                         // if both blocks are moving toward each other
+                         // if one block is moving and the other block is still
+                         switch(collided_block_dir){
+                         default:
+                              break;
+                         case DIRECTION_LEFT:
+                         case DIRECTION_RIGHT:
+                              if(new_collided_block->accel.x == 0.0f && block_on_ice(new_collided_block, tilemap, interactive_quad_tree)){
+                                   block_push(new_collided_block, rel_dir, tilemap, interactive_quad_tree,
+                                              block_quad_tree, false);
+                                   // TODO: do i need this?
+                                   // collided_block->pos += collided_block_delta;
+                                   collided_block->accel.x = 0.0f;
+                                   collided_block->vel.x = 0.0f;
+                              }else if(collided_block->accel.x == 0.0f && block_on_ice(collided_block, tilemap, interactive_quad_tree)){
+                                   block_push(collided_block, collided_block_dir, tilemap, interactive_quad_tree,
+                                              block_quad_tree, false);
+                                   // new_collided_block->pos += collided_block_delta;
+                                   new_collided_block->accel.x = 0.0f;
+                                   new_collided_block->vel.x = 0.0f;
+                              }else{
+                                   collided_block->accel.x = 0.0f;
+                                   collided_block->vel.x = 0.0f;
+                                   new_collided_block->accel.x = 0.0f;
+                                   new_collided_block->vel.x = 0.0f;
+                              }
+                              break;
+                         case DIRECTION_UP:
+                         case DIRECTION_DOWN:
+                              break;
                          }
 
+#if 0
                          switch(collided_block_dir){
                          default:
                               break;
@@ -2196,6 +2240,7 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
                               new_collided_block->vel.y = 0.0f;
                               break;
                          }
+#endif
                     }
                }
 
@@ -3524,9 +3569,11 @@ int main(int argc, char** argv){
 
                Block_t* inside_block = nullptr;
                Position_t collided_with = {};
+               U8 portal_rotations = 0;
 
                while((inside_block = block_inside_another_block(block_array.elements + i, block_quad_tree,
-                                                                interactive_quad_tree, &tilemap, &collided_with)) &&
+                                                                interactive_quad_tree, &tilemap, &collided_with,
+                                                                &portal_rotations)) &&
                      blocks_at_collidable_height(block, inside_block)){
                     auto block_center_pixel = block->pos.pixel + Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS};
                     auto quadrant = relative_quadrant(block_center_pixel, collided_with.pixel + Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS});
@@ -3565,7 +3612,8 @@ int main(int argc, char** argv){
                     }
 
                     if(block_on_ice(inside_block, &tilemap, interactive_quad_tree) && block_on_ice(block, &tilemap, interactive_quad_tree)){
-                         block_push(inside_block, quadrant, &tilemap, interactive_quad_tree, block_quad_tree, false);
+                         block_push(inside_block, direction_rotate_clockwise(quadrant, portal_rotations), &tilemap,
+                                    interactive_quad_tree, block_quad_tree, false);
                     }
                }
 
@@ -3768,7 +3816,7 @@ int main(int argc, char** argv){
                bool collide_with_interactive = false;
                Vec_t player_delta_pos = move_player_position_through_world(player.pos, pos_delta, player.face, skip_coord,
                                                                            &player, &tilemap, interactive_quad_tree,
-                                                                           &block_array, &block_to_push,
+                                                                           &block_array, block_quad_tree, &block_to_push,
                                                                            &last_block_pushed_direction,
                                                                            &collide_with_interactive);
 
