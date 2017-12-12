@@ -2170,12 +2170,14 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
                if(collided_block){
                     if(rel_dir != DIRECTION_COUNT &&
                        rel_dir == direction_opposite(collided_block_dir)){
+
                          Block_t* new_collided_block = block_array->elements + i;
                          if(collided_block->accel.x != 0.0f || collided_block->accel.y != 0.0f){
                               collided_block->pos -= collided_block_delta;
                          }else{
                               new_collided_block->pos -= collided_block_delta;
                          }
+
                          switch(collided_block_dir){
                          default:
                               break;
@@ -2201,12 +2203,10 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
                collided_block_dir = rel_dir;
                collided_block_delta = pos_delta - pos_delta_save;
                auto rotated_player_face = direction_rotate_clockwise(player_face, portal_rotations);
-               if(collided_block_dir == rotated_player_face &&
-                  (player->accel.x != 0.0f || player->accel.y != 0.0f)){ // also check that the player is actually pushing against the block
-                    if(*block_to_push == nullptr){
-                         *block_to_push = block_array->elements + i;
-                         *last_block_pushed_direction = player_face;
-                    }
+               if(collided_block_dir == rotated_player_face && (player->accel.x != 0.0f || player->accel.y != 0.0f) &&
+                  *block_to_push == nullptr){ // also check that the player is actually pushing against the block
+                    *block_to_push = block_array->elements + i;
+                    *last_block_pushed_direction = player_face;
                }
           }
      }
@@ -3790,6 +3790,8 @@ int main(int argc, char** argv){
                if(rotations_between < 0){
                     rotations_between = teleport_position_across_portal(&player.pos, &player_delta_pos, interactive_quad_tree, &tilemap, player_previous_coord,
                                                                         player_coord);
+               }else{
+                    teleport_position_across_portal(&player.pos, &player_delta_pos, interactive_quad_tree, &tilemap, player_previous_coord, player_coord);
                }
 
                if(rotations_between >= 0){
