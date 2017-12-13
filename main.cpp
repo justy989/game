@@ -935,15 +935,12 @@ Interactive_t* block_against_solid_interactive(Block_t* block_to_check, Directio
 }
 
 void block_push(Block_t* block, Direction_t direction, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree,
-                QuadTreeNode_t<Block_t>* block_quad_tree, bool pushed_by_player){
-     Direction_t against_block_push_dir = DIRECTION_COUNT;
-     Block_t* against_block = block_against_another_block(block, direction, block_quad_tree, interactive_quad_tree, tilemap,
-                                                          &against_block_push_dir);
-     if(against_block){
-          if(!pushed_by_player && block_on_ice(against_block, tilemap, interactive_quad_tree)){
-               block_push(against_block, against_block_push_dir, tilemap, interactive_quad_tree, block_quad_tree, false);
-          }
-
+                QuadTreeNode_t<Block_t>* block_quad_tree, bool pushed_by_ice){
+     Direction_t collided_block_push_dir = DIRECTION_COUNT;
+     Block_t* collided_block = block_against_another_block(block, direction, block_quad_tree, interactive_quad_tree, tilemap,
+                                                           &collided_block_push_dir);
+     if(pushed_by_ice && collided_block && block_on_ice(collided_block, tilemap, interactive_quad_tree)){
+          block_push(collided_block, collided_block_push_dir, tilemap, interactive_quad_tree, block_quad_tree, pushed_by_ice);
           return;
      }
 
@@ -2118,7 +2115,6 @@ void position_move_against_block(Position_t pos, Position_t block_pos, Vec_t* po
 Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, Direction_t player_face, Coord_t* skip_coord,
                                          Player_t* player, TileMap_t* tilemap,
                                          QuadTreeNode_t<Interactive_t>* interactive_quad_tree, ObjectArray_t<Block_t>* block_array,
-                                         QuadTreeNode_t<Block_t>* block_quad_tree,
                                          Block_t** block_to_push, Direction_t* last_block_pushed_direction,
                                          bool* collided_with_interactive){
      // figure out tiles that are close by
@@ -2133,10 +2129,10 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
      max = coord_clamp_zero_to_dim(max, tilemap->width - 1, tilemap->height - 1);
 
      // TODO: convert to use quad tree
-     Direction_t collided_block_dir = DIRECTION_COUNT;
-     Block_t* collided_block = nullptr;
      Vec_t pos_delta_save = pos_delta;
      Vec_t collided_block_delta {};
+     Direction_t collided_block_dir = DIRECTION_COUNT;
+     Block_t* collided_block = nullptr;
      for(S16 i = 0; i < block_array->count; i++){
           bool collide_with_block = false;
           Position_t block_pos = block_array->elements[i].pos;
@@ -2181,72 +2177,43 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
           }
 
           if(collide_with_block){
-               Direction_t rel_dir = relative_quadrant(position.pixel, block_pos.pixel +
-                                                       Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS});
-               if(collided_block){
-                    if(rel_dir != DIRECTION_COUNT &&
-                       rel_dir == direction_opposite(collided_block_dir)){
-
-                         Block_t* new_collided_block = block_array->elements + i;
-
-                         // if both blocks are moving toward each other
-                         // if one block is moving and the other block is still
-                         switch(collided_block_dir){
-                         default:
-                              break;
-                         case DIRECTION_LEFT:
-                         case DIRECTION_RIGHT:
-                              if(new_collided_block->accel.x == 0.0f && block_on_ice(new_collided_block, tilemap, interactive_quad_tree)){
-                                   block_push(new_collided_block, rel_dir, tilemap, interactive_quad_tree,
-                                              block_quad_tree, false);
-                                   // TODO: do i need this?
-                                   // collided_block->pos += collided_block_delta;
-                                   collided_block->accel.x = 0.0f;
-                                   collided_block->vel.x = 0.0f;
-                              }else if(collided_block->accel.x == 0.0f && block_on_ice(collided_block, tilemap, interactive_quad_tree)){
-                                   block_push(collided_block, collided_block_dir, tilemap, interactive_quad_tree,
-                                              block_quad_tree, false);
-                                   // new_collided_block->pos += collided_block_delta;
-                                   new_collided_block->accel.x = 0.0f;
-                                   new_collided_block->vel.x = 0.0f;
-                              }else{
-                                   collided_block->accel.x = 0.0f;
-                                   collided_block->vel.x = 0.0f;
-                                   new_collided_block->accel.x = 0.0f;
-                                   new_collided_block->vel.x = 0.0f;
-                              }
-                              break;
-                         case DIRECTION_UP:
-                         case DIRECTION_DOWN:
-                              break;
-                         }
-
-#if 0
-                         switch(collided_block_dir){
-                         default:
-                              break;
-                         case DIRECTION_LEFT:
-                         case DIRECTION_RIGHT:
-                              collided_block->accel.x = 0.0f;
-                              collided_block->vel.x = 0.0f;
-                              new_collided_block->accel.x = 0.0f;
-                              new_collided_block->vel.x = 0.0f;
-                              break;
-                         case DIRECTION_UP:
-                         case DIRECTION_DOWN:
-                              collided_block->accel.y = 0.0f;
-                              collided_block->vel.y = 0.0f;
-                              new_collided_block->accel.y = 0.0f;
-                              new_collided_block->vel.y = 0.0f;
-                              break;
-                         }
-#endif
+               collided_block = block_array->elements + i;
+               collided_block_delta = pos_delta - pos_delta_save;
+               collided_block_dir = relative_quadrant(position.pixel, block_pos.pixel +
+                                                      Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS});
+               switch(collided_block_dir){
+               default:
+                    break;
+               case DIRECTION_LEFT:
+                    if(collided_block->accel.x > 0.0f){
+                         collided_block->pos -= collided_block_delta;
+                         collided_block->accel.x = 0.0f;
+                         collided_block->vel.x = 0.0f;
                     }
+                    break;
+               case DIRECTION_RIGHT:
+                    if(collided_block->accel.x < 0.0f){
+                         collided_block->pos -= collided_block_delta;
+                         collided_block->accel.x = 0.0f;
+                         collided_block->vel.x = 0.0f;
+                    }
+                    break;
+               case DIRECTION_UP:
+                    if(collided_block->accel.y < 0.0f){
+                         collided_block->pos -= collided_block_delta;
+                         collided_block->accel.y = 0.0f;
+                         collided_block->vel.y = 0.0f;
+                    }
+                    break;
+               case DIRECTION_DOWN:
+                    if(collided_block->accel.y > 0.0f){
+                         collided_block->pos -= collided_block_delta;
+                         collided_block->accel.y = 0.0f;
+                         collided_block->vel.y = 0.0f;
+                    }
+                    break;
                }
 
-               collided_block = block_array->elements + i;
-               collided_block_dir = rel_dir;
-               collided_block_delta = pos_delta - pos_delta_save;
                auto rotated_player_face = direction_rotate_clockwise(player_face, portal_rotations);
                if(collided_block_dir == rotated_player_face && (player->accel.x != 0.0f || player->accel.y != 0.0f) &&
                   *block_to_push == nullptr){ // also check that the player is actually pushing against the block
@@ -2295,7 +2262,9 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
      if(collided_block_dir != DIRECTION_COUNT &&
         (collided_block_dir == direction_opposite(collided_interactive_dir) ||
          collided_block_dir == direction_opposite(collided_tile_dir))){
+
           collided_block->pos -= collided_block_delta;
+
           switch(collided_block_dir){
           default:
                break;
@@ -3613,7 +3582,7 @@ int main(int argc, char** argv){
 
                     if(block_on_ice(inside_block, &tilemap, interactive_quad_tree) && block_on_ice(block, &tilemap, interactive_quad_tree)){
                          block_push(inside_block, direction_rotate_clockwise(quadrant, portal_rotations), &tilemap,
-                                    interactive_quad_tree, block_quad_tree, false);
+                                    interactive_quad_tree, block_quad_tree, true);
                     }
                }
 
@@ -3816,7 +3785,7 @@ int main(int argc, char** argv){
                bool collide_with_interactive = false;
                Vec_t player_delta_pos = move_player_position_through_world(player.pos, pos_delta, player.face, skip_coord,
                                                                            &player, &tilemap, interactive_quad_tree,
-                                                                           &block_array, block_quad_tree, &block_to_push,
+                                                                           &block_array, &block_to_push,
                                                                            &last_block_pushed_direction,
                                                                            &collide_with_interactive);
 
@@ -3828,7 +3797,7 @@ int main(int argc, char** argv){
                     player.push_time += dt;
                     if(player.push_time > BLOCK_PUSH_TIME){
                          if(before_time <= BLOCK_PUSH_TIME) undo_commit(&undo, &player, &tilemap, &block_array, &interactive_array);
-                         block_push(block_to_push, last_block_pushed_direction, &tilemap, interactive_quad_tree, block_quad_tree, true);
+                         block_push(block_to_push, last_block_pushed_direction, &tilemap, interactive_quad_tree, block_quad_tree, false);
                          if(block_to_push->pos.z > 0) player.push_time = -0.5f;
                     }
                }else{
