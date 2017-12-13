@@ -34,4 +34,6 @@ void coord_move_y(Coord_t* c, S16 dy);
 
 bool coord_after(Coord_t a, Coord_t b);
 
+float coord_distance_between(Coord_t a, Coord_t b);
+
 #endif

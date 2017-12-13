@@ -91,6 +91,14 @@ DirectionMask_t direction_mask_rotate_clockwise(DirectionMask_t mask){
      return (DirectionMask_t)(rot);
 }
 
+DirectionMask_t direction_mask_rotate_clockwise(DirectionMask_t mask, U8 rotations){
+     for(U8 i = 0; i < rotations; i++){
+          mask = direction_mask_rotate_clockwise(mask);
+     }
+
+     return mask;
+}
+
 DirectionMask_t direction_mask_flip_horizontal(DirectionMask_t mask){
      S8 flip = DIRECTION_MASK_NONE;
 

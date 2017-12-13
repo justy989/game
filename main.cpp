@@ -74,6 +74,13 @@ Pixel_t pixel_rotate_quadrants(Pixel_t pixel, S8 rotations_between){
      return pixel;
 }
 
+Position_t position_rotate_quadrants(Position_t pos, S8 rotations_between){
+     pos.decimal = vec_rotate_quadrants(pos.decimal, rotations_between);
+     pos.pixel = pixel_rotate_quadrants(pos.pixel, rotations_between);
+     canonicalize(&pos);
+     return pos;
+}
+
 Vec_t rotate_vec_between_dirs(Direction_t a, Direction_t b, Vec_t vec){
      U8 rotations_between = portal_rotations_between(a, b);
      return vec_rotate_quadrants(vec, rotations_between);
@@ -1891,6 +1898,9 @@ void interactive_draw(Interactive_t* interactive, Vec_t pos_vec){
           break;
      case INTERACTIVE_TYPE_PORTAL:
           draw_theme_frame(theme_frame(interactive->portal.face, 26 + interactive->portal.on), pos_vec);
+          if(!interactive->portal.on){
+
+          }
           break;
      }
 
@@ -2284,9 +2294,22 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
      return pos_delta;
 }
 
-void draw_flats(Vec_t pos, Tile_t* tile, Interactive_t* interactive, GLuint theme_texture){
+void draw_flats(Vec_t pos, Tile_t* tile, Interactive_t* interactive, GLuint theme_texture,
+                U8 portal_rotations){
      tile_id_draw(tile->id, pos);
-     tile_flags_draw(tile->flags, pos);
+     U16 tile_flags = tile->flags;
+     for(U8 i = 0; i < portal_rotations; i++){
+          U16 new_flags = tile_flags & ~(TILE_FLAG_WIRE_LEFT | TILE_FLAG_WIRE_UP | TILE_FLAG_WIRE_RIGHT | TILE_FLAG_WIRE_DOWN);
+
+          if(tile_flags & TILE_FLAG_WIRE_LEFT) new_flags |= TILE_FLAG_WIRE_UP;
+          if(tile_flags & TILE_FLAG_WIRE_UP) new_flags |= TILE_FLAG_WIRE_RIGHT;
+          if(tile_flags & TILE_FLAG_WIRE_RIGHT) new_flags |= TILE_FLAG_WIRE_DOWN;
+          if(tile_flags & TILE_FLAG_WIRE_DOWN) new_flags |= TILE_FLAG_WIRE_LEFT;
+
+          tile_flags = new_flags;
+     }
+
+     tile_flags_draw(tile_flags, pos);
 
      // draw flat interactives that could be covered by ice
      if(interactive){
@@ -2349,6 +2372,97 @@ void draw_flats(Vec_t pos, Tile_t* tile, Interactive_t* interactive, GLuint them
           glEnd();
 
           // reset state back to default
+          glBindTexture(GL_TEXTURE_2D, theme_texture);
+          glBegin(GL_QUADS);
+          glColor3f(1.0f, 1.0f, 1.0f);
+     }
+}
+
+void draw_solids(Vec_t pos, Interactive_t* interactive, Block_t** blocks, S16 block_count, Player_t* player,
+                 Position_t screen_camera, GLuint theme_texture, GLuint player_texture,
+                 Coord_t source_coord, Coord_t destination_coord, U8 portal_rotations){
+     if(interactive){
+          if(interactive->type == INTERACTIVE_TYPE_PRESSURE_PLATE ||
+             interactive->type == INTERACTIVE_TYPE_ICE_DETECTOR ||
+             interactive->type == INTERACTIVE_TYPE_LIGHT_DETECTOR ||
+             (interactive->type == INTERACTIVE_TYPE_POPUP && interactive->popup.lift.ticks == 1)){
+               // pass, these are flat
+          }else{
+               interactive_draw(interactive, pos);
+
+               if(interactive->type == INTERACTIVE_TYPE_POPUP && interactive->popup.iced){
+                    pos.y += interactive->popup.lift.ticks * PIXEL_SIZE;
+                    Vec_t tex_vec = theme_frame(3, 12);
+                    glColor4f(1.0f, 1.0f, 1.0f, 0.5f);
+                    glTexCoord2f(tex_vec.x, tex_vec.y);
+                    glVertex2f(pos.x, pos.y);
+                    glTexCoord2f(tex_vec.x, tex_vec.y + THEME_FRAME_HEIGHT);
+                    glVertex2f(pos.x, pos.y + TILE_SIZE);
+                    glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y + THEME_FRAME_HEIGHT);
+                    glVertex2f(pos.x + TILE_SIZE, pos.y + TILE_SIZE);
+                    glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y);
+                    glVertex2f(pos.x + TILE_SIZE, pos.y);
+                    glColor3f(1.0f, 1.0f, 1.0f);
+               }
+          }
+     }
+
+     for(S16 i = 0; i < block_count; i++){
+          Block_t* block = blocks[i];
+          Position_t block_camera_offset = block->pos;
+          block_camera_offset.pixel += Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS};
+          if(destination_coord.x >= 0){
+               Position_t destination_pos = coord_to_pos_at_tile_center(destination_coord);
+               Position_t source_pos = coord_to_pos_at_tile_center(source_coord);
+               Position_t center_delta = block_camera_offset - source_pos;
+               center_delta = position_rotate_quadrants(center_delta, portal_rotations);
+               block_camera_offset = destination_pos + center_delta;
+          }
+
+          block_camera_offset.pixel -= Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS};
+          block_camera_offset -= screen_camera;
+          block_camera_offset.pixel.y += block->pos.z;
+          block_draw(block, pos_to_vec(block_camera_offset));
+     }
+
+     if(player){
+          Vec_t pos_vec = pos_to_vec(player->pos);
+          if(destination_coord.x >= 0){
+               Position_t destination_pos = coord_to_pos_at_tile_center(destination_coord);
+               Position_t source_pos = coord_to_pos_at_tile_center(source_coord);
+               Position_t center_delta = player->pos - source_pos;
+               center_delta = position_rotate_quadrants(center_delta, portal_rotations);
+               pos_vec = pos_to_vec(destination_pos + center_delta);
+          }
+
+          S8 player_frame_y = direction_rotate_clockwise(player->face, portal_rotations);
+          if(player->push_time > FLT_EPSILON) player_frame_y += 4;
+          if(player->has_bow){
+               player_frame_y += 8;
+               if(player->bow_draw_time > (PLAYER_BOW_DRAW_DELAY / 2.0f)){
+                    player_frame_y += 8;
+                    if(player->bow_draw_time >= PLAYER_BOW_DRAW_DELAY){
+                         player_frame_y += 4;
+                    }
+               }
+          }
+          Vec_t tex_vec = player_frame(player->walk_frame, player_frame_y);
+          pos_vec.y += (5.0f * PIXEL_SIZE);
+
+          glEnd();
+          glBindTexture(GL_TEXTURE_2D, player_texture);
+          glBegin(GL_QUADS);
+          glColor3f(1.0f, 1.0f, 1.0f);
+          glTexCoord2f(tex_vec.x, tex_vec.y);
+          glVertex2f(pos_vec.x - HALF_TILE_SIZE, pos_vec.y - HALF_TILE_SIZE);
+          glTexCoord2f(tex_vec.x, tex_vec.y + PLAYER_FRAME_HEIGHT);
+          glVertex2f(pos_vec.x - HALF_TILE_SIZE, pos_vec.y + HALF_TILE_SIZE);
+          glTexCoord2f(tex_vec.x + PLAYER_FRAME_WIDTH, tex_vec.y + PLAYER_FRAME_HEIGHT);
+          glVertex2f(pos_vec.x + HALF_TILE_SIZE, pos_vec.y + HALF_TILE_SIZE);
+          glTexCoord2f(tex_vec.x + PLAYER_FRAME_WIDTH, tex_vec.y);
+          glVertex2f(pos_vec.x + HALF_TILE_SIZE, pos_vec.y - HALF_TILE_SIZE);
+          glEnd();
+
           glBindTexture(GL_TEXTURE_2D, theme_texture);
           glBegin(GL_QUADS);
           glColor3f(1.0f, 1.0f, 1.0f);
@@ -3942,18 +4056,8 @@ int main(int argc, char** argv){
           glBindTexture(GL_TEXTURE_2D, theme_texture);
           glBegin(GL_QUADS);
           glColor3f(1.0f, 1.0f, 1.0f);
-          for(S16 y = max.y; y >= min.y; y--){
-               for(S16 x = min.x; x <= max.x; x++){
-                    Vec_t tile_pos {(F32)(x - min.x) * TILE_SIZE + camera_offset.x,
-                                    (F32)(y - min.y) * TILE_SIZE + camera_offset.y};
 
-                    Tile_t* tile = tilemap.tiles[y] + x;
-                    Interactive_t* interactive = quad_tree_find_at(interactive_quad_tree, x, y);
-                    draw_flats(tile_pos, tile, interactive, theme_texture);
-               }
-          }
-
-          // portal pass at drawing flats
+          // portal pass
           for(S16 y = max.y; y >= min.y; y--){
                for(S16 x = min.x; x <= max.x; x++){
                     Interactive_t* interactive = quad_tree_find_at(interactive_quad_tree, x, y);
@@ -3962,13 +4066,31 @@ int main(int argc, char** argv){
                          PortalExit_t portal_exits = find_portal_exits(coord, &tilemap, interactive_quad_tree);
                          Coord_t adj_coord = coord + direction_opposite(interactive->portal.face);
                          Tile_t* tile = tilemap.tiles[adj_coord.y] + adj_coord.x;
-                         interactive = quad_tree_find_at(interactive_quad_tree, adj_coord.x, adj_coord.y);
+
+                         S16 px = adj_coord.x * TILE_SIZE_IN_PIXELS;
+                         S16 py = adj_coord.y * TILE_SIZE_IN_PIXELS;
+                         Rect_t coord_rect {(S16)(px - HALF_TILE_SIZE_IN_PIXELS), (S16)(py - HALF_TILE_SIZE_IN_PIXELS),
+                                            (S16)(px + TILE_SIZE_IN_PIXELS + HALF_TILE_SIZE_IN_PIXELS),
+                                            (S16)(py + TILE_SIZE_IN_PIXELS + HALF_TILE_SIZE_IN_PIXELS)};
+
+                         S16 block_count = 0;
+                         Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
+
+                         quad_tree_find_in(block_quad_tree, coord_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
+                         Interactive_t* adj_interactive = quad_tree_find_at(interactive_quad_tree, adj_coord.x, adj_coord.y);
+
                          for(S8 d = 0; d < DIRECTION_COUNT; d++){
                               for(S8 i = 0; i < portal_exits.directions[d].count; i++){
                                    if(portal_exits.directions[d].coords[i] == coord) continue;
                                    Vec_t portal_pos {(F32)(portal_exits.directions[d].coords[i].x - min.x) * TILE_SIZE + camera_offset.x,
                                                      (F32)(portal_exits.directions[d].coords[i].y - min.y) * TILE_SIZE + camera_offset.y};
-                                   draw_flats(portal_pos, tile, interactive, theme_texture);
+                                   U8 portal_rotations = portal_rotations_between(interactive->portal.face, (Direction_t)(d));
+                                   draw_flats(portal_pos, tile, adj_interactive, theme_texture, portal_rotations);
+                                   Player_t* player_ptr = nullptr;
+                                   if(coord_distance_between(pos_to_coord(player.pos), adj_coord) < 2.0f) player_ptr = &player;
+                                   draw_solids(portal_pos, adj_interactive, blocks, block_count, player_ptr, screen_camera,
+                                               theme_texture, player_texture, adj_coord, portal_exits.directions[d].coords[i],
+                                               portal_rotations);
                               }
                          }
                     }
@@ -3977,90 +4099,43 @@ int main(int argc, char** argv){
 
           for(S16 y = max.y; y >= min.y; y--){
                for(S16 x = min.x; x <= max.x; x++){
-                    Coord_t coord {x, y};
+                    Vec_t tile_pos {(F32)(x - min.x) * TILE_SIZE + camera_offset.x,
+                                    (F32)(y - min.y) * TILE_SIZE + camera_offset.y};
 
-                    // draw interactive
-                    Interactive_t* interactive = quad_tree_find_at(interactive_quad_tree, coord.x, coord.y);
-                    if(interactive){
-                         if(interactive->type == INTERACTIVE_TYPE_PRESSURE_PLATE ||
-                            interactive->type == INTERACTIVE_TYPE_ICE_DETECTOR ||
-                            interactive->type == INTERACTIVE_TYPE_LIGHT_DETECTOR ||
-                            (interactive->type == INTERACTIVE_TYPE_POPUP && interactive->popup.lift.ticks == 1)){
-                              // pass, these are flat
-                         }else{
-                              interactive_draw(interactive, pos_to_vec(coord_to_pos(interactive->coord) - screen_camera));
-
-                              if(interactive->type == INTERACTIVE_TYPE_POPUP && interactive->popup.iced){
-                                   Vec_t tile_pos {(F32)(x - min.x) * TILE_SIZE + camera_offset.x,
-                                                   (F32)(y - min.y) * TILE_SIZE + camera_offset.y};
-                                   tile_pos.y += interactive->popup.lift.ticks * PIXEL_SIZE;
-                                   Vec_t tex_vec = theme_frame(3, 12);
-                                   glColor4f(1.0f, 1.0f, 1.0f, 0.5f);
-                                   glTexCoord2f(tex_vec.x, tex_vec.y);
-                                   glVertex2f(tile_pos.x, tile_pos.y);
-                                   glTexCoord2f(tex_vec.x, tex_vec.y + THEME_FRAME_HEIGHT);
-                                   glVertex2f(tile_pos.x, tile_pos.y + TILE_SIZE);
-                                   glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y + THEME_FRAME_HEIGHT);
-                                   glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y + TILE_SIZE);
-                                   glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y);
-                                   glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y);
-                                   glColor3f(1.0f, 1.0f, 1.0f);
-                              }
-                         }
+                    Tile_t* tile = tilemap.tiles[y] + x;
+                    Interactive_t* interactive = quad_tree_find_at(interactive_quad_tree, x, y);
+                    if(interactive && interactive->type == INTERACTIVE_TYPE_PORTAL && interactive->portal.on){
+                         interactive_draw(interactive, tile_pos);
+                         continue;
                     }
+                    draw_flats(tile_pos, tile, interactive, theme_texture, 0);
+               }
+          }
 
-                    // draw block
+          for(S16 y = max.y; y >= min.y; y--){
+               for(S16 x = min.x; x <= max.x; x++){
+                    Coord_t coord {x, y};
+                    Interactive_t* interactive = quad_tree_find_at(interactive_quad_tree, coord.x, coord.y);
+                    if(interactive && interactive->type == INTERACTIVE_TYPE_PORTAL && interactive->portal.on) continue;
+
+                    Vec_t tile_pos {(F32)(x - min.x) * TILE_SIZE + camera_offset.x,
+                                    (F32)(y - min.y) * TILE_SIZE + camera_offset.y};
+
                     S16 px = coord.x * TILE_SIZE_IN_PIXELS;
                     S16 py = coord.y * TILE_SIZE_IN_PIXELS;
-                    Rect_t coord_rect {(S16)(px - 1), (S16)(py - 1), (S16)(px * TILE_SIZE_IN_PIXELS + 1), (S16)(py * TILE_SIZE_IN_PIXELS + 1)};
+                    Rect_t coord_rect {(S16)(px - HALF_TILE_SIZE_IN_PIXELS), (S16)(py - HALF_TILE_SIZE_IN_PIXELS),
+                                       (S16)(px + TILE_SIZE_IN_PIXELS + HALF_TILE_SIZE_IN_PIXELS),
+                                       (S16)(py + TILE_SIZE_IN_PIXELS + HALF_TILE_SIZE_IN_PIXELS)};
 
                     S16 block_count = 0;
                     Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
                     quad_tree_find_in(block_quad_tree, coord_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
 
-                    for(S16 i = 0; i < block_count; i++){
-                         Block_t* block = blocks[i];
-                         if(block_get_coord(block) == coord){
-                              Position_t block_camera_offset = block->pos - screen_camera;
-                              block_camera_offset.pixel.y += block->pos.z;
-                              block_draw(block, pos_to_vec(block_camera_offset));
-                         }
-                    }
+                    Player_t* player_ptr = nullptr;
+                    if(pos_to_coord(player.pos) == coord) player_ptr = &player;
 
-                    // player
-                    if(pos_to_coord(player.pos) == coord){
-                         S8 player_frame_y = player.face;
-                         if(player.push_time > FLT_EPSILON) player_frame_y += 4;
-                         if(player.has_bow){
-                              player_frame_y += 8;
-                              if(player.bow_draw_time > (PLAYER_BOW_DRAW_DELAY / 2.0f)){
-                                   player_frame_y += 8;
-                                   if(player.bow_draw_time >= PLAYER_BOW_DRAW_DELAY){
-                                        player_frame_y += 4;
-                                   }
-                              }
-                         }
-                         Vec_t tex_vec = player_frame(player.walk_frame, player_frame_y);
-                         pos_vec.y += (5.0f * PIXEL_SIZE);
-
-                         glEnd();
-                         glBindTexture(GL_TEXTURE_2D, player_texture);
-                         glBegin(GL_QUADS);
-                         glColor3f(1.0f, 1.0f, 1.0f);
-                         glTexCoord2f(tex_vec.x, tex_vec.y);
-                         glVertex2f(pos_vec.x - HALF_TILE_SIZE, pos_vec.y - HALF_TILE_SIZE);
-                         glTexCoord2f(tex_vec.x, tex_vec.y + PLAYER_FRAME_HEIGHT);
-                         glVertex2f(pos_vec.x - HALF_TILE_SIZE, pos_vec.y + HALF_TILE_SIZE);
-                         glTexCoord2f(tex_vec.x + PLAYER_FRAME_WIDTH, tex_vec.y + PLAYER_FRAME_HEIGHT);
-                         glVertex2f(pos_vec.x + HALF_TILE_SIZE, pos_vec.y + HALF_TILE_SIZE);
-                         glTexCoord2f(tex_vec.x + PLAYER_FRAME_WIDTH, tex_vec.y);
-                         glVertex2f(pos_vec.x + HALF_TILE_SIZE, pos_vec.y - HALF_TILE_SIZE);
-                         glEnd();
-
-                         glBindTexture(GL_TEXTURE_2D, theme_texture);
-                         glBegin(GL_QUADS);
-                         glColor3f(1.0f, 1.0f, 1.0f);
-                    }
+                    draw_solids(tile_pos, interactive, blocks, block_count, player_ptr, screen_camera, theme_texture, player_texture,
+                                Coord_t{-1, -1}, Coord_t{-1, -1}, 0);
 
                     // draw arrows
                     static Vec_t arrow_tip_offset[DIRECTION_COUNT] = {
@@ -4073,6 +4148,8 @@ int main(int argc, char** argv){
                     for(S16 a = 0; a < ARROW_ARRAY_MAX; a++){
                          Arrow_t* arrow = arrow_array.arrows + a;
                          if(!arrow->alive) continue;
+                         if((arrow->pos.pixel.y / TILE_SIZE_IN_PIXELS) != y) continue;
+
                          Vec_t arrow_vec = pos_to_vec(arrow->pos - screen_camera);
                          arrow_vec.x -= arrow_tip_offset[arrow->face].x;
                          arrow_vec.y -= arrow_tip_offset[arrow->face].y;
