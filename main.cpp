@@ -2284,6 +2284,77 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
      return pos_delta;
 }
 
+void draw_flats(Vec_t pos, Tile_t* tile, Interactive_t* interactive, GLuint theme_texture){
+     tile_id_draw(tile->id, pos);
+     tile_flags_draw(tile->flags, pos);
+
+     // draw flat interactives that could be covered by ice
+     if(interactive){
+          if(interactive->type == INTERACTIVE_TYPE_PRESSURE_PLATE){
+               if(!tile_is_iced(tile) && interactive->pressure_plate.iced_under){
+                    // TODO: compress with above ice drawing code
+                    glEnd();
+
+                    // get state ready for ice
+                    glBindTexture(GL_TEXTURE_2D, 0);
+                    glColor4f(196.0f / 255.0f, 217.0f / 255.0f, 1.0f, 0.45f);
+                    glBegin(GL_QUADS);
+                    glVertex2f(pos.x, pos.y);
+                    glVertex2f(pos.x, pos.y + TILE_SIZE);
+                    glVertex2f(pos.x + TILE_SIZE, pos.y + TILE_SIZE);
+                    glVertex2f(pos.x + TILE_SIZE, pos.y);
+                    glEnd();
+
+                    // reset state back to default
+                    glBindTexture(GL_TEXTURE_2D, theme_texture);
+                    glBegin(GL_QUADS);
+                    glColor3f(1.0f, 1.0f, 1.0f);
+               }
+
+               interactive_draw(interactive, pos);
+          }else if(interactive->type == INTERACTIVE_TYPE_POPUP && interactive->popup.lift.ticks == 1){
+               if(interactive->popup.iced){
+                    pos.y += interactive->popup.lift.ticks * PIXEL_SIZE;
+                    Vec_t tex_vec = theme_frame(3, 12);
+                    glColor4f(1.0f, 1.0f, 1.0f, 0.5f);
+                    glTexCoord2f(tex_vec.x, tex_vec.y);
+                    glVertex2f(pos.x, pos.y);
+                    glTexCoord2f(tex_vec.x, tex_vec.y + THEME_FRAME_HEIGHT);
+                    glVertex2f(pos.x, pos.y + TILE_SIZE);
+                    glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y + THEME_FRAME_HEIGHT);
+                    glVertex2f(pos.x + TILE_SIZE, pos.y + TILE_SIZE);
+                    glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y);
+                    glVertex2f(pos.x + TILE_SIZE, pos.y);
+                    glColor3f(1.0f, 1.0f, 1.0f);
+               }
+
+               interactive_draw(interactive, pos);
+          }else if(interactive->type == INTERACTIVE_TYPE_LIGHT_DETECTOR ||
+                   interactive->type == INTERACTIVE_TYPE_ICE_DETECTOR){
+               interactive_draw(interactive, pos);
+          }
+     }
+
+     if(tile_is_iced(tile)){
+          glEnd();
+
+          // get state ready for ice
+          glBindTexture(GL_TEXTURE_2D, 0);
+          glColor4f(196.0f / 255.0f, 217.0f / 255.0f, 1.0f, 0.45f);
+          glBegin(GL_QUADS);
+          glVertex2f(pos.x, pos.y);
+          glVertex2f(pos.x, pos.y + TILE_SIZE);
+          glVertex2f(pos.x + TILE_SIZE, pos.y + TILE_SIZE);
+          glVertex2f(pos.x + TILE_SIZE, pos.y);
+          glEnd();
+
+          // reset state back to default
+          glBindTexture(GL_TEXTURE_2D, theme_texture);
+          glBegin(GL_QUADS);
+          glColor3f(1.0f, 1.0f, 1.0f);
+     }
+}
+
 using namespace std::chrono;
 
 int main(int argc, char** argv){
@@ -3860,7 +3931,6 @@ int main(int argc, char** argv){
 
           Position_t screen_camera = camera - Vec_t{0.5f, 0.5f} + Vec_t{HALF_TILE_SIZE, HALF_TILE_SIZE};
 
-          // tilemap
           Coord_t min = pos_to_coord(screen_camera);
           Coord_t max = min + Coord_t{ROOM_TILE_SIZE, ROOM_TILE_SIZE};
           min = coord_clamp_zero_to_dim(min, tilemap.width - 1, tilemap.height - 1);
@@ -3868,85 +3938,39 @@ int main(int argc, char** argv){
           Position_t tile_bottom_left = coord_to_pos(min);
           Vec_t camera_offset = pos_to_vec(tile_bottom_left - screen_camera);
 
+          // draw flats
           glBindTexture(GL_TEXTURE_2D, theme_texture);
           glBegin(GL_QUADS);
           glColor3f(1.0f, 1.0f, 1.0f);
           for(S16 y = max.y; y >= min.y; y--){
                for(S16 x = min.x; x <= max.x; x++){
-                    // draw tile
-                    Tile_t* tile = tilemap.tiles[y] + x;
-
                     Vec_t tile_pos {(F32)(x - min.x) * TILE_SIZE + camera_offset.x,
                                     (F32)(y - min.y) * TILE_SIZE + camera_offset.y};
 
-                    tile_id_draw(tile->id, tile_pos);
-                    tile_flags_draw(tile->flags, tile_pos);
-
-                    // draw flat interactives that could be covered by ice
+                    Tile_t* tile = tilemap.tiles[y] + x;
                     Interactive_t* interactive = quad_tree_find_at(interactive_quad_tree, x, y);
-                    if(interactive){
-                         if(interactive->type == INTERACTIVE_TYPE_PRESSURE_PLATE){
-                              if(!tile_is_iced(tile) && interactive->pressure_plate.iced_under){
-                                   // TODO: compress with above ice drawing code
-                                   glEnd();
+                    draw_flats(tile_pos, tile, interactive, theme_texture);
+               }
+          }
 
-                                   // get state ready for ice
-                                   glBindTexture(GL_TEXTURE_2D, 0);
-                                   glColor4f(196.0f / 255.0f, 217.0f / 255.0f, 1.0f, 0.45f);
-                                   glBegin(GL_QUADS);
-                                   glVertex2f(tile_pos.x, tile_pos.y);
-                                   glVertex2f(tile_pos.x, tile_pos.y + TILE_SIZE);
-                                   glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y + TILE_SIZE);
-                                   glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y);
-                                   glEnd();
-
-                                   // reset state back to default
-                                   glBindTexture(GL_TEXTURE_2D, theme_texture);
-                                   glBegin(GL_QUADS);
-                                   glColor3f(1.0f, 1.0f, 1.0f);
+          // portal pass at drawing flats
+          for(S16 y = max.y; y >= min.y; y--){
+               for(S16 x = min.x; x <= max.x; x++){
+                    Interactive_t* interactive = quad_tree_find_at(interactive_quad_tree, x, y);
+                    if(interactive && interactive->type == INTERACTIVE_TYPE_PORTAL && interactive->portal.on){
+                         Coord_t coord {x, y};
+                         PortalExit_t portal_exits = find_portal_exits(coord, &tilemap, interactive_quad_tree);
+                         Coord_t adj_coord = coord + direction_opposite(interactive->portal.face);
+                         Tile_t* tile = tilemap.tiles[adj_coord.y] + adj_coord.x;
+                         interactive = quad_tree_find_at(interactive_quad_tree, adj_coord.x, adj_coord.y);
+                         for(S8 d = 0; d < DIRECTION_COUNT; d++){
+                              for(S8 i = 0; i < portal_exits.directions[d].count; i++){
+                                   if(portal_exits.directions[d].coords[i] == coord) continue;
+                                   Vec_t portal_pos {(F32)(portal_exits.directions[d].coords[i].x - min.x) * TILE_SIZE + camera_offset.x,
+                                                     (F32)(portal_exits.directions[d].coords[i].y - min.y) * TILE_SIZE + camera_offset.y};
+                                   draw_flats(portal_pos, tile, interactive, theme_texture);
                               }
-
-                              interactive_draw(interactive, pos_to_vec(coord_to_pos(interactive->coord) - screen_camera));
-                         }else if(interactive->type == INTERACTIVE_TYPE_POPUP && interactive->popup.lift.ticks == 1){
-                              if(interactive->popup.iced){
-                                   tile_pos.y += interactive->popup.lift.ticks * PIXEL_SIZE;
-                                   Vec_t tex_vec = theme_frame(3, 12);
-                                   glColor4f(1.0f, 1.0f, 1.0f, 0.5f);
-                                   glTexCoord2f(tex_vec.x, tex_vec.y);
-                                   glVertex2f(tile_pos.x, tile_pos.y);
-                                   glTexCoord2f(tex_vec.x, tex_vec.y + THEME_FRAME_HEIGHT);
-                                   glVertex2f(tile_pos.x, tile_pos.y + TILE_SIZE);
-                                   glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y + THEME_FRAME_HEIGHT);
-                                   glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y + TILE_SIZE);
-                                   glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y);
-                                   glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y);
-                                   glColor3f(1.0f, 1.0f, 1.0f);
-                              }
-
-                              interactive_draw(interactive, pos_to_vec(coord_to_pos(interactive->coord) - screen_camera));
-                         }else if(interactive->type == INTERACTIVE_TYPE_LIGHT_DETECTOR ||
-                                  interactive->type == INTERACTIVE_TYPE_ICE_DETECTOR){
-                              interactive_draw(interactive, pos_to_vec(coord_to_pos(interactive->coord) - screen_camera));
                          }
-                    }
-
-                    if(tile_is_iced(tile)){
-                         glEnd();
-
-                         // get state ready for ice
-                         glBindTexture(GL_TEXTURE_2D, 0);
-                         glColor4f(196.0f / 255.0f, 217.0f / 255.0f, 1.0f, 0.45f);
-                         glBegin(GL_QUADS);
-                         glVertex2f(tile_pos.x, tile_pos.y);
-                         glVertex2f(tile_pos.x, tile_pos.y + TILE_SIZE);
-                         glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y + TILE_SIZE);
-                         glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y);
-                         glEnd();
-
-                         // reset state back to default
-                         glBindTexture(GL_TEXTURE_2D, theme_texture);
-                         glBegin(GL_QUADS);
-                         glColor3f(1.0f, 1.0f, 1.0f);
                     }
                }
           }
