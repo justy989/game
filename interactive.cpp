@@ -17,7 +17,8 @@ void lift_update(Lift_t* lift, float tick_delay, float dt, S8 min_tick, S8 max_t
 bool interactive_is_solid(const Interactive_t* interactive){
      return (interactive->type == INTERACTIVE_TYPE_LEVER ||
              (interactive->type == INTERACTIVE_TYPE_POPUP && interactive->popup.lift.ticks > 1) ||
-             (interactive->type == INTERACTIVE_TYPE_DOOR && interactive->door.lift.ticks < DOOR_MAX_HEIGHT));
+             (interactive->type == INTERACTIVE_TYPE_DOOR && interactive->door.lift.ticks < DOOR_MAX_HEIGHT) ||
+             (interactive->type == INTERACTIVE_TYPE_PORTAL && !interactive->portal.on));
 }
 
 S16 get_object_x(const Interactive_t* interactive){

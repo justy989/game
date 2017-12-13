@@ -778,6 +778,9 @@ void toggle_electricity(TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* inter
                                                          coord_move(coord, interactive->door.face, 3),
                                                          interactive->door.face, true);
                break;
+          case INTERACTIVE_TYPE_PORTAL:
+               interactive->portal.on = !interactive->portal.on;
+               break;
           }
      }
 
@@ -1897,10 +1900,35 @@ void interactive_draw(Interactive_t* interactive, Vec_t pos_vec){
           }
           break;
      case INTERACTIVE_TYPE_PORTAL:
-          draw_theme_frame(theme_frame(interactive->portal.face, 26 + interactive->portal.on), pos_vec);
           if(!interactive->portal.on){
+               S16 frame_x = 0;
+               S16 frame_y = 0;
 
+               switch(interactive->portal.face){
+               default:
+                    break;
+               case DIRECTION_LEFT:
+                    frame_x = 3;
+                    frame_y = 1;
+                    break;
+               case DIRECTION_UP:
+                    frame_x = 0;
+                    frame_y = 2;
+                    break;
+               case DIRECTION_RIGHT:
+                    frame_x = 2;
+                    frame_y = 2;
+                    break;
+               case DIRECTION_DOWN:
+                    frame_x = 1;
+                    frame_y = 1;
+                    break;
+               }
+
+               draw_theme_frame(theme_frame(frame_x, frame_y), pos_vec);
           }
+
+          draw_theme_frame(theme_frame(interactive->portal.face, 26 + interactive->portal.on), pos_vec);
           break;
      }
 
@@ -2297,6 +2325,7 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
 void draw_flats(Vec_t pos, Tile_t* tile, Interactive_t* interactive, GLuint theme_texture,
                 U8 portal_rotations){
      tile_id_draw(tile->id, pos);
+
      U16 tile_flags = tile->flags;
      for(U8 i = 0; i < portal_rotations; i++){
           U16 new_flags = tile_flags & ~(TILE_FLAG_WIRE_LEFT | TILE_FLAG_WIRE_UP | TILE_FLAG_WIRE_RIGHT | TILE_FLAG_WIRE_DOWN);
