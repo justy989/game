@@ -47,3 +47,13 @@ Rect_t block_get_rect(Block_t* b){
                           (S16)(b->pos.pixel.y + TILE_SIZE_IN_PIXELS)};
      return block_rect;
 }
+
+bool block_y_tile_aligned(Block_t* block){
+     return (block->pos.decimal.y == 0.0f &&
+             (block->pos.pixel.y % TILE_SIZE_IN_PIXELS) == 0);
+}
+
+bool block_x_tile_aligned(Block_t* block){
+     return (block->pos.decimal.x == 0.0f &&
+             (block->pos.pixel.x % TILE_SIZE_IN_PIXELS) == 0);
+}

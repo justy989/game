@@ -3596,33 +3596,69 @@ int main(int argc, char** argv){
                // check for adjacent walls
                if(block->vel.x > 0.0f){
                     Coord_t check = coord + DIRECTION_RIGHT;
-                    if(check != skip_coord[DIRECTION_RIGHT] && tilemap_is_solid(&tilemap, check)){
-                         stop_on_boundary_x = true;
+                    if(block_y_tile_aligned(block)){
+                         if(check != skip_coord[DIRECTION_RIGHT] && tilemap_is_solid(&tilemap, check)){
+                              stop_on_boundary_x = true;
+                         }else{
+                              stop_on_boundary_x = quad_tree_interactive_solid_at(interactive_quad_tree, check);
+                         }
                     }else{
-                         stop_on_boundary_x = quad_tree_interactive_solid_at(interactive_quad_tree, check);
+                         Pixel_t pixel_a;
+                         Pixel_t pixel_b;
+                         block_adjacent_pixels_to_check(block, DIRECTION_RIGHT, &pixel_a, &pixel_b);
+                         if(tilemap_is_solid(&tilemap, pixel_to_coord(pixel_a)) || tilemap_is_solid(&tilemap, pixel_to_coord(pixel_b))){
+                              stop_on_boundary_x = true;
+                         }
                     }
                }else if(block->vel.x < 0.0f){
                     Coord_t check = coord + DIRECTION_LEFT;
-                    if(check != skip_coord[DIRECTION_LEFT] && tilemap_is_solid(&tilemap, check)){
-                         stop_on_boundary_x = true;
+                    if(block_y_tile_aligned(block)){
+                         if(check != skip_coord[DIRECTION_LEFT] && tilemap_is_solid(&tilemap, check)){
+                              stop_on_boundary_x = true;
+                         }else{
+                              stop_on_boundary_x = quad_tree_interactive_solid_at(interactive_quad_tree, check);
+                         }
                     }else{
-                         stop_on_boundary_x = quad_tree_interactive_solid_at(interactive_quad_tree, check);
+                         Pixel_t pixel_a;
+                         Pixel_t pixel_b;
+                         block_adjacent_pixels_to_check(block, DIRECTION_LEFT, &pixel_a, &pixel_b);
+                         if(tilemap_is_solid(&tilemap, pixel_to_coord(pixel_a)) || tilemap_is_solid(&tilemap, pixel_to_coord(pixel_b))){
+                              stop_on_boundary_x = true;
+                         }
                     }
                }
 
                if(block->vel.y > 0.0f){
                     Coord_t check = coord + DIRECTION_UP;
-                    if(check != skip_coord[DIRECTION_UP] && tilemap_is_solid(&tilemap, check)){
-                         stop_on_boundary_y = true;
+                    if(block_x_tile_aligned(block)){
+                         if(check != skip_coord[DIRECTION_UP] && tilemap_is_solid(&tilemap, check)){
+                              stop_on_boundary_y = true;
+                         }else{
+                              stop_on_boundary_y = quad_tree_interactive_solid_at(interactive_quad_tree, check);
+                         }
                     }else{
-                         stop_on_boundary_y = quad_tree_interactive_solid_at(interactive_quad_tree, check);
+                         Pixel_t pixel_a;
+                         Pixel_t pixel_b;
+                         block_adjacent_pixels_to_check(block, DIRECTION_UP, &pixel_a, &pixel_b);
+                         if(tilemap_is_solid(&tilemap, pixel_to_coord(pixel_a)) || tilemap_is_solid(&tilemap, pixel_to_coord(pixel_b))){
+                              stop_on_boundary_y = true;
+                         }
                     }
                }else if(block->vel.y < 0.0f){
                     Coord_t check = coord + DIRECTION_DOWN;
-                    if(check != skip_coord[DIRECTION_DOWN] && tilemap_is_solid(&tilemap, check)){
-                         stop_on_boundary_y = true;
+                    if(block_x_tile_aligned(block)){
+                         if(check != skip_coord[DIRECTION_DOWN] && tilemap_is_solid(&tilemap, check)){
+                              stop_on_boundary_y = true;
+                         }else{
+                              stop_on_boundary_y = quad_tree_interactive_solid_at(interactive_quad_tree, check);
+                         }
                     }else{
-                         stop_on_boundary_y = quad_tree_interactive_solid_at(interactive_quad_tree, check);
+                         Pixel_t pixel_a;
+                         Pixel_t pixel_b;
+                         block_adjacent_pixels_to_check(block, DIRECTION_DOWN, &pixel_a, &pixel_b);
+                         if(tilemap_is_solid(&tilemap, pixel_to_coord(pixel_a)) || tilemap_is_solid(&tilemap, pixel_to_coord(pixel_b))){
+                              stop_on_boundary_y = true;
+                         }
                     }
                }
 

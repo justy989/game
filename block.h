@@ -26,5 +26,7 @@ Position_t block_get_center(Block_t* block);
 Coord_t block_get_coord(Block_t* block);
 bool blocks_at_collidable_height(Block_t* a, Block_t* b);
 Rect_t block_get_rect(Block_t* block);
+bool block_x_tile_aligned(Block_t* block);
+bool block_y_tile_aligned(Block_t* block);
 
 #endif
