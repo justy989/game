@@ -4102,46 +4102,6 @@ int main(int argc, char** argv){
           glBegin(GL_QUADS);
           glColor3f(1.0f, 1.0f, 1.0f);
 
-          // portal pass
-          for(S16 y = max.y; y >= min.y; y--){
-               for(S16 x = min.x; x <= max.x; x++){
-                    Interactive_t* interactive = quad_tree_find_at(interactive_quad_tree, x, y);
-                    if(interactive && interactive->type == INTERACTIVE_TYPE_PORTAL && interactive->portal.on){
-                         Coord_t coord {x, y};
-                         PortalExit_t portal_exits = find_portal_exits(coord, &tilemap, interactive_quad_tree);
-                         Coord_t adj_coord = coord + direction_opposite(interactive->portal.face);
-                         Tile_t* tile = tilemap.tiles[adj_coord.y] + adj_coord.x;
-
-                         S16 px = adj_coord.x * TILE_SIZE_IN_PIXELS;
-                         S16 py = adj_coord.y * TILE_SIZE_IN_PIXELS;
-                         Rect_t coord_rect {(S16)(px - HALF_TILE_SIZE_IN_PIXELS), (S16)(py - HALF_TILE_SIZE_IN_PIXELS),
-                                            (S16)(px + TILE_SIZE_IN_PIXELS + HALF_TILE_SIZE_IN_PIXELS),
-                                            (S16)(py + TILE_SIZE_IN_PIXELS + HALF_TILE_SIZE_IN_PIXELS)};
-
-                         S16 block_count = 0;
-                         Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
-
-                         quad_tree_find_in(block_quad_tree, coord_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
-                         Interactive_t* adj_interactive = quad_tree_find_at(interactive_quad_tree, adj_coord.x, adj_coord.y);
-
-                         for(S8 d = 0; d < DIRECTION_COUNT; d++){
-                              for(S8 i = 0; i < portal_exits.directions[d].count; i++){
-                                   if(portal_exits.directions[d].coords[i] == coord) continue;
-                                   Vec_t portal_pos {(F32)(portal_exits.directions[d].coords[i].x - min.x) * TILE_SIZE + camera_offset.x,
-                                                     (F32)(portal_exits.directions[d].coords[i].y - min.y) * TILE_SIZE + camera_offset.y};
-                                   U8 portal_rotations = portal_rotations_between(interactive->portal.face, (Direction_t)(d));
-                                   draw_flats(portal_pos, tile, adj_interactive, theme_texture, portal_rotations);
-                                   Player_t* player_ptr = nullptr;
-                                   if(coord_distance_between(pos_to_coord(player.pos), adj_coord) < 2.0f) player_ptr = &player;
-                                   draw_solids(portal_pos, adj_interactive, blocks, block_count, player_ptr, screen_camera,
-                                               theme_texture, player_texture, adj_coord, portal_exits.directions[d].coords[i],
-                                               portal_rotations);
-                              }
-                         }
-                    }
-               }
-          }
-
           for(S16 y = max.y; y >= min.y; y--){
                for(S16 x = min.x; x <= max.x; x++){
                     Vec_t tile_pos {(F32)(x - min.x) * TILE_SIZE + camera_offset.x,
@@ -4150,21 +4110,66 @@ int main(int argc, char** argv){
                     Tile_t* tile = tilemap.tiles[y] + x;
                     Interactive_t* interactive = quad_tree_find_at(interactive_quad_tree, x, y);
                     if(interactive && interactive->type == INTERACTIVE_TYPE_PORTAL && interactive->portal.on){
-                         interactive_draw(interactive, tile_pos);
-                         continue;
+                         Coord_t coord {x, y};
+                         PortalExit_t portal_exits = find_portal_exits(coord, &tilemap, interactive_quad_tree);
+
+                         for(S8 d = 0; d < DIRECTION_COUNT; d++){
+                              for(S8 i = 0; i < portal_exits.directions[d].count; i++){
+                                   if(portal_exits.directions[d].coords[i] == coord) continue;
+                                   Coord_t portal_coord = portal_exits.directions[d].coords[i] + direction_opposite((Direction_t)(d));
+                                   Tile_t* portal_tile = tilemap.tiles[portal_coord.y] + portal_coord.x;
+                                   Interactive_t* portal_interactive = quad_tree_find_at(interactive_quad_tree, portal_coord.x, portal_coord.y);
+                                   U8 portal_rotations = portal_rotations_between((Direction_t)(d), interactive->portal.face);
+                                   draw_flats(tile_pos, portal_tile, portal_interactive, theme_texture, portal_rotations);
+                              }
+                         }
+                    }else{
+                         draw_flats(tile_pos, tile, interactive, theme_texture, 0);
                     }
-                    draw_flats(tile_pos, tile, interactive, theme_texture, 0);
                }
           }
 
           for(S16 y = max.y; y >= min.y; y--){
                for(S16 x = min.x; x <= max.x; x++){
-                    Coord_t coord {x, y};
-                    Interactive_t* interactive = quad_tree_find_at(interactive_quad_tree, coord.x, coord.y);
-                    if(interactive && interactive->type == INTERACTIVE_TYPE_PORTAL && interactive->portal.on) continue;
-
                     Vec_t tile_pos {(F32)(x - min.x) * TILE_SIZE + camera_offset.x,
                                     (F32)(y - min.y) * TILE_SIZE + camera_offset.y};
+
+                    Coord_t coord {x, y};
+                    Interactive_t* interactive = quad_tree_find_at(interactive_quad_tree, coord.x, coord.y);
+
+                    if(interactive && interactive->type == INTERACTIVE_TYPE_PORTAL && interactive->portal.on){
+                         PortalExit_t portal_exits = find_portal_exits(coord, &tilemap, interactive_quad_tree);
+
+                         for(S8 d = 0; d < DIRECTION_COUNT; d++){
+                              for(S8 i = 0; i < portal_exits.directions[d].count; i++){
+                                   if(portal_exits.directions[d].coords[i] == coord) continue;
+                                   Coord_t portal_coord = portal_exits.directions[d].coords[i] + direction_opposite((Direction_t)(d));
+
+                                   S16 px = portal_coord.x * TILE_SIZE_IN_PIXELS;
+                                   S16 py = portal_coord.y * TILE_SIZE_IN_PIXELS;
+                                   Rect_t coord_rect {(S16)(px - HALF_TILE_SIZE_IN_PIXELS), (S16)(py - HALF_TILE_SIZE_IN_PIXELS),
+                                                      (S16)(px + TILE_SIZE_IN_PIXELS + HALF_TILE_SIZE_IN_PIXELS),
+                                                      (S16)(py + TILE_SIZE_IN_PIXELS + HALF_TILE_SIZE_IN_PIXELS)};
+
+                                   S16 block_count = 0;
+                                   Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
+
+                                   quad_tree_find_in(block_quad_tree, coord_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
+
+                                   Interactive_t* portal_interactive = quad_tree_find_at(interactive_quad_tree, portal_coord.x, portal_coord.y);
+
+                                   U8 portal_rotations = portal_rotations_between((Direction_t)(d), interactive->portal.face);
+                                   Player_t* player_ptr = nullptr;
+                                   if(coord_distance_between(pos_to_coord(player.pos), portal_coord) <= 1.0f){
+                                        player_ptr = &player;
+                                   }
+                                   draw_solids(tile_pos, portal_interactive, blocks, block_count, player_ptr, screen_camera,
+                                               theme_texture, player_texture, portal_coord, coord, portal_rotations);
+                              }
+                         }
+
+                         interactive_draw(interactive, tile_pos);
+                    }
 
                     S16 px = coord.x * TILE_SIZE_IN_PIXELS;
                     S16 py = coord.y * TILE_SIZE_IN_PIXELS;
@@ -4239,6 +4244,19 @@ int main(int argc, char** argv){
                     }
                }
           }
+
+          for(S16 y = max.y; y >= min.y; y--){
+               for(S16 x = min.x; x <= max.x; x++){
+                    Tile_t* tile = tilemap.tiles[y] + x;
+                    if(tile->id >= 16){
+                         Vec_t tile_pos {(F32)(x - min.x) * TILE_SIZE + camera_offset.x,
+                                         (F32)(y - min.y) * TILE_SIZE + camera_offset.y};
+
+                         tile_id_draw(tile->id, tile_pos);
+                    }
+               }
+          }
+
           glEnd();
 
           // player circle
