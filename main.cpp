@@ -1,5 +1,6 @@
 /*
 http://www.simonstalenhag.se/
+-Grant Sanderson 3blue1brown
 */
 
 #include <iostream>
@@ -368,7 +369,7 @@ Block_t* block_against_block_in_list(Block_t* block_to_check, Block_t** blocks, 
 
 void search_portal_destination_for_blocks(QuadTreeNode_t<Block_t>* block_quad_tree, Direction_t source_portal_face, Direction_t dest_portal_face, Coord_t coord,
                                           Coord_t portal_coord, Block_t** blocks, S16* block_count, Pixel_t* offsets){
-     U8 rotations_between_portals = direction_rotations_between(source_portal_face, dest_portal_face);
+     U8 rotations_between_portals = portal_rotations_between(source_portal_face, dest_portal_face);
      Coord_t destination_coord = portal_coord + direction_opposite(dest_portal_face);
      Pixel_t portal_offset = coord_to_pixel(destination_coord - coord);
      Pixel_t portal_pixel = coord_to_pixel_at_center(destination_coord); // the center of the destination coord
@@ -443,7 +444,7 @@ Block_t* block_inside_block_list(Block_t* block_to_check, Block_t** blocks, S16 
                     (S16)(block_to_check->pos.pixel.y + TILE_SIZE_IN_PIXELS - 1)};
 
      for(S16 i = 0; i < block_count; i++){
-          if(blocks[i] == block_to_check) continue;
+          if(blocks[i] == block_to_check && portal_offsets[i].x == 0 && portal_offsets[i].y == 0) continue;
           Block_t* block = blocks[i];
 
           Pixel_t pixel_to_check = block->pos.pixel - portal_offsets[i];
@@ -456,7 +457,7 @@ Block_t* block_inside_block_list(Block_t* block_to_check, Block_t** blocks, S16 
              pixel_in_rect(top_left, rect) ||
              pixel_in_rect(top_right, rect) ||
              pixel_in_rect(bottom_right, rect)){
-               *collided_with = block->pos;
+               *collided_with = block_get_center(block);
                collided_with->pixel -= portal_offsets[i];
                return block;
           }
@@ -1969,6 +1970,14 @@ void selection_draw(Coord_t selection_start, Coord_t selection_end, Position_t c
      draw_quad_wireframe(&selection_quad, red, green, blue);
 }
 
+Pixel_t mouse_select_pixel(Vec_t mouse_screen){
+     return {(S16)(mouse_screen.x * (F32)(ROOM_PIXEL_SIZE)), (S16)(mouse_screen.y * (F32)(ROOM_PIXEL_SIZE))};
+}
+
+Pixel_t mouse_select_world_pixel(Vec_t mouse_screen, Position_t camera){
+     return mouse_select_pixel(mouse_screen) + (camera.pixel - Pixel_t{ROOM_PIXEL_SIZE / 2, ROOM_PIXEL_SIZE / 2});
+}
+
 Coord_t mouse_select_coord(Vec_t mouse_screen){
      return {(S16)(mouse_screen.x * (F32)(ROOM_TILE_SIZE)), (S16)(mouse_screen.y * (F32)(ROOM_TILE_SIZE))};
 }
@@ -2167,11 +2176,12 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
      max = coord_clamp_zero_to_dim(max, tilemap->width - 1, tilemap->height - 1);
 
      // TODO: convert to use quad tree
-     Vec_t pos_delta_save = pos_delta;
      Vec_t collided_block_delta {};
      Direction_t collided_block_dir = DIRECTION_COUNT;
      Block_t* collided_block = nullptr;
      for(S16 i = 0; i < block_array->count; i++){
+          Vec_t pos_delta_save = pos_delta;
+
           bool collide_with_block = false;
           Position_t block_pos = block_array->elements[i].pos;
           position_move_against_block(position, block_pos, &pos_delta, &collide_with_block);
@@ -2227,7 +2237,8 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
                     break;
                case DIRECTION_LEFT:
                     if(rotated_accel.x > 0.0f){
-                         // collided_block->pos -= collided_block_delta;
+                         collided_block->pos -= collided_block_delta;
+                         pos_delta -= collided_block_delta;
                          rotated_accel.x = 0.0f;
                          rotated_vel.x = 0.0f;
                          U8 unrotations = 4 - portal_rotations;
@@ -2237,7 +2248,8 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
                     break;
                case DIRECTION_RIGHT:
                     if(rotated_accel.x < 0.0f){
-                         // collided_block->pos -= collided_block_delta;
+                         collided_block->pos -= collided_block_delta;
+                         pos_delta -= collided_block_delta;
                          rotated_accel.x = 0.0f;
                          rotated_vel.x = 0.0f;
                          U8 unrotations = 4 - portal_rotations;
@@ -2247,7 +2259,8 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
                     break;
                case DIRECTION_UP:
                     if(rotated_accel.y < 0.0f){
-                         // collided_block->pos -= collided_block_delta;
+                         collided_block->pos -= collided_block_delta;
+                         pos_delta -= collided_block_delta;
                          rotated_accel.y = 0.0f;
                          rotated_vel.y = 0.0f;
                          U8 unrotations = 4 - portal_rotations;
@@ -2257,7 +2270,8 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
                     break;
                case DIRECTION_DOWN:
                     if(rotated_accel.y > 0.0f){
-                         // collided_block->pos -= collided_block_delta;
+                         collided_block->pos -= collided_block_delta;
+                         pos_delta -= collided_block_delta;
                          rotated_accel.y = 0.0f;
                          rotated_vel.y = 0.0f;
                          U8 unrotations = 4 - portal_rotations;
@@ -3229,6 +3243,11 @@ int main(int argc, char** argv){
                               }
                          }
                     } break;
+                    case SDL_SCANCODE_5:
+                         player.pos.pixel = mouse_select_world_pixel(mouse_screen, camera) + Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS};
+                         player.pos.decimal.x = 0;
+                         player.pos.decimal.y = 0;
+                         break;
                     }
                     break;
                case SDL_KEYUP:
@@ -3773,37 +3792,58 @@ int main(int argc, char** argv){
                while((inside_block = block_inside_another_block(block_array.elements + i, block_quad_tree,
                                                                 interactive_quad_tree, &tilemap, &collided_with,
                                                                 &portal_rotations)) &&
-                     blocks_at_collidable_height(block, inside_block)){
+                      blocks_at_collidable_height(block, inside_block)){
                     auto block_center_pixel = block->pos.pixel + Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS};
-                    auto quadrant = relative_quadrant(block_center_pixel, collided_with.pixel + Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS});
+                    auto quadrant = relative_quadrant(block_center_pixel, collided_with.pixel);
 
-                    switch(quadrant){
-                    default:
-                         break;
-                    case DIRECTION_LEFT:
-                         block->pos.pixel.x = collided_with.pixel.x + TILE_SIZE_IN_PIXELS;
-                         block->pos.decimal.x = 0.0f;
-                         block->vel.x = 0.0f;
-                         block->accel.x = 0.0f;
-                         break;
-                    case DIRECTION_RIGHT:
-                         block->pos.pixel.x = collided_with.pixel.x - TILE_SIZE_IN_PIXELS;
-                         block->pos.decimal.x = 0.0f;
-                         block->vel.x = 0.0f;
-                         block->accel.x = 0.0f;
-                         break;
-                    case DIRECTION_DOWN:
-                         block->pos.pixel.y = collided_with.pixel.y + TILE_SIZE_IN_PIXELS;
-                         block->pos.decimal.y = 0.0f;
-                         block->vel.y = 0.0f;
-                         block->accel.y = 0.0f;
-                         break;
-                    case DIRECTION_UP:
-                         block->pos.pixel.y = collided_with.pixel.y - TILE_SIZE_IN_PIXELS;
-                         block->pos.decimal.y = 0.0f;
-                         block->vel.y = 0.0f;
-                         block->accel.y = 0.0f;
-                         break;
+                    if(inside_block == block_array.elements + i){
+                         switch(quadrant){
+                         default:
+                              break;
+                         case DIRECTION_LEFT:
+                         case DIRECTION_RIGHT:
+                              block->pos.pixel.y = collided_with.pixel.y - HALF_TILE_SIZE_IN_PIXELS;
+                              block->pos.decimal.y = 0.0f;
+                              block->vel.y = 0.0f;
+                              block->accel.y = 0.0f;
+                              break;
+                         case DIRECTION_DOWN:
+                         case DIRECTION_UP:
+                              block->pos.pixel.x = collided_with.pixel.x - HALF_TILE_SIZE_IN_PIXELS;
+                              block->pos.decimal.x = 0.0f;
+                              block->vel.x = 0.0f;
+                              block->accel.x = 0.0f;
+                              break;
+                         }
+                    }else{
+                         switch(quadrant){
+                         default:
+                              break;
+                         case DIRECTION_LEFT:
+                              block->pos.pixel.x = collided_with.pixel.x + HALF_TILE_SIZE_IN_PIXELS;
+                              block->pos.decimal.x = 0.0f;
+                              block->vel.x = 0.0f;
+                              block->accel.x = 0.0f;
+                              break;
+                         case DIRECTION_RIGHT:
+                              block->pos.pixel.x = collided_with.pixel.x - HALF_TILE_SIZE_IN_PIXELS - TILE_SIZE_IN_PIXELS;
+                              block->pos.decimal.x = 0.0f;
+                              block->vel.x = 0.0f;
+                              block->accel.x = 0.0f;
+                              break;
+                         case DIRECTION_DOWN:
+                              block->pos.pixel.y = collided_with.pixel.y + HALF_TILE_SIZE_IN_PIXELS;
+                              block->pos.decimal.y = 0.0f;
+                              block->vel.y = 0.0f;
+                              block->accel.y = 0.0f;
+                              break;
+                         case DIRECTION_UP:
+                              block->pos.pixel.y = collided_with.pixel.y - HALF_TILE_SIZE_IN_PIXELS - TILE_SIZE_IN_PIXELS;
+                              block->pos.decimal.y = 0.0f;
+                              block->vel.y = 0.0f;
+                              block->accel.y = 0.0f;
+                              break;
+                         }
                     }
 
                     if(block == last_block_pushed && quadrant == last_block_pushed_direction){
@@ -3811,9 +3851,13 @@ int main(int argc, char** argv){
                     }
 
                     if(block_on_ice(inside_block, &tilemap, interactive_quad_tree) && block_on_ice(block, &tilemap, interactive_quad_tree)){
-                         block_push(inside_block, direction_rotate_clockwise(quadrant, portal_rotations), &tilemap,
-                                    interactive_quad_tree, block_quad_tree, true);
+                         Direction_t push_dir = direction_rotate_clockwise(quadrant, portal_rotations);
+                         if(inside_block == block_array.elements + i) push_dir = direction_opposite(quadrant);
+                         block_push(inside_block, push_dir, &tilemap, interactive_quad_tree, block_quad_tree, true);
                     }
+
+                    // TODO: there is no way this is the right way to do this
+                    if(inside_block == block_array.elements + i) break;
                }
 
                // get the current coord of the center of the block
