@@ -2219,35 +2219,50 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
                collided_block_delta = pos_delta - pos_delta_save;
                collided_block_dir = relative_quadrant(position.pixel, block_pos.pixel +
                                                       Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS});
+               Vec_t rotated_accel = vec_rotate_quadrants(collided_block->accel, portal_rotations);
+               Vec_t rotated_vel = vec_rotate_quadrants(collided_block->vel, portal_rotations);
+
                switch(collided_block_dir){
                default:
                     break;
                case DIRECTION_LEFT:
-                    if(collided_block->accel.x > 0.0f){
-                         collided_block->pos -= collided_block_delta;
-                         collided_block->accel.x = 0.0f;
-                         collided_block->vel.x = 0.0f;
+                    if(rotated_accel.x > 0.0f){
+                         // collided_block->pos -= collided_block_delta;
+                         rotated_accel.x = 0.0f;
+                         rotated_vel.x = 0.0f;
+                         U8 unrotations = 4 - portal_rotations;
+                         collided_block->accel = vec_rotate_quadrants(rotated_accel, unrotations);
+                         collided_block->vel = vec_rotate_quadrants(rotated_vel, unrotations);
                     }
                     break;
                case DIRECTION_RIGHT:
-                    if(collided_block->accel.x < 0.0f){
-                         collided_block->pos -= collided_block_delta;
-                         collided_block->accel.x = 0.0f;
-                         collided_block->vel.x = 0.0f;
+                    if(rotated_accel.x < 0.0f){
+                         // collided_block->pos -= collided_block_delta;
+                         rotated_accel.x = 0.0f;
+                         rotated_vel.x = 0.0f;
+                         U8 unrotations = 4 - portal_rotations;
+                         collided_block->accel = vec_rotate_quadrants(rotated_accel, unrotations);
+                         collided_block->vel = vec_rotate_quadrants(rotated_vel, unrotations);
                     }
                     break;
                case DIRECTION_UP:
-                    if(collided_block->accel.y < 0.0f){
-                         collided_block->pos -= collided_block_delta;
-                         collided_block->accel.y = 0.0f;
-                         collided_block->vel.y = 0.0f;
+                    if(rotated_accel.y < 0.0f){
+                         // collided_block->pos -= collided_block_delta;
+                         rotated_accel.y = 0.0f;
+                         rotated_vel.y = 0.0f;
+                         U8 unrotations = 4 - portal_rotations;
+                         collided_block->accel = vec_rotate_quadrants(rotated_accel, unrotations);
+                         collided_block->vel = vec_rotate_quadrants(rotated_vel, unrotations);
                     }
                     break;
                case DIRECTION_DOWN:
-                    if(collided_block->accel.y > 0.0f){
-                         collided_block->pos -= collided_block_delta;
-                         collided_block->accel.y = 0.0f;
-                         collided_block->vel.y = 0.0f;
+                    if(rotated_accel.y > 0.0f){
+                         // collided_block->pos -= collided_block_delta;
+                         rotated_accel.y = 0.0f;
+                         rotated_vel.y = 0.0f;
+                         U8 unrotations = 4 - portal_rotations;
+                         collided_block->accel = vec_rotate_quadrants(rotated_accel, unrotations);
+                         collided_block->vel = vec_rotate_quadrants(rotated_vel, unrotations);
                     }
                     break;
                }
@@ -2762,7 +2777,8 @@ int main(int argc, char** argv){
           }
 
           // TODO: consider 30fps as minimum for random noobs computers
-          if(demo_mode) dt = 0.0166666f; // the game always runs as if a 60th of a frame has occurred.
+          //if(demo_mode) dt = 0.0166666f; // the game always runs as if a 60th of a frame has occurred.
+          dt = 0.0166666f; // the game always runs as if a 60th of a frame has occurred.
 
           quad_tree_free(block_quad_tree);
           block_quad_tree = quad_tree_build(&block_array);
