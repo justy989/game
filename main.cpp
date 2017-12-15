@@ -1357,6 +1357,7 @@ void player_action_perform(PlayerAction_t* player_action, Player_t* player, Play
      default:
           break;
      case PLAYER_ACTION_TYPE_MOVE_LEFT_START:
+          if(player_action->move_left) return;
           player_action->move_left = true;
           player->face = DIRECTION_LEFT;
           break;
@@ -1368,6 +1369,7 @@ void player_action_perform(PlayerAction_t* player_action, Player_t* player, Play
           player_action->move_left_rotation = 0;
           break;
      case PLAYER_ACTION_TYPE_MOVE_UP_START:
+          if(player_action->move_up) return;
           player_action->move_up = true;
           player->face = DIRECTION_UP;
           break;
@@ -1379,6 +1381,7 @@ void player_action_perform(PlayerAction_t* player_action, Player_t* player, Play
           player_action->move_up_rotation = 0;
           break;
      case PLAYER_ACTION_TYPE_MOVE_RIGHT_START:
+          if(player_action->move_right) return;
           player_action->move_right = true;
           player->face = DIRECTION_RIGHT;
           break;
@@ -1391,6 +1394,7 @@ void player_action_perform(PlayerAction_t* player_action, Player_t* player, Play
           player_action->move_right_rotation = 0;
      } break;
      case PLAYER_ACTION_TYPE_MOVE_DOWN_START:
+          if(player_action->move_down) return;
           player_action->move_down = true;
           player->face = DIRECTION_DOWN;
           break;
@@ -1402,18 +1406,21 @@ void player_action_perform(PlayerAction_t* player_action, Player_t* player, Play
           player_action->move_down_rotation = 0;
           break;
      case PLAYER_ACTION_TYPE_ACTIVATE_START:
+          if(player_action->activate) return;
           player_action->activate = true;
           break;
      case PLAYER_ACTION_TYPE_ACTIVATE_STOP:
           player_action->activate = false;
           break;
      case PLAYER_ACTION_TYPE_SHOOT_START:
+          if(player_action->shoot) return;
           player_action->shoot = true;
           break;
      case PLAYER_ACTION_TYPE_SHOOT_STOP:
           player_action->shoot = false;
           break;
      case PLAYER_ACTION_TYPE_UNDO:
+          if(player_action->undo) return;
           player_action->undo = true;
           break;
      }
@@ -4260,7 +4267,7 @@ int main(int argc, char** argv){
 
                                    U8 portal_rotations = portal_rotations_between((Direction_t)(d), interactive->portal.face);
                                    Player_t* player_ptr = nullptr;
-                                   if(coord_distance_between(pos_to_coord(player.pos), portal_coord) <= 1.0f){
+                                   if(coord_distance_between(pos_to_coord(player.pos), portal_coord) <= 0.5f){
                                         player_ptr = &player;
                                    }
                                    draw_solids(tile_pos, portal_interactive, blocks, block_count, player_ptr, screen_camera,
