@@ -3808,7 +3808,7 @@ int main(int argc, char** argv){
                               block->accel.x = 0.0f;
                               break;
                          case DIRECTION_RIGHT:
-                              block->pos.pixel.x = collided_with.pixel.x - (HALF_TILE_SIZE_IN_PIXELS - 1);
+                              block->pos.pixel.x = collided_with.pixel.x - (HALF_TILE_SIZE_IN_PIXELS + TILE_SIZE_IN_PIXELS);
                               block->pos.decimal.x = 0.0f;
                               block->vel.x = 0.0f;
                               block->accel.x = 0.0f;
@@ -3820,7 +3820,7 @@ int main(int argc, char** argv){
                               block->accel.y = 0.0f;
                               break;
                          case DIRECTION_UP:
-                              block->pos.pixel.y = collided_with.pixel.y - (HALF_TILE_SIZE_IN_PIXELS - 1);
+                              block->pos.pixel.y = collided_with.pixel.y - (HALF_TILE_SIZE_IN_PIXELS + TILE_SIZE_IN_PIXELS);
                               block->pos.decimal.y = 0.0f;
                               block->vel.y = 0.0f;
                               block->accel.y = 0.0f;
