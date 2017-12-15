@@ -315,7 +315,7 @@ Block_t* block_against_block_in_list(Block_t* block_to_check, Block_t** blocks, 
                Block_t* block = blocks[i];
                if(!blocks_at_collidable_height(block_to_check, block)) continue;
 
-               Pixel_t pixel_to_check = block->pos.pixel - offsets[i];
+               Pixel_t pixel_to_check = block->pos.pixel + offsets[i];
                if((pixel_to_check.x + TILE_SIZE_IN_PIXELS) == block_to_check->pos.pixel.x &&
                   pixel_to_check.y >= block_to_check->pos.pixel.y &&
                   pixel_to_check.y < (block_to_check->pos.pixel.y + TILE_SIZE_IN_PIXELS)){
@@ -328,7 +328,7 @@ Block_t* block_against_block_in_list(Block_t* block_to_check, Block_t** blocks, 
                Block_t* block = blocks[i];
                if(!blocks_at_collidable_height(block_to_check, block)) continue;
 
-               Pixel_t pixel_to_check = block->pos.pixel - offsets[i];
+               Pixel_t pixel_to_check = block->pos.pixel + offsets[i];
                if(pixel_to_check.x == (block_to_check->pos.pixel.x + TILE_SIZE_IN_PIXELS) &&
                   pixel_to_check.y >= block_to_check->pos.pixel.y &&
                   pixel_to_check.y < (block_to_check->pos.pixel.y + TILE_SIZE_IN_PIXELS)){
@@ -341,7 +341,7 @@ Block_t* block_against_block_in_list(Block_t* block_to_check, Block_t** blocks, 
                Block_t* block = blocks[i];
                if(!blocks_at_collidable_height(block_to_check, block)) continue;
 
-               Pixel_t pixel_to_check = block->pos.pixel - offsets[i];
+               Pixel_t pixel_to_check = block->pos.pixel + offsets[i];
                if((pixel_to_check.y + TILE_SIZE_IN_PIXELS) == block_to_check->pos.pixel.y &&
                   pixel_to_check.x >= block_to_check->pos.pixel.x &&
                   pixel_to_check.x < (block_to_check->pos.pixel.x + TILE_SIZE_IN_PIXELS)){
@@ -354,7 +354,7 @@ Block_t* block_against_block_in_list(Block_t* block_to_check, Block_t** blocks, 
                Block_t* block = blocks[i];
                if(!blocks_at_collidable_height(block_to_check, block)) continue;
 
-               Pixel_t pixel_to_check = block->pos.pixel - offsets[i];
+               Pixel_t pixel_to_check = block->pos.pixel + offsets[i];
                if(pixel_to_check.y == (block_to_check->pos.pixel.y + TILE_SIZE_IN_PIXELS) &&
                   pixel_to_check.x >= block_to_check->pos.pixel.x &&
                   pixel_to_check.x < (block_to_check->pos.pixel.x + TILE_SIZE_IN_PIXELS)){
@@ -369,16 +369,18 @@ Block_t* block_against_block_in_list(Block_t* block_to_check, Block_t** blocks, 
 
 void search_portal_destination_for_blocks(QuadTreeNode_t<Block_t>* block_quad_tree, Direction_t source_portal_face, Direction_t dest_portal_face, Coord_t coord,
                                           Coord_t portal_coord, Block_t** blocks, S16* block_count, Pixel_t* offsets){
-     U8 rotations_between_portals = portal_rotations_between(source_portal_face, dest_portal_face);
-     Coord_t destination_coord = portal_coord + direction_opposite(dest_portal_face);
-     Pixel_t portal_offset = coord_to_pixel(destination_coord - coord);
-     Pixel_t portal_pixel = coord_to_pixel_at_center(destination_coord); // the center of the destination coord
-     Rect_t rect = rect_surrounding_adjacent_coords(portal_coord);
+     (void)(source_portal_face);
+     //U8 rotations_between_portals = direction_rotations_between(source_portal_face, dest_portal_face);
+     Coord_t dest_coord = portal_coord + direction_opposite(dest_portal_face);
+     Pixel_t portal_offset = coord_to_pixel(dest_coord - coord);
+     Pixel_t pixel = coord_to_pixel_at_center(dest_coord); // the center of the destination coord
+     Rect_t rect = rect_surrounding_adjacent_coords(dest_coord);
      quad_tree_find_in(block_quad_tree, rect, blocks, block_count, BLOCK_QUAD_TREE_MAX_QUERY);
 
      for(S8 o = 0; o < *block_count; o++){
-          Pixel_t offset = block_center_pixel(blocks[o]) - portal_pixel;
-          offsets[o] = portal_offset + pixel_rotate_quadrants(offset, rotations_between_portals);
+          Pixel_t offset = block_center_pixel(blocks[o]) - pixel;
+          //offsets[o] = portal_offset + pixel_rotate_quadrants(offset, rotations_between_portals);
+          offsets[o] = portal_offset + offset;
      }
 }
 
@@ -498,7 +500,6 @@ Block_t* block_inside_another_block(Block_t* block_to_check, QuadTreeNode_t<Bloc
 
                Interactive_t* interactive = quad_tree_interactive_find_at(interactive_quad_tree, coord);
                if(interactive && interactive->type == INTERACTIVE_TYPE_PORTAL && interactive->portal.on){
-
                     auto portal_exits = find_portal_exits(coord, tilemap, interactive_quad_tree);
                     for(S8 d = 0; d < DIRECTION_COUNT; d++){
                          for(S8 p = 0; p < portal_exits.directions[d].count; p++){
@@ -950,7 +951,7 @@ void block_push(Block_t* block, Direction_t direction, TileMap_t* tilemap, QuadT
      Direction_t collided_block_push_dir = DIRECTION_COUNT;
      Block_t* collided_block = block_against_another_block(block, direction, block_quad_tree, interactive_quad_tree, tilemap,
                                                            &collided_block_push_dir);
-     if(pushed_by_ice && collided_block && block_on_ice(collided_block, tilemap, interactive_quad_tree)){
+     if(pushed_by_ice && collided_block && block != collided_block && block_on_ice(collided_block, tilemap, interactive_quad_tree)){
           block_push(collided_block, collided_block_push_dir, tilemap, interactive_quad_tree, block_quad_tree, pushed_by_ice);
           return;
      }
@@ -3801,18 +3802,28 @@ int main(int argc, char** argv){
                          default:
                               break;
                          case DIRECTION_LEFT:
+                              block->pos.pixel.x = collided_with.pixel.x + HALF_TILE_SIZE_IN_PIXELS;
+                              block->pos.decimal.x = 0.0f;
+                              block->vel.x = 0.0f;
+                              block->accel.x = 0.0f;
+                              break;
                          case DIRECTION_RIGHT:
-                              block->pos.pixel.y = collided_with.pixel.y - HALF_TILE_SIZE_IN_PIXELS;
+                              block->pos.pixel.x = collided_with.pixel.x - (HALF_TILE_SIZE_IN_PIXELS - 1);
+                              block->pos.decimal.x = 0.0f;
+                              block->vel.x = 0.0f;
+                              block->accel.x = 0.0f;
+                              break;
+                         case DIRECTION_DOWN:
+                              block->pos.pixel.y = collided_with.pixel.y + HALF_TILE_SIZE_IN_PIXELS;
                               block->pos.decimal.y = 0.0f;
                               block->vel.y = 0.0f;
                               block->accel.y = 0.0f;
                               break;
-                         case DIRECTION_DOWN:
                          case DIRECTION_UP:
-                              block->pos.pixel.x = collided_with.pixel.x - HALF_TILE_SIZE_IN_PIXELS;
-                              block->pos.decimal.x = 0.0f;
-                              block->vel.x = 0.0f;
-                              block->accel.x = 0.0f;
+                              block->pos.pixel.y = collided_with.pixel.y - (HALF_TILE_SIZE_IN_PIXELS - 1);
+                              block->pos.decimal.y = 0.0f;
+                              block->vel.y = 0.0f;
+                              block->accel.y = 0.0f;
                               break;
                          }
                     }else{
@@ -3852,7 +3863,6 @@ int main(int argc, char** argv){
 
                     if(block_on_ice(inside_block, &tilemap, interactive_quad_tree) && block_on_ice(block, &tilemap, interactive_quad_tree)){
                          Direction_t push_dir = direction_rotate_clockwise(quadrant, portal_rotations);
-                         if(inside_block == block_array.elements + i) push_dir = direction_opposite(quadrant);
                          block_push(inside_block, push_dir, &tilemap, interactive_quad_tree, block_quad_tree, true);
                     }
 
