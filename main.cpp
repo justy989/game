@@ -368,9 +368,8 @@ Block_t* block_against_block_in_list(Block_t* block_to_check, Block_t** blocks, 
 }
 
 void search_portal_destination_for_blocks(QuadTreeNode_t<Block_t>* block_quad_tree, Direction_t source_portal_face, Direction_t dest_portal_face, Coord_t coord,
-                                          Coord_t portal_coord, Block_t** blocks, S16* block_count, Pixel_t* offsets){
-     (void)(source_portal_face);
-     //U8 rotations_between_portals = direction_rotations_between(source_portal_face, dest_portal_face);
+                                          Coord_t portal_coord, Block_t* block_to_check, Block_t** blocks, S16* block_count, Pixel_t* offsets){
+     U8 rotations_between_portals = direction_rotations_between(source_portal_face, dest_portal_face);
      Coord_t dest_coord = portal_coord + direction_opposite(dest_portal_face);
      Pixel_t portal_offset = coord_to_pixel(dest_coord - coord);
      Pixel_t pixel = coord_to_pixel_at_center(dest_coord); // the center of the destination coord
@@ -379,8 +378,14 @@ void search_portal_destination_for_blocks(QuadTreeNode_t<Block_t>* block_quad_tr
 
      for(S8 o = 0; o < *block_count; o++){
           Pixel_t offset = block_center_pixel(blocks[o]) - pixel;
-          //offsets[o] = portal_offset + pixel_rotate_quadrants(offset, rotations_between_portals);
-          offsets[o] = portal_offset + offset;
+          if(block_to_check == blocks[o]){
+               // TODO: this isn't ideal, is there a better solution?
+               // this only really happens when a block collides with itself through a portal and at this point, the situation is that the collision only happens
+               // 1 frame after the block moves passed the center of the tile, but should really happen at the center of the tile, so rotation doesn't matter
+               offsets[o] = portal_offset + offset;
+          }else{
+               offsets[o] = portal_offset + pixel_rotate_quadrants(offset, rotations_between_portals);
+          }
      }
 }
 
@@ -421,7 +426,7 @@ Block_t* block_against_another_block(Block_t* block_to_check, Direction_t direct
                               if(portal_coord == coord) continue;
 
                               search_portal_destination_for_blocks(block_quad_tree, interactive->portal.face, (Direction_t)(d), coord,
-                                                                   portal_coord, blocks, &block_count, portal_offsets);
+                                                                   portal_coord, block_to_check, blocks, &block_count, portal_offsets);
 
                               collided_block = block_against_block_in_list(block_to_check, blocks, block_count, direction, portal_offsets);
                               if(collided_block){
@@ -507,7 +512,7 @@ Block_t* block_inside_another_block(Block_t* block_to_check, QuadTreeNode_t<Bloc
                               if(portal_coord == coord) continue;
 
                               search_portal_destination_for_blocks(block_quad_tree, interactive->portal.face, (Direction_t)(d), coord,
-                                                                   portal_coord, blocks, &block_count, portal_offsets);
+                                                                   portal_coord, block_to_check, blocks, &block_count, portal_offsets);
 
                               collided_block = block_inside_block_list(block_to_check, blocks, block_count, collided_with, portal_offsets);
                               if(collided_block){
@@ -956,6 +961,7 @@ void block_push(Block_t* block, Direction_t direction, TileMap_t* tilemap, QuadT
                // pass
           }else if(pushed_by_ice && block_on_ice(collided_block, tilemap, interactive_quad_tree)){
                block_push(collided_block, collided_block_push_dir, tilemap, interactive_quad_tree, block_quad_tree, pushed_by_ice);
+               return;
           }else{
                return;
           }
@@ -3868,7 +3874,42 @@ int main(int argc, char** argv){
 
                     if(block_on_ice(inside_block, &tilemap, interactive_quad_tree) && block_on_ice(block, &tilemap, interactive_quad_tree)){
                          Direction_t push_dir = direction_rotate_clockwise(quadrant, portal_rotations);
-                         block_push(inside_block, push_dir, &tilemap, interactive_quad_tree, block_quad_tree, true);
+                         bool push = true;
+
+                         switch(push_dir){
+                         default:
+                              break;
+                         case DIRECTION_LEFT:
+                              if(inside_block->accel.x > 0){
+                                   inside_block->accel.x = 0.0f;
+                                   inside_block->vel.x = 0.0f;
+                                   push = false;
+                              }
+                              break;
+                         case DIRECTION_RIGHT:
+                              if(inside_block->accel.x < 0){
+                                   inside_block->accel.x = 0.0f;
+                                   inside_block->vel.x = 0.0f;
+                                   push = false;
+                              }
+                              break;
+                         case DIRECTION_DOWN:
+                              if(inside_block->accel.y > 0){
+                                   inside_block->accel.y = 0.0f;
+                                   inside_block->vel.y = 0.0f;
+                                   push = false;
+                              }
+                              break;
+                         case DIRECTION_UP:
+                              if(inside_block->accel.y < 0){
+                                   inside_block->accel.y = 0.0f;
+                                   inside_block->vel.y = 0.0f;
+                                   push = false;
+                              }
+                              break;
+                         }
+
+                         if(push) block_push(inside_block, push_dir, &tilemap, interactive_quad_tree, block_quad_tree, true);
                     }
 
                     // TODO: there is no way this is the right way to do this
