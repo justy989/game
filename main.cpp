@@ -951,8 +951,10 @@ void block_push(Block_t* block, Direction_t direction, TileMap_t* tilemap, QuadT
      Direction_t collided_block_push_dir = DIRECTION_COUNT;
      Block_t* collided_block = block_against_another_block(block, direction, block_quad_tree, interactive_quad_tree, tilemap,
                                                            &collided_block_push_dir);
-     if(pushed_by_ice && collided_block && block != collided_block && block_on_ice(collided_block, tilemap, interactive_quad_tree)){
-          block_push(collided_block, collided_block_push_dir, tilemap, interactive_quad_tree, block_quad_tree, pushed_by_ice);
+     if(collided_block){
+          if(pushed_by_ice && block != collided_block && block_on_ice(collided_block, tilemap, interactive_quad_tree)){
+               block_push(collided_block, collided_block_push_dir, tilemap, interactive_quad_tree, block_quad_tree, pushed_by_ice);
+          }
           return;
      }
 
