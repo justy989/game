@@ -445,6 +445,8 @@ Block_t* block_against_another_block(Block_t* block_to_check, Direction_t direct
 
 #define MAX_TELEPORTED_DEBUG_BLOCK_COUNT 4
 
+Pixel_t g_collided_with_pixel = {};
+
 Block_t* block_inside_block_list(Block_t* block_to_check, Block_t** blocks, S16 block_count, Position_t* collided_with, Pixel_t* portal_offsets){
      Rect_t rect = {block_to_check->pos.pixel.x, block_to_check->pos.pixel.y,
                     (S16)(block_to_check->pos.pixel.x + TILE_SIZE_IN_PIXELS - 1),
@@ -466,6 +468,7 @@ Block_t* block_inside_block_list(Block_t* block_to_check, Block_t** blocks, S16 
              pixel_in_rect(bottom_right, rect)){
                *collided_with = block_get_center(block);
                collided_with->pixel -= portal_offsets[i];
+               g_collided_with_pixel = collided_with->pixel;
                return block;
           }
      }
@@ -2364,20 +2367,36 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
         (collided_block_dir == direction_opposite(collided_interactive_dir) ||
          collided_block_dir == direction_opposite(collided_tile_dir))){
 
-          collided_block->pos -= collided_block_delta;
-
           switch(collided_block_dir){
           default:
                break;
           case DIRECTION_LEFT:
+               if(collided_block->accel.x > 0){
+                    collided_block->pos -= collided_block_delta;
+                    collided_block->accel.x = 0.0f;
+                    collided_block->vel.x = 0.0f;
+               }
+               break;
           case DIRECTION_RIGHT:
-               collided_block->accel.x = 0.0f;
-               collided_block->vel.x = 0.0f;
+               if(collided_block->accel.x < 0){
+                    collided_block->pos -= collided_block_delta;
+                    collided_block->accel.x = 0.0f;
+                    collided_block->vel.x = 0.0f;
+               }
+               break;
+          case DIRECTION_DOWN:
+               if(collided_block->accel.y > 0){
+                    collided_block->pos -= collided_block_delta;
+                    collided_block->accel.y = 0.0f;
+                    collided_block->vel.y = 0.0f;
+               }
                break;
           case DIRECTION_UP:
-          case DIRECTION_DOWN:
-               collided_block->accel.y = 0.0f;
-               collided_block->vel.y = 0.0f;
+               if(collided_block->accel.y < 0){
+                    collided_block->pos -= collided_block_delta;
+                    collided_block->accel.y = 0.0f;
+                    collided_block->vel.y = 0.0f;
+               }
                break;
           }
      }
@@ -2577,6 +2596,17 @@ void check_block_collision_with_other_blocks(Block_t* block_to_check, QuadTreeNo
           // check if they are on ice before we adjust the position on our block to check
           bool a_on_ice = block_on_ice(block_to_check, tilemap, interactive_quad_tree);
           bool b_on_ice = block_on_ice(inside_block, tilemap, interactive_quad_tree);
+
+          // TODO: remove
+          block_to_check->vel.x = 0.0f;
+          block_to_check->accel.x = 0.0f;
+          block_to_check->vel.y = 0.0f;
+          block_to_check->accel.y = 0.0f;
+
+          inside_block->vel.x = 0.0f;
+          inside_block->accel.x = 0.0f;
+          inside_block->vel.y = 0.0f;
+          inside_block->accel.y = 0.0f;
 
           if(inside_block == block_to_check){
                switch(quadrant){
@@ -4455,6 +4485,11 @@ int main(int argc, char** argv){
 
           glEnd();
 
+          Vec_t collided_with_center = {(float)(g_collided_with_pixel.x) * PIXEL_SIZE, (float)(g_collided_with_pixel.y) * PIXEL_SIZE};
+          const float half_block_size = PIXEL_SIZE * HALF_TILE_SIZE_IN_PIXELS;
+          Quad_t collided_with_quad = {collided_with_center.x - half_block_size, collided_with_center.y - half_block_size,
+                                       collided_with_center.x + half_block_size, collided_with_center.y + half_block_size};
+          draw_quad_wireframe(&collided_with_quad, 255.0f, 0.0f, 255.0f);
 #if 0
           // light
           glBindTexture(GL_TEXTURE_2D, 0);
