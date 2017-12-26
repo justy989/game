@@ -2597,17 +2597,6 @@ void check_block_collision_with_other_blocks(Block_t* block_to_check, QuadTreeNo
           bool a_on_ice = block_on_ice(block_to_check, tilemap, interactive_quad_tree);
           bool b_on_ice = block_on_ice(inside_block, tilemap, interactive_quad_tree);
 
-          // TODO: remove
-          block_to_check->vel.x = 0.0f;
-          block_to_check->accel.x = 0.0f;
-          block_to_check->vel.y = 0.0f;
-          block_to_check->accel.y = 0.0f;
-
-          inside_block->vel.x = 0.0f;
-          inside_block->accel.x = 0.0f;
-          inside_block->vel.y = 0.0f;
-          inside_block->accel.y = 0.0f;
-
           if(inside_block == block_to_check){
                switch(quadrant){
                default:
@@ -2719,6 +2708,110 @@ void check_block_collision_with_other_blocks(Block_t* block_to_check, QuadTreeNo
 
 using namespace std::chrono;
 
+void describe_coord(Coord_t coord, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree, QuadTreeNode_t<Block_t>* block_quad_tree){
+     (void)(block_quad_tree);
+
+     LOG("\ndescribe_coord(%d, %d)\n", coord.x, coord.y);
+     auto* tile = tilemap_get_tile(tilemap, coord);
+     if(tile){
+          LOG("Tile: id: %u, light: %u\n", tile->id, tile->light);
+          if(tile->flags){
+               LOG(" flags:\n");
+               if(tile->flags & TILE_FLAG_ICED) printf("  ICED\n");
+               if(tile->flags & TILE_FLAG_CHECKPOINT) printf("  CHECKPOINT\n");
+               if(tile->flags & TILE_FLAG_RESET_IMMUNE) printf("  RESET_IMMUNE\n");
+               if(tile->flags & TILE_FLAG_WIRE_STATE) printf("  WIRE_STATE\n");
+               if(tile->flags & TILE_FLAG_WIRE_LEFT) printf("  WIRE_LEFT\n");
+               if(tile->flags & TILE_FLAG_WIRE_UP) printf("  WIRE_UP\n");
+               if(tile->flags & TILE_FLAG_WIRE_RIGHT) printf("  WIRE_RIGHT\n");
+               if(tile->flags & TILE_FLAG_WIRE_DOWN) printf("  WIRE_DOWN\n");
+               if(tile->flags & TILE_FLAG_WIRE_CLUSTER_LEFT) printf("  CLUSTER_LEFT\n");
+               if(tile->flags & TILE_FLAG_WIRE_CLUSTER_MID) printf("  CLUSTER_MID\n");
+               if(tile->flags & TILE_FLAG_WIRE_CLUSTER_RIGHT) printf("  CLUSTER_RIGHT\n");
+               if(tile->flags & TILE_FLAG_WIRE_CLUSTER_LEFT_ON) printf("  CLUSTER_LEFT_ON\n");
+               if(tile->flags & TILE_FLAG_WIRE_CLUSTER_MID_ON) printf("  CLUSTER_MID_ON\n");
+               if(tile->flags & TILE_FLAG_WIRE_CLUSTER_RIGHT_ON) printf("  CLUSTER_RIGHT_ON\n");
+          }
+     }
+
+     auto* interactive = quad_tree_find_at(interactive_quad_tree, coord.x, coord.y);
+     if(interactive){
+          const char* type_string = "INTERACTIVE_TYPE_UKNOWN";
+          const int info_string_len = 32;
+          char info_string[info_string_len];
+          memset(info_string, 0, info_string_len);
+
+          switch(interactive->type){
+          default:
+               break;
+          case INTERACTIVE_TYPE_NONE:
+               type_string = "NONE";
+               break;
+          case INTERACTIVE_TYPE_PRESSURE_PLATE:
+               type_string = "PRESSURE_PLATE";
+               snprintf(info_string, info_string_len, "down: %d, iced_undo: %d",
+                        interactive->pressure_plate.down, interactive->pressure_plate.iced_under);
+               break;
+          case INTERACTIVE_TYPE_LIGHT_DETECTOR:
+               type_string = "LIGHT_DETECTOR";
+               snprintf(info_string, info_string_len, "on: %d", interactive->detector.on);
+               break;
+          case INTERACTIVE_TYPE_ICE_DETECTOR:
+               type_string = "ICE_DETECTOR";
+               snprintf(info_string, info_string_len, "on: %d", interactive->detector.on);
+               break;
+          case INTERACTIVE_TYPE_POPUP:
+               type_string = "POPUP";
+               snprintf(info_string, info_string_len, "lift: ticks: %u, up: %d, iced: %d", interactive->popup.lift.ticks, interactive->popup.lift.up, interactive->popup.iced);
+               break;
+          case INTERACTIVE_TYPE_LEVER:
+               type_string = "LEVER";
+               break;
+          case INTERACTIVE_TYPE_DOOR:
+               type_string = "DOOR";
+               snprintf(info_string, info_string_len, "face: %s, lift: ticks %u, up: %d",
+                        direction_to_string(interactive->door.face), interactive->door.lift.ticks,
+                        interactive->door.lift.up);
+               break;
+          case INTERACTIVE_TYPE_PORTAL:
+               type_string = "PORTAL";
+               snprintf(info_string, info_string_len, "face: %s, on: %d", direction_to_string(interactive->portal.face),
+                        interactive->portal.on);
+               break;
+          case INTERACTIVE_TYPE_BOMB:
+               type_string = "BOMB";
+               break;
+          case INTERACTIVE_TYPE_BOW:
+               type_string = "BOW";
+               break;
+          case INTERACTIVE_TYPE_STAIRS:
+               type_string = "STAIRS";
+               break;
+          case INTERACTIVE_TYPE_PROMPT:
+               type_string = "PROMPT";
+               break;
+          }
+
+          LOG("type: %s %s\n", type_string, info_string);
+     }
+
+     Rect_t coord_rect;
+
+     coord_rect.left = coord.x * TILE_SIZE_IN_PIXELS;
+     coord_rect.bottom = coord.y * TILE_SIZE_IN_PIXELS;
+     coord_rect.right = coord_rect.left + TILE_SIZE_IN_PIXELS;
+     coord_rect.top = coord_rect.bottom + TILE_SIZE_IN_PIXELS;
+
+     S16 block_count = 0;
+     Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
+     quad_tree_find_in(block_quad_tree, coord_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
+     for(S16 i = 0; i < block_count; i++){
+          auto* block = blocks[i];
+          LOG("block: %d, %d, dir: %s, element: %s\n", block->pos.pixel.x, block->pos.pixel.y,
+              direction_to_string(block->face), element_to_string(block->element));
+     }
+}
+
 int main(int argc, char** argv){
      DemoMode_t demo_mode = DEMO_MODE_NONE;
      const char* demo_filepath = nullptr;
@@ -2821,7 +2914,7 @@ int main(int argc, char** argv){
           if(arrow_texture == 0) return 1;
      }
 
-#if 0 // TODO: do we want this in the future
+#if 0 // TODO: do we want this in the future?
      Rect_t rooms[2];
      {
           rooms[0].left = 0;
@@ -3422,6 +3515,7 @@ int main(int argc, char** argv){
                          ctrl_down = true;
                          break;
                     case SDL_SCANCODE_B:
+#if 0
                     {
                          undo_commit(&undo, &player, &tilemap, &block_array, &interactive_array);
                          Coord_t min = pos_to_coord(player.pos) - Coord_t{1, 1};
@@ -3433,11 +3527,17 @@ int main(int argc, char** argv){
                               }
                          }
                     } break;
+#endif
                     case SDL_SCANCODE_5:
                          player.pos.pixel = mouse_select_world_pixel(mouse_screen, camera) + Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS};
                          player.pos.decimal.x = 0;
                          player.pos.decimal.y = 0;
                          break;
+                    case SDL_SCANCODE_H:
+                    {
+                         Coord_t coord = mouse_select_world(mouse_screen, camera);
+                         describe_coord(coord, &tilemap, interactive_quad_tree, block_quad_tree);
+                    } break;
                     }
                     break;
                case SDL_KEYUP:
@@ -3975,8 +4075,10 @@ int main(int argc, char** argv){
                bool stop_on_boundary_y = false;
                bool held_up = false;
 
-               check_block_collision_with_other_blocks(block, block_quad_tree, interactive_quad_tree, &tilemap,
-                                                       &player, last_block_pushed, last_block_pushed_direction);
+               if(pos_delta.x != 0.0f || pos_delta.y != 0.0f){
+                    check_block_collision_with_other_blocks(block, block_quad_tree, interactive_quad_tree, &tilemap,
+                                                            &player, last_block_pushed, last_block_pushed_direction);
+               }
 
                // get the current coord of the center of the block
                Pixel_t center = block->pos.pixel + Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS};
@@ -4342,7 +4444,7 @@ int main(int argc, char** argv){
 
                                    U8 portal_rotations = portal_rotations_between((Direction_t)(d), interactive->portal.face);
                                    Player_t* player_ptr = nullptr;
-                                   if(coord_distance_between(pos_to_coord(player.pos), portal_coord) <= 0.5f){
+                                   if(coord_distance_between(pos_to_coord(player.pos), portal_coord) <= 1.5f){
                                         player_ptr = &player;
                                    }
                                    draw_solids(tile_pos, portal_interactive, blocks, block_count, player_ptr, screen_camera,
