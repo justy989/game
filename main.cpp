@@ -1,6 +1,7 @@
 /*
 http://www.simonstalenhag.se/
 -Grant Sanderson 3blue1brown
+-Shane Hendrixson
 */
 
 #include <iostream>
@@ -367,12 +368,13 @@ Block_t* block_against_block_in_list(Block_t* block_to_check, Block_t** blocks, 
      return nullptr;
 }
 
-void search_portal_destination_for_blocks(QuadTreeNode_t<Block_t>* block_quad_tree, Direction_t source_portal_face, Direction_t dest_portal_face, Coord_t coord,
-                                          Coord_t portal_coord, Block_t* block_to_check, Block_t** blocks, S16* block_count, Pixel_t* offsets){
-     U8 rotations_between_portals = direction_rotations_between(source_portal_face, dest_portal_face);
-     Coord_t dest_coord = portal_coord + direction_opposite(dest_portal_face);
-     Pixel_t portal_offset = coord_to_pixel(dest_coord - coord);
-     Pixel_t pixel = coord_to_pixel_at_center(dest_coord); // the center of the destination coord
+void search_portal_destination_for_blocks(QuadTreeNode_t<Block_t>* block_quad_tree, Direction_t source_portal_face, Direction_t dest_portal_face,
+                                          Coord_t src_portal_coord, Block_t* block_to_check, Block_t** blocks, S16* block_count, Pixel_t* offsets){
+     U8 rotations_between_portals = portal_rotations_between(source_portal_face, dest_portal_face);
+     Coord_t dest_coord = src_portal_coord + direction_opposite(dest_portal_face);
+     Coord_t src_coord = src_portal_coord + direction_opposite(source_portal_face);
+     Pixel_t portal_offset = coord_to_pixel(dest_coord - src_coord);
+     Pixel_t pixel = coord_to_pixel_at_center(dest_coord); // the center of the destination
      Rect_t rect = rect_surrounding_adjacent_coords(dest_coord);
      quad_tree_find_in(block_quad_tree, rect, blocks, block_count, BLOCK_QUAD_TREE_MAX_QUERY);
 
@@ -425,7 +427,7 @@ Block_t* block_against_another_block(Block_t* block_to_check, Direction_t direct
                               auto portal_coord = portal_exits.directions[d].coords[p];
                               if(portal_coord == coord) continue;
 
-                              search_portal_destination_for_blocks(block_quad_tree, interactive->portal.face, (Direction_t)(d), coord,
+                              search_portal_destination_for_blocks(block_quad_tree, interactive->portal.face, (Direction_t)(d),
                                                                    portal_coord, block_to_check, blocks, &block_count, portal_offsets);
 
                               collided_block = block_against_block_in_list(block_to_check, blocks, block_count, direction, portal_offsets);
@@ -514,7 +516,7 @@ Block_t* block_inside_another_block(Block_t* block_to_check, QuadTreeNode_t<Bloc
                               auto portal_coord = portal_exits.directions[d].coords[p];
                               if(portal_coord == coord) continue;
 
-                              search_portal_destination_for_blocks(block_quad_tree, interactive->portal.face, (Direction_t)(d), coord,
+                              search_portal_destination_for_blocks(block_quad_tree, interactive->portal.face, (Direction_t)(d),
                                                                    portal_coord, block_to_check, blocks, &block_count, portal_offsets);
 
                               collided_block = block_inside_block_list(block_to_check, blocks, block_count, collided_with, portal_offsets);
@@ -2597,6 +2599,18 @@ void check_block_collision_with_other_blocks(Block_t* block_to_check, QuadTreeNo
           bool a_on_ice = block_on_ice(block_to_check, tilemap, interactive_quad_tree);
           bool b_on_ice = block_on_ice(inside_block, tilemap, interactive_quad_tree);
 
+#if 0
+          // TODO: remove, this is just for debuging exactly when collisions occur
+          block_to_check->vel.x = 0.0f;
+          block_to_check->accel.x = 0.0f;
+          block_to_check->vel.y = 0.0f;
+          block_to_check->accel.y = 0.0f;
+
+          inside_block->vel.x = 0.0f;
+          inside_block->accel.x = 0.0f;
+          inside_block->vel.y = 0.0f;
+          inside_block->accel.y = 0.0f;
+#else
           if(inside_block == block_to_check){
                switch(quadrant){
                default:
@@ -2656,6 +2670,7 @@ void check_block_collision_with_other_blocks(Block_t* block_to_check, QuadTreeNo
                     break;
                }
           }
+#endif
 
           if(block_to_check == last_block_pushed && quadrant == last_block_pushed_direction){
                player->push_time = 0.0f;
