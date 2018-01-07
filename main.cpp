@@ -50,6 +50,29 @@ Direction_t direction_between(Coord_t a, Coord_t b){
      return DIRECTION_UP;
 }
 
+bool directions_meet_expectations(Direction_t a, Direction_t b, Direction_t first_expectation, Direction_t second_expectation){
+     return (a == first_expectation && b == second_expectation) ||
+            (a == second_expectation && b == first_expectation);
+}
+
+DirectionMask_t vec_direction_mask(Vec_t vec){
+     DirectionMask_t mask = DIRECTION_MASK_NONE;
+
+     if(vec.x > 0){
+          mask = direction_mask_add(mask, DIRECTION_MASK_RIGHT);
+     }else if(vec.x < 0){
+          mask = direction_mask_add(mask, DIRECTION_MASK_LEFT);
+     }
+
+     if(vec.y > 0){
+          mask = direction_mask_add(mask, DIRECTION_MASK_UP);
+     }else if(vec.y < 0){
+          mask = direction_mask_add(mask, DIRECTION_MASK_DOWN);
+     }
+
+     return mask;
+}
+
 U8 portal_rotations_between(Direction_t a, Direction_t b){
      if(a == b) return 2;
      if(a == direction_opposite(b)) return 0;
@@ -370,13 +393,9 @@ Block_t* block_against_block_in_list(Block_t* block_to_check, Block_t** blocks, 
 
 void search_portal_destination_for_blocks(QuadTreeNode_t<Block_t>* block_quad_tree, Direction_t src_portal_face,
                                           Direction_t dst_portal_face, Coord_t src_portal_coord,
-                                          Coord_t dst_portal_coord, Block_t* block_to_check,
-                                          Block_t** blocks, S16* block_count, Pixel_t* offsets){
+                                          Coord_t dst_portal_coord, Block_t** blocks, S16* block_count, Pixel_t* offsets){
      U8 rotations_between_portals = portal_rotations_between(dst_portal_face, src_portal_face);
      Coord_t dst_coord = dst_portal_coord + direction_opposite(dst_portal_face);
-     // Coord_t src_coord = src_portal_coord + direction_opposite(src_portal_face);
-     // Pixel_t portal_offset = coord_to_pixel(dst_coord - src_coord);
-     // Pixel_t pixel = coord_to_pixel_at_center(dst_coord);
      Pixel_t src_portal_center_pixel = coord_to_pixel_at_center(src_portal_coord);
      Pixel_t dst_center_pixel = coord_to_pixel_at_center(dst_coord);
      Rect_t rect = rect_surrounding_adjacent_coords(dst_coord);
@@ -384,19 +403,12 @@ void search_portal_destination_for_blocks(QuadTreeNode_t<Block_t>* block_quad_tr
 
      for(S8 o = 0; o < *block_count; o++){
           Pixel_t offset = block_center_pixel(blocks[o]) - dst_center_pixel;
-
-          if(block_to_check == blocks[o]){
-               // TODO: this isn't ideal, is there a better solution?
-               // this only really happens when a block collides with itself through a portal and at this point, the situation is that the collision only happens
-               // 1 frame after the block moves passed the center of the tile, but should really happen at the center of the tile, so rotation doesn't matter
-               // offsets[o] = portal_offset + offset;
-          }else{
-               Pixel_t src_fake_pixel = src_portal_center_pixel + pixel_rotate_quadrants(offset, rotations_between_portals);
-               offsets[o] = src_fake_pixel - block_center_pixel(blocks[o]);
-          }
+          Pixel_t src_fake_pixel = src_portal_center_pixel + pixel_rotate_quadrants(offset, rotations_between_portals);
+          offsets[o] = src_fake_pixel - block_center_pixel(blocks[o]);
      }
 }
 
+// TODO: the form of this function looks a lot like block_inside_another_block(), see if we can compress these
 Block_t* block_against_another_block(Block_t* block_to_check, Direction_t direction, QuadTreeNode_t<Block_t>* block_quad_tree,
                                      QuadTreeNode_t<Interactive_t>* interactive_quad_tree, TileMap_t* tilemap, Direction_t* push_dir){
      Rect_t rect = rect_to_check_surrounding_blocks(block_center_pixel(block_to_check));
@@ -435,7 +447,7 @@ Block_t* block_against_another_block(Block_t* block_to_check, Direction_t direct
                               if(dst_coord == src_coord) continue;
 
                               search_portal_destination_for_blocks(block_quad_tree, interactive->portal.face, (Direction_t)(d), src_coord,
-                                                                   dst_coord, block_to_check, blocks, &block_count, portal_offsets);
+                                                                   dst_coord, blocks, &block_count, portal_offsets);
 
                               collided_block = block_against_block_in_list(block_to_check, blocks, block_count, direction, portal_offsets);
                               if(collided_block){
@@ -485,9 +497,20 @@ Block_t* block_inside_block_list(Block_t* block_to_check, Block_t** blocks, S16 
      return nullptr;
 }
 
-Block_t* block_inside_another_block(Block_t* block_to_check, QuadTreeNode_t<Block_t>* block_quad_tree,
-                                    QuadTreeNode_t<Interactive_t>* interactive_quad_tree, TileMap_t* tilemap,
-                                    Position_t* collided_with, U8* through_portal_rotations){
+#define MAX_CONNECTED_PORTALS 8
+
+struct BlockInsideResult_t{
+     Block_t* block;
+     Position_t collision_pos;
+     U8 portal_rotations;
+     Coord_t src_portal_coord;
+     Coord_t dst_portal_coord;
+};
+
+BlockInsideResult_t block_inside_another_block(Block_t* block_to_check, QuadTreeNode_t<Block_t>* block_quad_tree,
+                                                QuadTreeNode_t<Interactive_t>* interactive_quad_tree, TileMap_t* tilemap){
+     BlockInsideResult_t result = {};
+
      // TODO: need more complicated function to detect this
      Rect_t surrounding_rect = rect_to_check_surrounding_blocks(block_center_pixel(block_to_check));
      S16 block_count = 0;
@@ -500,10 +523,10 @@ Block_t* block_inside_another_block(Block_t* block_to_check, QuadTreeNode_t<Bloc
           portal_offsets[i].y = 0;
      }
 
-     Block_t* collided_block = block_inside_block_list(block_to_check, blocks, block_count, collided_with, portal_offsets);
+     Block_t* collided_block = block_inside_block_list(block_to_check, blocks, block_count, &result.collision_pos, portal_offsets);
      if(collided_block){
-          *through_portal_rotations = 0;
-          return collided_block;
+          result.block = collided_block;
+          return result;
      }
 
      // find portals around the block to check
@@ -520,16 +543,19 @@ Block_t* block_inside_another_block(Block_t* block_to_check, QuadTreeNode_t<Bloc
                     auto portal_exits = find_portal_exits(src_coord, tilemap, interactive_quad_tree);
                     for(S8 d = 0; d < DIRECTION_COUNT; d++){
                          for(S8 p = 0; p < portal_exits.directions[d].count; p++){
-                              auto portal_coord = portal_exits.directions[d].coords[p];
-                              if(portal_coord == src_coord) continue;
+                              auto dst_coord = portal_exits.directions[d].coords[p];
+                              if(dst_coord == src_coord) continue;
 
                               search_portal_destination_for_blocks(block_quad_tree, interactive->portal.face, (Direction_t)(d), src_coord,
-                                                                   portal_coord, block_to_check, blocks, &block_count, portal_offsets);
+                                                                   dst_coord, blocks, &block_count, portal_offsets);
 
-                              collided_block = block_inside_block_list(block_to_check, blocks, block_count, collided_with, portal_offsets);
+                              collided_block = block_inside_block_list(block_to_check, blocks, block_count, &result.collision_pos, portal_offsets);
                               if(collided_block){
-                                   *through_portal_rotations = portal_rotations_between(interactive->portal.face, (Direction_t)(d));
-                                   return collided_block;
+                                   result.block = collided_block;
+                                   result.portal_rotations = portal_rotations_between(interactive->portal.face, (Direction_t)(d));
+                                   result.src_portal_coord = src_coord;
+                                   result.dst_portal_coord = dst_coord;
+                                   return result;
                               }
                          }
                     }
@@ -537,7 +563,7 @@ Block_t* block_inside_another_block(Block_t* block_to_check, QuadTreeNode_t<Bloc
           }
      }
 
-     return nullptr;
+     return result;
 }
 
 Block_t* block_held_up_by_another_block(Block_t* block_to_check, QuadTreeNode_t<Block_t>* block_quad_tree){
@@ -2589,142 +2615,155 @@ void draw_solids(Vec_t pos, Interactive_t* interactive, Block_t** blocks, S16 bl
      }
 }
 
+
+void resolve_block_colliding_with_itself(Direction_t src_portal_dir, Direction_t dst_portal_dir, DirectionMask_t move_mask,
+                                         Block_t* block, Direction_t check_horizontal, Direction_t check_vertical, Direction_t* push_dir){
+     if(directions_meet_expectations(src_portal_dir, dst_portal_dir, check_horizontal, check_vertical)){
+          if(move_mask & direction_to_direction_mask(check_vertical)){
+               *push_dir = direction_opposite(check_horizontal);
+               block->vel.y = 0;
+               block->accel.y = 0;
+          }else if(move_mask & direction_to_direction_mask(check_horizontal)){
+               *push_dir = direction_opposite(check_vertical);
+               block->vel.x = 0;
+               block->accel.x = 0;
+          }
+     }
+}
+
+
 void check_block_collision_with_other_blocks(Block_t* block_to_check, QuadTreeNode_t<Block_t>* block_quad_tree,
                                              QuadTreeNode_t<Interactive_t>* interactive_quad_tree, TileMap_t* tilemap,
                                              Player_t* player, Block_t* last_block_pushed, Direction_t last_block_pushed_direction){
-     Block_t* inside_block = nullptr;
-     Position_t collided_with = {};
-     U8 portal_rotations = 0;
-     while((inside_block = block_inside_another_block(block_to_check, block_quad_tree,
-                                                      interactive_quad_tree, tilemap, &collided_with,
-                                                      &portal_rotations)) &&
-            blocks_at_collidable_height(block_to_check, inside_block)){
-          auto block_center_pixel = block_to_check->pos.pixel + Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS};
-          auto quadrant = relative_quadrant(block_center_pixel, collided_with.pixel);
-
-          // check if they are on ice before we adjust the position on our block to check
-          bool a_on_ice = block_on_ice(block_to_check, tilemap, interactive_quad_tree);
-          bool b_on_ice = block_on_ice(inside_block, tilemap, interactive_quad_tree);
+     for(BlockInsideResult_t block_inside_result = block_inside_another_block(block_to_check, block_quad_tree, interactive_quad_tree, tilemap);
+         block_inside_result.block && blocks_at_collidable_height(block_to_check, block_inside_result.block);
+         block_inside_result = block_inside_another_block(block_to_check, block_quad_tree, interactive_quad_tree, tilemap)){
 
 #if 0
+          (void)(player);
+          (void)(last_block_pushed);
+          (void)(last_block_pushed_direction);
+
           // TODO: remove, this is just for debuging exactly when collisions occur
           block_to_check->vel.x = 0.0f;
           block_to_check->accel.x = 0.0f;
           block_to_check->vel.y = 0.0f;
           block_to_check->accel.y = 0.0f;
 
-          inside_block->vel.x = 0.0f;
-          inside_block->accel.x = 0.0f;
-          inside_block->vel.y = 0.0f;
-          inside_block->accel.y = 0.0f;
+          block_inside_result.block->vel.x = 0.0f;
+          block_inside_result.block->accel.x = 0.0f;
+          block_inside_result.block->vel.y = 0.0f;
+          block_inside_result.block->accel.y = 0.0f;
 #else
-          if(inside_block == block_to_check){
-               switch(quadrant){
-               default:
-                    break;
-               case DIRECTION_LEFT:
-                    block_to_check->pos.pixel.x = collided_with.pixel.x + HALF_TILE_SIZE_IN_PIXELS;
-                    block_to_check->pos.decimal.x = 0.0f;
-                    block_to_check->vel.x = 0.0f;
-                    block_to_check->accel.x = 0.0f;
-                    break;
-               case DIRECTION_RIGHT:
-                    block_to_check->pos.pixel.x = collided_with.pixel.x - (HALF_TILE_SIZE_IN_PIXELS + TILE_SIZE_IN_PIXELS);
-                    block_to_check->pos.decimal.x = 0.0f;
-                    block_to_check->vel.x = 0.0f;
-                    block_to_check->accel.x = 0.0f;
-                    break;
-               case DIRECTION_DOWN:
-                    block_to_check->pos.pixel.y = collided_with.pixel.y + HALF_TILE_SIZE_IN_PIXELS;
-                    block_to_check->pos.decimal.y = 0.0f;
-                    block_to_check->vel.y = 0.0f;
-                    block_to_check->accel.y = 0.0f;
-                    break;
-               case DIRECTION_UP:
-                    block_to_check->pos.pixel.y = collided_with.pixel.y - (HALF_TILE_SIZE_IN_PIXELS + TILE_SIZE_IN_PIXELS);
-                    block_to_check->pos.decimal.y = 0.0f;
-                    block_to_check->vel.y = 0.0f;
-                    block_to_check->accel.y = 0.0f;
-                    break;
-               }
+          auto block_center_pixel = block_to_check->pos.pixel + Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS};
+          auto quadrant = relative_quadrant(block_center_pixel, block_inside_result.collision_pos.pixel);
+
+          // check if they are on ice before we adjust the position on our block to check
+          bool a_on_ice = block_on_ice(block_to_check, tilemap, interactive_quad_tree);
+          bool b_on_ice = block_on_ice(block_inside_result.block, tilemap, interactive_quad_tree);
+
+          if(block_inside_result.block == block_to_check){
+               block_to_check->pos = coord_to_pos(block_get_coord(block_to_check));
           }else{
                switch(quadrant){
                default:
                     break;
                case DIRECTION_LEFT:
-                    block_to_check->pos.pixel.x = collided_with.pixel.x + HALF_TILE_SIZE_IN_PIXELS;
+                    block_to_check->pos.pixel.x = block_inside_result.collision_pos.pixel.x + HALF_TILE_SIZE_IN_PIXELS;
                     block_to_check->pos.decimal.x = 0.0f;
                     block_to_check->vel.x = 0.0f;
                     block_to_check->accel.x = 0.0f;
                     break;
                case DIRECTION_RIGHT:
-                    block_to_check->pos.pixel.x = collided_with.pixel.x - HALF_TILE_SIZE_IN_PIXELS - TILE_SIZE_IN_PIXELS;
+                    block_to_check->pos.pixel.x = block_inside_result.collision_pos.pixel.x - HALF_TILE_SIZE_IN_PIXELS - TILE_SIZE_IN_PIXELS;
                     block_to_check->pos.decimal.x = 0.0f;
                     block_to_check->vel.x = 0.0f;
                     block_to_check->accel.x = 0.0f;
                     break;
                case DIRECTION_DOWN:
-                    block_to_check->pos.pixel.y = collided_with.pixel.y + HALF_TILE_SIZE_IN_PIXELS;
+                    block_to_check->pos.pixel.y = block_inside_result.collision_pos.pixel.y + HALF_TILE_SIZE_IN_PIXELS;
                     block_to_check->pos.decimal.y = 0.0f;
                     block_to_check->vel.y = 0.0f;
                     block_to_check->accel.y = 0.0f;
                     break;
                case DIRECTION_UP:
-                    block_to_check->pos.pixel.y = collided_with.pixel.y - HALF_TILE_SIZE_IN_PIXELS - TILE_SIZE_IN_PIXELS;
+                    block_to_check->pos.pixel.y = block_inside_result.collision_pos.pixel.y - HALF_TILE_SIZE_IN_PIXELS - TILE_SIZE_IN_PIXELS;
                     block_to_check->pos.decimal.y = 0.0f;
                     block_to_check->vel.y = 0.0f;
                     block_to_check->accel.y = 0.0f;
                     break;
                }
           }
-#endif
 
           if(block_to_check == last_block_pushed && quadrant == last_block_pushed_direction){
                player->push_time = 0.0f;
           }
 
           if(a_on_ice && b_on_ice){
-               Direction_t push_dir = direction_rotate_clockwise(quadrant, portal_rotations);
                bool push = true;
+               Direction_t push_dir = DIRECTION_COUNT;;
 
-               switch(push_dir){
-               default:
-                    break;
-               case DIRECTION_LEFT:
-                    if(inside_block->accel.x > 0){
-                         inside_block->accel.x = 0.0f;
-                         inside_block->vel.x = 0.0f;
-                         push = false;
+               if(block_inside_result.block == block_to_check){
+                    Coord_t block_coord = block_get_coord(block_to_check);
+                    Direction_t src_portal_dir = direction_between(block_coord, block_inside_result.src_portal_coord);
+                    Direction_t dst_portal_dir = direction_between(block_coord, block_inside_result.dst_portal_coord);
+                    DirectionMask_t move_mask = vec_direction_mask(block_to_check->vel);
+
+                    resolve_block_colliding_with_itself(src_portal_dir, dst_portal_dir, move_mask, block_to_check,
+                                                        DIRECTION_LEFT, DIRECTION_UP, &push_dir);
+
+                    resolve_block_colliding_with_itself(src_portal_dir, dst_portal_dir, move_mask, block_to_check,
+                                                        DIRECTION_LEFT, DIRECTION_DOWN, &push_dir);
+
+                    resolve_block_colliding_with_itself(src_portal_dir, dst_portal_dir, move_mask, block_to_check,
+                                                        DIRECTION_RIGHT, DIRECTION_UP, &push_dir);
+
+                    resolve_block_colliding_with_itself(src_portal_dir, dst_portal_dir, move_mask, block_to_check,
+                                                        DIRECTION_RIGHT, DIRECTION_DOWN, &push_dir);
+
+               }else{
+                    push_dir = direction_rotate_clockwise(quadrant, block_inside_result.portal_rotations);
+
+                    switch(push_dir){
+                    default:
+                         break;
+                    case DIRECTION_LEFT:
+                         if(block_inside_result.block->accel.x > 0){
+                              block_inside_result.block->accel.x = 0.0f;
+                              block_inside_result.block->vel.x = 0.0f;
+                              push = false;
+                         }
+                         break;
+                    case DIRECTION_RIGHT:
+                         if(block_inside_result.block->accel.x < 0){
+                              block_inside_result.block->accel.x = 0.0f;
+                              block_inside_result.block->vel.x = 0.0f;
+                              push = false;
+                         }
+                         break;
+                    case DIRECTION_DOWN:
+                         if(block_inside_result.block->accel.y > 0){
+                              block_inside_result.block->accel.y = 0.0f;
+                              block_inside_result.block->vel.y = 0.0f;
+                              push = false;
+                         }
+                         break;
+                    case DIRECTION_UP:
+                         if(block_inside_result.block->accel.y < 0){
+                              block_inside_result.block->accel.y = 0.0f;
+                              block_inside_result.block->vel.y = 0.0f;
+                              push = false;
+                         }
+                         break;
                     }
-                    break;
-               case DIRECTION_RIGHT:
-                    if(inside_block->accel.x < 0){
-                         inside_block->accel.x = 0.0f;
-                         inside_block->vel.x = 0.0f;
-                         push = false;
-                    }
-                    break;
-               case DIRECTION_DOWN:
-                    if(inside_block->accel.y > 0){
-                         inside_block->accel.y = 0.0f;
-                         inside_block->vel.y = 0.0f;
-                         push = false;
-                    }
-                    break;
-               case DIRECTION_UP:
-                    if(inside_block->accel.y < 0){
-                         inside_block->accel.y = 0.0f;
-                         inside_block->vel.y = 0.0f;
-                         push = false;
-                    }
-                    break;
                }
 
-               if(push) block_push(inside_block, push_dir, tilemap, interactive_quad_tree, block_quad_tree, true);
+               if(push) block_push(block_inside_result.block, push_dir, tilemap, interactive_quad_tree, block_quad_tree, true);
           }
+#endif
 
           // TODO: there is no way this is the right way to do this
-          if(inside_block == block_to_check) break;
+          if(block_inside_result.block == block_to_check) break;
      }
 }
 
