@@ -41,8 +41,8 @@ bool blocks_at_collidable_height(Block_t* a, Block_t* b){
 }
 
 Rect_t block_get_rect(Block_t* b){
-     Rect_t block_rect = {(S16)(b->pos.pixel.x - TILE_SIZE_IN_PIXELS),
-                          (S16)(b->pos.pixel.y - TILE_SIZE_IN_PIXELS),
+     Rect_t block_rect = {(S16)(b->pos.pixel.x),
+                          (S16)(b->pos.pixel.y),
                           (S16)(b->pos.pixel.x + TILE_SIZE_IN_PIXELS),
                           (S16)(b->pos.pixel.y + TILE_SIZE_IN_PIXELS)};
      return block_rect;
