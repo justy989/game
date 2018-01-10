@@ -163,15 +163,6 @@ Interactive_t* quad_tree_interactive_find_at(QuadTreeNode_t<Interactive_t>* root
      return quad_tree_find_at(root, coord.x, coord.y);
 }
 
-Interactive_t* quad_tree_interactive_solid_at(QuadTreeNode_t<Interactive_t>* root, Coord_t coord){
-     Interactive_t* interactive = quad_tree_find_at(root, coord.x, coord.y);
-     if(interactive && interactive_is_solid(interactive)){
-          return interactive;
-     }
-
-     return nullptr;
-}
-
 #define MAX_PORTAL_EXITS 4
 
 struct PortalExitCoords_t{
@@ -252,6 +243,30 @@ void find_portal_adjacents_to_skip_collision_check(Coord_t coord, QuadTreeNode_t
      if(interactive && interactive->type == INTERACTIVE_TYPE_PORTAL && interactive->portal.on){
           skip_coord[interactive->portal.face] = coord + interactive->portal.face;
      }
+}
+
+Interactive_t* quad_tree_interactive_solid_at(QuadTreeNode_t<Interactive_t>* root, TileMap_t* tilemap, Coord_t coord){
+     Interactive_t* interactive = quad_tree_find_at(root, coord.x, coord.y);
+     if(interactive){
+          if(interactive_is_solid(interactive)){
+               return interactive;
+          }else if(interactive->type == INTERACTIVE_TYPE_PORTAL && interactive->portal.on){
+               PortalExit_t portal_exits = find_portal_exits(coord, tilemap, root);
+               for(S8 d = 0; d < DIRECTION_COUNT; d++){
+                    for(S8 p = 0; p < portal_exits.directions[d].count; p++){
+                         if(portal_exits.directions[d].coords[p] == coord) continue;
+
+                         Coord_t through_portal_coord = portal_exits.directions[d].coords[p] - (Direction_t)(d);
+                         Interactive_t* through_portal_interactive = quad_tree_find_at(root, through_portal_coord.x, through_portal_coord.y);
+                         if(through_portal_interactive && interactive_is_solid(through_portal_interactive)){
+                              return through_portal_interactive;
+                         }
+                    }
+               }
+          }
+     }
+
+     return nullptr;
 }
 
 S8 teleport_position_across_portal(Position_t* position, Vec_t* pos_delta, QuadTreeNode_t<Interactive_t>* interactive_quad_tree,
@@ -970,7 +985,7 @@ void activate(TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qua
 }
 
 Interactive_t* block_against_solid_interactive(Block_t* block_to_check, Direction_t direction,
-                                               QuadTreeNode_t<Interactive_t>* interactive_quad_tree){
+                                               TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree){
      Pixel_t pixel_a;
      Pixel_t pixel_b;
 
@@ -979,11 +994,11 @@ Interactive_t* block_against_solid_interactive(Block_t* block_to_check, Directio
      }
 
      Coord_t tile_coord = pixel_to_coord(pixel_a);
-     Interactive_t* interactive = quad_tree_interactive_solid_at(interactive_quad_tree, tile_coord);
+     Interactive_t* interactive = quad_tree_interactive_solid_at(interactive_quad_tree, tilemap, tile_coord);
      if(interactive) return interactive;
 
      tile_coord = pixel_to_coord(pixel_b);
-     interactive = quad_tree_interactive_solid_at(interactive_quad_tree, tile_coord);
+     interactive = quad_tree_interactive_solid_at(interactive_quad_tree, tilemap, tile_coord);
      if(interactive) return interactive;
 
      return nullptr;
@@ -1006,7 +1021,7 @@ void block_push(Block_t* block, Direction_t direction, TileMap_t* tilemap, QuadT
      }
 
      if(block_against_solid_tile(block, direction, tilemap, interactive_quad_tree)) return;
-     if(block_against_solid_interactive(block, direction, interactive_quad_tree)) return;
+     if(block_against_solid_interactive(block, direction, tilemap, interactive_quad_tree)) return;
 
      switch(direction){
      default:
@@ -2387,7 +2402,9 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
      for(S16 y = min.y; y <= max.y; y++){
           for(S16 x = min.x; x <= max.x; x++){
                Coord_t coord {x, y};
-               if(quad_tree_interactive_solid_at(interactive_quad_tree, coord)){
+
+               Interactive_t* interactive = quad_tree_interactive_solid_at(interactive_quad_tree, tilemap, coord);
+               if(interactive){
                     bool collided = false;
                     player_collide_coord(position, coord, PLAYER_RADIUS, &pos_delta, &collided);
                     if(collided && !(*collided_with_interactive)){
@@ -4160,8 +4177,8 @@ int main(int argc, char** argv){
                     }else if(coord_b != skip_coord[DIRECTION_RIGHT] && tilemap_is_solid(&tilemap, coord_b)){
                          stop_on_boundary_x = true;
                     }else{
-                         stop_on_boundary_x = quad_tree_interactive_solid_at(interactive_quad_tree, coord_a) ||
-                                              quad_tree_interactive_solid_at(interactive_quad_tree, coord_b);
+                         stop_on_boundary_x = quad_tree_interactive_solid_at(interactive_quad_tree, &tilemap, coord_a) ||
+                                              quad_tree_interactive_solid_at(interactive_quad_tree, &tilemap, coord_b);
                     }
                }else if(block->vel.x < 0.0f){
                     Pixel_t pixel_a;
@@ -4174,8 +4191,8 @@ int main(int argc, char** argv){
                     }else if(coord_b != skip_coord[DIRECTION_LEFT] && tilemap_is_solid(&tilemap, coord_b)){
                          stop_on_boundary_x = true;
                     }else{
-                         stop_on_boundary_x = quad_tree_interactive_solid_at(interactive_quad_tree, coord_a) ||
-                                              quad_tree_interactive_solid_at(interactive_quad_tree, coord_b);
+                         stop_on_boundary_x = quad_tree_interactive_solid_at(interactive_quad_tree, &tilemap, coord_a) ||
+                                              quad_tree_interactive_solid_at(interactive_quad_tree, &tilemap, coord_b);
                     }
                }
 
@@ -4190,8 +4207,8 @@ int main(int argc, char** argv){
                     }else if(coord_b != skip_coord[DIRECTION_UP] && tilemap_is_solid(&tilemap, coord_b)){
                          stop_on_boundary_y = true;
                     }else{
-                         stop_on_boundary_y = quad_tree_interactive_solid_at(interactive_quad_tree, coord_a) ||
-                                              quad_tree_interactive_solid_at(interactive_quad_tree, coord_b);
+                         stop_on_boundary_y = quad_tree_interactive_solid_at(interactive_quad_tree, &tilemap, coord_a) ||
+                                              quad_tree_interactive_solid_at(interactive_quad_tree, &tilemap, coord_b);
                     }
                }else if(block->vel.y < 0.0f){
                     Pixel_t pixel_a;
@@ -4204,8 +4221,8 @@ int main(int argc, char** argv){
                     }else if(coord_b != skip_coord[DIRECTION_DOWN] && tilemap_is_solid(&tilemap, coord_b)){
                          stop_on_boundary_y = true;
                     }else{
-                         stop_on_boundary_y = quad_tree_interactive_solid_at(interactive_quad_tree, coord_a) ||
-                                              quad_tree_interactive_solid_at(interactive_quad_tree, coord_b);
+                         stop_on_boundary_y = quad_tree_interactive_solid_at(interactive_quad_tree, &tilemap, coord_a) ||
+                                              quad_tree_interactive_solid_at(interactive_quad_tree, &tilemap, coord_b);
                     }
                }
 
