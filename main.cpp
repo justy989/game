@@ -1370,6 +1370,8 @@ enum PlayerActionType_t{
      PLAYER_ACTION_TYPE_SHOOT_STOP,
      PLAYER_ACTION_TYPE_END_DEMO,
      PLAYER_ACTION_TYPE_UNDO,
+     PLAYER_ACTION_TYPE_GRAB_START,
+     PLAYER_ACTION_TYPE_GRAB_STOP,
 };
 
 struct PlayerAction_t{
@@ -1382,6 +1384,7 @@ struct PlayerAction_t{
      bool shoot;
      bool reface;
      bool undo;
+     bool grab;
      S8 move_left_rotation;
      S8 move_right_rotation;
      S8 move_up_rotation;
@@ -1475,6 +1478,12 @@ void player_action_perform(PlayerAction_t* player_action, Player_t* player, Play
      case PLAYER_ACTION_TYPE_UNDO:
           if(player_action->undo) return;
           player_action->undo = true;
+          break;
+     case PLAYER_ACTION_TYPE_GRAB_START:
+          player_action->grab = true;
+          break;
+     case PLAYER_ACTION_TYPE_GRAB_STOP:
+          player_action->grab = false;
           break;
      }
 
@@ -2210,6 +2219,7 @@ void reset_map(Player_t* player, Coord_t player_start, ObjectArray_t<Interactive
      player->walk_frame_delta = 1;
      player->pos = coord_to_pos_at_tile_center(player_start);
      player->has_bow = true;
+     player->grabbing_block = -1;
 
      // update interactive quad tree
      quad_tree_free(*interactive_quad_tree);
@@ -2599,7 +2609,7 @@ void draw_solids(Vec_t pos, Interactive_t* interactive, Block_t** blocks, S16 bl
           }
 
           S8 player_frame_y = direction_rotate_clockwise(player->face, portal_rotations);
-          if(player->push_time > FLT_EPSILON) player_frame_y += 4;
+          if(player->push_time > FLT_EPSILON || player->grabbing_block >= 0) player_frame_y += 4;
           if(player->has_bow){
                player_frame_y += 8;
                if(player->bow_draw_time > (PLAYER_BOW_DRAW_DELAY / 2.0f)){
@@ -3475,6 +3485,10 @@ int main(int argc, char** argv){
                          player_action_perform(&player_action, &player, PLAYER_ACTION_TYPE_UNDO, demo_mode,
                                                demo_file, frame_count);
                          break;
+                    case SDL_SCANCODE_G:
+                         player_action_perform(&player_action, &player, PLAYER_ACTION_TYPE_GRAB_START, demo_mode,
+                                               demo_file, frame_count);
+                         break;
                     case SDL_SCANCODE_N:
                     {
                          Tile_t* tile = tilemap_get_tile(&tilemap, mouse_select_world(mouse_screen, camera));
@@ -3651,6 +3665,10 @@ int main(int argc, char** argv){
                          break;
                     case SDL_SCANCODE_LCTRL:
                          ctrl_down = false;
+                         break;
+                    case SDL_SCANCODE_G:
+                         player_action_perform(&player_action, &player, PLAYER_ACTION_TYPE_GRAB_STOP, demo_mode,
+                                               demo_file, frame_count);
                          break;
                     }
                     break;
@@ -4057,6 +4075,50 @@ int main(int argc, char** argv){
                player_action.undo = false;
           }
 
+          if(player_action.grab){
+               Rect_t check_rect = {};
+               int64_t aprox_player_radius_in_pixels = 3;
+
+               switch(player.face){
+               default:
+                    break;
+               case DIRECTION_LEFT:
+                    check_rect.bottom = player.pos.pixel.y - aprox_player_radius_in_pixels;
+                    check_rect.top = player.pos.pixel.y + aprox_player_radius_in_pixels;
+                    check_rect.right = player.pos.pixel.x - aprox_player_radius_in_pixels;
+                    check_rect.left = check_rect.right - (HALF_TILE_SIZE_IN_PIXELS + 2);
+                    break;
+               case DIRECTION_RIGHT:
+                    check_rect.bottom = player.pos.pixel.y - aprox_player_radius_in_pixels;
+                    check_rect.top = player.pos.pixel.y + aprox_player_radius_in_pixels;
+                    check_rect.left = player.pos.pixel.x + aprox_player_radius_in_pixels;
+                    check_rect.right = check_rect.left + (HALF_TILE_SIZE_IN_PIXELS + 2);
+                    break;
+               case DIRECTION_UP:
+                    check_rect.left = player.pos.pixel.x - aprox_player_radius_in_pixels;
+                    check_rect.right = player.pos.pixel.x + aprox_player_radius_in_pixels;
+                    check_rect.bottom = player.pos.pixel.y + aprox_player_radius_in_pixels;
+                    check_rect.top = check_rect.bottom + (HALF_TILE_SIZE_IN_PIXELS + 2);
+                    break;
+               case DIRECTION_DOWN:
+                    check_rect.left = player.pos.pixel.x - aprox_player_radius_in_pixels;
+                    check_rect.right = player.pos.pixel.x + aprox_player_radius_in_pixels;
+                    check_rect.top = player.pos.pixel.y - aprox_player_radius_in_pixels;
+                    check_rect.bottom = check_rect.top - (HALF_TILE_SIZE_IN_PIXELS + 2);
+                    break;
+               }
+
+               S16 block_count = 0;
+               Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
+               quad_tree_find_in(block_quad_tree, check_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
+               if(block_count){
+                    // TODO: loop over blocks finding the closest one
+                    player.grabbing_block = blocks[0] - block_array.elements;
+               }
+          }else if(player.grabbing_block >= 0){
+               player.grabbing_block = -1;
+          }
+
           if(player.has_bow && player_action.shoot && player.bow_draw_time < PLAYER_BOW_DRAW_DELAY){
                player.bow_draw_time += dt;
           }else if(!player_action.shoot){
@@ -4380,7 +4442,68 @@ int main(int argc, char** argv){
           Position_t portal_player_pos = {};
 
           // player movement
-          {
+          if(player.grabbing_block >= 0){
+               Block_t* grabbed_block = block_array.elements + player.grabbing_block;
+               Pixel_t delta = {};
+
+               switch(player.face){
+               default:
+                    break;
+               case DIRECTION_LEFT:
+                    if(player_action.move_left){
+                         player_action.move_left = false;
+                         player.pos.decimal.x = 0;
+                         grabbed_block->pos.decimal.x = 0;
+                         delta.x = -1;
+                    }
+                    break;
+               case DIRECTION_RIGHT:
+                    if(player_action.move_right){
+                         player_action.move_right = false;
+                         player.pos.decimal.x = 0;
+                         grabbed_block->pos.decimal.x = 0;
+                         delta.x = 1;
+
+                    }
+                    break;
+               case DIRECTION_UP:
+                    if(player_action.move_up){
+                         player_action.move_up = false;
+                         player.pos.decimal.y = 0;
+                         grabbed_block->pos.decimal.y = 0;
+                         delta.y = 1;
+                    }
+                    break;
+               case DIRECTION_DOWN:
+                    if(player_action.move_down){
+                         player_action.move_down = false;
+                         player.pos.decimal.y = 0;
+                         grabbed_block->pos.decimal.y = 0;
+                         delta.y = -1;
+                    }
+                    break;
+               }
+
+               Direction_t push_dir = DIRECTION_COUNT;
+               Tile_t* against_tile = block_against_solid_tile(grabbed_block, player.face, &tilemap,
+                                                               interactive_quad_tree);
+               if(!against_tile){
+                    Interactive_t* against_interactive = block_against_solid_interactive(grabbed_block,
+                                                                                         player.face,
+                                                                                         &tilemap,
+                                                                                         interactive_quad_tree);
+                    if(!against_interactive){
+                         Block_t* against_block = block_against_another_block(grabbed_block, player.face,
+                                                                              block_quad_tree,
+                                                                              interactive_quad_tree,
+                                                                              &tilemap, &push_dir);
+                         if(!against_block){
+                              player.pos.pixel += delta;
+                              grabbed_block->pos.pixel += delta;
+                         }
+                    }
+               }
+          }else{
                user_movement = vec_normalize(user_movement);
                player.accel = user_movement * PLAYER_SPEED;
 
