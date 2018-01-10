@@ -4522,16 +4522,41 @@ int main(int argc, char** argv){
 
                                    U8 portal_rotations = portal_rotations_between((Direction_t)(d), interactive->portal.face);
                                    Player_t* player_ptr = nullptr;
-                                   if(coord_distance_between(pos_to_coord(player.pos), portal_coord) <= 1.5f){
+                                   Pixel_t portal_center_pixel = coord_to_pixel_at_center(portal_coord);
+                                   if(pixel_distance_between(portal_center_pixel, player.pos.pixel) <= 20){
                                         player_ptr = &player;
                                    }
                                    draw_solids(tile_pos, portal_interactive, blocks, block_count, player_ptr, screen_camera,
                                                theme_texture, player_texture, portal_coord, coord, portal_rotations);
+
                               }
                          }
 
                          interactive_draw(interactive, tile_pos);
                     }
+               }
+          }
+
+          for(S16 y = max.y; y >= min.y; y--){
+               for(S16 x = min.x; x <= max.x; x++){
+                    Tile_t* tile = tilemap.tiles[y] + x;
+                    if(tile && tile->id >= 16){
+                         Vec_t tile_pos {(F32)(x - min.x) * TILE_SIZE + camera_offset.x,
+                                         (F32)(y - min.y) * TILE_SIZE + camera_offset.y};
+                         tile_id_draw(tile->id, tile_pos);
+                    }
+               }
+          }
+
+          for(S16 y = max.y; y >= min.y; y--){
+               Player_t* player_ptr = nullptr;
+               if(pos_to_coord(player.pos).y == y) player_ptr = &player;
+
+               for(S16 x = min.x; x <= max.x; x++){
+                    Coord_t coord {x, y};
+
+                    Vec_t tile_pos {(F32)(x - min.x) * TILE_SIZE + camera_offset.x,
+                                    (F32)(y - min.y) * TILE_SIZE + camera_offset.y};
 
                     S16 px = coord.x * TILE_SIZE_IN_PIXELS;
                     S16 py = coord.y * TILE_SIZE_IN_PIXELS;
@@ -4543,79 +4568,67 @@ int main(int argc, char** argv){
                     Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
                     quad_tree_find_in(block_quad_tree, coord_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
 
-                    Player_t* player_ptr = nullptr;
-                    if(pos_to_coord(player.pos) == coord) player_ptr = &player;
+                    Interactive_t* interactive = quad_tree_find_at(interactive_quad_tree, x, y);
 
                     draw_solids(tile_pos, interactive, blocks, block_count, player_ptr, screen_camera, theme_texture, player_texture,
                                 Coord_t{-1, -1}, Coord_t{-1, -1}, 0);
 
-                    // draw arrows
-                    static Vec_t arrow_tip_offset[DIRECTION_COUNT] = {
-                         {0.0f,               9.0f * PIXEL_SIZE},
-                         {8.0f * PIXEL_SIZE,  16.0f * PIXEL_SIZE},
-                         {16.0f * PIXEL_SIZE, 9.0f * PIXEL_SIZE},
-                         {8.0f * PIXEL_SIZE,  0.0f * PIXEL_SIZE},
-                    };
-
-                    for(S16 a = 0; a < ARROW_ARRAY_MAX; a++){
-                         Arrow_t* arrow = arrow_array.arrows + a;
-                         if(!arrow->alive) continue;
-                         if((arrow->pos.pixel.y / TILE_SIZE_IN_PIXELS) != y) continue;
-
-                         Vec_t arrow_vec = pos_to_vec(arrow->pos - screen_camera);
-                         arrow_vec.x -= arrow_tip_offset[arrow->face].x;
-                         arrow_vec.y -= arrow_tip_offset[arrow->face].y;
-
-                         glEnd();
-                         glBindTexture(GL_TEXTURE_2D, arrow_texture);
-                         glBegin(GL_QUADS);
-                         glColor3f(1.0f, 1.0f, 1.0f);
-
-                         // shadow
-                         //arrow_vec.y -= (arrow->pos.z * PIXEL_SIZE);
-                         Vec_t tex_vec = arrow_frame(arrow->face, 1);
-                         glTexCoord2f(tex_vec.x, tex_vec.y);
-                         glVertex2f(arrow_vec.x, arrow_vec.y);
-                         glTexCoord2f(tex_vec.x, tex_vec.y + ARROW_FRAME_HEIGHT);
-                         glVertex2f(arrow_vec.x, arrow_vec.y + TILE_SIZE);
-                         glTexCoord2f(tex_vec.x + ARROW_FRAME_WIDTH, tex_vec.y + ARROW_FRAME_HEIGHT);
-                         glVertex2f(arrow_vec.x + TILE_SIZE, arrow_vec.y + TILE_SIZE);
-                         glTexCoord2f(tex_vec.x + ARROW_FRAME_WIDTH, tex_vec.y);
-                         glVertex2f(arrow_vec.x + TILE_SIZE, arrow_vec.y);
-
-                         arrow_vec.y += (arrow->pos.z * PIXEL_SIZE);
-
-                         S8 y_frame = 0;
-                         if(arrow->element) y_frame = 2 + ((arrow->element - 1) * 4);
-
-                         tex_vec = arrow_frame(arrow->face, y_frame);
-                         glTexCoord2f(tex_vec.x, tex_vec.y);
-                         glVertex2f(arrow_vec.x, arrow_vec.y);
-                         glTexCoord2f(tex_vec.x, tex_vec.y + ARROW_FRAME_HEIGHT);
-                         glVertex2f(arrow_vec.x, arrow_vec.y + TILE_SIZE);
-                         glTexCoord2f(tex_vec.x + ARROW_FRAME_WIDTH, tex_vec.y + ARROW_FRAME_HEIGHT);
-                         glVertex2f(arrow_vec.x + TILE_SIZE, arrow_vec.y + TILE_SIZE);
-                         glTexCoord2f(tex_vec.x + ARROW_FRAME_WIDTH, tex_vec.y);
-                         glVertex2f(arrow_vec.x + TILE_SIZE, arrow_vec.y);
-
-                         glEnd();
-
-                         glBindTexture(GL_TEXTURE_2D, theme_texture);
-                         glBegin(GL_QUADS);
-                         glColor3f(1.0f, 1.0f, 1.0f);
-                    }
                }
-          }
 
-          for(S16 y = max.y; y >= min.y; y--){
-               for(S16 x = min.x; x <= max.x; x++){
-                    Tile_t* tile = tilemap.tiles[y] + x;
-                    if(tile->id >= 16){
-                         Vec_t tile_pos {(F32)(x - min.x) * TILE_SIZE + camera_offset.x,
-                                         (F32)(y - min.y) * TILE_SIZE + camera_offset.y};
+               // draw arrows
+               static Vec_t arrow_tip_offset[DIRECTION_COUNT] = {
+                    {0.0f,               9.0f * PIXEL_SIZE},
+                    {8.0f * PIXEL_SIZE,  16.0f * PIXEL_SIZE},
+                    {16.0f * PIXEL_SIZE, 9.0f * PIXEL_SIZE},
+                    {8.0f * PIXEL_SIZE,  0.0f * PIXEL_SIZE},
+               };
 
-                         tile_id_draw(tile->id, tile_pos);
-                    }
+               for(S16 a = 0; a < ARROW_ARRAY_MAX; a++){
+                    Arrow_t* arrow = arrow_array.arrows + a;
+                    if(!arrow->alive) continue;
+                    if((arrow->pos.pixel.y / TILE_SIZE_IN_PIXELS) != y) continue;
+
+                    Vec_t arrow_vec = pos_to_vec(arrow->pos - screen_camera);
+                    arrow_vec.x -= arrow_tip_offset[arrow->face].x;
+                    arrow_vec.y -= arrow_tip_offset[arrow->face].y;
+
+                    glEnd();
+                    glBindTexture(GL_TEXTURE_2D, arrow_texture);
+                    glBegin(GL_QUADS);
+                    glColor3f(1.0f, 1.0f, 1.0f);
+
+                    // shadow
+                    //arrow_vec.y -= (arrow->pos.z * PIXEL_SIZE);
+                    Vec_t tex_vec = arrow_frame(arrow->face, 1);
+                    glTexCoord2f(tex_vec.x, tex_vec.y);
+                    glVertex2f(arrow_vec.x, arrow_vec.y);
+                    glTexCoord2f(tex_vec.x, tex_vec.y + ARROW_FRAME_HEIGHT);
+                    glVertex2f(arrow_vec.x, arrow_vec.y + TILE_SIZE);
+                    glTexCoord2f(tex_vec.x + ARROW_FRAME_WIDTH, tex_vec.y + ARROW_FRAME_HEIGHT);
+                    glVertex2f(arrow_vec.x + TILE_SIZE, arrow_vec.y + TILE_SIZE);
+                    glTexCoord2f(tex_vec.x + ARROW_FRAME_WIDTH, tex_vec.y);
+                    glVertex2f(arrow_vec.x + TILE_SIZE, arrow_vec.y);
+
+                    arrow_vec.y += (arrow->pos.z * PIXEL_SIZE);
+
+                    S8 y_frame = 0;
+                    if(arrow->element) y_frame = 2 + ((arrow->element - 1) * 4);
+
+                    tex_vec = arrow_frame(arrow->face, y_frame);
+                    glTexCoord2f(tex_vec.x, tex_vec.y);
+                    glVertex2f(arrow_vec.x, arrow_vec.y);
+                    glTexCoord2f(tex_vec.x, tex_vec.y + ARROW_FRAME_HEIGHT);
+                    glVertex2f(arrow_vec.x, arrow_vec.y + TILE_SIZE);
+                    glTexCoord2f(tex_vec.x + ARROW_FRAME_WIDTH, tex_vec.y + ARROW_FRAME_HEIGHT);
+                    glVertex2f(arrow_vec.x + TILE_SIZE, arrow_vec.y + TILE_SIZE);
+                    glTexCoord2f(tex_vec.x + ARROW_FRAME_WIDTH, tex_vec.y);
+                    glVertex2f(arrow_vec.x + TILE_SIZE, arrow_vec.y);
+
+                    glEnd();
+
+                    glBindTexture(GL_TEXTURE_2D, theme_texture);
+                    glBegin(GL_QUADS);
+                    glColor3f(1.0f, 1.0f, 1.0f);
                }
           }
 
@@ -4665,11 +4678,14 @@ int main(int argc, char** argv){
 
           glEnd();
 
+#if 0
           Vec_t collided_with_center = {(float)(g_collided_with_pixel.x) * PIXEL_SIZE, (float)(g_collided_with_pixel.y) * PIXEL_SIZE};
           const float half_block_size = PIXEL_SIZE * HALF_TILE_SIZE_IN_PIXELS;
           Quad_t collided_with_quad = {collided_with_center.x - half_block_size, collided_with_center.y - half_block_size,
                                        collided_with_center.x + half_block_size, collided_with_center.y + half_block_size};
           draw_quad_wireframe(&collided_with_quad, 255.0f, 0.0f, 255.0f);
+#endif
+
 #if 0
           // light
           glBindTexture(GL_TEXTURE_2D, 0);

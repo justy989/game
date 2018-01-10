@@ -14,5 +14,6 @@ void operator+=(Pixel_t& a, Pixel_t b);
 void operator-=(Pixel_t& a, Pixel_t b);
 bool operator!=(Pixel_t a, Pixel_t b);
 bool operator==(Pixel_t a, Pixel_t b);
+double pixel_distance_between(Pixel_t a, Pixel_t b);
 
 #endif
