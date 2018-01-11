@@ -1415,7 +1415,10 @@ void player_action_perform(PlayerAction_t* player_action, Player_t* player, Play
      case PLAYER_ACTION_TYPE_MOVE_LEFT_START:
           if(player_action->move_left) return;
           player_action->move_left = true;
-          player->face = DIRECTION_LEFT;
+          if(player->face != DIRECTION_LEFT){
+               player->face = DIRECTION_LEFT;
+               player_action->grab = false;
+          }
           break;
      case PLAYER_ACTION_TYPE_MOVE_LEFT_STOP:
           if(player->face == direction_rotate_clockwise(DIRECTION_LEFT, player_action->move_left_rotation)){
@@ -1427,7 +1430,10 @@ void player_action_perform(PlayerAction_t* player_action, Player_t* player, Play
      case PLAYER_ACTION_TYPE_MOVE_UP_START:
           if(player_action->move_up) return;
           player_action->move_up = true;
-          player->face = DIRECTION_UP;
+          if(player->face != DIRECTION_UP){
+               player->face = DIRECTION_UP;
+               player_action->grab = false;
+          }
           break;
      case PLAYER_ACTION_TYPE_MOVE_UP_STOP:
           if(player->face == direction_rotate_clockwise(DIRECTION_UP, player_action->move_up_rotation)){
@@ -1439,7 +1445,10 @@ void player_action_perform(PlayerAction_t* player_action, Player_t* player, Play
      case PLAYER_ACTION_TYPE_MOVE_RIGHT_START:
           if(player_action->move_right) return;
           player_action->move_right = true;
-          player->face = DIRECTION_RIGHT;
+          if(player->face != DIRECTION_RIGHT){
+               player->face = DIRECTION_RIGHT;
+               player_action->grab = false;
+          }
           break;
      case PLAYER_ACTION_TYPE_MOVE_RIGHT_STOP:
      {
@@ -1452,7 +1461,10 @@ void player_action_perform(PlayerAction_t* player_action, Player_t* player, Play
      case PLAYER_ACTION_TYPE_MOVE_DOWN_START:
           if(player_action->move_down) return;
           player_action->move_down = true;
-          player->face = DIRECTION_DOWN;
+          if(player->face != DIRECTION_DOWN){
+               player->face = DIRECTION_DOWN;
+               player_action->grab = false;
+          }
           break;
      case PLAYER_ACTION_TYPE_MOVE_DOWN_STOP:
           if(player->face == direction_rotate_clockwise(DIRECTION_DOWN, player_action->move_down_rotation)){
@@ -1480,9 +1492,11 @@ void player_action_perform(PlayerAction_t* player_action, Player_t* player, Play
           player_action->undo = true;
           break;
      case PLAYER_ACTION_TYPE_GRAB_START:
+          if(player_action->grab) return;
           player_action->grab = true;
           break;
      case PLAYER_ACTION_TYPE_GRAB_STOP:
+          if(!player_action->grab) return;
           player_action->grab = false;
           break;
      }
@@ -4030,6 +4044,82 @@ int main(int argc, char** argv){
           }
 
           // update player
+          if(player_action.grab){
+               if(player.grabbing_block < 0){
+                    Rect_t check_rect = {};
+                    int64_t aprox_player_radius_in_pixels = 3;
+
+                    switch(player.face){
+                    default:
+                         break;
+                    case DIRECTION_LEFT:
+                         check_rect.bottom = player.pos.pixel.y - aprox_player_radius_in_pixels;
+                         check_rect.top = player.pos.pixel.y + aprox_player_radius_in_pixels;
+                         check_rect.right = player.pos.pixel.x - aprox_player_radius_in_pixels;
+                         check_rect.left = check_rect.right - (HALF_TILE_SIZE_IN_PIXELS + 2);
+                         break;
+                    case DIRECTION_RIGHT:
+                         check_rect.bottom = player.pos.pixel.y - aprox_player_radius_in_pixels;
+                         check_rect.top = player.pos.pixel.y + aprox_player_radius_in_pixels;
+                         check_rect.left = player.pos.pixel.x + aprox_player_radius_in_pixels;
+                         check_rect.right = check_rect.left + (HALF_TILE_SIZE_IN_PIXELS + 2);
+                         break;
+                    case DIRECTION_UP:
+                         check_rect.left = player.pos.pixel.x - aprox_player_radius_in_pixels;
+                         check_rect.right = player.pos.pixel.x + aprox_player_radius_in_pixels;
+                         check_rect.bottom = player.pos.pixel.y + aprox_player_radius_in_pixels;
+                         check_rect.top = check_rect.bottom + (HALF_TILE_SIZE_IN_PIXELS + 2);
+                         break;
+                    case DIRECTION_DOWN:
+                         check_rect.left = player.pos.pixel.x - aprox_player_radius_in_pixels;
+                         check_rect.right = player.pos.pixel.x + aprox_player_radius_in_pixels;
+                         check_rect.top = player.pos.pixel.y - aprox_player_radius_in_pixels;
+                         check_rect.bottom = check_rect.top - (HALF_TILE_SIZE_IN_PIXELS + 2);
+                         break;
+                    }
+
+                    S16 block_count = 0;
+                    Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
+                    quad_tree_find_in(block_quad_tree, check_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
+                    if(block_count){
+                         // TODO: loop over blocks finding the closest one
+                         player.grabbing_block = blocks[0] - block_array.elements;
+                    }else{
+                         Coord_t check_coord = pos_to_coord(player.pos) + player.face;
+
+                         Interactive_t* interactive = quad_tree_interactive_find_at(interactive_quad_tree, check_coord);
+                         if(interactive && interactive->type == INTERACTIVE_TYPE_PORTAL && interactive->portal.on){
+                              PortalExit_t portal_exits = find_portal_exits(check_coord, &tilemap, interactive_quad_tree);
+
+                              Pixel_t portal_offsets[BLOCK_QUAD_TREE_MAX_QUERY];
+                              for(S8 p = 0; p < BLOCK_QUAD_TREE_MAX_QUERY; p++){
+                                   portal_offsets[p].x = 0;
+                                   portal_offsets[p].y = 0;
+                              }
+
+                              for(S8 d = 0; d < DIRECTION_COUNT; d++){
+                                   for(S8 p = 0; p < portal_exits.directions[d].count; p++){
+                                        if(portal_exits.directions[d].coords[p] == check_coord) continue;
+
+                                        search_portal_destination_for_blocks(block_quad_tree, interactive->portal.face, (Direction_t)(d), check_coord,
+                                                                             portal_exits.directions[d].coords[p], blocks, &block_count, portal_offsets);
+
+                                        for(S16 b = 0; b < block_count; b++){
+                                             Pixel_t final_block_pixel = block_center_pixel(blocks[b]) + portal_offsets[b];
+                                             if(pixel_in_rect(final_block_pixel, check_rect)){
+                                                  player.grabbing_block = blocks[b] - block_array.elements;
+                                                  break;
+                                             }
+                                        }
+                                   }
+                              }
+                         }
+                    }
+               }
+          }else if(player.grabbing_block >= 0){
+               player.grabbing_block = -1;
+          }
+
           user_movement = vec_zero();
 
           if(player_action.move_left){
@@ -4073,65 +4163,6 @@ int main(int argc, char** argv){
                quad_tree_free(block_quad_tree);
                block_quad_tree = quad_tree_build(&block_array);
                player_action.undo = false;
-          }
-
-          if(player_action.grab){
-               Rect_t check_rect = {};
-               int64_t aprox_player_radius_in_pixels = 3;
-
-               switch(player.face){
-               default:
-                    break;
-               case DIRECTION_LEFT:
-                    check_rect.bottom = player.pos.pixel.y - aprox_player_radius_in_pixels;
-                    check_rect.top = player.pos.pixel.y + aprox_player_radius_in_pixels;
-                    check_rect.right = player.pos.pixel.x - aprox_player_radius_in_pixels;
-                    check_rect.left = check_rect.right - (HALF_TILE_SIZE_IN_PIXELS + 2);
-                    break;
-               case DIRECTION_RIGHT:
-                    check_rect.bottom = player.pos.pixel.y - aprox_player_radius_in_pixels;
-                    check_rect.top = player.pos.pixel.y + aprox_player_radius_in_pixels;
-                    check_rect.left = player.pos.pixel.x + aprox_player_radius_in_pixels;
-                    check_rect.right = check_rect.left + (HALF_TILE_SIZE_IN_PIXELS + 2);
-                    break;
-               case DIRECTION_UP:
-                    check_rect.left = player.pos.pixel.x - aprox_player_radius_in_pixels;
-                    check_rect.right = player.pos.pixel.x + aprox_player_radius_in_pixels;
-                    check_rect.bottom = player.pos.pixel.y + aprox_player_radius_in_pixels;
-                    check_rect.top = check_rect.bottom + (HALF_TILE_SIZE_IN_PIXELS + 2);
-                    break;
-               case DIRECTION_DOWN:
-                    check_rect.left = player.pos.pixel.x - aprox_player_radius_in_pixels;
-                    check_rect.right = player.pos.pixel.x + aprox_player_radius_in_pixels;
-                    check_rect.top = player.pos.pixel.y - aprox_player_radius_in_pixels;
-                    check_rect.bottom = check_rect.top - (HALF_TILE_SIZE_IN_PIXELS + 2);
-                    break;
-               }
-
-               S16 block_count = 0;
-               Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
-               quad_tree_find_in(block_quad_tree, check_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
-               if(block_count){
-                    // TODO: loop over blocks finding the closest one
-                    player.grabbing_block = blocks[0] - block_array.elements;
-               }else{
-                    Coord_t check_coord = pos_to_coord(player.pos) + player.face;
-
-                    Interactive_t* interactive = quad_tree_interactive_find_at(interactive_quad_tree, check_coord);
-                    if(interactive && interactive->type == INTERACTIVE_TYPE_PORTAL && interactive->portal.on){
-                         PortalExit_t portal_exits = find_portal_exits(check_coord, tilemap, interactive_quad_tree);
-
-                         for(S8 d = 0; d < DIRECTION_COUNT; d++){
-                              for(S8 p = 0; p < portal_exits.directions[d].count; p++){
-                                   if(portal_exits.directions[d].coords[p] == check_coord) continue;
-
-                                   // NEXT_TODO: check for block through portal to grab
-                              }
-                         }
-                    }
-               }
-          }else if(player.grabbing_block >= 0){
-               player.grabbing_block = -1;
           }
 
           if(player.has_bow && player_action.shoot && player.bow_draw_time < PLAYER_BOW_DRAW_DELAY){
@@ -4477,7 +4508,6 @@ int main(int argc, char** argv){
                          player.pos.decimal.x = 0;
                          grabbed_block->pos.decimal.x = 0;
                          delta.x = 1;
-
                     }
                     break;
                case DIRECTION_UP:
