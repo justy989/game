@@ -4365,11 +4365,10 @@ int main(int argc, char** argv){
                     premove_coord = pixel_to_coord(block_center.pixel + Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS});
                     coord = pixel_to_coord(block->pos.pixel + Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS});
 
-                    block_center = block->pos;
-                    block_center.pixel += Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS};
+                    block_center = block_get_center(block);
 
                     rotations_between = teleport_position_across_portal(&block_center, NULL, interactive_quad_tree, &tilemap, premove_coord,
-                                                    coord);
+                                                                        coord);
                     if(rotations_between >= 0){
                          block->pos = block_center;
                          block->pos.pixel -= Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS};
@@ -4498,8 +4497,33 @@ int main(int argc, char** argv){
                                                                               interactive_quad_tree,
                                                                               &tilemap, &push_dir);
                          if(!against_block){
+                              Coord_t premove_coord = pixel_to_coord(player.pos.pixel);
                               player.pos.pixel += delta;
-                              grabbed_block->pos.pixel += delta;
+                              Coord_t postmove_coord = pixel_to_coord(player.pos.pixel);
+
+                              if(premove_coord != postmove_coord){
+                                   teleport_position_across_portal(&player.pos, NULL, interactive_quad_tree,
+                                                                   &tilemap, premove_coord, postmove_coord);
+                              }
+
+                              Position_t block_center = block_get_center(grabbed_block);
+
+                              premove_coord = pixel_to_coord(block_center.pixel);
+                              block_center.pixel += delta;
+                              postmove_coord = pixel_to_coord(block_center.pixel);
+
+                              if(premove_coord != postmove_coord){
+                                   teleport_position_across_portal(&block_center, NULL, interactive_quad_tree,
+                                                                   &tilemap, premove_coord, postmove_coord);
+                              }
+
+                              grabbed_block->pos= block_center;
+                              grabbed_block->pos.pixel -= Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS};
+
+                              if(block_on_ice(grabbed_block, &tilemap, interactive_quad_tree)){
+                                   player.grabbing_block = -1;
+                                   block_push(grabbed_block, player.face, &tilemap, interactive_quad_tree, block_quad_tree, true);
+                              }
                          }
                     }
                }
@@ -4809,7 +4833,7 @@ int main(int argc, char** argv){
           draw_quad_wireframe(&collided_with_quad, 255.0f, 0.0f, 255.0f);
 #endif
 
-#if 0
+#if 1
           // light
           glBindTexture(GL_TEXTURE_2D, 0);
           glBegin(GL_QUADS);
