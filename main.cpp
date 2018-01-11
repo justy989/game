@@ -4114,6 +4114,21 @@ int main(int argc, char** argv){
                if(block_count){
                     // TODO: loop over blocks finding the closest one
                     player.grabbing_block = blocks[0] - block_array.elements;
+               }else{
+                    Coord_t check_coord = pos_to_coord(player.pos) + player.face;
+
+                    Interactive_t* interactive = quad_tree_interactive_find_at(interactive_quad_tree, check_coord);
+                    if(interactive && interactive->type == INTERACTIVE_TYPE_PORTAL && interactive->portal.on){
+                         PortalExit_t portal_exits = find_portal_exits(check_coord, tilemap, interactive_quad_tree);
+
+                         for(S8 d = 0; d < DIRECTION_COUNT; d++){
+                              for(S8 p = 0; p < portal_exits.directions[d].count; p++){
+                                   if(portal_exits.directions[d].coords[p] == check_coord) continue;
+
+                                   // NEXT_TODO: check for block through portal to grab
+                              }
+                         }
+                    }
                }
           }else if(player.grabbing_block >= 0){
                player.grabbing_block = -1;
