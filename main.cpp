@@ -4010,6 +4010,22 @@ int main(int argc, char** argv){
                          Tile_t* tile = tilemap_get_tile(&tilemap, post_move_coord);
                          if(tile_is_solid(tile)){
                               arrow->stuck_time = dt;
+                         }else{
+                              Interactive_t* interactive = quad_tree_find_at(interactive_quad_tree, post_move_coord.x, post_move_coord.y);
+                              if(interactive){
+                                   switch(interactive->type){
+                                   default:
+                                        break;
+                                   case INTERACTIVE_TYPE_PORTAL:
+                                        if(!interactive->portal.on) arrow->stuck_time = dt;
+                                        break;
+                                   case INTERACTIVE_TYPE_POPUP:
+                                        // TODO: stick in popup and lower and raise with it !
+                                        break;
+                                   }
+                              }
+
+                              // TODO: stick in the side of a block if the arrow is low enough
                          }
                     }
 
@@ -4878,7 +4894,7 @@ int main(int argc, char** argv){
           draw_quad_wireframe(&collided_with_quad, 255.0f, 0.0f, 255.0f);
 #endif
 
-#if 1
+#if 0
           // light
           glBindTexture(GL_TEXTURE_2D, 0);
           glBegin(GL_QUADS);
