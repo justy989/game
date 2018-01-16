@@ -4963,6 +4963,45 @@ int main(int argc, char** argv){
           glEnd();
 #endif
 
+          static float demo_blink_timer = 0.0f;
+
+          demo_blink_timer += dt;
+
+          if(demo_blink_timer > 0.66f){
+
+               if(demo_blink_timer > 1.22f) demo_blink_timer -= 1.22f;
+
+               switch(demo_mode){
+               default:
+                    break;
+               case DEMO_MODE_RECORD:
+               {
+                    glBindTexture(GL_TEXTURE_2D, 0);
+                    glBegin(GL_POLYGON);
+                    glColor3f(1.0f, 0.0f, 0.0f);
+                    delta = 3.14159f * 2.0f / (F32)(segments);
+                    angle = 0.0f  + delta;
+                    for(S32 i = 0; i <= segments; i++){
+                         F32 dx = cos(angle) * 0.01;
+                         F32 dy = sin(angle) * 0.01;
+
+                         glVertex2f(0.98f + dx, 0.02f + dy);
+                         angle += delta;
+                    }
+                    glEnd();
+               } break;
+               case DEMO_MODE_PLAY:
+                    glBindTexture(GL_TEXTURE_2D, 0);
+                    glBegin(GL_TRIANGLES);
+                    glColor3f(1.0f, 0.0f, 0.0f);
+                    glVertex2f(0.975f, 0.01f);
+                    glVertex2f(0.975f, 0.03f);
+                    glVertex2f(0.995f, 0.02f);
+                    glEnd();
+                    break;
+               }
+          }
+
           // player start
           selection_draw(player_start, player_start, screen_camera, 0.0f, 1.0f, 0.0f);
 
