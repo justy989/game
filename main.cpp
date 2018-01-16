@@ -157,6 +157,18 @@ Rect_t rect_surrounding_adjacent_coords(Coord_t coord){
      return rect;
 }
 
+Rect_t rect_surrounding_coord(Coord_t coord){
+     Pixel_t pixel = coord_to_pixel(coord);
+
+     Rect_t rect = {};
+     rect.left = pixel.x;
+     rect.right = pixel.x + TILE_SIZE_IN_PIXELS;
+     rect.bottom = pixel.y;
+     rect.top = pixel.y + TILE_SIZE_IN_PIXELS;
+
+     return rect;
+}
+
 #define UNDO_MEMORY (4 * 1024 * 1024)
 
 Interactive_t* quad_tree_interactive_find_at(QuadTreeNode_t<Interactive_t>* root, Coord_t coord){
@@ -3928,6 +3940,17 @@ int main(int argc, char** argv){
                     if(arrow->stuck_time > ARROW_DISINTEGRATE_DELAY){
                          arrow->alive = false;
                     }
+
+                    switch(arrow->stick_type){
+                    default:
+                         break;
+                    case STICK_TYPE_BLOCK:
+                         arrow->pos = arrow->stick_to_block->pos + arrow->stick_offset;
+                         break;
+                    case STICK_TYPE_POPUP:
+                         arrow->pos.z = arrow->stick_to_popup->popup.lift.ticks + arrow->stick_offset.z;
+                         break;
+                    }
                     continue;
                }
 
@@ -4020,12 +4043,37 @@ int main(int argc, char** argv){
                                         if(!interactive->portal.on) arrow->stuck_time = dt;
                                         break;
                                    case INTERACTIVE_TYPE_POPUP:
-                                        // TODO: stick in popup and lower and raise with it !
+                                   {
+                                        S8 popup_height = interactive->popup.lift.ticks - 1;
+                                        if(popup_height > arrow->pos.z){
+                                             arrow->stuck_time = dt;
+                                             arrow->stick_offset = arrow->pos - coord_to_pos_at_tile_center(post_move_coord);
+                                             arrow->stick_type = STICK_TYPE_POPUP;
+                                             arrow->stick_to_popup = interactive;
+                                        }
+                                   }
                                         break;
                                    }
                               }
+                         }
 
-                              // TODO: stick in the side of a block if the arrow is low enough
+                         if(arrow->stuck_time < dt){
+                              Rect_t check_rect = rect_surrounding_coord(post_move_coord);
+                              S16 stick_block_count = 0;
+                              Block_t* stick_blocks[BLOCK_QUAD_TREE_MAX_QUERY];
+                              quad_tree_find_in(block_quad_tree, check_rect, stick_blocks, &stick_block_count, BLOCK_QUAD_TREE_MAX_QUERY);
+                              for(S8 b = 0; b < stick_block_count; b++){
+                                   Rect_t block_rect = block_get_rect(stick_blocks[b]);
+                                   if(pixel_in_rect(arrow->pos.pixel, block_rect) &&
+                                      arrow->pos.z >= stick_blocks[b]->pos.z &&
+                                      arrow->pos.z < (stick_blocks[b]->pos.z + HEIGHT_INTERVAL)){
+                                        arrow->stuck_time = dt;
+                                        arrow->stick_offset = arrow->pos - stick_blocks[b]->pos;
+                                        arrow->stick_type = STICK_TYPE_BLOCK;
+                                        arrow->stick_to_block = stick_blocks[b];
+                                        break;
+                                   }
+                              }
                          }
                     }
 

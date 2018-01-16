@@ -9,6 +9,15 @@
 #define ARROW_SHOOT_HEIGHT 7
 #define ARROW_FALL_DELAY 2.0f
 
+class Block_t;
+class Interactive_t;
+
+enum StickType_t{
+     STICK_TYPE_NONE,
+     STICK_TYPE_POPUP,
+     STICK_TYPE_BLOCK,
+};
+
 struct Arrow_t{
      Position_t pos;
      Direction_t face;
@@ -17,8 +26,15 @@ struct Arrow_t{
      S16 element_from_block;
 
      bool alive;
-     F32 stuck_time; // TODO: track objects we are stuck in
      F32 fall_time;
+
+     F32 stuck_time; // TODO: track objects we are stuck in
+     Position_t stick_offset;
+     StickType_t stick_type;
+     union{
+          Block_t* stick_to_block;
+          Interactive_t* stick_to_popup;
+     };
 };
 
 #define ARROW_ARRAY_MAX 32
