@@ -1384,6 +1384,7 @@ enum PlayerActionType_t{
      PLAYER_ACTION_TYPE_UNDO,
      PLAYER_ACTION_TYPE_GRAB_START,
      PLAYER_ACTION_TYPE_GRAB_STOP,
+     PLAYER_ACTION_TYPE_RESET_ROOM,
 };
 
 struct PlayerAction_t{
@@ -1397,6 +1398,7 @@ struct PlayerAction_t{
      bool reface;
      bool undo;
      bool grab;
+     bool reset_room;
      S8 move_left_rotation;
      S8 move_right_rotation;
      S8 move_up_rotation;
@@ -1510,6 +1512,10 @@ void player_action_perform(PlayerAction_t* player_action, Player_t* player, Play
      case PLAYER_ACTION_TYPE_GRAB_STOP:
           if(!player_action->grab) return;
           player_action->grab = false;
+          break;
+     case PLAYER_ACTION_TYPE_RESET_ROOM:
+          if(player_action->reset_room) return;
+          player_action->reset_room = true;
           break;
      }
 
@@ -2933,7 +2939,7 @@ int main(int argc, char** argv){
      bool test = false;
      bool suite = false;
      bool show_suite = false;
-     S16 map_number = 0;
+     S16 map_number = -1;
      S16 first_map_number = 0;
      S16 map_count = 0;
 
@@ -3079,6 +3085,8 @@ int main(int argc, char** argv){
                return 1;
           }
      }else if(suite){
+          map_number = 0;
+
           if(!load_map_number(map_number, &player_start, &tilemap, &block_array, &interactive_array)){
                return 1;
           }
@@ -3091,7 +3099,7 @@ int main(int argc, char** argv){
           }
           LOG("testing demo %s\n", demo_filepath);
           demo_entry_get(&demo_entry, demo_file);
-     }else if(map_number){
+     }else if(map_number >= 0){
           if(!load_map_number(map_number, &player_start, &tilemap, &block_array, &interactive_array)){
                return 1;
           }
@@ -3155,6 +3163,9 @@ int main(int argc, char** argv){
      undo_snapshot(&undo, &player, &tilemap, &block_array, &interactive_array);
 
      bool quit = false;
+
+     float resetting = 0;
+     bool has_reset = false;
 
      Vec_t user_movement = {};
      PlayerAction_t player_action {};
@@ -3513,6 +3524,10 @@ int main(int argc, char** argv){
                          break;
                     case SDL_SCANCODE_G:
                          player_action_perform(&player_action, &player, PLAYER_ACTION_TYPE_GRAB_START, demo_mode,
+                                               demo_file, frame_count);
+                         break;
+                    case SDL_SCANCODE_Z:
+                         player_action_perform(&player_action, &player, PLAYER_ACTION_TYPE_RESET_ROOM, demo_mode,
                                                demo_file, frame_count);
                          break;
                     case SDL_SCANCODE_N:
@@ -4108,125 +4123,158 @@ int main(int argc, char** argv){
           }
 
           // update player
-          if(player_action.grab){
-               if(player.grabbing_block < 0){
-                    Rect_t check_rect = {};
-                    int64_t aprox_player_radius_in_pixels = 3;
+          if(resetting == 0 || has_reset){
+               if(player_action.grab){
+                    if(player.grabbing_block < 0){
+                         Rect_t check_rect = {};
+                         int64_t aprox_player_radius_in_pixels = 3;
 
-                    switch(player.face){
-                    default:
-                         break;
-                    case DIRECTION_LEFT:
-                         check_rect.bottom = player.pos.pixel.y - aprox_player_radius_in_pixels;
-                         check_rect.top = player.pos.pixel.y + aprox_player_radius_in_pixels;
-                         check_rect.right = player.pos.pixel.x - aprox_player_radius_in_pixels;
-                         check_rect.left = check_rect.right - (HALF_TILE_SIZE_IN_PIXELS + 2);
-                         break;
-                    case DIRECTION_RIGHT:
-                         check_rect.bottom = player.pos.pixel.y - aprox_player_radius_in_pixels;
-                         check_rect.top = player.pos.pixel.y + aprox_player_radius_in_pixels;
-                         check_rect.left = player.pos.pixel.x + aprox_player_radius_in_pixels;
-                         check_rect.right = check_rect.left + (HALF_TILE_SIZE_IN_PIXELS + 2);
-                         break;
-                    case DIRECTION_UP:
-                         check_rect.left = player.pos.pixel.x - aprox_player_radius_in_pixels;
-                         check_rect.right = player.pos.pixel.x + aprox_player_radius_in_pixels;
-                         check_rect.bottom = player.pos.pixel.y + aprox_player_radius_in_pixels;
-                         check_rect.top = check_rect.bottom + (HALF_TILE_SIZE_IN_PIXELS + 2);
-                         break;
-                    case DIRECTION_DOWN:
-                         check_rect.left = player.pos.pixel.x - aprox_player_radius_in_pixels;
-                         check_rect.right = player.pos.pixel.x + aprox_player_radius_in_pixels;
-                         check_rect.top = player.pos.pixel.y - aprox_player_radius_in_pixels;
-                         check_rect.bottom = check_rect.top - (HALF_TILE_SIZE_IN_PIXELS + 2);
-                         break;
-                    }
+                         switch(player.face){
+                         default:
+                              break;
+                         case DIRECTION_LEFT:
+                              check_rect.bottom = player.pos.pixel.y - aprox_player_radius_in_pixels;
+                              check_rect.top = player.pos.pixel.y + aprox_player_radius_in_pixels;
+                              check_rect.right = player.pos.pixel.x - aprox_player_radius_in_pixels;
+                              check_rect.left = check_rect.right - (HALF_TILE_SIZE_IN_PIXELS + 2);
+                              break;
+                         case DIRECTION_RIGHT:
+                              check_rect.bottom = player.pos.pixel.y - aprox_player_radius_in_pixels;
+                              check_rect.top = player.pos.pixel.y + aprox_player_radius_in_pixels;
+                              check_rect.left = player.pos.pixel.x + aprox_player_radius_in_pixels;
+                              check_rect.right = check_rect.left + (HALF_TILE_SIZE_IN_PIXELS + 2);
+                              break;
+                         case DIRECTION_UP:
+                              check_rect.left = player.pos.pixel.x - aprox_player_radius_in_pixels;
+                              check_rect.right = player.pos.pixel.x + aprox_player_radius_in_pixels;
+                              check_rect.bottom = player.pos.pixel.y + aprox_player_radius_in_pixels;
+                              check_rect.top = check_rect.bottom + (HALF_TILE_SIZE_IN_PIXELS + 2);
+                              break;
+                         case DIRECTION_DOWN:
+                              check_rect.left = player.pos.pixel.x - aprox_player_radius_in_pixels;
+                              check_rect.right = player.pos.pixel.x + aprox_player_radius_in_pixels;
+                              check_rect.top = player.pos.pixel.y - aprox_player_radius_in_pixels;
+                              check_rect.bottom = check_rect.top - (HALF_TILE_SIZE_IN_PIXELS + 2);
+                              break;
+                         }
 
-                    S16 block_count = 0;
-                    Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
-                    quad_tree_find_in(block_quad_tree, check_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
-                    if(block_count){
-                         // TODO: loop over blocks finding the closest one
-                         player.grabbing_block = blocks[0] - block_array.elements;
-                    }else{
-                         Coord_t check_coord = pos_to_coord(player.pos) + player.face;
+                         S16 block_count = 0;
+                         Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
+                         quad_tree_find_in(block_quad_tree, check_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
+                         if(block_count){
+                              // TODO: loop over blocks finding the closest one
+                              player.grabbing_block = blocks[0] - block_array.elements;
+                         }else{
+                              Coord_t check_coord = pos_to_coord(player.pos) + player.face;
 
-                         Interactive_t* interactive = quad_tree_interactive_find_at(interactive_quad_tree, check_coord);
-                         if(interactive && interactive->type == INTERACTIVE_TYPE_PORTAL && interactive->portal.on){
-                              PortalExit_t portal_exits = find_portal_exits(check_coord, &tilemap, interactive_quad_tree);
+                              Interactive_t* interactive = quad_tree_interactive_find_at(interactive_quad_tree, check_coord);
+                              if(interactive && interactive->type == INTERACTIVE_TYPE_PORTAL && interactive->portal.on){
+                                   PortalExit_t portal_exits = find_portal_exits(check_coord, &tilemap, interactive_quad_tree);
 
-                              Pixel_t portal_offsets[BLOCK_QUAD_TREE_MAX_QUERY];
-                              for(S8 p = 0; p < BLOCK_QUAD_TREE_MAX_QUERY; p++){
-                                   portal_offsets[p].x = 0;
-                                   portal_offsets[p].y = 0;
-                              }
+                                   Pixel_t portal_offsets[BLOCK_QUAD_TREE_MAX_QUERY];
+                                   for(S8 p = 0; p < BLOCK_QUAD_TREE_MAX_QUERY; p++){
+                                        portal_offsets[p].x = 0;
+                                        portal_offsets[p].y = 0;
+                                   }
 
-                              for(S8 d = 0; d < DIRECTION_COUNT; d++){
-                                   for(S8 p = 0; p < portal_exits.directions[d].count; p++){
-                                        if(portal_exits.directions[d].coords[p] == check_coord) continue;
+                                   for(S8 d = 0; d < DIRECTION_COUNT; d++){
+                                        for(S8 p = 0; p < portal_exits.directions[d].count; p++){
+                                             if(portal_exits.directions[d].coords[p] == check_coord) continue;
 
-                                        search_portal_destination_for_blocks(block_quad_tree, interactive->portal.face, (Direction_t)(d), check_coord,
-                                                                             portal_exits.directions[d].coords[p], blocks, &block_count, portal_offsets);
+                                             search_portal_destination_for_blocks(block_quad_tree, interactive->portal.face, (Direction_t)(d), check_coord,
+                                                                                  portal_exits.directions[d].coords[p], blocks, &block_count, portal_offsets);
 
-                                        for(S16 b = 0; b < block_count; b++){
-                                             Pixel_t final_block_pixel = block_center_pixel(blocks[b]) + portal_offsets[b];
-                                             if(pixel_in_rect(final_block_pixel, check_rect)){
-                                                  player.grabbing_block = blocks[b] - block_array.elements;
-                                                  break;
+                                             for(S16 b = 0; b < block_count; b++){
+                                                  Pixel_t final_block_pixel = block_center_pixel(blocks[b]) + portal_offsets[b];
+                                                  if(pixel_in_rect(final_block_pixel, check_rect)){
+                                                       player.grabbing_block = blocks[b] - block_array.elements;
+                                                       break;
+                                                  }
                                              }
                                         }
                                    }
                               }
                          }
                     }
+               }else if(player.grabbing_block >= 0){
+                    player.grabbing_block = -1;
                }
-          }else if(player.grabbing_block >= 0){
-               player.grabbing_block = -1;
+
+               user_movement = vec_zero();
+
+               if(player_action.move_left){
+                    Direction_t direction = DIRECTION_LEFT;
+                    direction = direction_rotate_clockwise(direction, player_action.move_left_rotation);
+                    user_movement += direction_to_vec(direction);
+                    if(player_action.reface) player.face = direction;
+               }
+
+               if(player_action.move_right){
+                    Direction_t direction = DIRECTION_RIGHT;
+                    direction = direction_rotate_clockwise(direction, player_action.move_right_rotation);
+                    user_movement += direction_to_vec(direction);
+                    if(player_action.reface) player.face = direction;
+               }
+
+               if(player_action.move_up){
+                    Direction_t direction = DIRECTION_UP;
+                    direction = direction_rotate_clockwise(direction, player_action.move_up_rotation);
+                    user_movement += direction_to_vec(direction);
+                    if(player_action.reface) player.face = direction;
+               }
+
+               if(player_action.move_down){
+                    Direction_t direction = DIRECTION_DOWN;
+                    direction = direction_rotate_clockwise(direction, player_action.move_down_rotation);
+                    user_movement += direction_to_vec(direction);
+                    if(player_action.reface) player.face = direction;
+               }
+
+               if(player_action.activate && !player_action.last_activate){
+                    undo_commit(&undo, &player, &tilemap, &block_array, &interactive_array);
+                    activate(&tilemap, interactive_quad_tree, pos_to_coord(player.pos) + player.face);
+               }
+
+               if(player_action.undo){
+                    undo_commit(&undo, &player, &tilemap, &block_array, &interactive_array);
+                    undo_revert(&undo, &player, &tilemap, &block_array, &interactive_array);
+                    quad_tree_free(interactive_quad_tree);
+                    interactive_quad_tree = quad_tree_build(&interactive_array);
+                    quad_tree_free(block_quad_tree);
+                    block_quad_tree = quad_tree_build(&block_array);
+                    player_action.undo = false;
+               }
           }
 
-          user_movement = vec_zero();
+          if(player_action.reset_room){
+               if(has_reset){
+                    if(resetting <= 0){
+                         resetting = 0;
+                         has_reset = false;
+                         player_action.reset_room = false;
+                    }else{
+                         resetting -= dt;
+                    }
+               }else{
+                    if(resetting >= RESET_TIME){
+                         has_reset = true;
+                         if(load_map_filepath){
+                              if(!load_map(load_map_filepath, &player_start, &tilemap, &block_array, &interactive_array)){
+                                   return 1;
+                              }
 
-          if(player_action.move_left){
-               Direction_t direction = DIRECTION_LEFT;
-               direction = direction_rotate_clockwise(direction, player_action.move_left_rotation);
-               user_movement += direction_to_vec(direction);
-               if(player_action.reface) player.face = direction;
-          }
+                              reset_map(&player, player_start, &interactive_array, &interactive_quad_tree);
+                         }else if(map_number >= 0){
+                              if(!load_map_number(map_number, &player_start, &tilemap, &block_array, &interactive_array)){
+                                   return 1;
+                              }
 
-          if(player_action.move_right){
-               Direction_t direction = DIRECTION_RIGHT;
-               direction = direction_rotate_clockwise(direction, player_action.move_right_rotation);
-               user_movement += direction_to_vec(direction);
-               if(player_action.reface) player.face = direction;
-          }
-
-          if(player_action.move_up){
-               Direction_t direction = DIRECTION_UP;
-               direction = direction_rotate_clockwise(direction, player_action.move_up_rotation);
-               user_movement += direction_to_vec(direction);
-               if(player_action.reface) player.face = direction;
-          }
-
-          if(player_action.move_down){
-               Direction_t direction = DIRECTION_DOWN;
-               direction = direction_rotate_clockwise(direction, player_action.move_down_rotation);
-               user_movement += direction_to_vec(direction);
-               if(player_action.reface) player.face = direction;
-          }
-
-          if(player_action.activate && !player_action.last_activate){
-               undo_commit(&undo, &player, &tilemap, &block_array, &interactive_array);
-               activate(&tilemap, interactive_quad_tree, pos_to_coord(player.pos) + player.face);
-          }
-
-          if(player_action.undo){
-               undo_commit(&undo, &player, &tilemap, &block_array, &interactive_array);
-               undo_revert(&undo, &player, &tilemap, &block_array, &interactive_array);
-               quad_tree_free(interactive_quad_tree);
-               interactive_quad_tree = quad_tree_build(&interactive_array);
-               quad_tree_free(block_quad_tree);
-               block_quad_tree = quad_tree_build(&block_array);
-               player_action.undo = false;
+                              reset_map(&player, player_start, &interactive_array, &interactive_quad_tree);
+                         }
+                    }else{
+                         resetting += dt;
+                    }
+               }
           }
 
           if(player.has_bow && player_action.shoot && player.bow_draw_time < PLAYER_BOW_DRAW_DELAY){
@@ -5000,6 +5048,18 @@ int main(int argc, char** argv){
                     glEnd();
                     break;
                }
+          }
+
+          {
+               float reset_alpha = resetting / RESET_TIME;
+               glBindTexture(GL_TEXTURE_2D, 0);
+               glBegin(GL_QUADS);
+               glColor4f(0.0f, 0.0f, 0.0f, reset_alpha);
+               glVertex2f(0.0, 0.0);
+               glVertex2f(1.0, 0.0);
+               glVertex2f(1.0, 1.0);
+               glVertex2f(0.0, 1.0);
+               glEnd();
           }
 
           // player start
