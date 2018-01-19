@@ -11,11 +11,13 @@
 
 class Block_t;
 class Interactive_t;
+class Player_t;
 
 enum StickType_t{
      STICK_TYPE_NONE,
      STICK_TYPE_POPUP,
      STICK_TYPE_BLOCK,
+     STICK_TYPE_PLAYER,
 };
 
 struct Arrow_t{
@@ -28,12 +30,13 @@ struct Arrow_t{
      bool alive;
      F32 fall_time;
 
-     F32 stuck_time; // TODO: track objects we are stuck in
+     F32 stick_time; // TODO: track objects we are stuck in
      Position_t stick_offset;
      StickType_t stick_type;
      union{
           Block_t* stick_to_block;
           Interactive_t* stick_to_popup;
+          Player_t* stick_to_player;
      };
 };
 

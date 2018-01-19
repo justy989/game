@@ -2246,7 +2246,7 @@ FILE* load_demo_number(S32 map_number, const char** demo_filepath){
 }
 
 void reset_map(Player_t* player, Coord_t player_start, ObjectArray_t<Interactive_t>* interactive_array,
-               QuadTreeNode_t<Interactive_t>** interactive_quad_tree){
+               QuadTreeNode_t<Interactive_t>** interactive_quad_tree, ArrowArray_t* arrow_array){
      *player = {};
      player->walk_frame_delta = 1;
      player->pos = coord_to_pos_at_tile_center(player_start);
@@ -2256,6 +2256,7 @@ void reset_map(Player_t* player, Coord_t player_start, ObjectArray_t<Interactive
      // update interactive quad tree
      quad_tree_free(*interactive_quad_tree);
      *interactive_quad_tree = quad_tree_build(interactive_array);
+     init(arrow_array);
 }
 
 void position_move_against_block(Position_t pos, Position_t block_pos, Vec_t* pos_delta, bool* collide_with_block){
@@ -3155,7 +3156,7 @@ int main(int argc, char** argv){
      QuadTreeNode_t<Interactive_t>* interactive_quad_tree = nullptr;
      QuadTreeNode_t<Block_t>* block_quad_tree = nullptr;
 
-     reset_map(&player, player_start, &interactive_array, &interactive_quad_tree);
+     reset_map(&player, player_start, &interactive_array, &interactive_quad_tree, &arrow_array);
 
      Undo_t undo = {};
      init(&undo, UNDO_MEMORY, tilemap.width, tilemap.height, block_array.count, interactive_array.count);
@@ -3382,7 +3383,7 @@ int main(int argc, char** argv){
                                         return 0;
                                    }
                                    if(load_map_number(map_number, &player_start, &tilemap, &block_array, &interactive_array)){
-                                        reset_map(&player, player_start, &interactive_array, &interactive_quad_tree);
+                                        reset_map(&player, player_start, &interactive_array, &interactive_quad_tree, &arrow_array);
                                         destroy(&undo);
                                         init(&undo, UNDO_MEMORY, tilemap.width, tilemap.height, block_array.count, interactive_array.count);
                                         undo_snapshot(&undo, &player, &tilemap, &block_array, &interactive_array);
@@ -3477,7 +3478,7 @@ int main(int argc, char** argv){
                          break;
                     case SDL_SCANCODE_L:
                          if(load_map_number(map_number, &player_start, &tilemap, &block_array, &interactive_array)){
-                              reset_map(&player, player_start, &interactive_array, &interactive_quad_tree);
+                              reset_map(&player, player_start, &interactive_array, &interactive_quad_tree, &arrow_array);
                               destroy(&undo);
                               init(&undo, UNDO_MEMORY, tilemap.width, tilemap.height, block_array.count, interactive_array.count);
                               undo_snapshot(&undo, &player, &tilemap, &block_array, &interactive_array);
@@ -3488,7 +3489,7 @@ int main(int argc, char** argv){
                     case SDL_SCANCODE_LEFTBRACKET:
                          map_number--;
                          if(load_map_number(map_number, &player_start, &tilemap, &block_array, &interactive_array)){
-                              reset_map(&player, player_start, &interactive_array, &interactive_quad_tree);
+                              reset_map(&player, player_start, &interactive_array, &interactive_quad_tree, &arrow_array);
                               destroy(&undo);
                               init(&undo, UNDO_MEMORY, tilemap.width, tilemap.height, block_array.count, interactive_array.count);
                               undo_snapshot(&undo, &player, &tilemap, &block_array, &interactive_array);
@@ -3502,7 +3503,7 @@ int main(int argc, char** argv){
                          map_number++;
                          if(load_map_number(map_number, &player_start, &tilemap, &block_array, &interactive_array)){
                               // TODO: compress with code above
-                              reset_map(&player, player_start, &interactive_array, &interactive_quad_tree);
+                              reset_map(&player, player_start, &interactive_array, &interactive_quad_tree, &arrow_array);
                               destroy(&undo);
                               init(&undo, UNDO_MEMORY, tilemap.width, tilemap.height, block_array.count, interactive_array.count);
                               undo_snapshot(&undo, &player, &tilemap, &block_array, &interactive_array);
@@ -3939,6 +3940,12 @@ int main(int argc, char** argv){
                }
           }
 
+          Rect_t player_rect = {};
+          player_rect.left = player.pos.pixel.x - 3;
+          player_rect.right = player_rect.left + 6;
+          player_rect.bottom = player.pos.pixel.y - 3;
+          player_rect.top = player_rect.bottom + 6;
+
           // update arrows
           for(S16 i = 0; i < ARROW_ARRAY_MAX; i++){
                Arrow_t* arrow = arrow_array.arrows + i;
@@ -3950,9 +3957,9 @@ int main(int argc, char** argv){
                     illuminate(pre_move_coord, 255 - LIGHT_DECAY, &tilemap, block_quad_tree);
                }
 
-               if(arrow->stuck_time > 0.0f){
-                    arrow->stuck_time += dt;
-                    if(arrow->stuck_time > ARROW_DISINTEGRATE_DELAY){
+               if(arrow->stick_time > 0.0f){
+                    arrow->stick_time += dt;
+                    if(arrow->stick_time > ARROW_DISINTEGRATE_DELAY){
                          arrow->alive = false;
                     }
 
@@ -4002,6 +4009,18 @@ int main(int argc, char** argv){
 
                arrow->pos += (direction * dt * arrow->vel);
                arrow->vel *= arrow_friction;
+
+               if(arrow->pos.z >= player.pos.z &&
+                  arrow->pos.z < player.pos.z + (HEIGHT_INTERVAL * 2) &&
+                  pixel_in_rect(arrow->pos.pixel, player_rect)){
+                    arrow->stick_time += dt;
+                    arrow->stick_offset = arrow->pos - player.pos;
+                    arrow->stick_type = STICK_TYPE_PLAYER;
+                    arrow->stick_to_player = &player;
+                    resetting = dt;
+                    break;
+               }
+
                Coord_t post_move_coord = pixel_to_coord(arrow->pos.pixel);
 
                Rect_t coord_rect {(S16)(arrow->pos.pixel.x - TILE_SIZE_IN_PIXELS),
@@ -4047,7 +4066,7 @@ int main(int argc, char** argv){
                     if(!skip){
                          Tile_t* tile = tilemap_get_tile(&tilemap, post_move_coord);
                          if(tile_is_solid(tile)){
-                              arrow->stuck_time = dt;
+                              arrow->stick_time = dt;
                          }else{
                               Interactive_t* interactive = quad_tree_find_at(interactive_quad_tree, post_move_coord.x, post_move_coord.y);
                               if(interactive){
@@ -4055,13 +4074,13 @@ int main(int argc, char** argv){
                                    default:
                                         break;
                                    case INTERACTIVE_TYPE_PORTAL:
-                                        if(!interactive->portal.on) arrow->stuck_time = dt;
+                                        if(!interactive->portal.on) arrow->stick_time = dt;
                                         break;
                                    case INTERACTIVE_TYPE_POPUP:
                                    {
                                         S8 popup_height = interactive->popup.lift.ticks - 1;
                                         if(popup_height > arrow->pos.z){
-                                             arrow->stuck_time = dt;
+                                             arrow->stick_time = dt;
                                              arrow->stick_offset = arrow->pos - coord_to_pos_at_tile_center(post_move_coord);
                                              arrow->stick_type = STICK_TYPE_POPUP;
                                              arrow->stick_to_popup = interactive;
@@ -4072,7 +4091,7 @@ int main(int argc, char** argv){
                               }
                          }
 
-                         if(arrow->stuck_time < dt){
+                         if(arrow->stick_time < dt){
                               Rect_t check_rect = rect_surrounding_coord(post_move_coord);
                               S16 stick_block_count = 0;
                               Block_t* stick_blocks[BLOCK_QUAD_TREE_MAX_QUERY];
@@ -4082,7 +4101,7 @@ int main(int argc, char** argv){
                                    if(pixel_in_rect(arrow->pos.pixel, block_rect) &&
                                       arrow->pos.z >= stick_blocks[b]->pos.z &&
                                       arrow->pos.z < (stick_blocks[b]->pos.z + HEIGHT_INTERVAL)){
-                                        arrow->stuck_time = dt;
+                                        arrow->stick_time = dt;
                                         arrow->stick_offset = arrow->pos - stick_blocks[b]->pos;
                                         arrow->stick_type = STICK_TYPE_BLOCK;
                                         arrow->stick_to_block = stick_blocks[b];
@@ -4105,11 +4124,11 @@ int main(int argc, char** argv){
                               if(arrow->pos.z >= HEIGHT_INTERVAL){
                                    activate(&tilemap, interactive_quad_tree, post_move_coord);
                               }else{
-                                   arrow->stuck_time = dt;
+                                   arrow->stick_time = dt;
                               }
                          }else if(interactive->type == INTERACTIVE_TYPE_DOOR){
                               if(interactive->door.lift.ticks < arrow->pos.z){
-                                   arrow->stuck_time = dt;
+                                   arrow->stick_time = dt;
                               }
                          }
                     }
@@ -4118,6 +4137,36 @@ int main(int argc, char** argv){
                                                                            post_move_coord);
                     if(rotations_between >= 0){
                          arrow->face = direction_rotate_clockwise(arrow->face, rotations_between);
+                    }
+               }
+          }
+
+          if(resetting > 0){
+               if(has_reset){
+                    resetting -= dt;
+                    if(resetting <= 0){
+                         resetting = 0;
+                         has_reset = false;
+                         player_action.reset_room = false;
+                    }
+               }else{
+                    if(resetting >= RESET_TIME){
+                         has_reset = true;
+                         if(load_map_filepath){
+                              if(!load_map(load_map_filepath, &player_start, &tilemap, &block_array, &interactive_array)){
+                                   return 1;
+                              }
+
+                              reset_map(&player, player_start, &interactive_array, &interactive_quad_tree, &arrow_array);
+                         }else if(map_number >= 0){
+                              if(!load_map_number(map_number, &player_start, &tilemap, &block_array, &interactive_array)){
+                                   return 1;
+                              }
+
+                              reset_map(&player, player_start, &interactive_array, &interactive_quad_tree, &arrow_array);
+                         }
+                    }else{
+                         resetting += dt;
                     }
                }
           }
@@ -4247,34 +4296,8 @@ int main(int argc, char** argv){
           }
 
           if(player_action.reset_room){
-               if(has_reset){
-                    if(resetting <= 0){
-                         resetting = 0;
-                         has_reset = false;
-                         player_action.reset_room = false;
-                    }else{
-                         resetting -= dt;
-                    }
-               }else{
-                    if(resetting >= RESET_TIME){
-                         has_reset = true;
-                         if(load_map_filepath){
-                              if(!load_map(load_map_filepath, &player_start, &tilemap, &block_array, &interactive_array)){
-                                   return 1;
-                              }
-
-                              reset_map(&player, player_start, &interactive_array, &interactive_quad_tree);
-                         }else if(map_number >= 0){
-                              if(!load_map_number(map_number, &player_start, &tilemap, &block_array, &interactive_array)){
-                                   return 1;
-                              }
-
-                              reset_map(&player, player_start, &interactive_array, &interactive_quad_tree);
-                         }
-                    }else{
-                         resetting += dt;
-                    }
-               }
+               player_action.reset_room = false;
+               resetting = dt;
           }
 
           if(player.has_bow && player_action.shoot && player.bow_draw_time < PLAYER_BOW_DRAW_DELAY){
@@ -5052,14 +5075,16 @@ int main(int argc, char** argv){
 
           {
                float reset_alpha = resetting / RESET_TIME;
-               glBindTexture(GL_TEXTURE_2D, 0);
-               glBegin(GL_QUADS);
-               glColor4f(0.0f, 0.0f, 0.0f, reset_alpha);
-               glVertex2f(0.0, 0.0);
-               glVertex2f(1.0, 0.0);
-               glVertex2f(1.0, 1.0);
-               glVertex2f(0.0, 1.0);
-               glEnd();
+               if(reset_alpha > 0){
+                    glBindTexture(GL_TEXTURE_2D, 0);
+                    glBegin(GL_QUADS);
+                    glColor4f(0.0f, 0.0f, 0.0f, reset_alpha);
+                    glVertex2f(0.0, 0.0);
+                    glVertex2f(1.0, 0.0);
+                    glVertex2f(1.0, 1.0);
+                    glVertex2f(0.0, 1.0);
+                    glEnd();
+               }
           }
 
           // player start
