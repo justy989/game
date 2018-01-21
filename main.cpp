@@ -3885,6 +3885,8 @@ int main(int argc, char** argv){
                }
           }
 
+          if(quit) break;
+
           // reset base light
           for(S16 j = 0; j < tilemap.height; j++){
                for(S16 i = 0; i < tilemap.width; i++){
