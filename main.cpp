@@ -331,18 +331,30 @@ S8 teleport_position_across_portal(Position_t* position, Vec_t* pos_delta, QuadT
 #define BLOCK_QUAD_TREE_MAX_QUERY 16
 
 bool block_on_ice(Block_t* block, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree){
+     Coord_t coords[4];
+
+     coords[0] = pixel_to_coord(block->pos.pixel + Pixel_t{1, 1});
+     coords[1] = pixel_to_coord(block->pos.pixel + Pixel_t{TILE_SIZE_IN_PIXELS - 2, 1});
+     coords[2] = pixel_to_coord(block->pos.pixel + Pixel_t{1, TILE_SIZE_IN_PIXELS - 2});
+     coords[3] = pixel_to_coord(block->pos.pixel + Pixel_t{TILE_SIZE_IN_PIXELS - 2, TILE_SIZE_IN_PIXELS - 2});
+
      if(block->pos.z == 0){
-          Coord_t coord = block_get_coord(block);
-          Interactive_t* interactive = quad_tree_interactive_find_at(interactive_quad_tree, coord);
-          if(interactive){
-               if(interactive->type == INTERACTIVE_TYPE_POPUP){
-                    if(interactive->popup.lift.ticks == 1 && interactive->popup.iced){
-                         return true;
+          for(S8 i = 0; i < 4; i++){
+               Interactive_t* interactive = quad_tree_interactive_find_at(interactive_quad_tree, coords[i]);
+               if(interactive){
+                    if(interactive->type == INTERACTIVE_TYPE_POPUP){
+                         if(interactive->popup.lift.ticks == (block->pos.z + 1) && interactive->popup.iced){
+                              return true;
+                         }
                     }
                }
           }
 
-          return tilemap_is_iced(tilemap, coord);
+          for(S8 i = 0; i < 4; i++){
+               if(tilemap_is_iced(tilemap, coords[i])){
+                    return true;
+               }
+          }
      }
 
      // TODO: check for blocks below
@@ -745,12 +757,12 @@ Vec_t collide_circle_with_line(Vec_t circle_center, F32 circle_radius, Vec_t a, 
 S16 range_passes_tile_boundary(S16 a, S16 b, S16 ignore){
      if(a == b) return 0;
      if(a > b){
-          if((b % TILE_SIZE_IN_PIXELS) == 0) return 0;
+          if((b % HALF_TILE_SIZE_IN_PIXELS) == 0) return 0;
           SWAP(a, b);
      }
 
      for(S16 i = a; i <= b; i++){
-          if((i % TILE_SIZE_IN_PIXELS) == 0 && i != ignore){
+          if((i % HALF_TILE_SIZE_IN_PIXELS) == 0 && i != ignore){
                return i;
           }
      }
