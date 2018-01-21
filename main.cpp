@@ -329,17 +329,22 @@ S8 teleport_position_across_portal(Position_t* position, Vec_t* pos_delta, QuadT
 }
 
 #define BLOCK_QUAD_TREE_MAX_QUERY 16
+#define BLOCK_MAX_TOUCHING_COORDS 4
 
-bool block_on_ice(Block_t* block, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree){
-     Coord_t coords[4];
-
+void block_touching_coords(Block_t* block, Coord_t* coords){
      coords[0] = pixel_to_coord(block->pos.pixel + Pixel_t{1, 1});
      coords[1] = pixel_to_coord(block->pos.pixel + Pixel_t{TILE_SIZE_IN_PIXELS - 2, 1});
      coords[2] = pixel_to_coord(block->pos.pixel + Pixel_t{1, TILE_SIZE_IN_PIXELS - 2});
      coords[3] = pixel_to_coord(block->pos.pixel + Pixel_t{TILE_SIZE_IN_PIXELS - 2, TILE_SIZE_IN_PIXELS - 2});
+}
+
+bool block_on_ice(Block_t* block, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree){
+     Coord_t coords[BLOCK_MAX_TOUCHING_COORDS];
+
+     block_touching_coords(block, coords);
 
      if(block->pos.z == 0){
-          for(S8 i = 0; i < 4; i++){
+          for(S8 i = 0; i < BLOCK_MAX_TOUCHING_COORDS; i++){
                Interactive_t* interactive = quad_tree_interactive_find_at(interactive_quad_tree, coords[i]);
                if(interactive){
                     if(interactive->type == INTERACTIVE_TYPE_POPUP){
@@ -350,7 +355,7 @@ bool block_on_ice(Block_t* block, TileMap_t* tilemap, QuadTreeNode_t<Interactive
                }
           }
 
-          for(S8 i = 0; i < 4; i++){
+          for(S8 i = 0; i < BLOCK_MAX_TOUCHING_COORDS; i++){
                if(tilemap_is_iced(tilemap, coords[i])){
                     return true;
                }
@@ -1406,7 +1411,6 @@ struct PlayerAction_t{
      bool shoot;
      bool reface;
      bool undo;
-     bool grab;
      bool reset_room;
      S8 move_left_rotation;
      S8 move_right_rotation;
@@ -1440,7 +1444,6 @@ void player_action_perform(PlayerAction_t* player_action, Player_t* player, Play
           player_action->move_left = true;
           if(player->face != DIRECTION_LEFT){
                player->face = DIRECTION_LEFT;
-               player_action->grab = false;
           }
           break;
      case PLAYER_ACTION_TYPE_MOVE_LEFT_STOP:
@@ -1455,7 +1458,6 @@ void player_action_perform(PlayerAction_t* player_action, Player_t* player, Play
           player_action->move_up = true;
           if(player->face != DIRECTION_UP){
                player->face = DIRECTION_UP;
-               player_action->grab = false;
           }
           break;
      case PLAYER_ACTION_TYPE_MOVE_UP_STOP:
@@ -1470,7 +1472,6 @@ void player_action_perform(PlayerAction_t* player_action, Player_t* player, Play
           player_action->move_right = true;
           if(player->face != DIRECTION_RIGHT){
                player->face = DIRECTION_RIGHT;
-               player_action->grab = false;
           }
           break;
      case PLAYER_ACTION_TYPE_MOVE_RIGHT_STOP:
@@ -1486,7 +1487,6 @@ void player_action_perform(PlayerAction_t* player_action, Player_t* player, Play
           player_action->move_down = true;
           if(player->face != DIRECTION_DOWN){
                player->face = DIRECTION_DOWN;
-               player_action->grab = false;
           }
           break;
      case PLAYER_ACTION_TYPE_MOVE_DOWN_STOP:
@@ -1515,12 +1515,8 @@ void player_action_perform(PlayerAction_t* player_action, Player_t* player, Play
           player_action->undo = true;
           break;
      case PLAYER_ACTION_TYPE_GRAB_START:
-          if(player_action->grab) return;
-          player_action->grab = true;
           break;
      case PLAYER_ACTION_TYPE_GRAB_STOP:
-          if(!player_action->grab) return;
-          player_action->grab = false;
           break;
      case PLAYER_ACTION_TYPE_RESET_ROOM:
           if(player_action->reset_room) return;
@@ -3933,11 +3929,16 @@ int main(int argc, char** argv){
                                    Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
                                    quad_tree_find_in(block_quad_tree, rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
 
+                                   Coord_t block_coords[BLOCK_MAX_TOUCHING_COORDS];
+
                                    for(S16 b = 0; b < block_count; b++){
-                                        Coord_t block_coord = block_get_coord(blocks[b]);
-                                        if(interactive->coord == block_coord){
-                                             should_be_down = true;
-                                             break;
+                                        block_touching_coords(blocks[b], block_coords);
+
+                                        for(int c = 0; c < BLOCK_MAX_TOUCHING_COORDS; c++){
+                                             if(interactive->coord == block_coords[c]){
+                                                  should_be_down = true;
+                                                  break;
+                                             }
                                         }
                                    }
                               }
@@ -4184,82 +4185,6 @@ int main(int argc, char** argv){
 
           // update player
           if(resetting == 0 || has_reset){
-               if(player_action.grab){
-                    if(player.grabbing_block < 0){
-                         Rect_t check_rect = {};
-                         int64_t aprox_player_radius_in_pixels = 3;
-
-                         switch(player.face){
-                         default:
-                              break;
-                         case DIRECTION_LEFT:
-                              check_rect.bottom = player.pos.pixel.y - aprox_player_radius_in_pixels;
-                              check_rect.top = player.pos.pixel.y + aprox_player_radius_in_pixels;
-                              check_rect.right = player.pos.pixel.x - aprox_player_radius_in_pixels;
-                              check_rect.left = check_rect.right - (HALF_TILE_SIZE_IN_PIXELS + 2);
-                              break;
-                         case DIRECTION_RIGHT:
-                              check_rect.bottom = player.pos.pixel.y - aprox_player_radius_in_pixels;
-                              check_rect.top = player.pos.pixel.y + aprox_player_radius_in_pixels;
-                              check_rect.left = player.pos.pixel.x + aprox_player_radius_in_pixels;
-                              check_rect.right = check_rect.left + (HALF_TILE_SIZE_IN_PIXELS + 2);
-                              break;
-                         case DIRECTION_UP:
-                              check_rect.left = player.pos.pixel.x - aprox_player_radius_in_pixels;
-                              check_rect.right = player.pos.pixel.x + aprox_player_radius_in_pixels;
-                              check_rect.bottom = player.pos.pixel.y + aprox_player_radius_in_pixels;
-                              check_rect.top = check_rect.bottom + (HALF_TILE_SIZE_IN_PIXELS + 2);
-                              break;
-                         case DIRECTION_DOWN:
-                              check_rect.left = player.pos.pixel.x - aprox_player_radius_in_pixels;
-                              check_rect.right = player.pos.pixel.x + aprox_player_radius_in_pixels;
-                              check_rect.top = player.pos.pixel.y - aprox_player_radius_in_pixels;
-                              check_rect.bottom = check_rect.top - (HALF_TILE_SIZE_IN_PIXELS + 2);
-                              break;
-                         }
-
-                         S16 block_count = 0;
-                         Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
-                         quad_tree_find_in(block_quad_tree, check_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
-                         if(block_count){
-                              // TODO: loop over blocks finding the closest one
-                              player.grabbing_block = blocks[0] - block_array.elements;
-                         }else{
-                              Coord_t check_coord = pos_to_coord(player.pos) + player.face;
-
-                              Interactive_t* interactive = quad_tree_interactive_find_at(interactive_quad_tree, check_coord);
-                              if(interactive && interactive->type == INTERACTIVE_TYPE_PORTAL && interactive->portal.on){
-                                   PortalExit_t portal_exits = find_portal_exits(check_coord, &tilemap, interactive_quad_tree);
-
-                                   Pixel_t portal_offsets[BLOCK_QUAD_TREE_MAX_QUERY];
-                                   for(S8 p = 0; p < BLOCK_QUAD_TREE_MAX_QUERY; p++){
-                                        portal_offsets[p].x = 0;
-                                        portal_offsets[p].y = 0;
-                                   }
-
-                                   for(S8 d = 0; d < DIRECTION_COUNT; d++){
-                                        for(S8 p = 0; p < portal_exits.directions[d].count; p++){
-                                             if(portal_exits.directions[d].coords[p] == check_coord) continue;
-
-                                             search_portal_destination_for_blocks(block_quad_tree, interactive->portal.face, (Direction_t)(d), check_coord,
-                                                                                  portal_exits.directions[d].coords[p], blocks, &block_count, portal_offsets);
-
-                                             for(S16 b = 0; b < block_count; b++){
-                                                  Pixel_t final_block_pixel = block_center_pixel(blocks[b]) + portal_offsets[b];
-                                                  if(pixel_in_rect(final_block_pixel, check_rect)){
-                                                       player.grabbing_block = blocks[b] - block_array.elements;
-                                                       break;
-                                                  }
-                                             }
-                                        }
-                                   }
-                              }
-                         }
-                    }
-               }else if(player.grabbing_block >= 0){
-                    player.grabbing_block = -1;
-               }
-
                user_movement = vec_zero();
 
                if(player_action.move_left){
@@ -4511,21 +4436,19 @@ int main(int argc, char** argv){
                held_up = block_held_up_by_another_block(block, block_quad_tree);
 
                // TODO: should we care about the decimal component of the position ?
-               auto* interactive = quad_tree_interactive_find_at(interactive_quad_tree, coord);
-               if(interactive){
-                    if(interactive->type == INTERACTIVE_TYPE_POPUP){
-                         if(block->pos.z == interactive->popup.lift.ticks - 2){
-                              block->pos.z++;
-                              held_up = true;
-                         }else if(block->pos.z > (interactive->popup.lift.ticks - 1)){
-                              block->fall_time += dt;
-                              if(block->fall_time >= FALL_TIME){
-                                   block->fall_time -= FALL_TIME;
-                                   block->pos.z--;
+               Coord_t block_coords[BLOCK_MAX_TOUCHING_COORDS];
+               block_touching_coords(block, block_coords);
+
+               for(int c = 0; c < BLOCK_MAX_TOUCHING_COORDS; c++){
+                    auto* interactive = quad_tree_interactive_find_at(interactive_quad_tree, block_coords[c]);
+                    if(interactive){
+                         if(interactive->type == INTERACTIVE_TYPE_POPUP){
+                              if(block->pos.z == interactive->popup.lift.ticks - 2){
+                                   block->pos.z++;
+                                   held_up = true;
+                              }else if(block->pos.z == (interactive->popup.lift.ticks - 1)){
+                                   held_up = true;
                               }
-                              held_up = true;
-                         }else if(block->pos.z == (interactive->popup.lift.ticks - 1)){
-                              held_up = true;
                          }
                     }
                }
@@ -4577,10 +4500,19 @@ int main(int argc, char** argv){
           for(S16 i = 0; i < block_array.count; i++){
                Block_t* block = block_array.elements + i;
                if(block->element == ELEMENT_FIRE){
-                    illuminate(block_get_coord(block), 255, &tilemap, block_quad_tree);
+                    Coord_t block_coords[BLOCK_MAX_TOUCHING_COORDS];
+                    block_touching_coords(block, block_coords);
+
+                    for(int b = 0; b < BLOCK_MAX_TOUCHING_COORDS; b++){
+                         illuminate(block_coords[b], 255, &tilemap, block_quad_tree);
+                    }
                }else if(block->element == ELEMENT_ICE){
-                    auto block_coord = block_get_coord(block);
-                    spread_ice(block_coord, 1, &tilemap, interactive_quad_tree, block_quad_tree, false);
+                    Coord_t block_coords[BLOCK_MAX_TOUCHING_COORDS];
+                    block_touching_coords(block, block_coords);
+
+                    for(int b = 0; b < BLOCK_MAX_TOUCHING_COORDS; b++){
+                         spread_ice(block_coords[b], 1, &tilemap, interactive_quad_tree, block_quad_tree, false);
+                    }
                }
           }
 
@@ -4604,10 +4536,15 @@ int main(int argc, char** argv){
 
                     Block_t* block = nullptr;
                     for(S16 b = 0; b < block_count; b++){
+                         Coord_t block_coords[BLOCK_MAX_TOUCHING_COORDS];
+                         block_touching_coords(blocks[b], block_coords);
+
                          // blocks on the coordinate and on the ground block light
-                         if(block_get_coord(blocks[b]) == interactive->coord && blocks[b]->pos.z == 0){
-                              block = blocks[b];
-                              break;
+                         for(int c = 0; c < BLOCK_MAX_TOUCHING_COORDS; c++){
+                              if(block_coords[c] == interactive->coord && blocks[b]->pos.z == 0){
+                                   block = blocks[b];
+                                   break;
+                              }
                          }
                     }
 
