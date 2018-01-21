@@ -2,6 +2,7 @@
 http://www.simonstalenhag.se/
 -Grant Sanderson 3blue1brown
 -Shane Hendrixson
+-"fail early, fail often, fail forward" -will smith youtube video
 */
 
 #include <iostream>
@@ -808,10 +809,6 @@ Vec_t arrow_frame(S8 x, S8 y) {
 #define PLAYER_FRAME_HEIGHT 0.03125f
 #define PLAYER_FRAMES_WIDE 4
 #define PLAYER_FRAMES_TALL 32
-
-// new quakelive bot settings
-// bot_thinktime
-// challenge mode
 
 Vec_t player_frame(S8 x, S8 y){
      y = (PLAYER_FRAMES_TALL - 1) - y;
@@ -3086,7 +3083,7 @@ int main(int argc, char** argv){
                return 1;
           }
      }else if(suite){
-          map_number = 0;
+          if(map_number == -1) map_number = 0;
 
           if(!load_map_number(map_number, &player_start, &tilemap, &block_array, &interactive_array)){
                return 1;
@@ -4018,7 +4015,7 @@ int main(int argc, char** argv){
                     arrow->stick_type = STICK_TYPE_PLAYER;
                     arrow->stick_to_player = &player;
                     resetting = dt;
-                    break;
+                    continue;
                }
 
                Coord_t post_move_coord = pixel_to_coord(arrow->pos.pixel);
@@ -4305,6 +4302,7 @@ int main(int argc, char** argv){
           }else if(!player_action.shoot){
                if(player.bow_draw_time >= PLAYER_BOW_DRAW_DELAY){
                     undo_commit(&undo, &player, &tilemap, &block_array, &interactive_array);
+
                     Position_t arrow_pos = player.pos;
                     switch(player.face){
                     default:
@@ -4324,6 +4322,7 @@ int main(int argc, char** argv){
                          arrow_pos.pixel.y -= 11;
                          break;
                     }
+
                     arrow_pos.z += ARROW_SHOOT_HEIGHT;
                     arrow_spawn(&arrow_array, arrow_pos, player.face);
                }
@@ -4899,7 +4898,6 @@ int main(int argc, char** argv){
 
                     draw_solids(tile_pos, interactive, blocks, block_count, player_ptr, screen_camera, theme_texture, player_texture,
                                 Coord_t{-1, -1}, Coord_t{-1, -1}, 0);
-
                }
 
                // draw arrows

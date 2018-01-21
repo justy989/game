@@ -20,6 +20,7 @@ Arrow_t* arrow_spawn(ArrowArray_t* arrow_array, Position_t pos, Direction_t face
                arrow_array->arrows[i].stick_to_block = 0;
                arrow_array->arrows[i].element = ELEMENT_NONE;
                arrow_array->arrows[i].vel = 1.25f;
+               arrow_array->arrows[i].fall_time = 0;
                return arrow_array->arrows + i;
           }
      }
