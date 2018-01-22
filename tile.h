@@ -3,6 +3,7 @@
 
 #include "types.h"
 #include "coord.h"
+#include "half.h"
 
 #define TILE_ID_SOLID_START 16
 
@@ -42,7 +43,6 @@ enum TileFlag_t : U32{
 
 struct Tile_t{
      U8 id;
-     U8 light;
      U32 flags;
 };
 
@@ -50,6 +50,7 @@ struct TileMap_t{
      S16 width;
      S16 height;
      Tile_t** tiles;
+     U8** light;
 };
 
 bool init(TileMap_t* tilemap, S16 width, S16 height);
@@ -58,6 +59,7 @@ bool tile_is_solid(Tile_t* tile);
 bool tile_is_iced(Tile_t* tile);
 bool tile_has_ice(Tile_t* tile);
 Tile_t* tilemap_get_tile(TileMap_t* tilemap, Coord_t coord);
+U8* tilemap_get_light(TileMap_t* tilemap, Half_t half);
 bool tilemap_is_solid(TileMap_t* tilemap, Coord_t coord);
 bool tilemap_is_iced(TileMap_t* tilemap, Coord_t coord);
 bool tile_flags_have_ice(U32 flags);

@@ -3,14 +3,18 @@
 
 #include "position.h"
 #include "coord.h"
+#include "half.h"
 
 Coord_t vec_to_coord(Vec_t v);
 Vec_t coord_to_vec(Coord_t c);
 Vec_t pos_to_vec(Position_t p);
 Coord_t pixel_to_coord(Pixel_t p);
 Coord_t pos_to_coord(Position_t p);
+Coord_t half_to_coord(Half_t h);
 Pixel_t coord_to_pixel(Coord_t c);
 Pixel_t coord_to_pixel_at_center(Coord_t c);
+Half_t coord_to_half(Coord_t c);
+Half_t pixel_to_half(Pixel_t c);
 Position_t coord_to_pos_at_tile_center(Coord_t c);
 Position_t coord_to_pos(Coord_t c);
 Position_t vec_to_pos(Vec_t v);

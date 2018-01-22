@@ -5,12 +5,23 @@
 #include <cstring>
 
 bool init(TileMap_t* tilemap, S16 width, S16 height){
+     S16 light_width = width * 2;
+     S16 light_height = height * 2;
+
      tilemap->tiles = (Tile_t**)calloc(height, sizeof(*tilemap->tiles));
      if(!tilemap->tiles) return false;
+
+     tilemap->light = (U8**)calloc(light_height, sizeof(*tilemap->light));
+     if(!tilemap->light) return false;
 
      for(S16 i = 0; i < height; i++){
           tilemap->tiles[i] = (Tile_t*)calloc(width, sizeof(*tilemap->tiles[i]));
           if(!tilemap->tiles[i]) return false;
+     }
+
+     for(S16 i = 0; i < light_height; i++){
+          tilemap->light[i] = (U8*)calloc(light_width, sizeof(*tilemap->light[i]));
+          if(!tilemap->light[i]) return false;
      }
 
      tilemap->width = width;
@@ -24,7 +35,13 @@ void destroy(TileMap_t* tilemap){
           free(tilemap->tiles[i]);
      }
 
+     S16 light_height = tilemap->height * 2;
+     for(S16 i = 0; i < light_height; i++){
+          free(tilemap->light[i]);
+     }
+
      free(tilemap->tiles);
+     free(tilemap->light);
      memset(tilemap, 0, sizeof(*tilemap));
 }
 
@@ -58,6 +75,13 @@ Tile_t* tilemap_get_tile(TileMap_t* tilemap, Coord_t coord){
      if(coord.y < 0 || coord.y >= tilemap->height) return NULL;
 
      return tilemap->tiles[coord.y] + coord.x;
+}
+
+U8* tilemap_get_light(TileMap_t* tilemap, Half_t half){
+     if(half.x < 0 || half.x >= (tilemap->width * 2)) return NULL;
+     if(half.y < 0 || half.y >= (tilemap->height * 2)) return NULL;
+
+     return tilemap->light[half.y] + half.x;
 }
 
 bool tile_flags_have_ice(U32 flags){

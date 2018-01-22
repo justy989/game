@@ -1123,19 +1123,19 @@ void player_collide_coord(Position_t player_pos, Coord_t coord, F32 player_radiu
      }
 }
 
-#define LIGHT_MAX_LINE_LEN 8
+#define LIGHT_MAX_LINE_LEN 32
 
-void illuminate_line(Coord_t start, Coord_t end, U8 value, TileMap_t* tilemap, QuadTreeNode_t<Block_t>* block_quad_tree){
-     Coord_t coords[LIGHT_MAX_LINE_LEN];
-     S8 coord_count = 0;
+void illuminate_line(Half_t start, Coord_t end, U8 value, TileMap_t* tilemap, QuadTreeNode_t<Block_t>* block_quad_tree){
+     Half_t halfs[LIGHT_MAX_LINE_LEN]; // lol halves
+     S8 half_count = 0;
 
      // determine line of points using a modified bresenham to be symmetrical
      {
           if(start.x == end.x){
                // build a simple vertical path
                for(S16 y = start.y; y <= end.y; ++y){
-                    coords[coord_count] = Coord_t{start.x, y};
-                    coord_count++;
+                    halfs[half_count] = Half_t{start.x, y};
+                    half_count++;
                }
           }else{
                F64 error = 0.0;
@@ -1149,18 +1149,18 @@ void illuminate_line(Coord_t start, Coord_t end, U8 value, TileMap_t* tilemap, Q
                S16 sy = start.y;
 
                for(S16 sx = start.x; sx != end_step_x; sx += step_x){
-                    Coord_t coord {sx, sy};
-                    coords[coord_count] = coord;
-                    coord_count++;
+                    Half_t half {sx, sy};
+                    halfs[half_count] = half;
+                    half_count++;
 
                     error += derror;
                     while(error >= 0.5){
-                         coord = {sx, sy};
+                         half = {sx, sy};
 
-                         // only add non-duplicate coords
-                         if(coords[coord_count - 1] != coord){
-                              coords[coord_count] = coord;
-                              coord_count++;
+                         // only add non-duplicate halfs
+                         if(halfs[half_count - 1] != half){
+                              halfs[half_count] = half;
+                              half_count++;
                          }
 
                          sy += step_y;
@@ -1170,26 +1170,29 @@ void illuminate_line(Coord_t start, Coord_t end, U8 value, TileMap_t* tilemap, Q
           }
      }
 
-     for(S8 i = 0; i < coord_count; ++i){
-          Tile_t* tile = tilemap_get_tile(tilemap, coords[i]);
+     for(S8 i = 0; i < half_count; ++i){
+          Coord_t coord = half_to_coord(halfs[i]);
+          Tile_t* tile = tilemap_get_tile(tilemap, coord);
           if(!tile) continue;
+          U8* tile_light = tilemap_get_light(tilemap, halfs[i]);
 
-          S16 diff_x = abs(coords[i].x - start.x);
-          S16 diff_y = abs(coords[i].y - start.y);
+          S16 diff_x = abs(halfs[i].x - start.x);
+          S16 diff_y = abs(halfs[i].y - start.y);
           U8 distance = static_cast<U8>(sqrt(static_cast<F32>(diff_x * diff_x + diff_y * diff_y)));
 
           U8 new_value = value - (distance * LIGHT_DECAY);
+          if(new_value > value) continue;
 
 #if 0
           if(tile->solid.type == SOLID_PORTAL && tile->solid.portal.on){
                ConnectedPortals_t connected_portals = {};
-               find_connected_portals(tilemap, coords[i], &connected_portals);
-               Coord_t end_offset = end - coords[i];
-               Coord_t prev_offset = coords[i] - coords[i - 1];
+               find_connected_portals(tilemap, halfs[i], &connected_portals);
+               Coord_t end_offset = end - halfs[i];
+               Coord_t prev_offset = halfs[i] - halfs[i - 1];
 
-               for(S32 p = 0; p < connected_portals.coord_count; ++p){
-                    if(connected_portals.coords[p] != coords[i]){
-                         Coord_t dst_coord = connected_portals.coords[p] + prev_offset;
+               for(S32 p = 0; p < connected_portals.half_count; ++p){
+                    if(connected_portals.halfs[p] != halfs[i]){
+                         Coord_t dst_coord = connected_portals.halfs[p] + prev_offset;
                          illuminate_line(dst_coord, dst_coord + end_offset, new_value, tilemap, block_array);
                     }
                }
@@ -1198,13 +1201,13 @@ void illuminate_line(Coord_t start, Coord_t end, U8 value, TileMap_t* tilemap, Q
 #endif
 
           Block_t* block = nullptr;
-          if(coords[i] != start){
+          if(halfs[i] != start){
                if(tile_is_solid(tile)){
                     break;
                }
 
-               S16 px = coords[i].x * TILE_SIZE_IN_PIXELS;
-               S16 py = coords[i].y * TILE_SIZE_IN_PIXELS;
+               S16 px = halfs[i].x * TILE_SIZE_IN_PIXELS;
+               S16 py = halfs[i].y * TILE_SIZE_IN_PIXELS;
                Rect_t coord_rect {px, py, (S16)(px + TILE_SIZE_IN_PIXELS), (S16)(py + TILE_SIZE_IN_PIXELS)};
 
                S16 block_count = 0;
@@ -1212,43 +1215,45 @@ void illuminate_line(Coord_t start, Coord_t end, U8 value, TileMap_t* tilemap, Q
                quad_tree_find_in(block_quad_tree, coord_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
 
                for(S16 b = 0; b < block_count; b++){
-                    if(block_get_coord(blocks[b]) == coords[i]){
+                    if(block_get_coord(blocks[b]) == coord){
                          block = blocks[b];
                          break;
                     }
                }
           }
 
-          if(tile->light < new_value) tile->light = new_value;
+          if(*tile_light < new_value) *tile_light = new_value;
           if(block) break;
      }
 }
 
-void illuminate(Coord_t coord, U8 value, TileMap_t* tilemap, QuadTreeNode_t<Block_t>* block_quad_tree){
-     if(coord.x < 0 || coord.y < 0 || coord.x >= tilemap->width || coord.y >= tilemap->height) return;
+void illuminate(Half_t half, U8 value, TileMap_t* tilemap, QuadTreeNode_t<Block_t>* block_quad_tree){
+     if(half.x < 0 || half.y < 0 || half.x >= tilemap->width || half.y >= tilemap->height) return;
 
      S16 radius = ((value - BASE_LIGHT) / LIGHT_DECAY) + 1;
 
      if(radius < 0) return;
 
-     Coord_t delta {radius, radius};
-     Coord_t min = coord - delta;
-     Coord_t max = coord + delta;
+     radius *= 2;
+
+     Half_t delta {radius, radius};
+     Half_t min = half - delta;
+     Half_t max = half + delta;
 
      for(S16 j = min.y + 1; j < max.y; ++j) {
           // bottom of box
-          illuminate_line(coord, Coord_t{min.x, j}, value, tilemap, block_quad_tree);
+          illuminate_line(half, Coord_t{min.x, j}, value, tilemap, block_quad_tree);
 
           // top of box
-          illuminate_line(coord, Coord_t{max.x, j}, value, tilemap, block_quad_tree);
+          illuminate_line(half, Coord_t{max.x, j}, value, tilemap, block_quad_tree);
      }
 
      for(S16 i = min.x + 1; i < max.x; ++i) {
           // left of box
-          illuminate_line(coord, Coord_t{i, min.y,}, value, tilemap, block_quad_tree);
+          illuminate_line(half, Coord_t{i, min.y,}, value, tilemap, block_quad_tree);
 
           // right of box
-          illuminate_line(coord, Coord_t{i, max.y,}, value, tilemap, block_quad_tree);
+          illuminate_line(half, Coord_t{i, max.y,}, value, tilemap, block_quad_tree);
      }
 }
 
@@ -1763,8 +1768,16 @@ bool load_map_from_file(FILE* file, Coord_t* player_start, TileMap_t* tilemap, O
           for(S32 x = 0; x < tilemap->width; x++){
                tilemap->tiles[y][x].id = map_tiles[index].id;
                tilemap->tiles[y][x].flags = map_tiles[index].flags;
-               tilemap->tiles[y][x].light = BASE_LIGHT;
                index++;
+          }
+     }
+
+     S32 light_width = tilemap->width * 2;
+     S32 light_height = tilemap->height * 2;
+
+     for(S32 y = 0; y < light_height; y++){
+          for(S32 x = 0; x < light_width; x++){
+               tilemap->light[y][x] = BASE_LIGHT;
           }
      }
 
@@ -2892,7 +2905,13 @@ void describe_coord(Coord_t coord, TileMap_t* tilemap, QuadTreeNode_t<Interactiv
      LOG("\ndescribe_coord(%d, %d)\n", coord.x, coord.y);
      auto* tile = tilemap_get_tile(tilemap, coord);
      if(tile){
-          LOG("Tile: id: %u, light: %u\n", tile->id, tile->light);
+          Half_t half = coord_to_half(coord);
+          auto* light_top_left = tilemap_get_light(tilemap, half);
+          auto* light_top_right = tilemap_get_light(tilemap, half + Half_t{1, 0});
+          auto* light_bottom_left = tilemap_get_light(tilemap, half + Half_t{0, 1});
+          auto* light_bottom_right = tilemap_get_light(tilemap, half + Half_t{1, 1});
+          LOG("Tile: id: %u, light: {%u, %u, %u, %u}\n", tile->id, *light_top_left, *light_top_right,
+              *light_bottom_left, *light_bottom_right);
           if(tile->flags){
                LOG(" flags:\n");
                if(tile->flags & TILE_FLAG_ICED_TOP_LEFT) printf("  ICED TOP LEFT\n");
@@ -3951,9 +3970,11 @@ int main(int argc, char** argv){
           if(quit) break;
 
           // reset base light
-          for(S16 j = 0; j < tilemap.height; j++){
-               for(S16 i = 0; i < tilemap.width; i++){
-                    tilemap.tiles[j][i].light = BASE_LIGHT;
+          S32 light_width = tilemap.width * 2;
+          S32 light_height = tilemap.height * 2;
+          for(S16 j = 0; j < light_height; j++){
+               for(S16 i = 0; i < light_width; i++){
+                    tilemap.light[j][i] = BASE_LIGHT;
                }
           }
 
@@ -4021,7 +4042,7 @@ int main(int argc, char** argv){
                Coord_t pre_move_coord = pixel_to_coord(arrow->pos.pixel);
 
                if(arrow->element == ELEMENT_FIRE){
-                    illuminate(pre_move_coord, 255 - LIGHT_DECAY, &tilemap, block_quad_tree);
+                    illuminate(pixel_to_half(arrow->pos.pixel), 255 - LIGHT_DECAY, &tilemap, block_quad_tree);
                }
 
                if(arrow->stick_time > 0.0f){
@@ -4555,19 +4576,9 @@ int main(int argc, char** argv){
           for(S16 i = 0; i < block_array.count; i++){
                Block_t* block = block_array.elements + i;
                if(block->element == ELEMENT_FIRE){
-                    Coord_t block_coords[BLOCK_MAX_TOUCHING_COORDS];
-                    block_touching_coords(block, block_coords);
-
-                    for(int b = 0; b < BLOCK_MAX_TOUCHING_COORDS; b++){
-                         illuminate(block_coords[b], 255, &tilemap, block_quad_tree);
-                    }
+                    illuminate(pixel_to_half(block->pos.pixel), 255, &tilemap, block_quad_tree);
                }else if(block->element == ELEMENT_ICE){
-                    Coord_t block_coords[BLOCK_MAX_TOUCHING_COORDS];
-                    block_touching_coords(block, block_coords);
-
-                    for(int b = 0; b < BLOCK_MAX_TOUCHING_COORDS; b++){
-                         spread_ice(block_coords[b], 1, &tilemap, interactive_quad_tree, block_quad_tree, false);
-                    }
+                    spread_ice(block_get_coord(block), 1, &tilemap, interactive_quad_tree, block_quad_tree, false);
                }
           }
 
@@ -4582,7 +4593,11 @@ int main(int argc, char** argv){
           for(S16 i = 0; i < interactive_array.count; i++){
                Interactive_t* interactive = interactive_array.elements + i;
                if(interactive->type == INTERACTIVE_TYPE_LIGHT_DETECTOR){
-                    Tile_t* tile = tilemap_get_tile(&tilemap, interactive->coord);
+                    Half_t half = coord_to_half(interactive->coord);
+                    U8* light_top_left = tilemap_get_light(&tilemap, half);
+                    U8* light_top_right = tilemap_get_light(&tilemap, half);
+                    U8* light_bottom_left = tilemap_get_light(&tilemap, half);
+                    U8* light_bottom_right = tilemap_get_light(&tilemap, half);
                     Rect_t coord_rect = rect_surrounding_adjacent_coords(interactive->coord);
 
                     S16 block_count = 0;
@@ -4603,10 +4618,24 @@ int main(int argc, char** argv){
                          }
                     }
 
-                    if(interactive->detector.on && (tile->light < LIGHT_DETECTOR_THRESHOLD || block)){
+                    bool light_above_threshold = false;
+
+                    bool light_below_threshold = *light_top_left < LIGHT_DETECTOR_THRESHOLD &&
+                                                 *light_top_right < LIGHT_DETECTOR_THRESHOLD &&
+                                                 *light_bottom_left < LIGHT_DETECTOR_THRESHOLD &&
+                                                 *light_bottom_right < LIGHT_DETECTOR_THRESHOLD;
+
+                    if(!light_below_threshold){
+                         light_above_threshold = *light_top_left >= LIGHT_DETECTOR_THRESHOLD &&
+                                                 *light_top_right >= LIGHT_DETECTOR_THRESHOLD &&
+                                                 *light_bottom_left >= LIGHT_DETECTOR_THRESHOLD &&
+                                                 *light_bottom_right >= LIGHT_DETECTOR_THRESHOLD;
+                    }
+
+                    if(interactive->detector.on && (light_below_threshold || block)){
                          activate(&tilemap, interactive_quad_tree, interactive->coord);
                          interactive->detector.on = false;
-                    }else if(!interactive->detector.on && tile->light >= LIGHT_DETECTOR_THRESHOLD && !block){
+                    }else if(!interactive->detector.on && light_above_threshold && !block){
                          activate(&tilemap, interactive_quad_tree, interactive->coord);
                          interactive->detector.on = true;
                     }
@@ -5023,17 +5052,23 @@ int main(int argc, char** argv){
           // light
           glBindTexture(GL_TEXTURE_2D, 0);
           glBegin(GL_QUADS);
-          for(S16 y = min.y; y <= max.y; y++){
-               for(S16 x = min.x; x <= max.x; x++){
-                    Tile_t* tile = tilemap.tiles[y] + x;
 
-                    Vec_t tile_pos {(F32)(x - min.x) * TILE_SIZE + camera_offset.x,
-                                    (F32)(y - min.y) * TILE_SIZE + camera_offset.y};
-                    glColor4f(0.0f, 0.0f, 0.0f, (F32)(255 - tile->light) / 255.0f);
+          S32 light_min_x = min.x * 2;
+          S32 light_min_y = min.y * 2;
+          S32 light_max_x = max.x * 2;
+          S32 light_max_y = max.y * 2;
+
+          for(S32 y = light_min_y; y <= light_max_y; y++){
+               for(S32 x = light_min_x; x <= light_max_x; x++){
+                    U8 light = tilemap.light[y][x];
+
+                    Vec_t tile_pos {(F32)(x - light_min_x) * HALF_TILE_SIZE + camera_offset.x,
+                                    (F32)(y - light_min_y) * HALF_TILE_SIZE + camera_offset.y};
+                    glColor4f(0.0f, 0.0f, 0.0f, (F32)(255 - light) / 255.0f);
                     glVertex2f(tile_pos.x, tile_pos.y);
-                    glVertex2f(tile_pos.x, tile_pos.y + TILE_SIZE);
-                    glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y + TILE_SIZE);
-                    glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y);
+                    glVertex2f(tile_pos.x, tile_pos.y + HALF_TILE_SIZE);
+                    glVertex2f(tile_pos.x + HALF_TILE_SIZE, tile_pos.y + HALF_TILE_SIZE);
+                    glVertex2f(tile_pos.x + HALF_TILE_SIZE, tile_pos.y);
 
                }
           }

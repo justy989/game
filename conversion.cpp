@@ -39,6 +39,11 @@ Coord_t pos_to_coord(Position_t p){
      return pixel_to_coord(p.pixel);
 }
 
+Coord_t half_to_coord(Half_t p){
+     Coord_t c {(S16)(p.x / 2), (S16)(p.y / 2)};
+     return c;
+}
+
 Pixel_t coord_to_pixel(Coord_t c){
      Pixel_t p;
      p.x = c.x * TILE_SIZE_IN_PIXELS;
@@ -51,6 +56,16 @@ Pixel_t coord_to_pixel_at_center(Coord_t c){
      p.x = (c.x * TILE_SIZE_IN_PIXELS) + HALF_TILE_SIZE_IN_PIXELS;
      p.y = (c.y * TILE_SIZE_IN_PIXELS) + HALF_TILE_SIZE_IN_PIXELS;
      return p;
+}
+
+Half_t coord_to_half(Coord_t c){
+     Half_t h {(S16)(c.x * 2), (S16)(c.y * 2)};
+     return h;
+}
+
+Half_t pixel_to_half(Pixel_t p){
+     Half_t h {(S16)(p.x / HALF_TILE_SIZE_IN_PIXELS), (S16)(p.y / HALF_TILE_SIZE_IN_PIXELS)};
+     return h;
 }
 
 Position_t coord_to_pos_at_tile_center(Coord_t c){
