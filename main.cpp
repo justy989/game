@@ -1228,13 +1228,11 @@ void illuminate_line(Half_t start, Coord_t end, U8 value, TileMap_t* tilemap, Qu
 }
 
 void illuminate(Half_t half, U8 value, TileMap_t* tilemap, QuadTreeNode_t<Block_t>* block_quad_tree){
-     if(half.x < 0 || half.y < 0 || half.x >= tilemap->width || half.y >= tilemap->height) return;
+     if(half.x < 0 || half.y < 0 || half.x >= (tilemap->width * 2) || half.y >= (tilemap->height * 2)) return;
 
      S16 radius = ((value - BASE_LIGHT) / LIGHT_DECAY) + 1;
 
      if(radius < 0) return;
-
-     radius *= 2;
 
      Half_t delta {radius, radius};
      Half_t min = half - delta;
