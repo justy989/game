@@ -339,27 +339,31 @@ void block_touching_coords(Block_t* block, Coord_t* coords){
 }
 
 bool block_on_ice(Block_t* block, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree){
+     bool on_ice[BLOCK_MAX_TOUCHING_COORDS];
      Coord_t coords[BLOCK_MAX_TOUCHING_COORDS];
 
      block_touching_coords(block, coords);
 
      if(block->pos.z == 0){
           for(S8 i = 0; i < BLOCK_MAX_TOUCHING_COORDS; i++){
+               on_ice[i] = false;
+
                Interactive_t* interactive = quad_tree_interactive_find_at(interactive_quad_tree, coords[i]);
                if(interactive){
                     if(interactive->type == INTERACTIVE_TYPE_POPUP){
                          if(interactive->popup.lift.ticks == (block->pos.z + 1) && interactive->popup.iced){
-                              return true;
+                              on_ice[i] = true;
+                              break;
                          }
                     }
                }
-          }
 
-          for(S8 i = 0; i < BLOCK_MAX_TOUCHING_COORDS; i++){
                if(tilemap_is_iced(tilemap, coords[i])){
-                    return true;
+                    on_ice[i] = true;
                }
           }
+
+          return on_ice[0] && on_ice[1] && on_ice[2] && on_ice[3];
      }
 
      // TODO: check for blocks below
@@ -832,12 +836,19 @@ Vec_t player_frame(S8 x, S8 y){
      return Vec_t{(F32)(x) * PLAYER_FRAME_WIDTH, (F32)(y) * PLAYER_FRAME_HEIGHT};
 }
 
-void toggle_flag(U16* flags, U16 flag){
+void toggle_flag(U32* flags, U32 flag){
      if(*flags & flag){
           *flags &= ~flag;
      }else{
           *flags |= flag;
      }
+}
+
+void clear_ice_flags(U32* flags){
+     *flags &= ~TILE_FLAG_ICED_TOP_LEFT;
+     *flags &= ~TILE_FLAG_ICED_TOP_RIGHT;
+     *flags &= ~TILE_FLAG_ICED_BOTTOM_LEFT;
+     *flags &= ~TILE_FLAG_ICED_BOTTOM_RIGHT;
 }
 
 void toggle_electricity(TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree, Coord_t coord,
@@ -854,9 +865,7 @@ void toggle_electricity(TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* inter
           case INTERACTIVE_TYPE_POPUP:
           {
                interactive->popup.lift.up = !interactive->popup.lift.up;
-               if(tile->flags & TILE_FLAG_ICED){
-                    tile->flags &= ~TILE_FLAG_ICED;
-               }
+               clear_ice_flags(&tile->flags);
           } break;
           case INTERACTIVE_TYPE_DOOR:
                interactive->door.lift.up = !interactive->door.lift.up;
@@ -1262,9 +1271,14 @@ void spread_ice(Coord_t center, S16 radius, TileMap_t* tilemap, QuadTreeNode_t<I
 
                     Block_t* block = nullptr;
                     for(S16 i = 0; i < block_count; i++){
-                         if(block_get_coord(blocks[i]) == coord && blocks[i]->pos.z == 0){
-                              block = blocks[i];
-                              break;
+                         Coord_t block_coords[BLOCK_MAX_TOUCHING_COORDS];
+                         block_touching_coords(blocks[i], block_coords);
+
+                         for(S8 c = 0; c < BLOCK_MAX_TOUCHING_COORDS; c++){
+                              if(block_coords[c] == coord && blocks[i]->pos.z == 0){
+                                   block = blocks[i];
+                                   break;
+                              }
                          }
                     }
 
@@ -1278,17 +1292,20 @@ void spread_ice(Coord_t center, S16 radius, TileMap_t* tilemap, QuadTreeNode_t<I
                               if(interactive->type == INTERACTIVE_TYPE_POPUP){
                                    if(interactive->popup.lift.ticks == 1){
                                         interactive->popup.iced = false;
-                                        tile->flags |= TILE_FLAG_ICED;
+                                        tile->flags |= TILE_FLAG_ICED_TOP_LEFT | TILE_FLAG_ICED_TOP_RIGHT |
+                                                       TILE_FLAG_ICED_BOTTOM_LEFT | TILE_FLAG_ICED_BOTTOM_RIGHT;
                                    }else{
                                         interactive->popup.iced = true;
                                    }
                               }else if(interactive->type == INTERACTIVE_TYPE_PRESSURE_PLATE ||
                                        interactive->type == INTERACTIVE_TYPE_ICE_DETECTOR ||
                                        interactive->type == INTERACTIVE_TYPE_LIGHT_DETECTOR){
-                                   tile->flags |= TILE_FLAG_ICED;
+                                   tile->flags |= TILE_FLAG_ICED_TOP_LEFT | TILE_FLAG_ICED_TOP_RIGHT |
+                                                  TILE_FLAG_ICED_BOTTOM_LEFT | TILE_FLAG_ICED_BOTTOM_RIGHT;
                               }
                          }else{
-                              tile->flags |= TILE_FLAG_ICED;
+                              tile->flags |= TILE_FLAG_ICED_TOP_LEFT | TILE_FLAG_ICED_TOP_RIGHT |
+                                             TILE_FLAG_ICED_BOTTOM_LEFT | TILE_FLAG_ICED_BOTTOM_RIGHT;
                          }
                     }
 
@@ -1331,9 +1348,14 @@ void melt_ice(Coord_t center, S16 radius, TileMap_t* tilemap, QuadTreeNode_t<Int
 
                     Block_t* block = nullptr;
                     for(S16 i = 0; i < block_count; i++){
-                         if(block_get_coord(blocks[i]) == coord && blocks[i]->pos.z == 0){
-                              block = blocks[i];
-                              break;
+                         Coord_t block_coords[BLOCK_MAX_TOUCHING_COORDS];
+                         block_touching_coords(blocks[i], block_coords);
+
+                         for(S8 c = 0; c < BLOCK_MAX_TOUCHING_COORDS; c++){
+                              if(block_coords[c] == coord && blocks[i]->pos.z == 0){
+                                   block = blocks[i];
+                                   break;
+                              }
                          }
                     }
 
@@ -1345,19 +1367,19 @@ void melt_ice(Coord_t center, S16 radius, TileMap_t* tilemap, QuadTreeNode_t<Int
                          if(interactive){
                               if(interactive->type == INTERACTIVE_TYPE_POPUP){
                                    if(interactive->popup.lift.ticks == 1){
-                                        tile->flags &= ~TILE_FLAG_ICED;
+                                        clear_ice_flags(&tile->flags);
                                    }else{
                                         interactive->popup.iced = false;
                                    }
                               }else if(interactive->type == INTERACTIVE_TYPE_PRESSURE_PLATE){
                                    interactive->pressure_plate.iced_under = false;
-                                   tile->flags &= ~TILE_FLAG_ICED;
+                                   clear_ice_flags(&tile->flags);
                               }else if(interactive->type == INTERACTIVE_TYPE_ICE_DETECTOR ||
                                        interactive->type == INTERACTIVE_TYPE_LIGHT_DETECTOR){
-                                   tile->flags &= ~TILE_FLAG_ICED;
+                                   clear_ice_flags(&tile->flags);
                               }
                          }else{
-                              tile->flags &= ~TILE_FLAG_ICED;
+                              clear_ice_flags(&tile->flags);
                          }
                     }
 
@@ -1927,6 +1949,53 @@ void tile_flags_draw(U16 flags, Vec_t tile_pos){
                draw_theme_frame(theme_frame(frame_x, frame_y), tile_pos);
           }
      }
+}
+
+void tile_ice_draw(U32 flags, Vec_t pos, GLuint theme_texture){
+     if(tile_flags_have_ice(flags)){
+          glEnd();
+
+          // get state ready for ice
+          glBindTexture(GL_TEXTURE_2D, 0);
+          glColor4f(196.0f / 255.0f, 217.0f / 255.0f, 1.0f, 0.45f);
+          glBegin(GL_QUADS);
+
+          if(flags & TILE_FLAG_ICED_TOP_LEFT){
+               glVertex2f(pos.x, pos.y + HALF_TILE_SIZE);
+               glVertex2f(pos.x, pos.y + TILE_SIZE);
+               glVertex2f(pos.x + HALF_TILE_SIZE, pos.y + TILE_SIZE);
+               glVertex2f(pos.x + HALF_TILE_SIZE, pos.y + HALF_TILE_SIZE);
+          }
+
+          if(flags & TILE_FLAG_ICED_TOP_RIGHT){
+               glVertex2f(pos.x + HALF_TILE_SIZE, pos.y + HALF_TILE_SIZE);
+               glVertex2f(pos.x + HALF_TILE_SIZE, pos.y + TILE_SIZE);
+               glVertex2f(pos.x + TILE_SIZE, pos.y + TILE_SIZE);
+               glVertex2f(pos.x + TILE_SIZE, pos.y + HALF_TILE_SIZE);
+          }
+
+          if(flags & TILE_FLAG_ICED_BOTTOM_LEFT){
+               glVertex2f(pos.x, pos.y);
+               glVertex2f(pos.x, pos.y + HALF_TILE_SIZE);
+               glVertex2f(pos.x + HALF_TILE_SIZE, pos.y + HALF_TILE_SIZE);
+               glVertex2f(pos.x + HALF_TILE_SIZE, pos.y);
+          }
+
+          if(flags & TILE_FLAG_ICED_BOTTOM_RIGHT){
+               glVertex2f(pos.x + HALF_TILE_SIZE, pos.y);
+               glVertex2f(pos.x + HALF_TILE_SIZE, pos.y + HALF_TILE_SIZE);
+               glVertex2f(pos.x + TILE_SIZE, pos.y + HALF_TILE_SIZE);
+               glVertex2f(pos.x + TILE_SIZE, pos.y);
+          }
+
+          glEnd();
+
+          // reset state back to default
+          glBindTexture(GL_TEXTURE_2D, theme_texture);
+          glBegin(GL_QUADS);
+          glColor3f(1.0f, 1.0f, 1.0f);
+     }
+
 }
 
 void block_draw(Block_t* block, Vec_t pos_vec){
@@ -2569,24 +2638,7 @@ void draw_flats(Vec_t pos, Tile_t* tile, Interactive_t* interactive, GLuint them
           }
      }
 
-     if(tile_is_iced(tile)){
-          glEnd();
-
-          // get state ready for ice
-          glBindTexture(GL_TEXTURE_2D, 0);
-          glColor4f(196.0f / 255.0f, 217.0f / 255.0f, 1.0f, 0.45f);
-          glBegin(GL_QUADS);
-          glVertex2f(pos.x, pos.y);
-          glVertex2f(pos.x, pos.y + TILE_SIZE);
-          glVertex2f(pos.x + TILE_SIZE, pos.y + TILE_SIZE);
-          glVertex2f(pos.x + TILE_SIZE, pos.y);
-          glEnd();
-
-          // reset state back to default
-          glBindTexture(GL_TEXTURE_2D, theme_texture);
-          glBegin(GL_QUADS);
-          glColor3f(1.0f, 1.0f, 1.0f);
-     }
+     tile_ice_draw(tile->flags, pos, theme_texture);
 }
 
 void draw_solids(Vec_t pos, Interactive_t* interactive, Block_t** blocks, S16 block_count, Player_t* player,
@@ -2843,7 +2895,10 @@ void describe_coord(Coord_t coord, TileMap_t* tilemap, QuadTreeNode_t<Interactiv
           LOG("Tile: id: %u, light: %u\n", tile->id, tile->light);
           if(tile->flags){
                LOG(" flags:\n");
-               if(tile->flags & TILE_FLAG_ICED) printf("  ICED\n");
+               if(tile->flags & TILE_FLAG_ICED_TOP_LEFT) printf("  ICED TOP LEFT\n");
+               if(tile->flags & TILE_FLAG_ICED_TOP_RIGHT) printf("  ICED TOP RIGHT\n");
+               if(tile->flags & TILE_FLAG_ICED_BOTTOM_LEFT) printf("  ICED BOTTOM LEFT\n");
+               if(tile->flags & TILE_FLAG_ICED_BOTTOM_RIGHT) printf("  ICED BOTTOM RIGHT\n");
                if(tile->flags & TILE_FLAG_CHECKPOINT) printf("  CHECKPOINT\n");
                if(tile->flags & TILE_FLAG_RESET_IMMUNE) printf("  RESET_IMMUNE\n");
                if(tile->flags & TILE_FLAG_WIRE_STATE) printf("  WIRE_STATE\n");
@@ -4776,40 +4831,42 @@ int main(int argc, char** argv){
                     Coord_t coord {x, y};
                     Interactive_t* interactive = quad_tree_find_at(interactive_quad_tree, coord.x, coord.y);
 
-                    if(interactive && interactive->type == INTERACTIVE_TYPE_PORTAL && interactive->portal.on){
-                         PortalExit_t portal_exits = find_portal_exits(coord, &tilemap, interactive_quad_tree);
+                    if(interactive){
+                         if(interactive->type == INTERACTIVE_TYPE_PORTAL && interactive->portal.on){
+                              PortalExit_t portal_exits = find_portal_exits(coord, &tilemap, interactive_quad_tree);
 
-                         for(S8 d = 0; d < DIRECTION_COUNT; d++){
-                              for(S8 i = 0; i < portal_exits.directions[d].count; i++){
-                                   if(portal_exits.directions[d].coords[i] == coord) continue;
-                                   Coord_t portal_coord = portal_exits.directions[d].coords[i] + direction_opposite((Direction_t)(d));
+                              for(S8 d = 0; d < DIRECTION_COUNT; d++){
+                                   for(S8 i = 0; i < portal_exits.directions[d].count; i++){
+                                        if(portal_exits.directions[d].coords[i] == coord) continue;
+                                        Coord_t portal_coord = portal_exits.directions[d].coords[i] + direction_opposite((Direction_t)(d));
 
-                                   S16 px = portal_coord.x * TILE_SIZE_IN_PIXELS;
-                                   S16 py = portal_coord.y * TILE_SIZE_IN_PIXELS;
-                                   Rect_t coord_rect {(S16)(px - HALF_TILE_SIZE_IN_PIXELS), (S16)(py - HALF_TILE_SIZE_IN_PIXELS),
-                                                      (S16)(px + TILE_SIZE_IN_PIXELS + HALF_TILE_SIZE_IN_PIXELS),
-                                                      (S16)(py + TILE_SIZE_IN_PIXELS + HALF_TILE_SIZE_IN_PIXELS)};
+                                        S16 px = portal_coord.x * TILE_SIZE_IN_PIXELS;
+                                        S16 py = portal_coord.y * TILE_SIZE_IN_PIXELS;
+                                        Rect_t coord_rect {(S16)(px - HALF_TILE_SIZE_IN_PIXELS), (S16)(py - HALF_TILE_SIZE_IN_PIXELS),
+                                                           (S16)(px + TILE_SIZE_IN_PIXELS + HALF_TILE_SIZE_IN_PIXELS),
+                                                           (S16)(py + TILE_SIZE_IN_PIXELS + HALF_TILE_SIZE_IN_PIXELS)};
 
-                                   S16 block_count = 0;
-                                   Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
+                                        S16 block_count = 0;
+                                        Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
 
-                                   quad_tree_find_in(block_quad_tree, coord_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
+                                        quad_tree_find_in(block_quad_tree, coord_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
 
-                                   Interactive_t* portal_interactive = quad_tree_find_at(interactive_quad_tree, portal_coord.x, portal_coord.y);
+                                        Interactive_t* portal_interactive = quad_tree_find_at(interactive_quad_tree, portal_coord.x, portal_coord.y);
 
-                                   U8 portal_rotations = portal_rotations_between((Direction_t)(d), interactive->portal.face);
-                                   Player_t* player_ptr = nullptr;
-                                   Pixel_t portal_center_pixel = coord_to_pixel_at_center(portal_coord);
-                                   if(pixel_distance_between(portal_center_pixel, player.pos.pixel) <= 20){
-                                        player_ptr = &player;
+                                        U8 portal_rotations = portal_rotations_between((Direction_t)(d), interactive->portal.face);
+                                        Player_t* player_ptr = nullptr;
+                                        Pixel_t portal_center_pixel = coord_to_pixel_at_center(portal_coord);
+                                        if(pixel_distance_between(portal_center_pixel, player.pos.pixel) <= 20){
+                                             player_ptr = &player;
+                                        }
+                                        draw_solids(tile_pos, portal_interactive, blocks, block_count, player_ptr, screen_camera,
+                                                    theme_texture, player_texture, portal_coord, coord, portal_rotations);
+
                                    }
-                                   draw_solids(tile_pos, portal_interactive, blocks, block_count, player_ptr, screen_camera,
-                                               theme_texture, player_texture, portal_coord, coord, portal_rotations);
-
                               }
-                         }
 
-                         interactive_draw(interactive, tile_pos);
+                              interactive_draw(interactive, tile_pos);
+                         }
                     }
                }
           }
@@ -4962,7 +5019,7 @@ int main(int argc, char** argv){
           draw_quad_wireframe(&collided_with_quad, 255.0f, 0.0f, 255.0f);
 #endif
 
-#if 0
+#if 1
           // light
           glBindTexture(GL_TEXTURE_2D, 0);
           glBegin(GL_QUADS);
@@ -5073,6 +5130,7 @@ int main(int argc, char** argv){
                               break;
                          case STAMP_TYPE_TILE_FLAGS:
                               tile_flags_draw(stamp->tile_flags, vec);
+                              tile_ice_draw(stamp->tile_flags, vec, theme_texture);
                               break;
                          case STAMP_TYPE_BLOCK:
                          {
@@ -5116,6 +5174,7 @@ int main(int argc, char** argv){
                          break;
                     case STAMP_TYPE_TILE_FLAGS:
                          tile_flags_draw(stamp->tile_flags, stamp_pos);
+                         tile_ice_draw(stamp->tile_flags, stamp_pos, theme_texture);
                          break;
                     case STAMP_TYPE_BLOCK:
                     {
@@ -5154,6 +5213,7 @@ int main(int argc, char** argv){
                                    break;
                               case STAMP_TYPE_TILE_FLAGS:
                                    tile_flags_draw(stamp->tile_flags, stamp_vec);
+                                   tile_ice_draw(stamp->tile_flags, stamp_vec, theme_texture);
                                    break;
                               case STAMP_TYPE_BLOCK:
                               {
@@ -5202,6 +5262,7 @@ int main(int argc, char** argv){
                          break;
                     case STAMP_TYPE_TILE_FLAGS:
                          tile_flags_draw(stamp->tile_flags, stamp_vec);
+                         tile_ice_draw(stamp->tile_flags, stamp_vec, theme_texture);
                          break;
                     case STAMP_TYPE_BLOCK:
                     {

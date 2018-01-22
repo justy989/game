@@ -33,14 +33,12 @@ bool tile_is_solid(Tile_t* tile){
 }
 
 bool tile_is_iced(Tile_t* tile){
-     return tile->flags & TILE_FLAG_ICED;
+     return tile->flags & (TILE_FLAG_ICED_TOP_LEFT | TILE_FLAG_ICED_TOP_RIGHT |
+                           TILE_FLAG_ICED_BOTTOM_LEFT | TILE_FLAG_ICED_BOTTOM_RIGHT);
 }
 
-Tile_t* tilemap_get_tile(TileMap_t* tilemap, Coord_t coord){
-     if(coord.x < 0 || coord.x >= tilemap->width) return NULL;
-     if(coord.y < 0 || coord.y >= tilemap->height) return NULL;
-
-     return tilemap->tiles[coord.y] + coord.x;
+bool tile_has_ice(Tile_t* tile){
+     return tile_flags_have_ice(tile->flags);
 }
 
 bool tilemap_is_solid(TileMap_t* tilemap, Coord_t coord){
@@ -55,9 +53,24 @@ bool tilemap_is_iced(TileMap_t* tilemap, Coord_t coord){
      return (tile_is_iced(tile));
 }
 
-Direction_t tile_flags_cluster_direction(U16 flags){
-     bool first_bit = flags & (1 << 14);
-     bool second_bit = flags & (1 << 15);
+Tile_t* tilemap_get_tile(TileMap_t* tilemap, Coord_t coord){
+     if(coord.x < 0 || coord.x >= tilemap->width) return NULL;
+     if(coord.y < 0 || coord.y >= tilemap->height) return NULL;
+
+     return tilemap->tiles[coord.y] + coord.x;
+}
+
+bool tile_flags_have_ice(U32 flags){
+     return (flags & TILE_FLAG_ICED_TOP_LEFT ||
+             flags & TILE_FLAG_ICED_TOP_RIGHT ||
+             flags & TILE_FLAG_ICED_BOTTOM_LEFT ||
+             flags & TILE_FLAG_ICED_BOTTOM_RIGHT);
+}
+
+Direction_t tile_flags_cluster_direction(U32 flags){
+     bool first_bit = flags & TILE_FLAG_FIRST_DIRECTION_BIT;
+     bool second_bit = flags & TILE_FLAG_SECOND_DIRECTION_BIT;
+
      if(first_bit){
           if(second_bit){
                return DIRECTION_UP;
@@ -71,33 +84,34 @@ Direction_t tile_flags_cluster_direction(U16 flags){
                return DIRECTION_LEFT;
           }
      }
+
      return DIRECTION_COUNT;
 }
 
-void tile_flags_set_cluster_direction(U16* flags, Direction_t dir){
+void tile_flags_set_cluster_direction(U32* flags, Direction_t dir){
      switch(dir){
      default:
           break;
      case DIRECTION_LEFT:
-          OFF_BIT(*flags, 14);
-          OFF_BIT(*flags, 15);
+          *flags &= ~TILE_FLAG_FIRST_DIRECTION_BIT;
+          *flags &= ~TILE_FLAG_SECOND_DIRECTION_BIT;
           break;
      case DIRECTION_RIGHT:
-          ON_BIT(*flags, 14);
-          OFF_BIT(*flags, 15);
+          *flags |= TILE_FLAG_FIRST_DIRECTION_BIT;
+          *flags &= ~TILE_FLAG_SECOND_DIRECTION_BIT;
           break;
      case DIRECTION_UP:
-          ON_BIT(*flags, 14);
-          ON_BIT(*flags, 15);
+          *flags |= TILE_FLAG_FIRST_DIRECTION_BIT;
+          *flags |= TILE_FLAG_SECOND_DIRECTION_BIT;
           break;
      case DIRECTION_DOWN:
-          OFF_BIT(*flags, 14);
-          ON_BIT(*flags, 15);
+          *flags &= ~TILE_FLAG_FIRST_DIRECTION_BIT;
+          *flags |= TILE_FLAG_SECOND_DIRECTION_BIT;
           break;
      }
 }
 
-bool tile_flags_cluster_all_on(U16 flags){
+bool tile_flags_cluster_all_on(U32 flags){
      if(flags & TILE_FLAG_WIRE_CLUSTER_LEFT && !(flags & TILE_FLAG_WIRE_CLUSTER_LEFT_ON)){
           return false;
      }

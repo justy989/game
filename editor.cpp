@@ -100,7 +100,7 @@ bool init(Editor_t* editor){
      }
 
      auto* tile_flags_category = editor->category_array.elements + EDITOR_CATEGORY_TILE_FLAGS;
-     init(tile_flags_category, 35);
+     init(tile_flags_category, 39);
 
      S16 index_offset = 0;
      init(&tile_flags_category->elements[index_offset], 1);
@@ -188,13 +188,31 @@ bool init(Editor_t* editor){
 
      init(tile_flags_category->elements + 32, 1);
      tile_flags_category->elements[32].elements[0].type = STAMP_TYPE_TILE_FLAGS;
-     tile_flags_category->elements[32].elements[0].tile_flags = TILE_FLAG_ICED;
+     tile_flags_category->elements[32].elements[0].tile_flags = TILE_FLAG_ICED_TOP_LEFT | TILE_FLAG_ICED_TOP_RIGHT |
+                                                                TILE_FLAG_ICED_BOTTOM_LEFT | TILE_FLAG_ICED_BOTTOM_RIGHT;
      init(tile_flags_category->elements + 33, 1);
      tile_flags_category->elements[33].elements[0].type = STAMP_TYPE_TILE_FLAGS;
-     tile_flags_category->elements[33].elements[0].tile_flags = TILE_FLAG_CHECKPOINT;
+     tile_flags_category->elements[33].elements[0].tile_flags = TILE_FLAG_ICED_TOP_LEFT;
+
      init(tile_flags_category->elements + 34, 1);
      tile_flags_category->elements[34].elements[0].type = STAMP_TYPE_TILE_FLAGS;
-     tile_flags_category->elements[34].elements[0].tile_flags = TILE_FLAG_RESET_IMMUNE;
+     tile_flags_category->elements[34].elements[0].tile_flags = TILE_FLAG_ICED_TOP_RIGHT;
+
+     init(tile_flags_category->elements + 35, 1);
+     tile_flags_category->elements[35].elements[0].type = STAMP_TYPE_TILE_FLAGS;
+     tile_flags_category->elements[35].elements[0].tile_flags = TILE_FLAG_ICED_BOTTOM_LEFT;
+
+     init(tile_flags_category->elements + 36, 1);
+     tile_flags_category->elements[36].elements[0].type = STAMP_TYPE_TILE_FLAGS;
+     tile_flags_category->elements[36].elements[0].tile_flags = TILE_FLAG_ICED_BOTTOM_RIGHT;
+
+     init(tile_flags_category->elements + 37, 1);
+     tile_flags_category->elements[37].elements[0].type = STAMP_TYPE_TILE_FLAGS;
+     tile_flags_category->elements[37].elements[0].tile_flags = TILE_FLAG_CHECKPOINT;
+
+     init(tile_flags_category->elements + 38, 1);
+     tile_flags_category->elements[38].elements[0].type = STAMP_TYPE_TILE_FLAGS;
+     tile_flags_category->elements[38].elements[0].tile_flags = TILE_FLAG_RESET_IMMUNE;
 
      auto* block_category = editor->category_array.elements + EDITOR_CATEGORY_BLOCK;
      init(block_category, 4);

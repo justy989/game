@@ -23,7 +23,7 @@ struct Stamp_t{
 
      union{
           U8 tile_id;
-          U16 tile_flags;
+          U32 tile_flags;
           StampBlock_t block;
           Interactive_t interactive;
      };
