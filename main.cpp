@@ -330,12 +330,20 @@ S8 teleport_position_across_portal(Position_t* position, Vec_t* pos_delta, QuadT
 
 #define BLOCK_QUAD_TREE_MAX_QUERY 16
 #define BLOCK_MAX_TOUCHING_COORDS 4
+#define BLOCK_MAX_TOUCHING_HALFS 4
 
 void block_touching_coords(Block_t* block, Coord_t* coords){
      coords[0] = pixel_to_coord(block->pos.pixel + Pixel_t{1, 1});
      coords[1] = pixel_to_coord(block->pos.pixel + Pixel_t{TILE_SIZE_IN_PIXELS - 2, 1});
      coords[2] = pixel_to_coord(block->pos.pixel + Pixel_t{1, TILE_SIZE_IN_PIXELS - 2});
      coords[3] = pixel_to_coord(block->pos.pixel + Pixel_t{TILE_SIZE_IN_PIXELS - 2, TILE_SIZE_IN_PIXELS - 2});
+}
+
+void block_touching_halfs(Block_t* block, Half_t* halfs){
+     halfs[0] = pixel_to_half(block->pos.pixel + Pixel_t{1, 1});
+     halfs[1] = pixel_to_half(block->pos.pixel + Pixel_t{TILE_SIZE_IN_PIXELS - 2, 1});
+     halfs[2] = pixel_to_half(block->pos.pixel + Pixel_t{1, TILE_SIZE_IN_PIXELS - 2});
+     halfs[3] = pixel_to_half(block->pos.pixel + Pixel_t{TILE_SIZE_IN_PIXELS - 2, TILE_SIZE_IN_PIXELS - 2});
 }
 
 bool block_on_ice(Block_t* block, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree){
@@ -1123,10 +1131,10 @@ void player_collide_coord(Position_t player_pos, Coord_t coord, F32 player_radiu
      }
 }
 
-#define LIGHT_MAX_LINE_LEN 32
+#define LIGHT_MAX_LINE_LEN 16
 
-void illuminate_line(Half_t start, Coord_t end, U8 value, TileMap_t* tilemap, QuadTreeNode_t<Block_t>* block_quad_tree){
-     Half_t halfs[LIGHT_MAX_LINE_LEN]; // lol halves
+void illuminate_line(Half_t start, Half_t end, U8 value, TileMap_t* tilemap, QuadTreeNode_t<Block_t>* block_quad_tree){
+     Half_t halfs[LIGHT_MAX_LINE_LEN];
      S8 half_count = 0;
 
      // determine line of points using a modified bresenham to be symmetrical
@@ -1149,17 +1157,17 @@ void illuminate_line(Half_t start, Coord_t end, U8 value, TileMap_t* tilemap, Qu
                S16 sy = start.y;
 
                for(S16 sx = start.x; sx != end_step_x; sx += step_x){
-                    Half_t half {sx, sy};
-                    halfs[half_count] = half;
+                    Half_t coord {sx, sy};
+                    halfs[half_count] = coord;
                     half_count++;
 
                     error += derror;
                     while(error >= 0.5){
-                         half = {sx, sy};
+                         coord = {sx, sy};
 
                          // only add non-duplicate halfs
-                         if(halfs[half_count - 1] != half){
-                              halfs[half_count] = half;
+                         if(halfs[half_count - 1] != coord){
+                              halfs[half_count] = coord;
                               half_count++;
                          }
 
@@ -1173,85 +1181,78 @@ void illuminate_line(Half_t start, Coord_t end, U8 value, TileMap_t* tilemap, Qu
      for(S8 i = 0; i < half_count; ++i){
           Coord_t coord = half_to_coord(halfs[i]);
           Tile_t* tile = tilemap_get_tile(tilemap, coord);
-          if(!tile) continue;
-          U8* tile_light = tilemap_get_light(tilemap, halfs[i]);
+          if(!tile) break;
 
-          S16 diff_x = abs(halfs[i].x - start.x);
-          S16 diff_y = abs(halfs[i].y - start.y);
+          S16 diff_x = (abs(halfs[i].x - start.x) + 1) / 2;
+          S16 diff_y = (abs(halfs[i].y - start.y) + 1) / 2;
           U8 distance = static_cast<U8>(sqrt(static_cast<F32>(diff_x * diff_x + diff_y * diff_y)));
 
           U8 new_value = value - (distance * LIGHT_DECAY);
-          if(new_value > value) continue;
-
-#if 0
-          if(tile->solid.type == SOLID_PORTAL && tile->solid.portal.on){
-               ConnectedPortals_t connected_portals = {};
-               find_connected_portals(tilemap, halfs[i], &connected_portals);
-               Coord_t end_offset = end - halfs[i];
-               Coord_t prev_offset = halfs[i] - halfs[i - 1];
-
-               for(S32 p = 0; p < connected_portals.half_count; ++p){
-                    if(connected_portals.halfs[p] != halfs[i]){
-                         Coord_t dst_coord = connected_portals.halfs[p] + prev_offset;
-                         illuminate_line(dst_coord, dst_coord + end_offset, new_value, tilemap, block_array);
-                    }
-               }
-               break;
-          }
-#endif
+          if(new_value > value) break;
+          if(new_value <= BASE_LIGHT) break;
 
           Block_t* block = nullptr;
-          if(halfs[i] != start){
-               if(tile_is_solid(tile)){
-                    break;
-               }
+          if(i){
+               if(tile_is_solid(tile)) break;
 
-               S16 px = halfs[i].x * TILE_SIZE_IN_PIXELS;
-               S16 py = halfs[i].y * TILE_SIZE_IN_PIXELS;
-               Rect_t coord_rect {px, py, (S16)(px + TILE_SIZE_IN_PIXELS), (S16)(py + TILE_SIZE_IN_PIXELS)};
+               Rect_t coord_rect = rect_surrounding_adjacent_coords(half_to_coord(halfs[i]));
 
                S16 block_count = 0;
                Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
                quad_tree_find_in(block_quad_tree, coord_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
 
-               for(S16 b = 0; b < block_count; b++){
-                    if(block_get_coord(blocks[b]) == coord){
-                         block = blocks[b];
-                         break;
+               for(S16 b = 0; b < block_count && !block; b++){
+                    Half_t block_halfs[BLOCK_MAX_TOUCHING_HALFS];
+                    block_touching_halfs(blocks[b], halfs);
+
+                    for(S8 h = 0; h < BLOCK_MAX_TOUCHING_HALFS; h++){
+                         if(block_halfs[h] == halfs[i]){
+                              block = blocks[b];
+                              break;
+                         }
                     }
                }
           }
 
+          U8* tile_light = tilemap_get_light(tilemap, halfs[i]);
           if(*tile_light < new_value) *tile_light = new_value;
+
           if(block) break;
      }
 }
 
-void illuminate(Half_t half, U8 value, TileMap_t* tilemap, QuadTreeNode_t<Block_t>* block_quad_tree){
-     if(half.x < 0 || half.y < 0 || half.x >= (tilemap->width * 2) || half.y >= (tilemap->height * 2)) return;
+void illuminate(Half_t bottom_left_half, U8 value, TileMap_t* tilemap, QuadTreeNode_t<Block_t>* block_quad_tree){
+     if(bottom_left_half.x < 0 || bottom_left_half.y < 0 || bottom_left_half.x >= (tilemap->width * 2) || bottom_left_half.y >= (tilemap->height * 2)) return;
+     Half_t bottom_right_half = bottom_left_half + Half_t{1, 0};
+     Half_t top_left_half = bottom_left_half + Half_t{0, 1};
+     Half_t top_right_half = bottom_left_half + Half_t{1, 1};
 
      S16 radius = ((value - BASE_LIGHT) / LIGHT_DECAY) + 1;
 
      if(radius < 0) return;
 
-     Half_t delta {radius, radius};
-     Half_t min = half - delta;
-     Half_t max = half + delta;
+     Half_t delta {(S16)(radius * 2), (S16)(radius * 2)};
+     Half_t min = bottom_left_half - delta;
+     Half_t max = bottom_left_half + delta;
 
      for(S16 j = min.y + 1; j < max.y; ++j) {
-          // bottom of box
-          illuminate_line(half, Coord_t{min.x, j}, value, tilemap, block_quad_tree);
-
-          // top of box
-          illuminate_line(half, Coord_t{max.x, j}, value, tilemap, block_quad_tree);
+          if(j < bottom_left_half.y){
+               illuminate_line(bottom_left_half, Half_t{min.x, j}, value, tilemap, block_quad_tree);
+               illuminate_line(bottom_right_half, Half_t{max.x, j}, value, tilemap, block_quad_tree);
+          }else{
+               illuminate_line(top_left_half, Half_t{min.x, j}, value, tilemap, block_quad_tree);
+               illuminate_line(top_right_half, Half_t{max.x, j}, value, tilemap, block_quad_tree);
+          }
      }
 
      for(S16 i = min.x + 1; i < max.x; ++i) {
-          // left of box
-          illuminate_line(half, Coord_t{i, min.y,}, value, tilemap, block_quad_tree);
-
-          // right of box
-          illuminate_line(half, Coord_t{i, max.y,}, value, tilemap, block_quad_tree);
+          if(i < bottom_left_half.x){
+               illuminate_line(bottom_left_half, Half_t{i, min.y}, value, tilemap, block_quad_tree);
+               illuminate_line(top_left_half, Half_t{i, max.y}, value, tilemap, block_quad_tree);
+          }else{
+               illuminate_line(bottom_right_half, Half_t{i, min.y}, value, tilemap, block_quad_tree);
+               illuminate_line(top_right_half, Half_t{i, max.y}, value, tilemap, block_quad_tree);
+          }
      }
 }
 

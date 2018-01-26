@@ -3,7 +3,7 @@
 #include <cassert>
 
 static Half_t half_move(Half_t h, Direction_t dir, S16 distance){
-     switch ( dir ) {
+     switch(dir){
      default:
           assert(!"invalid direction");
           break;
