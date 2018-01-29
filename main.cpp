@@ -2366,7 +2366,6 @@ void reset_map(Player_t* player, Coord_t player_start, ObjectArray_t<Interactive
      player->walk_frame_delta = 1;
      player->pos = coord_to_pos_at_tile_center(player_start);
      player->has_bow = true;
-     player->grabbing_block = -1;
 
      // update interactive quad tree
      quad_tree_free(*interactive_quad_tree);
@@ -2740,7 +2739,7 @@ void draw_solids(Vec_t pos, Interactive_t* interactive, Block_t** blocks, S16 bl
           }
 
           S8 player_frame_y = direction_rotate_clockwise(player->face, portal_rotations);
-          if(player->push_time > FLT_EPSILON || player->grabbing_block >= 0) player_frame_y += 4;
+          if(player->push_time > FLT_EPSILON) player_frame_y += 4;
           if(player->has_bow){
                player_frame_y += 8;
                if(player->bow_draw_time > (PLAYER_BOW_DRAW_DELAY / 2.0f)){
@@ -4692,156 +4691,69 @@ int main(int argc, char** argv){
           Position_t portal_player_pos = {};
 
           // player movement
-          if(player.grabbing_block >= 0){
-               Block_t* grabbed_block = block_array.elements + player.grabbing_block;
-               Pixel_t delta = {};
+          user_movement = vec_normalize(user_movement);
+          player.accel = user_movement * PLAYER_SPEED;
 
-               switch(player.face){
-               default:
-                    break;
-               case DIRECTION_LEFT:
-                    if(player_action.move_left){
-                         player_action.move_left = false;
-                         player.pos.decimal.x = 0;
-                         grabbed_block->pos.decimal.x = 0;
-                         delta.x = -1;
-                    }
-                    break;
-               case DIRECTION_RIGHT:
-                    if(player_action.move_right){
-                         player_action.move_right = false;
-                         player.pos.decimal.x = 0;
-                         grabbed_block->pos.decimal.x = 0;
-                         delta.x = 1;
-                    }
-                    break;
-               case DIRECTION_UP:
-                    if(player_action.move_up){
-                         player_action.move_up = false;
-                         player.pos.decimal.y = 0;
-                         grabbed_block->pos.decimal.y = 0;
-                         delta.y = 1;
-                    }
-                    break;
-               case DIRECTION_DOWN:
-                    if(player_action.move_down){
-                         player_action.move_down = false;
-                         player.pos.decimal.y = 0;
-                         grabbed_block->pos.decimal.y = 0;
-                         delta.y = -1;
-                    }
-                    break;
-               }
+          Vec_t pos_delta = (player.accel * dt * dt * 0.5f) + (player.vel * dt);
+          player.vel += player.accel * dt;
+          player.vel *= drag;
 
-               Direction_t push_dir = DIRECTION_COUNT;
-               Tile_t* against_tile = block_against_solid_tile(grabbed_block, player.face, &tilemap,
-                                                               interactive_quad_tree);
-               if(!against_tile){
-                    Interactive_t* against_interactive = block_against_solid_interactive(grabbed_block,
-                                                                                         player.face,
-                                                                                         &tilemap,
-                                                                                         interactive_quad_tree);
-                    if(!against_interactive){
-                         Block_t* against_block = block_against_another_block(grabbed_block, player.face,
-                                                                              block_quad_tree,
-                                                                              interactive_quad_tree,
-                                                                              &tilemap, &push_dir);
-                         if(!against_block){
-                              Coord_t premove_coord = pixel_to_coord(player.pos.pixel);
-                              player.pos.pixel += delta;
-                              Coord_t postmove_coord = pixel_to_coord(player.pos.pixel);
+          if(fabs(vec_magnitude(player.vel)) > PLAYER_SPEED){
+               player.vel = vec_normalize(player.vel) * PLAYER_SPEED;
+          }
 
-                              if(premove_coord != postmove_coord){
-                                   teleport_position_across_portal(&player.pos, NULL, interactive_quad_tree,
-                                                                   &tilemap, premove_coord, postmove_coord);
-                              }
+          Coord_t skip_coord[DIRECTION_COUNT];
+          Coord_t player_previous_coord = pos_to_coord(player.pos);
+          Coord_t player_coord = pos_to_coord(player.pos + pos_delta);
 
-                              Position_t block_center = block_get_center(grabbed_block);
+          find_portal_adjacents_to_skip_collision_check(player_coord, interactive_quad_tree, skip_coord);
+          S8 rotations_between = teleport_position_across_portal(&player.pos, &pos_delta, interactive_quad_tree, &tilemap, player_previous_coord,
+                                                                 player_coord);
 
-                              premove_coord = pixel_to_coord(block_center.pixel);
-                              block_center.pixel += delta;
-                              postmove_coord = pixel_to_coord(block_center.pixel);
+          player_coord = pos_to_coord(player.pos + pos_delta);
 
-                              if(premove_coord != postmove_coord){
-                                   teleport_position_across_portal(&block_center, NULL, interactive_quad_tree,
-                                                                   &tilemap, premove_coord, postmove_coord);
-                              }
+          bool collide_with_interactive = false;
+          Vec_t player_delta_pos = move_player_position_through_world(player.pos, pos_delta, player.face, skip_coord,
+                                                                      &player, &tilemap, interactive_quad_tree,
+                                                                      &block_array, &block_to_push,
+                                                                      &last_block_pushed_direction,
+                                                                      &collide_with_interactive);
 
-                              grabbed_block->pos= block_center;
-                              grabbed_block->pos.pixel -= Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS};
+          player_coord = pos_to_coord(player.pos + player_delta_pos);
 
-                              if(block_on_ice(grabbed_block, &tilemap, interactive_quad_tree)){
-                                   player.grabbing_block = -1;
-                                   block_push(grabbed_block, player.face, &tilemap, interactive_quad_tree, block_quad_tree, true);
-                              }
-                         }
-                    }
+          if(block_to_push){
+               F32 before_time = player.push_time;
+
+               player.push_time += dt;
+               if(player.push_time > BLOCK_PUSH_TIME){
+                    if(before_time <= BLOCK_PUSH_TIME) undo_commit(&undo, &player, &tilemap, &block_array, &interactive_array);
+                    block_push(block_to_push, last_block_pushed_direction, &tilemap, interactive_quad_tree, block_quad_tree, false);
+                    if(block_to_push->pos.z > 0) player.push_time = -0.5f;
                }
           }else{
-               user_movement = vec_normalize(user_movement);
-               player.accel = user_movement * PLAYER_SPEED;
-
-               Vec_t pos_delta = (player.accel * dt * dt * 0.5f) + (player.vel * dt);
-               player.vel += player.accel * dt;
-               player.vel *= drag;
-
-               if(fabs(vec_magnitude(player.vel)) > PLAYER_SPEED){
-                    player.vel = vec_normalize(player.vel) * PLAYER_SPEED;
-               }
-
-               Coord_t skip_coord[DIRECTION_COUNT];
-               Coord_t player_previous_coord = pos_to_coord(player.pos);
-               Coord_t player_coord = pos_to_coord(player.pos + pos_delta);
-
-               find_portal_adjacents_to_skip_collision_check(player_coord, interactive_quad_tree, skip_coord);
-               S8 rotations_between = teleport_position_across_portal(&player.pos, &pos_delta, interactive_quad_tree, &tilemap, player_previous_coord,
-                                                                      player_coord);
-
-               player_coord = pos_to_coord(player.pos + pos_delta);
-
-               bool collide_with_interactive = false;
-               Vec_t player_delta_pos = move_player_position_through_world(player.pos, pos_delta, player.face, skip_coord,
-                                                                           &player, &tilemap, interactive_quad_tree,
-                                                                           &block_array, &block_to_push,
-                                                                           &last_block_pushed_direction,
-                                                                           &collide_with_interactive);
-
-               player_coord = pos_to_coord(player.pos + player_delta_pos);
-
-               if(block_to_push){
-                    F32 before_time = player.push_time;
-
-                    player.push_time += dt;
-                    if(player.push_time > BLOCK_PUSH_TIME){
-                         if(before_time <= BLOCK_PUSH_TIME) undo_commit(&undo, &player, &tilemap, &block_array, &interactive_array);
-                         block_push(block_to_push, last_block_pushed_direction, &tilemap, interactive_quad_tree, block_quad_tree, false);
-                         if(block_to_push->pos.z > 0) player.push_time = -0.5f;
-                    }
-               }else{
-                    player.push_time = 0;
-               }
-
-               if(rotations_between < 0){
-                    rotations_between = teleport_position_across_portal(&player.pos, &player_delta_pos, interactive_quad_tree, &tilemap, player_previous_coord,
-                                                                        player_coord);
-               }else{
-                    teleport_position_across_portal(&player.pos, &player_delta_pos, interactive_quad_tree, &tilemap, player_previous_coord, player_coord);
-               }
-
-               if(rotations_between >= 0){
-                    player.face = direction_rotate_clockwise(player.face, rotations_between);
-                    player.vel = vec_rotate_quadrants(player.vel, rotations_between);
-                    player.accel = vec_rotate_quadrants(player.accel, rotations_between);
-
-                    // set rotations for each direction the player wants to move
-                    if(player_action.move_left) player_action.move_left_rotation = (player_action.move_left_rotation + rotations_between) % DIRECTION_COUNT;
-                    if(player_action.move_right) player_action.move_right_rotation = (player_action.move_right_rotation + rotations_between) % DIRECTION_COUNT;
-                    if(player_action.move_up) player_action.move_up_rotation = (player_action.move_up_rotation + rotations_between) % DIRECTION_COUNT;
-                    if(player_action.move_down) player_action.move_down_rotation = (player_action.move_down_rotation + rotations_between) % DIRECTION_COUNT;
-               }
-
-               player.pos += player_delta_pos;
+               player.push_time = 0;
           }
+
+          if(rotations_between < 0){
+               rotations_between = teleport_position_across_portal(&player.pos, &player_delta_pos, interactive_quad_tree, &tilemap, player_previous_coord,
+                                                                   player_coord);
+          }else{
+               teleport_position_across_portal(&player.pos, &player_delta_pos, interactive_quad_tree, &tilemap, player_previous_coord, player_coord);
+          }
+
+          if(rotations_between >= 0){
+               player.face = direction_rotate_clockwise(player.face, rotations_between);
+               player.vel = vec_rotate_quadrants(player.vel, rotations_between);
+               player.accel = vec_rotate_quadrants(player.accel, rotations_between);
+
+               // set rotations for each direction the player wants to move
+               if(player_action.move_left) player_action.move_left_rotation = (player_action.move_left_rotation + rotations_between) % DIRECTION_COUNT;
+               if(player_action.move_right) player_action.move_right_rotation = (player_action.move_right_rotation + rotations_between) % DIRECTION_COUNT;
+               if(player_action.move_up) player_action.move_up_rotation = (player_action.move_up_rotation + rotations_between) % DIRECTION_COUNT;
+               if(player_action.move_down) player_action.move_down_rotation = (player_action.move_down_rotation + rotations_between) % DIRECTION_COUNT;
+          }
+
+          player.pos += player_delta_pos;
 
           if(suite && !show_suite) continue;
 

@@ -18,7 +18,6 @@ struct Player_t{
      F32 walk_frame_time;
      bool has_bow;
      F32 bow_draw_time;
-     S16 grabbing_block;
 };
 
 #endif
