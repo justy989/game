@@ -1389,13 +1389,17 @@ void spread_element(Half_t bottom_left_half, S16 radius, TileMap_t* tilemap, Qua
                     Interactive_t* interactive = quad_tree_find_at(interactive_quad_tree, coord.x, coord.y);
 
                     if(block){
-                         if(block->element == ELEMENT_NONE) block->element = ELEMENT_ONLY_ICED;
+                         if(block->element == ELEMENT_NONE && ice){
+                              block->element = ELEMENT_ONLY_ICED;
+                         }else if(block->element == ELEMENT_ONLY_ICED && !ice){
+                              block->element = ELEMENT_NONE;
+                         }
                     }else{
                          if(interactive){
                               // TODO: switch
                               if(interactive->type == INTERACTIVE_TYPE_POPUP){
                                    if(interactive->popup.lift.ticks == 1){
-                                        interactive->popup.iced = false;
+                                        interactive->popup.iced = ice;
                                         tilemap_set_ice(tilemap, half, ice);
                                    }else{
                                         interactive->popup.iced = ice;
