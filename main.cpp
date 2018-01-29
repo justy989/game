@@ -1132,16 +1132,23 @@ void player_collide_coord(Position_t player_pos, Coord_t coord, F32 player_radiu
 
 #define LIGHT_MAX_LINE_LEN 16
 
-void illuminate_line(Half_t start, Half_t end, U8 value, TileMap_t* tilemap, QuadTreeNode_t<Block_t>* block_quad_tree){
+Half_t g_illuminate_halfs[LIGHT_MAX_LINE_LEN];
+S8 g_illuminate_half_count = 0;
+
+void illuminate_line(Half_t start, Half_t end, U8 value, TileMap_t* tilemap, QuadTreeNode_t<Block_t>* block_quad_tree,
+                     Half_t* origins, bool debug){
      Half_t halfs[LIGHT_MAX_LINE_LEN];
      S8 half_count = 0;
 
      // determine line of points using a modified bresenham to be symmetrical
      {
           if(start.x == end.x){
+               S16 step_y = (end.y - start.y >= 0) ? 1 : -1;
+               S16 end_step_y = end.y + step_y;
+
                // build a simple vertical path
-               for(S16 y = start.y; y <= end.y; ++y){
-                    halfs[half_count] = Half_t{start.x, y};
+               for(S16 y = start.y; y != end_step_y; y += step_y){
+                    halfs[half_count] = {start.x, y};
                     half_count++;
                }
           }else{
@@ -1153,20 +1160,22 @@ void illuminate_line(Half_t start, Half_t end, U8 value, TileMap_t* tilemap, Qua
                S16 step_x = (start.x < end.x) ? 1 : -1;
                S16 step_y = (end.y - start.y >= 0) ? 1 : -1;
                S16 end_step_x = end.x + step_x;
+               S16 end_step_y = end.y + step_y;
                S16 sy = start.y;
 
-               for(S16 sx = start.x; sx != end_step_x; sx += step_x){
-                    Half_t coord {sx, sy};
-                    halfs[half_count] = coord;
+               for(S16 sx = start.x; sx != end_step_x && sy != end_step_y; sx += step_x){
+                    Half_t half {sx, sy};
+                    halfs[half_count] = half;
                     half_count++;
 
                     error += derror;
                     while(error >= 0.5){
-                         coord = {sx, sy};
+                         if(sy == end_step_y) break;
+                         half = {sx, sy};
 
                          // only add non-duplicate halfs
-                         if(halfs[half_count - 1] != coord){
-                              halfs[half_count] = coord;
+                         if(halfs[half_count - 1] != half){
+                              halfs[half_count] = half;
                               half_count++;
                          }
 
@@ -1174,6 +1183,13 @@ void illuminate_line(Half_t start, Half_t end, U8 value, TileMap_t* tilemap, Qua
                          error -= 1.0;
                     }
                }
+          }
+     }
+
+     if(debug){
+          for(S8 i = 0; i < half_count; ++i){
+               g_illuminate_half_count = half_count;
+               g_illuminate_halfs[i] = halfs[i];
           }
      }
 
@@ -1191,7 +1207,16 @@ void illuminate_line(Half_t start, Half_t end, U8 value, TileMap_t* tilemap, Qua
           if(new_value <= BASE_LIGHT) break;
 
           Block_t* block = nullptr;
-          if(i){
+          bool from_origin = false;
+
+          for(S8 o = 0; o < 4; o++){
+               if(origins[o] == halfs[i]){
+                    from_origin = true;
+                    break;
+               }
+          }
+
+          if(!from_origin){
                Rect_t coord_rect = rect_surrounding_adjacent_coords(coord);
 
                S16 block_count = 0;
@@ -1228,12 +1253,28 @@ void illuminate_line(Half_t start, Half_t end, U8 value, TileMap_t* tilemap, Qua
      }
 }
 
-void illuminate(Half_t bottom_left_half, U8 value, TileMap_t* tilemap, QuadTreeNode_t<Block_t>* block_quad_tree){
-     Half_t bottom_right_half = bottom_left_half + Half_t{1, 0};
-     Half_t top_left_half = bottom_left_half + Half_t{0, 1};
-     Half_t top_right_half = bottom_left_half + Half_t{1, 1};
+#define BOTTOM_LEFT_HALF 0
+#define BOTTOM_RIGHT_HALF 1
+#define TOP_LEFT_HALF 2
+#define TOP_RIGHT_HALF 3
 
-     if(bottom_left_half.x < 0 || bottom_left_half.y < 0 || top_right_half.x >= (tilemap->width * 2) || top_right_half.y >= (tilemap->height * 2)) return;
+void get_coord_sized_halfs(Half_t bottom_left, Half_t* halfs){
+     halfs[BOTTOM_LEFT_HALF] = bottom_left;
+     halfs[BOTTOM_RIGHT_HALF] = bottom_left + Half_t{1, 0};
+     halfs[TOP_LEFT_HALF] = bottom_left + Half_t{0, 1};
+     halfs[TOP_RIGHT_HALF] = bottom_left + Half_t{1, 1};
+}
+
+S16 g_debug_light_iteration = 0;
+
+void illuminate(Half_t bottom_left_half, U8 value, TileMap_t* tilemap, QuadTreeNode_t<Block_t>* block_quad_tree){
+     Half_t origins[4];
+
+     get_coord_sized_halfs(bottom_left_half, origins);
+
+     if(bottom_left_half.x < 0 || bottom_left_half.y < 0 ||
+        origins[TOP_RIGHT_HALF].x >= (tilemap->width * 2) ||
+        origins[TOP_RIGHT_HALF].y >= (tilemap->height * 2)) return;
 
      S16 radius = ((value - BASE_LIGHT) / LIGHT_DECAY) + 1;
 
@@ -1241,25 +1282,31 @@ void illuminate(Half_t bottom_left_half, U8 value, TileMap_t* tilemap, QuadTreeN
 
      Half_t delta {(S16)(radius * 2), (S16)(radius * 2)};
      Half_t min = bottom_left_half - delta;
-     Half_t max = bottom_left_half + delta;
+     Half_t max = origins[TOP_RIGHT_HALF] + delta;
 
-     for(S16 j = min.y + 1; j < max.y; ++j) {
-          if(j < bottom_left_half.y){
-               illuminate_line(bottom_left_half, Half_t{min.x, j}, value, tilemap, block_quad_tree);
-               illuminate_line(bottom_right_half, Half_t{max.x, j}, value, tilemap, block_quad_tree);
+     // loop from just after the min to just before the max, because the opposite loop will cover those
+     S16 iteration = 0;
+     for(S16 j = max.y; j >= min.y; --j) {
+          if(j <= bottom_left_half.y){
+               // illuminate_line(origins[BOTTOM_LEFT_HALF], Half_t{min.x, j}, value, tilemap, block_quad_tree, origins, false);
+               illuminate_line(origins[BOTTOM_LEFT_HALF], Half_t{min.x, j}, value, tilemap, block_quad_tree, origins, iteration == g_debug_light_iteration);
+               iteration++;
+
+               // illuminate_line(origins[BOTTOM_RIGHT_HALF], Half_t{max.x, j}, value, tilemap, block_quad_tree, origins, false);
           }else{
-               illuminate_line(top_left_half, Half_t{min.x, j}, value, tilemap, block_quad_tree);
-               illuminate_line(top_right_half, Half_t{max.x, j}, value, tilemap, block_quad_tree);
+               // illuminate_line(origins[TOP_LEFT_HALF], Half_t{min.x, j}, value, tilemap, block_quad_tree, origins, false);
+               // illuminate_line(origins[TOP_RIGHT_HALF], Half_t{max.x, j}, value, tilemap, block_quad_tree, origins, false);
           }
      }
 
-     for(S16 i = min.x + 1; i < max.x; ++i) {
-          if(i < bottom_left_half.x){
-               illuminate_line(bottom_left_half, Half_t{i, min.y}, value, tilemap, block_quad_tree);
-               illuminate_line(top_left_half, Half_t{i, max.y}, value, tilemap, block_quad_tree);
+     for(S16 i = min.x; i <= max.x; ++i) {
+          if(i <= origins[BOTTOM_LEFT_HALF].x){
+               illuminate_line(origins[BOTTOM_LEFT_HALF], Half_t{i, min.y}, value, tilemap, block_quad_tree, origins, iteration == g_debug_light_iteration);
+               iteration++;
+               // illuminate_line(origins[TOP_LEFT_HALF], Half_t{i, max.y}, value, tilemap, block_quad_tree, origins, false);
           }else{
-               illuminate_line(bottom_right_half, Half_t{i, min.y}, value, tilemap, block_quad_tree);
-               illuminate_line(top_right_half, Half_t{i, max.y}, value, tilemap, block_quad_tree);
+               // illuminate_line(origins[BOTTOM_RIGHT_HALF], Half_t{i, min.y}, value, tilemap, block_quad_tree, origins, false);
+               // illuminate_line(origins[TOP_RIGHT_HALF], Half_t{i, max.y}, value, tilemap, block_quad_tree, origins, false);
           }
      }
 }
@@ -3692,6 +3739,13 @@ int main(int argc, char** argv){
                          Coord_t coord = mouse_select_world(mouse_screen, camera);
                          describe_coord(coord, &tilemap, interactive_quad_tree, block_quad_tree);
                     } break;
+                    case SDL_SCANCODE_9:
+                         g_debug_light_iteration--;
+                         if(g_debug_light_iteration < 0) g_debug_light_iteration = 0;
+                         break;
+                    case SDL_SCANCODE_0:
+                         g_debug_light_iteration++;
+                         break;
                     }
                     break;
                case SDL_KEYUP:
@@ -4982,6 +5036,7 @@ int main(int argc, char** argv){
 
           glEnd();
 
+// debug block outline
 #if 0
           Vec_t collided_with_center = {(float)(g_collided_with_pixel.x) * PIXEL_SIZE, (float)(g_collided_with_pixel.y) * PIXEL_SIZE};
           const float half_block_size = PIXEL_SIZE * HALF_TILE_SIZE_IN_PIXELS;
@@ -4989,6 +5044,33 @@ int main(int argc, char** argv){
                                        collided_with_center.x + half_block_size, collided_with_center.y + half_block_size};
           draw_quad_wireframe(&collided_with_quad, 255.0f, 0.0f, 255.0f);
 #endif
+
+// debug light outline
+          const float half_coord_size = PIXEL_SIZE * HALF_TILE_SIZE_IN_PIXELS;
+          for(S8 i = 0; i < g_illuminate_half_count; i++){
+               Vec_t bottom_left = {(F32)(g_illuminate_halfs[i].x * HALF_TILE_SIZE_IN_PIXELS) * PIXEL_SIZE,
+                                    (F32)(g_illuminate_halfs[i].y * HALF_TILE_SIZE_IN_PIXELS) * PIXEL_SIZE};
+               Quad_t quad = {bottom_left.x, bottom_left.y,
+                              bottom_left.x + half_coord_size, bottom_left.y + half_coord_size};
+               draw_quad_wireframe(&quad, 255.0f, 0.0f, 255.0f);
+          }
+          if(g_illuminate_half_count){
+               const float quarter_coord_size = PIXEL_SIZE * HALF_TILE_SIZE_IN_PIXELS * 0.5f;
+               Vec_t light_start {(F32)(g_illuminate_halfs[0].x * HALF_TILE_SIZE_IN_PIXELS) * PIXEL_SIZE + quarter_coord_size,
+                                  (F32)(g_illuminate_halfs[0].y * HALF_TILE_SIZE_IN_PIXELS) * PIXEL_SIZE + quarter_coord_size,};
+               Vec_t light_end {(F32)(g_illuminate_halfs[g_illuminate_half_count - 1].x * HALF_TILE_SIZE_IN_PIXELS) * PIXEL_SIZE + quarter_coord_size,
+                                (F32)(g_illuminate_halfs[g_illuminate_half_count - 1].y * HALF_TILE_SIZE_IN_PIXELS) * PIXEL_SIZE + quarter_coord_size,};
+
+               glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
+               glBegin(GL_LINES);
+               glColor3f(0, 1, 0);
+               glVertex2f(light_start.x, light_start.y);
+               glVertex2f(light_end.x, light_end.y);
+               glEnd();
+
+               glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+          }
 
 #if 1
           // light
