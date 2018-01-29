@@ -1139,6 +1139,7 @@ void illuminate_line(Half_t start, Half_t end, U8 value, TileMap_t* tilemap, Qua
                      Half_t* origins, bool debug){
      Half_t halfs[LIGHT_MAX_LINE_LEN];
      S8 half_count = 0;
+     bool xy_swapped = false;
 
      // determine line of points using a modified bresenham to be symmetrical
      {
@@ -1156,6 +1157,25 @@ void illuminate_line(Half_t start, Half_t end, U8 value, TileMap_t* tilemap, Qua
                F64 dx = (F64)(end.x) - (F64)(start.x);
                F64 dy = (F64)(end.y) - (F64)(start.y);
                F64 derror = fabs(dy / dx);
+
+               // if there are more xs than ys, then flip the xs and ys so we can have a symmetrical way of handling xs and ys
+               if(derror < 1.0){
+                    xy_swapped = true;
+
+                    F64 tmp = dx;
+                    dx = dy;
+                    dy = tmp;
+
+                    derror = fabs(dy / dx);
+
+                    tmp = start.x;
+                    start.x = start.y;
+                    start.y = tmp;
+
+                    tmp = end.x;
+                    end.x = end.y;
+                    end.y = tmp;
+               }
 
                S16 step_x = (start.x < end.x) ? 1 : -1;
                S16 step_y = (end.y - start.y >= 0) ? 1 : -1;
@@ -1183,6 +1203,23 @@ void illuminate_line(Half_t start, Half_t end, U8 value, TileMap_t* tilemap, Qua
                          error -= 1.0;
                     }
                }
+          }
+     }
+
+     // unswap xs and ys if we have swapped!
+     if(xy_swapped){
+          S16 tmp = start.x;
+          start.x = start.y;
+          start.y = tmp;
+
+          tmp = end.x;
+          end.x = end.y;
+          end.y = tmp;
+
+          for(S8 i = 0; i < half_count; ++i){
+               tmp = halfs[i].x;
+               halfs[i].x = halfs[i].y;
+               halfs[i].y = tmp;
           }
      }
 
@@ -1285,28 +1322,27 @@ void illuminate(Half_t bottom_left_half, U8 value, TileMap_t* tilemap, QuadTreeN
      Half_t max = origins[TOP_RIGHT_HALF] + delta;
 
      // loop from just after the min to just before the max, because the opposite loop will cover those
-     S16 iteration = 0;
+     // S16 iteration = 0;
      for(S16 j = max.y; j >= min.y; --j) {
           if(j <= bottom_left_half.y){
-               // illuminate_line(origins[BOTTOM_LEFT_HALF], Half_t{min.x, j}, value, tilemap, block_quad_tree, origins, false);
-               illuminate_line(origins[BOTTOM_LEFT_HALF], Half_t{min.x, j}, value, tilemap, block_quad_tree, origins, iteration == g_debug_light_iteration);
-               iteration++;
+               illuminate_line(origins[BOTTOM_LEFT_HALF], Half_t{min.x, j}, value, tilemap, block_quad_tree, origins, false);
+               // illuminate_line(origins[BOTTOM_LEFT_HALF], Half_t{min.x, j}, value, tilemap, block_quad_tree, origins, iteration == g_debug_light_iteration);
+               // iteration++;
 
-               // illuminate_line(origins[BOTTOM_RIGHT_HALF], Half_t{max.x, j}, value, tilemap, block_quad_tree, origins, false);
+               illuminate_line(origins[BOTTOM_RIGHT_HALF], Half_t{max.x, j}, value, tilemap, block_quad_tree, origins, false);
           }else{
-               // illuminate_line(origins[TOP_LEFT_HALF], Half_t{min.x, j}, value, tilemap, block_quad_tree, origins, false);
-               // illuminate_line(origins[TOP_RIGHT_HALF], Half_t{max.x, j}, value, tilemap, block_quad_tree, origins, false);
+               illuminate_line(origins[TOP_LEFT_HALF], Half_t{min.x, j}, value, tilemap, block_quad_tree, origins, false);
+               illuminate_line(origins[TOP_RIGHT_HALF], Half_t{max.x, j}, value, tilemap, block_quad_tree, origins, false);
           }
      }
 
      for(S16 i = min.x; i <= max.x; ++i) {
           if(i <= origins[BOTTOM_LEFT_HALF].x){
-               illuminate_line(origins[BOTTOM_LEFT_HALF], Half_t{i, min.y}, value, tilemap, block_quad_tree, origins, iteration == g_debug_light_iteration);
-               iteration++;
-               // illuminate_line(origins[TOP_LEFT_HALF], Half_t{i, max.y}, value, tilemap, block_quad_tree, origins, false);
+               illuminate_line(origins[BOTTOM_LEFT_HALF], Half_t{i, min.y}, value, tilemap, block_quad_tree, origins, false);
+               illuminate_line(origins[TOP_LEFT_HALF], Half_t{i, max.y}, value, tilemap, block_quad_tree, origins, false);
           }else{
-               // illuminate_line(origins[BOTTOM_RIGHT_HALF], Half_t{i, min.y}, value, tilemap, block_quad_tree, origins, false);
-               // illuminate_line(origins[TOP_RIGHT_HALF], Half_t{i, max.y}, value, tilemap, block_quad_tree, origins, false);
+               illuminate_line(origins[BOTTOM_RIGHT_HALF], Half_t{i, min.y}, value, tilemap, block_quad_tree, origins, false);
+               illuminate_line(origins[TOP_RIGHT_HALF], Half_t{i, max.y}, value, tilemap, block_quad_tree, origins, false);
           }
      }
 }
