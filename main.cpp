@@ -5115,8 +5115,8 @@ int main(int argc, char** argv){
 
           S32 light_min_x = min.x * 2;
           S32 light_min_y = min.y * 2;
-          S32 light_max_x = max.x * 2;
-          S32 light_max_y = max.y * 2;
+          S32 light_max_x = max.x * 2 + 1;
+          S32 light_max_y = max.y * 2 + 1;
 
           for(S32 y = light_min_y; y <= light_max_y; y++){
                for(S32 x = light_min_x; x <= light_max_x; x++){
