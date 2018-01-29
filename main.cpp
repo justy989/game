@@ -1192,8 +1192,6 @@ void illuminate_line(Half_t start, Half_t end, U8 value, TileMap_t* tilemap, Qua
 
           Block_t* block = nullptr;
           if(i){
-               if(tile_is_solid(tile)) break;
-
                Rect_t coord_rect = rect_surrounding_adjacent_coords(coord);
 
                S16 block_count = 0;
@@ -1202,7 +1200,7 @@ void illuminate_line(Half_t start, Half_t end, U8 value, TileMap_t* tilemap, Qua
 
                for(S16 b = 0; b < block_count && !block; b++){
                     Half_t block_halfs[BLOCK_MAX_TOUCHING_HALFS];
-                    block_touching_halfs(blocks[b], halfs);
+                    block_touching_halfs(blocks[b], block_halfs);
 
                     for(S8 h = 0; h < BLOCK_MAX_TOUCHING_HALFS; h++){
                          if(block_halfs[h] == halfs[i]){
@@ -1216,7 +1214,17 @@ void illuminate_line(Half_t start, Half_t end, U8 value, TileMap_t* tilemap, Qua
           U8* tile_light = tilemap_get_light(tilemap, halfs[i]);
           if(*tile_light < new_value) *tile_light = new_value;
 
-          if(block) break;
+          if(tile_is_solid(tile)) break;
+          if(block){
+               Half_t block_halfs[BLOCK_MAX_TOUCHING_HALFS];
+               block_touching_halfs(block, block_halfs);
+
+               for(S8 h = 0; h < BLOCK_MAX_TOUCHING_HALFS; h++){
+                    tile_light = tilemap_get_light(tilemap, block_halfs[h]);
+                    if(*tile_light < new_value) *tile_light = new_value;
+               }
+               break;
+          }
      }
 }
 
@@ -1259,7 +1267,7 @@ void illuminate(Half_t bottom_left_half, U8 value, TileMap_t* tilemap, QuadTreeN
 void spread_element(Half_t bottom_left_half, S16 radius, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree,
                     QuadTreeNode_t<Block_t>* block_quad_tree, Element_t element, bool teleported){
      assert(element == ELEMENT_FIRE || element == ELEMENT_ICE);
-     (void)(teleported);
+     (void)(teleported); // TODO: remove
      Half_t top_right_half = bottom_left_half + Half_t{1, 1};
 
      if(bottom_left_half.x < 0 || bottom_left_half.y < 0 || top_right_half.x >= (tilemap->width * 2) || top_right_half.y >= (tilemap->height * 2)) return;
@@ -4982,7 +4990,7 @@ int main(int argc, char** argv){
           draw_quad_wireframe(&collided_with_quad, 255.0f, 0.0f, 255.0f);
 #endif
 
-#if 0
+#if 1
           // light
           glBindTexture(GL_TEXTURE_2D, 0);
           glBegin(GL_QUADS);
