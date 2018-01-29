@@ -1,5 +1,6 @@
 #include "tile.h"
 #include "defines.h"
+#include "conversion.h"
 
 #include <cstdlib>
 #include <cstring>
@@ -58,6 +59,67 @@ bool tile_has_ice(Tile_t* tile){
      return tile_flags_have_ice(tile->flags);
 }
 
+void tilemap_set_ice(TileMap_t* tilemap, Half_t half, bool value){
+     Coord_t coord = half_to_coord(half);
+     Tile_t* tile = tilemap_get_tile(tilemap, coord);
+     if(!tile) return;
+     S16 x_off = half.x % 2;
+     S16 y_off = half.y % 2;
+
+     if(value){
+          if(x_off){
+               if(y_off){
+                    tile->flags |= TILE_FLAG_ICED_TOP_RIGHT;
+               }else{
+                    tile->flags |= TILE_FLAG_ICED_BOTTOM_RIGHT;
+               }
+          }else{
+               if(y_off){
+                    tile->flags |= TILE_FLAG_ICED_TOP_LEFT;
+               }else{
+                    tile->flags |= TILE_FLAG_ICED_BOTTOM_LEFT;
+               }
+          }
+     }else{
+          if(x_off){
+               if(y_off){
+                    tile->flags &= ~TILE_FLAG_ICED_TOP_RIGHT;
+               }else{
+                    tile->flags &= ~TILE_FLAG_ICED_BOTTOM_RIGHT;
+               }
+          }else{
+               if(y_off){
+                    tile->flags &= ~TILE_FLAG_ICED_TOP_LEFT;
+               }else{
+                    tile->flags &= ~TILE_FLAG_ICED_BOTTOM_LEFT;
+               }
+          }
+     }
+
+}
+
+bool tilemap_get_ice(TileMap_t* tilemap, Half_t half){
+     Coord_t coord = half_to_coord(half);
+     Tile_t* tile = tilemap_get_tile(tilemap, coord);
+     if(!tile) return false;
+     S16 x_off = half.x % 2;
+     S16 y_off = half.y % 2;
+
+     if(x_off){
+          if(y_off){
+               return tile->flags & TILE_FLAG_ICED_TOP_RIGHT;
+          }else{
+               return tile->flags & TILE_FLAG_ICED_BOTTOM_RIGHT;
+          }
+     }
+
+     if(y_off){
+          return tile->flags & TILE_FLAG_ICED_TOP_LEFT;
+     }
+
+     return tile->flags & TILE_FLAG_ICED_BOTTOM_LEFT;
+}
+
 bool tilemap_is_solid(TileMap_t* tilemap, Coord_t coord){
      Tile_t* tile = tilemap_get_tile(tilemap, coord);
      if(!tile) return false;
@@ -73,6 +135,15 @@ bool tilemap_is_iced(TileMap_t* tilemap, Coord_t coord){
 Tile_t* tilemap_get_tile(TileMap_t* tilemap, Coord_t coord){
      if(coord.x < 0 || coord.x >= tilemap->width) return NULL;
      if(coord.y < 0 || coord.y >= tilemap->height) return NULL;
+
+     return tilemap->tiles[coord.y] + coord.x;
+}
+
+Tile_t* tilemap_get_tile(TileMap_t* tilemap, Half_t half){
+     if(half.x < 0 || half.x >= (tilemap->width * 2)) return NULL;
+     if(half.y < 0 || half.y >= (tilemap->height * 2)) return NULL;
+
+     Coord_t coord = half_to_coord(half);
 
      return tilemap->tiles[coord.y] + coord.x;
 }

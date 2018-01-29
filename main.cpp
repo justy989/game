@@ -347,16 +347,17 @@ void block_touching_halfs(Block_t* block, Half_t* halfs){
 }
 
 bool block_on_ice(Block_t* block, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree){
-     bool on_ice[BLOCK_MAX_TOUCHING_COORDS];
-     Coord_t coords[BLOCK_MAX_TOUCHING_COORDS];
+     bool on_ice[BLOCK_MAX_TOUCHING_HALFS];
+     Half_t halfs[BLOCK_MAX_TOUCHING_HALFS];
 
-     block_touching_coords(block, coords);
+     block_touching_halfs(block, halfs);
 
      if(block->pos.z == 0){
-          for(S8 i = 0; i < BLOCK_MAX_TOUCHING_COORDS; i++){
+          for(S8 i = 0; i < BLOCK_MAX_TOUCHING_HALFS; i++){
                on_ice[i] = false;
 
-               Interactive_t* interactive = quad_tree_interactive_find_at(interactive_quad_tree, coords[i]);
+               Coord_t coord = half_to_coord(halfs[i]);
+               Interactive_t* interactive = quad_tree_interactive_find_at(interactive_quad_tree, coord);
                if(interactive){
                     if(interactive->type == INTERACTIVE_TYPE_POPUP){
                          if(interactive->popup.lift.ticks == (block->pos.z + 1) && interactive->popup.iced){
@@ -366,9 +367,7 @@ bool block_on_ice(Block_t* block, TileMap_t* tilemap, QuadTreeNode_t<Interactive
                     }
                }
 
-               if(tilemap_is_iced(tilemap, coords[i])){
-                    on_ice[i] = true;
-               }
+               on_ice[i] = tilemap_get_ice(tilemap, halfs[i]);
           }
 
           return on_ice[0] && on_ice[1] && on_ice[2] && on_ice[3];
@@ -1195,7 +1194,7 @@ void illuminate_line(Half_t start, Half_t end, U8 value, TileMap_t* tilemap, Qua
           if(i){
                if(tile_is_solid(tile)) break;
 
-               Rect_t coord_rect = rect_surrounding_adjacent_coords(half_to_coord(halfs[i]));
+               Rect_t coord_rect = rect_surrounding_adjacent_coords(coord);
 
                S16 block_count = 0;
                Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
@@ -1222,10 +1221,11 @@ void illuminate_line(Half_t start, Half_t end, U8 value, TileMap_t* tilemap, Qua
 }
 
 void illuminate(Half_t bottom_left_half, U8 value, TileMap_t* tilemap, QuadTreeNode_t<Block_t>* block_quad_tree){
-     if(bottom_left_half.x < 0 || bottom_left_half.y < 0 || bottom_left_half.x >= (tilemap->width * 2) || bottom_left_half.y >= (tilemap->height * 2)) return;
      Half_t bottom_right_half = bottom_left_half + Half_t{1, 0};
      Half_t top_left_half = bottom_left_half + Half_t{0, 1};
      Half_t top_right_half = bottom_left_half + Half_t{1, 1};
+
+     if(bottom_left_half.x < 0 || bottom_left_half.y < 0 || top_right_half.x >= (tilemap->width * 2) || top_right_half.y >= (tilemap->height * 2)) return;
 
      S16 radius = ((value - BASE_LIGHT) / LIGHT_DECAY) + 1;
 
@@ -1256,18 +1256,27 @@ void illuminate(Half_t bottom_left_half, U8 value, TileMap_t* tilemap, QuadTreeN
      }
 }
 
-void spread_ice(Coord_t center, S16 radius, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree,
-                QuadTreeNode_t<Block_t>* block_quad_tree, bool teleported){
-     Coord_t delta {radius, radius};
-     Coord_t min = center - delta;
-     Coord_t max = center + delta;
+void spread_element(Half_t bottom_left_half, S16 radius, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree,
+                    QuadTreeNode_t<Block_t>* block_quad_tree, Element_t element, bool teleported){
+     assert(element == ELEMENT_FIRE || element == ELEMENT_ICE);
+     (void)(teleported);
+     Half_t top_right_half = bottom_left_half + Half_t{1, 1};
 
-     // TODO: compress with melt_ice()
+     if(bottom_left_half.x < 0 || bottom_left_half.y < 0 || top_right_half.x >= (tilemap->width * 2) || top_right_half.y >= (tilemap->height * 2)) return;
+
+     Half_t delta {radius, radius};
+     Half_t min = bottom_left_half - delta;
+     Half_t max = top_right_half + delta;
+
+     bool ice = element == ELEMENT_ICE;
+
      for(S16 y = min.y; y <= max.y; ++y){
           for(S16 x = min.x; x <= max.x; ++x){
-               Coord_t coord{x, y};
-               Tile_t* tile = tilemap_get_tile(tilemap, coord);
+               Half_t half{x, y};
+
+               Tile_t* tile = tilemap_get_tile(tilemap, half);
                if(tile && !tile_is_solid(tile)){
+                    Coord_t coord = half_to_coord(half);
                     Rect_t coord_rect = rect_surrounding_adjacent_coords(coord);
                     S16 block_count = 0;
                     Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
@@ -1275,11 +1284,11 @@ void spread_ice(Coord_t center, S16 radius, TileMap_t* tilemap, QuadTreeNode_t<I
 
                     Block_t* block = nullptr;
                     for(S16 i = 0; i < block_count; i++){
-                         Coord_t block_coords[BLOCK_MAX_TOUCHING_COORDS];
-                         block_touching_coords(blocks[i], block_coords);
+                         Half_t block_halfs[BLOCK_MAX_TOUCHING_HALFS];
+                         block_touching_halfs(blocks[i], block_halfs);
 
-                         for(S8 c = 0; c < BLOCK_MAX_TOUCHING_COORDS; c++){
-                              if(block_coords[c] == coord && blocks[i]->pos.z == 0){
+                         for(S8 h = 0; h < BLOCK_MAX_TOUCHING_HALFS; h++){
+                              if(block_halfs[h] == half && blocks[i]->pos.z == 0){
                                    block = blocks[i];
                                    break;
                               }
@@ -1296,23 +1305,21 @@ void spread_ice(Coord_t center, S16 radius, TileMap_t* tilemap, QuadTreeNode_t<I
                               if(interactive->type == INTERACTIVE_TYPE_POPUP){
                                    if(interactive->popup.lift.ticks == 1){
                                         interactive->popup.iced = false;
-                                        tile->flags |= TILE_FLAG_ICED_TOP_LEFT | TILE_FLAG_ICED_TOP_RIGHT |
-                                                       TILE_FLAG_ICED_BOTTOM_LEFT | TILE_FLAG_ICED_BOTTOM_RIGHT;
+                                        tilemap_set_ice(tilemap, half, ice);
                                    }else{
-                                        interactive->popup.iced = true;
+                                        interactive->popup.iced = ice;
                                    }
                               }else if(interactive->type == INTERACTIVE_TYPE_PRESSURE_PLATE ||
                                        interactive->type == INTERACTIVE_TYPE_ICE_DETECTOR ||
                                        interactive->type == INTERACTIVE_TYPE_LIGHT_DETECTOR){
-                                   tile->flags |= TILE_FLAG_ICED_TOP_LEFT | TILE_FLAG_ICED_TOP_RIGHT |
-                                                  TILE_FLAG_ICED_BOTTOM_LEFT | TILE_FLAG_ICED_BOTTOM_RIGHT;
+                                   tilemap_set_ice(tilemap, half, ice);
                               }
                          }else{
-                              tile->flags |= TILE_FLAG_ICED_TOP_LEFT | TILE_FLAG_ICED_TOP_RIGHT |
-                                             TILE_FLAG_ICED_BOTTOM_LEFT | TILE_FLAG_ICED_BOTTOM_RIGHT;
+                              tilemap_set_ice(tilemap, half, ice);
                          }
                     }
 
+#if 0
                     if(interactive && interactive->type == INTERACTIVE_TYPE_PORTAL && interactive->portal.on && !teleported){
                          auto portal_exits = find_portal_exits(coord, tilemap, interactive_quad_tree);
                          for(S8 d = 0; d < DIRECTION_COUNT; d++){
@@ -1323,85 +1330,12 @@ void spread_ice(Coord_t center, S16 radius, TileMap_t* tilemap, QuadTreeNode_t<I
                                    U8 distance_from_center = (U8)(sqrt(x_diff * x_diff + y_diff * y_diff));
                                    Direction_t opposite = direction_opposite((Direction_t)(d));
 
-                                   spread_ice(portal_exits.directions[d].coords[p] + opposite, radius - distance_from_center,
-                                              tilemap, interactive_quad_tree, block_quad_tree, true);
+                                   spread_element(portal_exits.directions[d].coords[p] + opposite, radius - distance_from_center,
+                                                  tilemap, interactive_quad_tree, block_quad_tree, element, true);
                               }
                          }
                     }
-               }
-          }
-     }
-}
-
-void melt_ice(Coord_t center, S16 radius, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree,
-              QuadTreeNode_t<Block_t>* block_quad_tree, bool teleported){
-     Coord_t delta {radius, radius};
-     Coord_t min = center - delta;
-     Coord_t max = center + delta;
-
-     for(S16 y = min.y; y <= max.y; ++y){
-          for(S16 x = min.x; x <= max.x; ++x){
-               Coord_t coord{x, y};
-               Tile_t* tile = tilemap_get_tile(tilemap, coord);
-               if(tile && !tile_is_solid(tile)){
-                    Rect_t coord_rect = rect_surrounding_adjacent_coords(coord);
-
-                    S16 block_count = 0;
-                    Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
-                    quad_tree_find_in(block_quad_tree, coord_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
-
-                    Block_t* block = nullptr;
-                    for(S16 i = 0; i < block_count; i++){
-                         Coord_t block_coords[BLOCK_MAX_TOUCHING_COORDS];
-                         block_touching_coords(blocks[i], block_coords);
-
-                         for(S8 c = 0; c < BLOCK_MAX_TOUCHING_COORDS; c++){
-                              if(block_coords[c] == coord && blocks[i]->pos.z == 0){
-                                   block = blocks[i];
-                                   break;
-                              }
-                         }
-                    }
-
-                    Interactive_t* interactive = quad_tree_find_at(interactive_quad_tree, coord.x, coord.y);
-
-                    if(block){
-                         if(block->element == ELEMENT_ONLY_ICED) block->element = ELEMENT_NONE;
-                    }else{
-                         if(interactive){
-                              if(interactive->type == INTERACTIVE_TYPE_POPUP){
-                                   if(interactive->popup.lift.ticks == 1){
-                                        clear_ice_flags(&tile->flags);
-                                   }else{
-                                        interactive->popup.iced = false;
-                                   }
-                              }else if(interactive->type == INTERACTIVE_TYPE_PRESSURE_PLATE){
-                                   interactive->pressure_plate.iced_under = false;
-                                   clear_ice_flags(&tile->flags);
-                              }else if(interactive->type == INTERACTIVE_TYPE_ICE_DETECTOR ||
-                                       interactive->type == INTERACTIVE_TYPE_LIGHT_DETECTOR){
-                                   clear_ice_flags(&tile->flags);
-                              }
-                         }else{
-                              clear_ice_flags(&tile->flags);
-                         }
-                    }
-
-                    if(interactive && interactive->type == INTERACTIVE_TYPE_PORTAL && interactive->portal.on && !teleported){
-                         auto portal_exits = find_portal_exits(coord, tilemap, interactive_quad_tree);
-                         for(S8 d = 0; d < DIRECTION_COUNT; d++){
-                              for(S8 p = 0; p < portal_exits.directions[d].count; p++){
-                                   if(portal_exits.directions[d].coords[p] == coord) continue;
-                                   S16 x_diff = coord.x - center.x;
-                                   S16 y_diff = coord.y - center.y;
-                                   U8 distance_from_center = (U8)(sqrt(x_diff * x_diff + y_diff * y_diff));
-                                   Direction_t opposite = direction_opposite((Direction_t)(d));
-
-                                   melt_ice(portal_exits.directions[d].coords[p] + opposite, radius - distance_from_center,
-                                            tilemap, interactive_quad_tree, block_quad_tree, true);
-                              }
-                         }
-                    }
+#endif
                }
           }
      }
@@ -4199,10 +4133,9 @@ int main(int argc, char** argv){
                     }
 
                     // catch or give elements
-                    if(arrow->element == ELEMENT_FIRE){
-                         melt_ice(post_move_coord, 0, &tilemap, interactive_quad_tree, block_quad_tree, false);
-                    }else if(arrow->element == ELEMENT_ICE){
-                         spread_ice(post_move_coord, 0, &tilemap, interactive_quad_tree, block_quad_tree, false);
+                    if(arrow->element == ELEMENT_FIRE || arrow->element == ELEMENT_ICE){
+                         spread_element(pixel_to_half(arrow->pos.pixel), 0, &tilemap, interactive_quad_tree, block_quad_tree,
+                                        arrow->element, false);
                     }
 
                     Interactive_t* interactive = quad_tree_interactive_find_at(interactive_quad_tree, post_move_coord);
@@ -4577,7 +4510,8 @@ int main(int argc, char** argv){
                if(block->element == ELEMENT_FIRE){
                     illuminate(pixel_to_half(block->pos.pixel), 255, &tilemap, block_quad_tree);
                }else if(block->element == ELEMENT_ICE){
-                    spread_ice(block_get_coord(block), 1, &tilemap, interactive_quad_tree, block_quad_tree, false);
+                    spread_element(pixel_to_half(block->pos.pixel), 2, &tilemap, interactive_quad_tree, block_quad_tree,
+                                   ELEMENT_ICE, false);
                }
           }
 
@@ -4585,7 +4519,8 @@ int main(int argc, char** argv){
           for(S16 i = 0; i < block_array.count; i++){
                Block_t* block = block_array.elements + i;
                if(block->element == ELEMENT_FIRE){
-                    melt_ice(block_get_coord(block), 1, &tilemap, interactive_quad_tree, block_quad_tree, false);
+                    spread_element(pixel_to_half(block->pos.pixel), 2, &tilemap, interactive_quad_tree, block_quad_tree,
+                                   ELEMENT_FIRE, false);
                }
           }
 
@@ -5047,7 +4982,7 @@ int main(int argc, char** argv){
           draw_quad_wireframe(&collided_with_quad, 255.0f, 0.0f, 255.0f);
 #endif
 
-#if 1
+#if 0
           // light
           glBindTexture(GL_TEXTURE_2D, 0);
           glBegin(GL_QUADS);
