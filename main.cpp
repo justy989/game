@@ -1585,12 +1585,47 @@ void player_action_perform(PlayerAction_t* player_action, Player_t* player, Play
      }
 }
 
-#define MAP_VERSION 1
+#define MAP_VERSION 2
 
 #pragma pack(push, 1)
+enum TileFlagV1_t : U16{
+     TILE_FLAG_V1_ICED = 1,
+     TILE_FLAG_V1_CHECKPOINT = 1 << 1,
+     TILE_FLAG_V1_RESET_IMMUNE = 1 << 2,
+
+     TILE_FLAG_V1_WIRE_STATE = 1 << 3,
+
+     TILE_FLAG_V1_WIRE_LEFT = 1 << 4,
+     TILE_FLAG_V1_WIRE_UP = 1 << 5,
+     TILE_FLAG_V1_WIRE_RIGHT = 1 << 6,
+     TILE_FLAG_V1_WIRE_DOWN = 1 << 7,
+
+     TILE_FLAG_V1_WIRE_CLUSTER_LEFT = 1 << 8,
+     TILE_FLAG_V1_WIRE_CLUSTER_MID = 1 << 9,
+     TILE_FLAG_V1_WIRE_CLUSTER_RIGHT = 1 << 10,
+
+     TILE_FLAG_V1_WIRE_CLUSTER_LEFT_ON = 1 << 11,
+     TILE_FLAG_V1_WIRE_CLUSTER_MID_ON = 1 << 12,
+     TILE_FLAG_V1_WIRE_CLUSTER_RIGHT_ON = 1 << 13,
+
+     // last 2 bits combine to say which direction the cluster is facing
+     // 00 left
+     // 10 right
+     // 11 up
+     // 01 down
+
+     TILE_FLAG_V1_FIRST_DIRECTION_BIT = 1 << 14,
+     TILE_FLAG_V1_SECOND_DIRECTION_BIT = 1 << 15,
+};
+
 struct MapTileV1_t{
      U8 id;
      U16 flags;
+};
+
+struct MapTileV2_t{
+     U8 id;
+     U32 flags;
 };
 
 struct MapBlockV1_t{
@@ -1625,11 +1660,69 @@ struct MapInteractiveV1_t{
 };
 #pragma pack(pop)
 
+void load_v1_blocks(ObjectArray_t<Block_t>* block_array, MapBlockV1_t* map_blocks, S16 block_count){
+     // TODO: a lot of maps have -16, -16 as the first block
+     for(S16 i = 0; i < block_count; i++){
+          Block_t* block = block_array->elements + i;
+          block->pos.pixel = map_blocks[i].pixel;
+          block->pos.z = map_blocks[i].z;
+          block->face = map_blocks[i].face;
+          block->element = map_blocks[i].element;
+     }
+}
+
+void load_v1_interactives(ObjectArray_t<Interactive_t>* interactive_array, MapInteractiveV1_t* map_interactives, S16 interactive_count){
+     for(S16 i = 0; i < interactive_count; i++){
+          Interactive_t* interactive = interactive_array->elements + i;
+          interactive->coord = map_interactives[i].coord;
+          interactive->type = map_interactives[i].type;
+
+          switch(map_interactives[i].type){
+          default:
+          case INTERACTIVE_TYPE_LEVER:
+          case INTERACTIVE_TYPE_BOW:
+               break;
+          case INTERACTIVE_TYPE_PRESSURE_PLATE:
+               interactive->pressure_plate = map_interactives[i].pressure_plate;
+               break;
+          case INTERACTIVE_TYPE_LIGHT_DETECTOR:
+          case INTERACTIVE_TYPE_ICE_DETECTOR:
+               interactive->detector = map_interactives[i].detector;
+               break;
+          case INTERACTIVE_TYPE_POPUP:
+               interactive->popup.lift.up = map_interactives[i].popup.up;
+               interactive->popup.lift.timer = 0.0f;
+               interactive->popup.iced = map_interactives[i].popup.iced;
+               if(interactive->popup.lift.up){
+                    interactive->popup.lift.ticks = HEIGHT_INTERVAL + 1;
+               }else{
+                    interactive->popup.lift.ticks = 1;
+               }
+               break;
+          case INTERACTIVE_TYPE_DOOR:
+               interactive->door.lift.up = map_interactives[i].door.up;
+               interactive->door.lift.timer = 0.0f;
+               interactive->door.face = map_interactives[i].door.face;
+               break;
+          case INTERACTIVE_TYPE_PORTAL:
+               interactive->portal.face = map_interactives[i].portal.face;
+               interactive->portal.on = map_interactives[i].portal.on;
+               break;
+          case INTERACTIVE_TYPE_STAIRS:
+               interactive->stairs.up = map_interactives[i].stairs.up;
+               interactive->stairs.face = map_interactives[i].stairs.face;
+               break;
+          case INTERACTIVE_TYPE_PROMPT:
+               break;
+          }
+     }
+}
+
 bool save_map_to_file(FILE* file, Coord_t player_start, const TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array,
                       ObjectArray_t<Interactive_t>* interactive_array){
      // alloc and convert map elements to map format
      S32 map_tile_count = (S32)(tilemap->width) * (S32)(tilemap->height);
-     MapTileV1_t* map_tiles = (MapTileV1_t*)(calloc(map_tile_count, sizeof(*map_tiles)));
+     MapTileV2_t* map_tiles = (MapTileV2_t*)(calloc(map_tile_count, sizeof(*map_tiles)));
      if(!map_tiles){
           LOG("%s(): failed to allocate %d tiles\n", __FUNCTION__, map_tile_count);
           return false;
@@ -1702,7 +1795,6 @@ bool save_map_to_file(FILE* file, Coord_t player_start, const TileMap_t* tilemap
           }
      }
 
-
      U8 map_version = MAP_VERSION;
      fwrite(&map_version, sizeof(map_version), 1, file);
      fwrite(&player_start, sizeof(player_start), 1, file);
@@ -1735,20 +1827,30 @@ bool save_map(const char* filepath, Coord_t player_start, const TileMap_t* tilem
      return success;
 }
 
-bool load_map_from_file(FILE* file, Coord_t* player_start, TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array,
-                        ObjectArray_t<Interactive_t>* interactive_array, const char* filepath){
-     // read counts from file
+template <typename T1, typename T2>
+void convert_bit_field(T1 field_a, T2* field_b, T1 flag_a, T2 flag_b){
+     if(field_a & flag_a){
+          *field_b |= flag_b;
+     }
+}
+
+void tilemap_reset_light(TileMap_t* tilemap){
+     S32 light_width = tilemap->width * 2;
+     S32 light_height = tilemap->height * 2;
+
+     for(S32 y = 0; y < light_height; y++){
+          for(S32 x = 0; x < light_width; x++){
+               tilemap->light[y][x] = BASE_LIGHT;
+          }
+     }
+}
+
+bool load_v1_map_from_file(FILE* file, Coord_t* player_start, TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array,
+                           ObjectArray_t<Interactive_t>* interactive_array){
      S16 map_width;
      S16 map_height;
      S16 interactive_count;
      S16 block_count;
-
-     U8 map_version = MAP_VERSION;
-     fread(&map_version, sizeof(map_version), 1, file);
-     if(map_version != MAP_VERSION){
-          LOG("%s(): mismatched version loading '%s', actual %d, expected %d\n", __FUNCTION__, filepath, map_version, MAP_VERSION);
-          return false;
-     }
 
      fread(player_start, sizeof(*player_start), 1, file);
      fread(&map_width, sizeof(map_width), 1, file);
@@ -1795,79 +1897,132 @@ bool load_map_from_file(FILE* file, Coord_t* player_start, TileMap_t* tilemap, O
      for(S32 y = 0; y < tilemap->height; y++){
           for(S32 x = 0; x < tilemap->width; x++){
                tilemap->tiles[y][x].id = map_tiles[index].id;
-               tilemap->tiles[y][x].flags = map_tiles[index].flags;
+
+               if(map_tiles[index].flags & TILE_FLAG_V1_ICED){
+                    tilemap->tiles[y][x].flags |= TILE_FLAG_ICED_TOP_LEFT;
+                    tilemap->tiles[y][x].flags |= TILE_FLAG_ICED_TOP_RIGHT;
+                    tilemap->tiles[y][x].flags |= TILE_FLAG_ICED_BOTTOM_LEFT;
+                    tilemap->tiles[y][x].flags |= TILE_FLAG_ICED_BOTTOM_RIGHT;
+               }
+
+               convert_bit_field<U16, U32>(map_tiles[index].flags, &tilemap->tiles[y][x].flags, TILE_FLAG_V1_CHECKPOINT, TILE_FLAG_CHECKPOINT);
+               convert_bit_field<U16, U32>(map_tiles[index].flags, &tilemap->tiles[y][x].flags, TILE_FLAG_V1_RESET_IMMUNE, TILE_FLAG_RESET_IMMUNE);
+               convert_bit_field<U16, U32>(map_tiles[index].flags, &tilemap->tiles[y][x].flags, TILE_FLAG_V1_WIRE_STATE, TILE_FLAG_WIRE_STATE);
+               convert_bit_field<U16, U32>(map_tiles[index].flags, &tilemap->tiles[y][x].flags, TILE_FLAG_V1_WIRE_LEFT, TILE_FLAG_WIRE_LEFT);
+               convert_bit_field<U16, U32>(map_tiles[index].flags, &tilemap->tiles[y][x].flags, TILE_FLAG_V1_WIRE_UP, TILE_FLAG_WIRE_UP);
+               convert_bit_field<U16, U32>(map_tiles[index].flags, &tilemap->tiles[y][x].flags, TILE_FLAG_V1_WIRE_RIGHT, TILE_FLAG_WIRE_RIGHT);
+               convert_bit_field<U16, U32>(map_tiles[index].flags, &tilemap->tiles[y][x].flags, TILE_FLAG_V1_WIRE_DOWN, TILE_FLAG_WIRE_DOWN);
+               convert_bit_field<U16, U32>(map_tiles[index].flags, &tilemap->tiles[y][x].flags, TILE_FLAG_V1_WIRE_CLUSTER_LEFT, TILE_FLAG_WIRE_CLUSTER_LEFT);
+               convert_bit_field<U16, U32>(map_tiles[index].flags, &tilemap->tiles[y][x].flags, TILE_FLAG_V1_WIRE_CLUSTER_MID, TILE_FLAG_WIRE_CLUSTER_MID);
+               convert_bit_field<U16, U32>(map_tiles[index].flags, &tilemap->tiles[y][x].flags, TILE_FLAG_V1_WIRE_CLUSTER_RIGHT, TILE_FLAG_WIRE_CLUSTER_RIGHT);
+               convert_bit_field<U16, U32>(map_tiles[index].flags, &tilemap->tiles[y][x].flags, TILE_FLAG_V1_WIRE_CLUSTER_LEFT_ON, TILE_FLAG_WIRE_CLUSTER_LEFT_ON);
+               convert_bit_field<U16, U32>(map_tiles[index].flags, &tilemap->tiles[y][x].flags, TILE_FLAG_V1_WIRE_CLUSTER_MID_ON, TILE_FLAG_WIRE_CLUSTER_MID_ON);
+               convert_bit_field<U16, U32>(map_tiles[index].flags, &tilemap->tiles[y][x].flags, TILE_FLAG_V1_WIRE_CLUSTER_RIGHT_ON, TILE_FLAG_WIRE_CLUSTER_RIGHT_ON);
+               convert_bit_field<U16, U32>(map_tiles[index].flags, &tilemap->tiles[y][x].flags, TILE_FLAG_V1_FIRST_DIRECTION_BIT, TILE_FLAG_FIRST_DIRECTION_BIT);
+               convert_bit_field<U16, U32>(map_tiles[index].flags, &tilemap->tiles[y][x].flags, TILE_FLAG_V1_SECOND_DIRECTION_BIT, TILE_FLAG_SECOND_DIRECTION_BIT);
+
                index++;
           }
      }
 
-     S32 light_width = tilemap->width * 2;
-     S32 light_height = tilemap->height * 2;
-
-     for(S32 y = 0; y < light_height; y++){
-          for(S32 x = 0; x < light_width; x++){
-               tilemap->light[y][x] = BASE_LIGHT;
-          }
-     }
-
-     // TODO: a lot of maps have -16, -16 as the first block
-     for(S16 i = 0; i < block_count; i++){
-          Block_t* block = block_array->elements + i;
-          block->pos.pixel = map_blocks[i].pixel;
-          block->pos.z = map_blocks[i].z;
-          block->face = map_blocks[i].face;
-          block->element = map_blocks[i].element;
-     }
-
-     for(S16 i = 0; i < interactive_array->count; i++){
-          Interactive_t* interactive = interactive_array->elements + i;
-          interactive->coord = map_interactives[i].coord;
-          interactive->type = map_interactives[i].type;
-
-          switch(map_interactives[i].type){
-          default:
-          case INTERACTIVE_TYPE_LEVER:
-          case INTERACTIVE_TYPE_BOW:
-               break;
-          case INTERACTIVE_TYPE_PRESSURE_PLATE:
-               interactive->pressure_plate = map_interactives[i].pressure_plate;
-               break;
-          case INTERACTIVE_TYPE_LIGHT_DETECTOR:
-          case INTERACTIVE_TYPE_ICE_DETECTOR:
-               interactive->detector = map_interactives[i].detector;
-               break;
-          case INTERACTIVE_TYPE_POPUP:
-               interactive->popup.lift.up = map_interactives[i].popup.up;
-               interactive->popup.lift.timer = 0.0f;
-               interactive->popup.iced = map_interactives[i].popup.iced;
-               if(interactive->popup.lift.up){
-                    interactive->popup.lift.ticks = HEIGHT_INTERVAL + 1;
-               }else{
-                    interactive->popup.lift.ticks = 1;
-               }
-               break;
-          case INTERACTIVE_TYPE_DOOR:
-               interactive->door.lift.up = map_interactives[i].door.up;
-               interactive->door.lift.timer = 0.0f;
-               interactive->door.face = map_interactives[i].door.face;
-               break;
-          case INTERACTIVE_TYPE_PORTAL:
-               interactive->portal.face = map_interactives[i].portal.face;
-               interactive->portal.on = map_interactives[i].portal.on;
-               break;
-          case INTERACTIVE_TYPE_STAIRS:
-               interactive->stairs.up = map_interactives[i].stairs.up;
-               interactive->stairs.face = map_interactives[i].stairs.face;
-               break;
-          case INTERACTIVE_TYPE_PROMPT:
-               break;
-          }
-     }
+     tilemap_reset_light(tilemap);
+     load_v1_blocks(block_array, map_blocks, block_count);
+     load_v1_interactives(interactive_array, map_interactives, interactive_count);
 
      free(map_tiles);
      free(map_blocks);
      free(map_interactives);
 
      return true;
+}
+
+bool load_v2_map_from_file(FILE* file, Coord_t* player_start, TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array,
+                           ObjectArray_t<Interactive_t>* interactive_array){
+     S16 map_width;
+     S16 map_height;
+     S16 interactive_count;
+     S16 block_count;
+
+     fread(player_start, sizeof(*player_start), 1, file);
+     fread(&map_width, sizeof(map_width), 1, file);
+     fread(&map_height, sizeof(map_height), 1, file);
+     fread(&block_count, sizeof(block_count), 1, file);
+     fread(&interactive_count, sizeof(interactive_count), 1, file);
+
+     // alloc and convert map elements to map format
+     S32 map_tile_count = (S32)(map_width) * (S32)(map_height);
+     MapTileV2_t* map_tiles = (MapTileV2_t*)(calloc(map_tile_count, sizeof(*map_tiles)));
+     if(!map_tiles){
+          LOG("%s(): failed to allocate %d tiles\n", __FUNCTION__, map_tile_count);
+          return false;
+     }
+
+     MapBlockV1_t* map_blocks = (MapBlockV1_t*)(calloc(block_count, sizeof(*map_blocks)));
+     if(!map_blocks){
+          LOG("%s(): failed to allocate %d blocks\n", __FUNCTION__, block_count);
+          return false;
+     }
+
+     MapInteractiveV1_t* map_interactives = (MapInteractiveV1_t*)(calloc(interactive_count, sizeof(*map_interactives)));
+     if(!map_interactives){
+          LOG("%s(): failed to allocate %d interactives\n", __FUNCTION__, interactive_count);
+          return false;
+     }
+
+     // read data from file
+     fread(map_tiles, sizeof(*map_tiles), map_tile_count, file);
+     fread(map_blocks, sizeof(*map_blocks), block_count, file);
+     fread(map_interactives, sizeof(*map_interactives), interactive_count, file);
+
+     destroy(tilemap);
+     init(tilemap, map_width, map_height);
+
+     destroy(block_array);
+     init(block_array, block_count);
+
+     destroy(interactive_array);
+     init(interactive_array, interactive_count);
+
+     // convert to map formats
+     S32 index = 0;
+     for(S32 y = 0; y < tilemap->height; y++){
+          for(S32 x = 0; x < tilemap->width; x++){
+               tilemap->tiles[y][x].id = map_tiles[index].id;
+               tilemap->tiles[y][x].flags = map_tiles[index].flags;
+               index++;
+          }
+     }
+
+     tilemap_reset_light(tilemap);
+
+     load_v1_blocks(block_array, map_blocks, block_count);
+     load_v1_interactives(interactive_array, map_interactives, interactive_count);
+
+     free(map_tiles);
+     free(map_blocks);
+     free(map_interactives);
+
+     return true;
+}
+
+bool load_map_from_file(FILE* file, Coord_t* player_start, TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array,
+                        ObjectArray_t<Interactive_t>* interactive_array, const char* filepath){
+     // can we load this version ?
+     U8 map_version = MAP_VERSION;
+     fread(&map_version, sizeof(map_version), 1, file);
+
+     switch(map_version){
+     default:
+          LOG("%s(): mismatched version loading '%s', actual %d, expected %d\n", __FUNCTION__, filepath, map_version, MAP_VERSION);
+          break;
+     case 1:
+          return load_v1_map_from_file(file, player_start, tilemap, block_array, interactive_array);
+     case 2:
+          return load_v2_map_from_file(file, player_start, tilemap, block_array, interactive_array);
+     }
+
+     return false;
+
 }
 
 bool load_map(const char* filepath, Coord_t* player_start, TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array,
@@ -1936,7 +2091,7 @@ void tile_id_draw(U8 id, Vec_t pos){
      draw_theme_frame(theme_frame(id_x, id_y), pos);
 }
 
-void tile_flags_draw(U16 flags, Vec_t tile_pos){
+void tile_flags_draw(U32 flags, Vec_t tile_pos){
      if(flags == 0) return;
 
      if(flags & TILE_FLAG_CHECKPOINT){
@@ -1949,7 +2104,7 @@ void tile_flags_draw(U16 flags, Vec_t tile_pos){
 
      if(flags & (TILE_FLAG_WIRE_LEFT | TILE_FLAG_WIRE_RIGHT | TILE_FLAG_WIRE_UP | TILE_FLAG_WIRE_DOWN)){
           S16 frame_y = 9;
-          S16 frame_x = flags >> 4;
+          S16 frame_x = flags >> 6;
 
           if(flags & TILE_FLAG_WIRE_STATE) frame_y++;
 
@@ -2617,9 +2772,9 @@ void draw_flats(Vec_t pos, Tile_t* tile, Interactive_t* interactive, GLuint them
                 U8 portal_rotations){
      tile_id_draw(tile->id, pos);
 
-     U16 tile_flags = tile->flags;
+     U32 tile_flags = tile->flags;
      for(U8 i = 0; i < portal_rotations; i++){
-          U16 new_flags = tile_flags & ~(TILE_FLAG_WIRE_LEFT | TILE_FLAG_WIRE_UP | TILE_FLAG_WIRE_RIGHT | TILE_FLAG_WIRE_DOWN);
+          U32 new_flags = tile_flags & ~(TILE_FLAG_WIRE_LEFT | TILE_FLAG_WIRE_UP | TILE_FLAG_WIRE_RIGHT | TILE_FLAG_WIRE_DOWN);
 
           if(tile_flags & TILE_FLAG_WIRE_LEFT) new_flags |= TILE_FLAG_WIRE_UP;
           if(tile_flags & TILE_FLAG_WIRE_UP) new_flags |= TILE_FLAG_WIRE_RIGHT;
