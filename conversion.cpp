@@ -11,10 +11,24 @@ Coord_t vec_to_coord(Vec_t v){
      return c;
 }
 
+Half_t vec_to_half(Vec_t v){
+     Half_t h;
+     h.x = v.x / PIXEL_SIZE / HALF_TILE_SIZE_IN_PIXELS;
+     h.y = v.y / PIXEL_SIZE / HALF_TILE_SIZE_IN_PIXELS;
+     return h;
+}
+
 Vec_t coord_to_vec(Coord_t c){
      Vec_t v;
      v.x = (F32)(c.x * TILE_SIZE_IN_PIXELS) * PIXEL_SIZE;
      v.y = (F32)(c.y * TILE_SIZE_IN_PIXELS) * PIXEL_SIZE;
+     return v;
+}
+
+Vec_t half_to_vec(Half_t h){
+     Vec_t v;
+     v.x = (F32)(h.x * HALF_TILE_SIZE_IN_PIXELS) * PIXEL_SIZE;
+     v.y = (F32)(h.y * HALF_TILE_SIZE_IN_PIXELS) * PIXEL_SIZE;
      return v;
 }
 
@@ -51,11 +65,23 @@ Pixel_t coord_to_pixel(Coord_t c){
      return p;
 }
 
+Pixel_t half_to_pixel(Half_t h){
+     Pixel_t p;
+     p.x = h.x * HALF_TILE_SIZE_IN_PIXELS;
+     p.y = h.y * HALF_TILE_SIZE_IN_PIXELS;
+     return p;
+}
+
 Pixel_t coord_to_pixel_at_center(Coord_t c){
      Pixel_t p;
      p.x = (c.x * TILE_SIZE_IN_PIXELS) + HALF_TILE_SIZE_IN_PIXELS;
      p.y = (c.y * TILE_SIZE_IN_PIXELS) + HALF_TILE_SIZE_IN_PIXELS;
      return p;
+}
+
+Half_t pos_to_half(Position_t p){
+     assert(p.decimal.x >= 0.0f && p.decimal.y >= 0.0f);
+     return pixel_to_half(p.pixel);
 }
 
 Half_t coord_to_half(Coord_t c){
@@ -74,6 +100,10 @@ Position_t coord_to_pos_at_tile_center(Coord_t c){
 
 Position_t coord_to_pos(Coord_t c){
      return pixel_pos(coord_to_pixel(c));
+}
+
+Position_t half_to_pos(Half_t h){
+     return pixel_pos(half_to_pixel(h));
 }
 
 Position_t vec_to_pos(Vec_t v){

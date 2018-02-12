@@ -1,12 +1,13 @@
 #include "editor.h"
 #include "defines.h"
 #include "tile.h"
+#include "conversion.h"
 
 #include <string.h>
 
-Coord_t stamp_array_dimensions(ObjectArray_t<Stamp_t>* object_array){
-     Coord_t min {0, 0};
-     Coord_t max {0, 0};
+Half_t stamp_array_dimensions(ObjectArray_t<Stamp_t>* object_array){
+     Half_t min {0, 0};
+     Half_t max {0, 0};
 
      for(S32 i = 0; i < object_array->count; ++i){
           Stamp_t* stamp = object_array->elements + i;
@@ -18,7 +19,7 @@ Coord_t stamp_array_dimensions(ObjectArray_t<Stamp_t>* object_array){
           if(stamp->offset.y > max.y){max.y = stamp->offset.y;}
      }
 
-     return (max - min) + Coord_t{1, 1};
+     return (max - min) + Half_t{1, 1};
 }
 
 bool init(Editor_t* editor){
@@ -41,7 +42,7 @@ bool init(Editor_t* editor){
      tile_id_array->elements[0].tile_id = 32;
      tile_id_array->elements[1].type = STAMP_TYPE_TILE_ID;
      tile_id_array->elements[1].tile_id = 16;
-     tile_id_array->elements[1].offset = Coord_t{0, 1};
+     tile_id_array->elements[1].offset = coord_to_half(Coord_t{0, 1});
 
      tile_id_array++;
      init(tile_id_array, 2);
@@ -49,7 +50,7 @@ bool init(Editor_t* editor){
      tile_id_array->elements[0].tile_id = 33;
      tile_id_array->elements[1].type = STAMP_TYPE_TILE_ID;
      tile_id_array->elements[1].tile_id = 17;
-     tile_id_array->elements[1].offset = Coord_t{0, 1};
+     tile_id_array->elements[1].offset = coord_to_half(Coord_t{0, 1});
 
      tile_id_array++;
      init(tile_id_array, 2);
@@ -57,7 +58,7 @@ bool init(Editor_t* editor){
      tile_id_array->elements[0].tile_id = 18;
      tile_id_array->elements[1].type = STAMP_TYPE_TILE_ID;
      tile_id_array->elements[1].tile_id = 19;
-     tile_id_array->elements[1].offset = Coord_t{1, 0};
+     tile_id_array->elements[1].offset = coord_to_half(Coord_t{1, 0});
 
      tile_id_array++;
      init(tile_id_array, 2);
@@ -65,7 +66,7 @@ bool init(Editor_t* editor){
      tile_id_array->elements[0].tile_id = 34;
      tile_id_array->elements[1].type = STAMP_TYPE_TILE_ID;
      tile_id_array->elements[1].tile_id = 35;
-     tile_id_array->elements[1].offset = Coord_t{1, 0};
+     tile_id_array->elements[1].offset = coord_to_half(Coord_t{1, 0});
 
      for(S16 i = 0; i < 6; i++){
           tile_id_array++;
@@ -74,13 +75,13 @@ bool init(Editor_t* editor){
           tile_id_array->elements[0].tile_id = 36 + (i * 2);
           tile_id_array->elements[1].type = STAMP_TYPE_TILE_ID;
           tile_id_array->elements[1].tile_id = 37 + (i * 2);
-          tile_id_array->elements[1].offset = Coord_t{1, 0};
+          tile_id_array->elements[1].offset = coord_to_half(Coord_t{1, 0});
           tile_id_array->elements[2].type = STAMP_TYPE_TILE_ID;
           tile_id_array->elements[2].tile_id = 20 + (i * 2);
-          tile_id_array->elements[2].offset = Coord_t{0, 1};
+          tile_id_array->elements[2].offset = coord_to_half(Coord_t{0, 1});
           tile_id_array->elements[3].type = STAMP_TYPE_TILE_ID;
           tile_id_array->elements[3].tile_id = 21 + (i * 2);
-          tile_id_array->elements[3].offset = Coord_t{1, 1};
+          tile_id_array->elements[3].offset = coord_to_half(Coord_t{1, 1});
      }
 
      for(S16 i = 0; i < 2; i++){
@@ -90,13 +91,13 @@ bool init(Editor_t* editor){
           tile_id_array->elements[0].tile_id = 50 + i * 4;
           tile_id_array->elements[1].type = STAMP_TYPE_TILE_ID;
           tile_id_array->elements[1].tile_id = 51 + i * 4;
-          tile_id_array->elements[1].offset = Coord_t{1, 0};
+          tile_id_array->elements[1].offset = coord_to_half(Coord_t{1, 0});
           tile_id_array->elements[2].type = STAMP_TYPE_TILE_ID;
           tile_id_array->elements[2].tile_id = 48 + i * 4;
-          tile_id_array->elements[2].offset = Coord_t{0, 1};
+          tile_id_array->elements[2].offset = coord_to_half(Coord_t{0, 1});
           tile_id_array->elements[3].type = STAMP_TYPE_TILE_ID;
           tile_id_array->elements[3].tile_id = 49 + i * 4;
-          tile_id_array->elements[3].offset = Coord_t{1, 1};
+          tile_id_array->elements[3].offset = coord_to_half(Coord_t{1, 1});
      }
 
      auto* tile_flags_category = editor->category_array.elements + EDITOR_CATEGORY_TILE_FLAGS;

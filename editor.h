@@ -4,6 +4,7 @@
 #include "interactive.h"
 #include "element.h"
 #include "object_array.h"
+#include "half.h"
 
 enum StampType_t{
      STAMP_TYPE_NONE,
@@ -28,7 +29,7 @@ struct Stamp_t{
           Interactive_t interactive;
      };
 
-     Coord_t offset;
+     Half_t offset;
 };
 
 enum EditorMode_t : U8{
@@ -62,17 +63,17 @@ struct Editor_t{
      S32 category = 0;
      S32 stamp = 0;
 
-     Coord_t selection_start;
-     Coord_t selection_end;
+     Half_t selection_start;
+     Half_t selection_end;
 
-     Coord_t clipboard_start_offset;
-     Coord_t clipboard_end_offset;
+     Half_t clipboard_start_offset;
+     Half_t clipboard_end_offset;
 
      ObjectArray_t<Stamp_t> selection;
      ObjectArray_t<Stamp_t> clipboard;
 };
 
-Coord_t stamp_array_dimensions(ObjectArray_t<Stamp_t>* object_array);
+Half_t stamp_array_dimensions(ObjectArray_t<Stamp_t>* object_array);
 bool init(Editor_t* editor);
 void destroy(Editor_t* editor);
 

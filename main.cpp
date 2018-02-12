@@ -3,6 +3,7 @@ http://www.simonstalenhag.se/
 -Grant Sanderson 3blue1brown
 -Shane Hendrixson
 -"fail early, fail often, fail forward" -will smith youtube video
+-Andy Samberg
 */
 
 #include <iostream>
@@ -2339,16 +2340,16 @@ void draw_quad_wireframe(const Quad_t* quad, F32 red, F32 green, F32 blue){
      glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 }
 
-void selection_draw(Coord_t selection_start, Coord_t selection_end, Position_t camera, F32 red, F32 green, F32 blue){
+void selection_draw(Half_t selection_start, Half_t selection_end, Position_t camera, F32 red, F32 green, F32 blue){
      if(selection_start.x > selection_end.x) SWAP(selection_start.x, selection_end.x);
      if(selection_start.y > selection_end.y) SWAP(selection_start.y, selection_end.y);
 
-     Position_t start_location = coord_to_pos(selection_start) - camera;
-     Position_t end_location = coord_to_pos(selection_end) - camera;
+     Position_t start_location = half_to_pos(selection_start) - camera;
+     Position_t end_location = half_to_pos(selection_end) - camera;
      Vec_t start_vec = pos_to_vec(start_location);
      Vec_t end_vec = pos_to_vec(end_location);
 
-     Quad_t selection_quad {start_vec.x, start_vec.y, end_vec.x + TILE_SIZE, end_vec.y + TILE_SIZE};
+     Quad_t selection_quad {start_vec.x, start_vec.y, end_vec.x + HALF_TILE_SIZE, end_vec.y + HALF_TILE_SIZE};
      glBindTexture(GL_TEXTURE_2D, 0);
      draw_quad_wireframe(&selection_quad, red, green, blue);
 }
@@ -2361,38 +2362,39 @@ Pixel_t mouse_select_world_pixel(Vec_t mouse_screen, Position_t camera){
      return mouse_select_pixel(mouse_screen) + (camera.pixel - Pixel_t{ROOM_PIXEL_SIZE / 2, ROOM_PIXEL_SIZE / 2});
 }
 
-Coord_t mouse_select_coord(Vec_t mouse_screen){
-     return {(S16)(mouse_screen.x * (F32)(ROOM_TILE_SIZE)), (S16)(mouse_screen.y * (F32)(ROOM_TILE_SIZE))};
+// TODO: can we agree this is really just vec_to_half() ?
+Half_t mouse_select_half(Vec_t mouse_screen){
+     return {(S16)(mouse_screen.x * (F32)(ROOM_HALF_SIZE)), (S16)(mouse_screen.y * (F32)(ROOM_HALF_SIZE))};
 }
 
-Coord_t mouse_select_world(Vec_t mouse_screen, Position_t camera){
-     return mouse_select_coord(mouse_screen) + (pos_to_coord(camera) - Coord_t{ROOM_TILE_SIZE / 2, ROOM_TILE_SIZE / 2});
+Half_t mouse_select_world(Vec_t mouse_screen, Position_t camera){
+     return mouse_select_half(mouse_screen) + (pos_to_half(camera) - Half_t{ROOM_HALF_SIZE / 2, ROOM_HALF_SIZE / 2});
 }
 
 S32 mouse_select_index(Vec_t mouse_screen){
-     Coord_t coord = mouse_select_coord(mouse_screen);
+     Coord_t coord = half_to_coord(mouse_select_half(mouse_screen));
      return coord.y * ROOM_TILE_SIZE + coord.x;
 }
 
-Vec_t coord_to_screen_position(Coord_t coord){
-     Pixel_t pixel = coord_to_pixel(coord);
+Vec_t half_to_screen_position(Half_t half){
+     Pixel_t pixel = half_to_pixel(half);
      Position_t relative_loc {pixel, 0, {0.0f, 0.0f}};
      return pos_to_vec(relative_loc);
 }
 
-void apply_stamp(Stamp_t* stamp, Coord_t coord, TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array, ObjectArray_t<Interactive_t>* interactive_array,
+void apply_stamp(Stamp_t* stamp, Half_t half, TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array, ObjectArray_t<Interactive_t>* interactive_array,
                  QuadTreeNode_t<Interactive_t>** interactive_quad_tree, bool combine){
      switch(stamp->type){
      default:
           break;
      case STAMP_TYPE_TILE_ID:
      {
-          Tile_t* tile = tilemap_get_tile(tilemap, coord);
+          Tile_t* tile = tilemap_get_tile(tilemap, half_to_coord(half));
           if(tile) tile->id = stamp->tile_id;
      } break;
      case STAMP_TYPE_TILE_FLAGS:
      {
-          Tile_t* tile = tilemap_get_tile(tilemap, coord);
+          Tile_t* tile = tilemap_get_tile(tilemap, half_to_coord(half));
           if(tile){
                if(combine){
                     tile->flags |= stamp->tile_flags;
@@ -2409,7 +2411,7 @@ void apply_stamp(Stamp_t* stamp, Coord_t coord, TileMap_t* tilemap, ObjectArray_
 
           Block_t* block = block_array->elements + index;
           *block = {};
-          block->pos = coord_to_pos(coord);
+          block->pos = half_to_pos(half);
           block->vel = vec_zero();
           block->accel = vec_zero();
           block->element = stamp->block.element;
@@ -2417,6 +2419,7 @@ void apply_stamp(Stamp_t* stamp, Coord_t coord, TileMap_t* tilemap, ObjectArray_
      } break;
      case STAMP_TYPE_INTERACTIVE:
      {
+          Coord_t coord = half_to_coord(half);
           Interactive_t* interactive = quad_tree_interactive_find_at(*interactive_quad_tree, coord);
           if(interactive) return;
 
@@ -2479,20 +2482,20 @@ Rect_t editor_selection_bounds(Editor_t* editor){
      return rect;
 }
 
-S32 mouse_select_stamp_index(Coord_t screen_coord, ObjectArray_t<ObjectArray_t<Stamp_t>>* stamp_array){
+S32 mouse_select_stamp_index(Half_t screen_half, ObjectArray_t<ObjectArray_t<Stamp_t>>* stamp_array){
      S32 index = -1;
      Rect_t current_rect = {};
      S16 row_height = 0;
      for(S16 i = 0; i < stamp_array->count; i++){
-          Coord_t dimensions = stamp_array_dimensions(stamp_array->elements + i);
+          Half_t dimensions = stamp_array_dimensions(stamp_array->elements + i);
 
           if(row_height < dimensions.y) row_height = dimensions.y; // track max
 
           current_rect.right = current_rect.left + dimensions.x;
           current_rect.top = current_rect.bottom + dimensions.y;
 
-          if(screen_coord.x >= current_rect.left && screen_coord.x < current_rect.right &&
-             screen_coord.y >= current_rect.bottom && screen_coord.y < current_rect.top){
+          if(screen_half.x >= current_rect.left && screen_half.x < current_rect.right &&
+             screen_half.y >= current_rect.bottom && screen_half.y < current_rect.top){
                index = i;
                break;
           }
@@ -3441,7 +3444,6 @@ int main(int argc, char** argv){
      Direction_t last_block_pushed_direction = DIRECTION_LEFT;
      Block_t* block_to_push = nullptr;
 
-     // bool left_click_down = false;
      Vec_t mouse_screen = {}; // 0.0f to 1.0f
      Position_t mouse_world = {};
      bool ctrl_down;
@@ -3863,8 +3865,8 @@ int main(int argc, char** argv){
                               }
 
                               for(int i = 0; i < editor.selection.count; i++){
-                                   Coord_t coord = editor.selection_start + editor.selection.elements[i].offset;
-                                   apply_stamp(editor.selection.elements + i, coord,
+                                   Half_t half = editor.selection_start + editor.selection.elements[i].offset;
+                                   apply_stamp(editor.selection.elements + i, half,
                                                &tilemap, &block_array, &interactive_array, &interactive_quad_tree, ctrl_down);
                               }
 
@@ -3882,7 +3884,7 @@ int main(int argc, char** argv){
                               // perform rotation on each offset
                               for(S16 i = 0; i < editor.selection.count; i++){
                                    auto* stamp = editor.selection.elements + i;
-                                   Coord_t rot {stamp->offset.y, (S16)(-stamp->offset.x + height_offset)};
+                                   Half_t rot {stamp->offset.y, (S16)(-stamp->offset.x + height_offset)};
                                    stamp->offset = rot;
                               }
                          }
@@ -3903,7 +3905,7 @@ int main(int argc, char** argv){
                          break;
                     case SDL_SCANCODE_M:
                          if(editor.mode == EDITOR_MODE_CATEGORY_SELECT){
-                              player_start = mouse_select_world(mouse_screen, camera);
+                              player_start = half_to_coord(mouse_select_world(mouse_screen, camera));
                          }
                          break;
                     case SDL_SCANCODE_LCTRL:
@@ -3930,7 +3932,7 @@ int main(int argc, char** argv){
                          break;
                     case SDL_SCANCODE_H:
                     {
-                         Coord_t coord = mouse_select_world(mouse_screen, camera);
+                         Coord_t coord = half_to_coord(mouse_select_world(mouse_screen, camera));
                          describe_coord(coord, &tilemap, interactive_quad_tree, block_quad_tree);
                     } break;
                     case SDL_SCANCODE_9:
@@ -3987,7 +3989,6 @@ int main(int argc, char** argv){
                     default:
                          break;
                     case SDL_BUTTON_LEFT:
-                         // left_click_down = true;
 
                          switch(editor.mode){
                          default:
@@ -4012,17 +4013,17 @@ int main(int argc, char** argv){
                          case EDITOR_MODE_STAMP_SELECT:
                          case EDITOR_MODE_STAMP_HIDE:
                          {
-                              S32 select_index = mouse_select_stamp_index(vec_to_coord(mouse_screen),
+                              S32 select_index = mouse_select_stamp_index(vec_to_half(mouse_screen),
                                                                           editor.category_array.elements + editor.category);
                               if(editor.mode != EDITOR_MODE_STAMP_HIDE && select_index < editor.category_array.elements[editor.category].count && select_index >= 0){
                                    editor.stamp = select_index;
                               }else{
                                    undo_commit(&undo, &player, &tilemap, &block_array, &interactive_array);
-                                   Coord_t select_coord = mouse_select_world(mouse_screen, camera);
+                                   Half_t select_half = mouse_select_world(mouse_screen, camera);
                                    auto* stamp_array = editor.category_array.elements[editor.category].elements + editor.stamp;
                                    for(S16 s = 0; s < stamp_array->count; s++){
                                         auto* stamp = stamp_array->elements + s;
-                                        apply_stamp(stamp, select_coord + stamp->offset,
+                                        apply_stamp(stamp, select_half + stamp->offset,
                                                     &tilemap, &block_array, &interactive_array, &interactive_quad_tree, ctrl_down);
                                    }
 
@@ -4038,18 +4039,18 @@ int main(int argc, char** argv){
                               break;
                          case EDITOR_MODE_CATEGORY_SELECT:
                               undo_commit(&undo, &player, &tilemap, &block_array, &interactive_array);
-                              coord_clear(mouse_select_world(mouse_screen, camera), &tilemap, &interactive_array,
+                              coord_clear(half_to_coord(mouse_select_world(mouse_screen, camera)), &tilemap, &interactive_array,
                                           interactive_quad_tree, &block_array);
                               break;
                          case EDITOR_MODE_STAMP_SELECT:
                          case EDITOR_MODE_STAMP_HIDE:
                          {
                               undo_commit(&undo, &player, &tilemap, &block_array, &interactive_array);
-                              Coord_t start = mouse_select_world(mouse_screen, camera);
-                              Coord_t end = start + stamp_array_dimensions(editor.category_array.elements[editor.category].elements + editor.stamp);
+                              Half_t start = mouse_select_world(mouse_screen, camera);
+                              Half_t end = start + stamp_array_dimensions(editor.category_array.elements[editor.category].elements + editor.stamp);
                               for(S16 j = start.y; j < end.y; j++){
                                    for(S16 i = start.x; i < end.x; i++){
-                                        Coord_t coord {i, j};
+                                        Coord_t coord = half_to_coord(Half_t{i, j});
                                         coord_clear(coord, &tilemap, &interactive_array, interactive_quad_tree, &block_array);
                                    }
                               }
@@ -4060,7 +4061,7 @@ int main(int argc, char** argv){
                               Rect_t selection_bounds = editor_selection_bounds(&editor);
                               for(S16 j = selection_bounds.bottom; j <= selection_bounds.top; j++){
                                    for(S16 i = selection_bounds.left; i <= selection_bounds.right; i++){
-                                        Coord_t coord {i, j};
+                                        Coord_t coord = half_to_coord(Half_t{i, j});
                                         coord_clear(coord, &tilemap, &interactive_array, interactive_quad_tree, &block_array);
                                    }
                               }
@@ -4074,7 +4075,6 @@ int main(int argc, char** argv){
                     default:
                          break;
                     case SDL_BUTTON_LEFT:
-                         // left_click_down = false;
                          switch(editor.mode){
                          default:
                               break;
@@ -4093,11 +4093,11 @@ int main(int argc, char** argv){
                               S16 stamp_index = 0;
                               for(S16 j = editor.selection_start.y; j <= editor.selection_end.y; j++){
                                    for(S16 i = editor.selection_start.x; i <= editor.selection_end.x; i++){
-                                        Coord_t coord = {i, j};
-                                        Coord_t offset = coord - editor.selection_start;
+                                        Half_t half = {i, j};
+                                        Half_t offset = half - editor.selection_start;
 
                                         // tile id
-                                        Tile_t* tile = tilemap_get_tile(&tilemap, coord);
+                                        Tile_t* tile = tilemap_get_tile(&tilemap, half_to_coord(half));
                                         editor.selection.elements[stamp_index].type = STAMP_TYPE_TILE_ID;
                                         editor.selection.elements[stamp_index].tile_id = tile->id;
                                         editor.selection.elements[stamp_index].offset = offset;
@@ -4110,7 +4110,7 @@ int main(int argc, char** argv){
                                         stamp_index++;
 
                                         // interactive
-                                        auto* interactive = quad_tree_interactive_find_at(interactive_quad_tree, coord);
+                                        auto* interactive = quad_tree_interactive_find_at(interactive_quad_tree, half_to_coord(half));
                                         if(interactive){
                                              resize(&editor.selection, editor.selection.count + 1);
                                              auto* stamp = editor.selection.elements + (editor.selection.count - 1);
@@ -4121,7 +4121,7 @@ int main(int argc, char** argv){
 
                                         for(S16 b = 0; b < block_array.count; b++){
                                              auto* block = block_array.elements + b;
-                                             if(pos_to_coord(block->pos) == coord){
+                                             if(pos_to_half(block->pos) == half){
                                                   resize(&editor.selection, editor.selection.count + 1);
                                                   auto* stamp = editor.selection.elements + (editor.selection.count - 1);
                                                   stamp->type = STAMP_TYPE_BLOCK;
@@ -4148,7 +4148,7 @@ int main(int argc, char** argv){
                          break;
                     case EDITOR_MODE_CREATE_SELECTION:
                          if(editor.selection_start.x >= 0 && editor.selection_start.y >= 0){
-                              editor.selection_end = pos_to_coord(mouse_world);
+                              editor.selection_end = pos_to_half(mouse_world);
                          }
                          break;
                     }
@@ -5179,7 +5179,7 @@ int main(int argc, char** argv){
                glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
           }
 
-#if 1
+#if 0
           // light
           glBindTexture(GL_TEXTURE_2D, 0);
           glBegin(GL_QUADS);
@@ -5260,7 +5260,7 @@ int main(int argc, char** argv){
           }
 
           // player start
-          selection_draw(player_start, player_start, screen_camera, 0.0f, 1.0f, 0.0f);
+          selection_draw(coord_to_half(player_start), coord_to_half(player_start), screen_camera, 0.0f, 1.0f, 0.0f);
 
           // editor
           switch(editor.mode){
@@ -5327,11 +5327,12 @@ int main(int argc, char** argv){
 
                // draw stamp at mouse
                auto* stamp_array = editor.category_array.elements[editor.category].elements + editor.stamp;
-               Coord_t mouse_coord = mouse_select_coord(mouse_screen);
+               Half_t mouse_half = mouse_select_half(mouse_screen);
 
                for(S16 s = 0; s < stamp_array->count; s++){
                     auto* stamp = stamp_array->elements + s;
-                    Vec_t stamp_pos = coord_to_screen_position(mouse_coord + stamp->offset);
+                    Vec_t stamp_pos = half_to_screen_position(mouse_half + stamp->offset);
+
                     switch(stamp->type){
                     default:
                          break;
@@ -5364,12 +5365,12 @@ int main(int argc, char** argv){
 
                     for(S32 g = 0; g < category->count; ++g){
                          stamp_array = category->elements + g;
-                         Coord_t dimensions = stamp_array_dimensions(stamp_array);
+                         Half_t dimensions = stamp_array_dimensions(stamp_array);
                          if(dimensions.y > row_height) row_height = dimensions.y;
 
                          for(S32 s = 0; s < stamp_array->count; s++){
                               auto* stamp = stamp_array->elements + s;
-                              Vec_t stamp_vec = pos + coord_to_vec(stamp->offset);
+                              Vec_t stamp_vec = pos + half_to_vec(stamp->offset);
 
                               switch(stamp->type){
                               default:
@@ -5417,7 +5418,7 @@ int main(int argc, char** argv){
 
                for(S32 g = 0; g < editor.selection.count; ++g){
                     auto* stamp = editor.selection.elements + g;
-                    Position_t stamp_pos = coord_to_pos(editor.selection_start + stamp->offset);
+                    Position_t stamp_pos = half_to_pos(editor.selection_start + stamp->offset);
                     Vec_t stamp_vec = pos_to_vec(stamp_pos);
 
                     switch(stamp->type){
@@ -5446,8 +5447,8 @@ int main(int argc, char** argv){
                glEnd();
 
                Rect_t selection_bounds = editor_selection_bounds(&editor);
-               Coord_t min_coord {selection_bounds.left, selection_bounds.bottom};
-               Coord_t max_coord {selection_bounds.right, selection_bounds.top};
+               Half_t min_coord {selection_bounds.left, selection_bounds.bottom};
+               Half_t max_coord {selection_bounds.right, selection_bounds.top};
                selection_draw(min_coord, max_coord, screen_camera, 1.0f, 0.0f, 0.0f);
           } break;
           }
