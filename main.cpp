@@ -2368,7 +2368,7 @@ Half_t mouse_select_half(Vec_t mouse_screen){
 }
 
 Half_t mouse_select_world(Vec_t mouse_screen, Position_t camera){
-     return mouse_select_half(mouse_screen) + (pos_to_half(camera) - Half_t{ROOM_HALF_SIZE / 2, ROOM_HALF_SIZE / 2});
+     return mouse_select_half(mouse_screen) + (pos_to_half(camera) - Half_t{ROOM_HALF_SIZE / 2, ROOM_HALF_SIZE / 2} + Half_t{1, 1});
 }
 
 S32 mouse_select_index(Vec_t mouse_screen){
@@ -3859,7 +3859,7 @@ int main(int argc, char** argv){
                               Rect_t selection_bounds = editor_selection_bounds(&editor);
                               for(S16 j = selection_bounds.bottom; j <= selection_bounds.top; j++){
                                    for(S16 i = selection_bounds.left; i <= selection_bounds.right; i++){
-                                        Coord_t coord {i, j};
+                                        Coord_t coord = half_to_coord(Half_t{i, j});
                                         coord_clear(coord, &tilemap, &interactive_array, interactive_quad_tree, &block_array);
                                    }
                               }
@@ -4096,27 +4096,29 @@ int main(int argc, char** argv){
                                         Half_t half = {i, j};
                                         Half_t offset = half - editor.selection_start;
 
-                                        // tile id
-                                        Tile_t* tile = tilemap_get_tile(&tilemap, half_to_coord(half));
-                                        editor.selection.elements[stamp_index].type = STAMP_TYPE_TILE_ID;
-                                        editor.selection.elements[stamp_index].tile_id = tile->id;
-                                        editor.selection.elements[stamp_index].offset = offset;
-                                        stamp_index++;
+                                        if(i % 2 == 0 && j % 2 == 0){
+                                             // tile id
+                                             Tile_t* tile = tilemap_get_tile(&tilemap, half_to_coord(half));
+                                             editor.selection.elements[stamp_index].type = STAMP_TYPE_TILE_ID;
+                                             editor.selection.elements[stamp_index].tile_id = tile->id;
+                                             editor.selection.elements[stamp_index].offset = offset;
+                                             stamp_index++;
 
-                                        // tile flags
-                                        editor.selection.elements[stamp_index].type = STAMP_TYPE_TILE_FLAGS;
-                                        editor.selection.elements[stamp_index].tile_flags = tile->flags;
-                                        editor.selection.elements[stamp_index].offset = offset;
-                                        stamp_index++;
+                                             // tile flags
+                                             editor.selection.elements[stamp_index].type = STAMP_TYPE_TILE_FLAGS;
+                                             editor.selection.elements[stamp_index].tile_flags = tile->flags;
+                                             editor.selection.elements[stamp_index].offset = offset;
+                                             stamp_index++;
 
-                                        // interactive
-                                        auto* interactive = quad_tree_interactive_find_at(interactive_quad_tree, half_to_coord(half));
-                                        if(interactive){
-                                             resize(&editor.selection, editor.selection.count + 1);
-                                             auto* stamp = editor.selection.elements + (editor.selection.count - 1);
-                                             stamp->type = STAMP_TYPE_INTERACTIVE;
-                                             stamp->interactive = *interactive;
-                                             stamp->offset = offset;
+                                             // interactive
+                                             auto* interactive = quad_tree_interactive_find_at(interactive_quad_tree, half_to_coord(half));
+                                             if(interactive){
+                                                  resize(&editor.selection, editor.selection.count + 1);
+                                                  auto* stamp = editor.selection.elements + (editor.selection.count - 1);
+                                                  stamp->type = STAMP_TYPE_INTERACTIVE;
+                                                  stamp->interactive = *interactive;
+                                                  stamp->offset = offset;
+                                             }
                                         }
 
                                         for(S16 b = 0; b < block_array.count; b++){
