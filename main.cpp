@@ -2043,13 +2043,13 @@ bool load_map_number(S32 map_number, Coord_t* player_start, TileMap_t* tilemap, 
      DIR* d = opendir("content");
      if(!d) return false;
      struct dirent* dir;
-     char filepath[64] = {};
+     char filepath[512] = {};
      char match[4] = {};
      snprintf(match, 4, "%03d", map_number);
      while((dir = readdir(d)) != nullptr){
           if(strncmp(dir->d_name, match, 3) == 0 &&
              strstr(dir->d_name, ".bm")){ // TODO: create strendswith() func for this?
-               snprintf(filepath, 64, "content/%s", dir->d_name);
+               snprintf(filepath, 512, "content/%s", dir->d_name);
                break;
           }
      }
