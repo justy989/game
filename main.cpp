@@ -41,7 +41,7 @@ struct Stats_t{
      int blocks;
      int lights;
      int sensors;
-     float avg_frame_time;
+     double avg_frame_time;
      int frame_time_sample_count;
 };
 
@@ -54,6 +54,35 @@ void stats_print(Stats_t* stats, FILE* f){
      fprintf(f, "l %d\n", stats->lights);
      fprintf(f, "s %d\n", stats->sensors);
      fprintf(f, "f %.02f\n", 1.0f / stats->avg_frame_time);
+}
+
+void stats_machine_print_json_header(const char* name, FILE* f){
+     fprintf(f, "{\n");
+     fprintf(f, " \"machine\": \"%s\",\n", name);
+}
+
+void stats_machine_print_json_body(Stats_t* stats, int map_index, FILE* f){
+     fprintf(f, "\"%d\": %.02f,\n", map_index, 1.0 / stats->avg_frame_time);
+}
+
+void stats_machine_print_json_footer(FILE* f){
+     fprintf(f, "}\n");
+}
+
+void stats_level_print_json_header(FILE* f){
+     fprintf(f, "{\n");
+}
+
+void stats_level_print_json_body(Stats_t* stats, int map_index, FILE* f){
+     fprintf(f, "\"%d\": {\n", map_index);
+     fprintf(f, "  \"blocks\": %d,\n", stats->blocks);
+     fprintf(f, "  \"lights\": %d,\n", stats->lights);
+     fprintf(f, "  \"sensors\": %d,\n", stats->sensors);
+     fprintf(f, "}\n");
+}
+
+void stats_level_print_json_footer(FILE* f){
+     fprintf(f, "}\n");
 }
 
 Stats_t g_stats;
@@ -3233,6 +3262,7 @@ int main(int argc, char** argv){
      DemoMode_t demo_mode = DEMO_MODE_NONE;
      const char* demo_filepath = nullptr;
      const char* load_map_filepath = nullptr;
+     const char* stats_machine_name = nullptr;
      bool test = false;
      bool suite = false;
      bool show_suite = false;
@@ -3271,8 +3301,16 @@ int main(int argc, char** argv){
                int next = i + 1;
                if(next >= argc) continue;
                map_count = atoi(argv[next]);
+          }else if(strcmp(argv[i], "-mach") == 0){
+               int next = i + 1;
+               stats_machine_name = argv[next];
           }
      }
+
+     FILE* machine_stats_file = fopen("machine_stats.json", "w");
+     FILE* level_stats_file = fopen("level_stats.json", "w");
+     stats_machine_print_json_header(stats_machine_name, machine_stats_file);
+     stats_level_print_json_header(level_stats_file);
 
      const char* log_path = "bryte.log";
      if(!Log_t::create(log_path)){
@@ -3800,8 +3838,9 @@ int main(int argc, char** argv){
                          }
                          break;
                     case SDL_SCANCODE_RIGHTBRACKET:
+                         stats_machine_print_json_body(&g_stats, map_number, machine_stats_file);
+                         stats_level_print_json_body(&g_stats, map_number, level_stats_file);
                          map_number++;
-                         stats_print(&g_stats, stdout);
                          if(load_map_number(map_number, &player_start, &tilemap, &block_array, &interactive_array)){
                               // TODO: compress with code above
                               reset_map(&player, player_start, &interactive_array, &interactive_quad_tree, &arrow_array);
@@ -5495,13 +5534,13 @@ int main(int argc, char** argv){
           SDL_GL_SwapWindow(window);
 
           one_second_frame_count++;
-          float ratio = 1.0f / (float)(one_second_frame_count);
+          double ratio = 1.0f / (double)(one_second_frame_count);
           one_second_avg_frame_time = (one_second_avg_frame_time * (1.0 - ratio)) + (dt * ratio);
           second_timer += dt;
           if(second_timer > 1.0f){
                second_timer -= 1.0f;
                g_stats.frame_time_sample_count++;
-               ratio = 1.0f / (float)(g_stats.frame_time_sample_count);
+               ratio = 1.0f / (double)(g_stats.frame_time_sample_count);
                g_stats.avg_frame_time = (g_stats.avg_frame_time * (1.0 - ratio)) + (one_second_avg_frame_time * ratio);
                one_second_avg_frame_time = 0;
                one_second_frame_count = 0;
@@ -5544,6 +5583,9 @@ int main(int argc, char** argv){
      }
 
      Log_t::destroy();
+
+     stats_machine_print_json_footer(machine_stats_file);
+     stats_level_print_json_footer(level_stats_file);
 
      return 0;
 }
