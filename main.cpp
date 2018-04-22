@@ -31,6 +31,33 @@ http://www.simonstalenhag.se/
 #include "undo.h"
 #include "editor.h"
 
+// 60, 50, 52, 58
+// 60    * 1 = 50
+// 60    * 0.5  + 50 * 0.50 = 30 + 25 = 55
+// 55    * 0.66 + 52 * 0.33 = 53.46
+// 53.46 * 0.75 + 58 * 0.25 = 54.5950
+
+struct Stats_t{
+     int blocks;
+     int lights;
+     int sensors;
+     float avg_frame_time;
+     int frame_time_sample_count;
+};
+
+void stats_init(Stats_t* stats){
+     memset(stats, 0, sizeof(*stats));
+}
+
+void stats_print(Stats_t* stats, FILE* f){
+     fprintf(f, "b %d\n", stats->blocks);
+     fprintf(f, "l %d\n", stats->lights);
+     fprintf(f, "s %d\n", stats->sensors);
+     fprintf(f, "f %.02f\n", 1.0f / stats->avg_frame_time);
+}
+
+Stats_t g_stats;
+
 Direction_t direction_between(Coord_t a, Coord_t b){
      if(a == b) return DIRECTION_COUNT;
 
@@ -773,12 +800,12 @@ Vec_t collide_circle_with_line(Vec_t circle_center, F32 circle_radius, Vec_t a, 
 S16 range_passes_tile_boundary(S16 a, S16 b, S16 ignore){
      if(a == b) return 0;
      if(a > b){
-          if((b % HALF_TILE_SIZE_IN_PIXELS) == 0) return 0;
+          if((b % TILE_SIZE_IN_PIXELS) == 0) return 0;
           SWAP(a, b);
      }
 
      for(S16 i = a; i <= b; i++){
-          if((i % HALF_TILE_SIZE_IN_PIXELS) == 0 && i != ignore){
+          if((i % TILE_SIZE_IN_PIXELS) == 0 && i != ignore){
                return i;
           }
      }
@@ -1668,7 +1695,12 @@ void load_v1_blocks(ObjectArray_t<Block_t>* block_array, MapBlockV1_t* map_block
           block->pos.z = map_blocks[i].z;
           block->face = map_blocks[i].face;
           block->element = map_blocks[i].element;
+          if(block->element == ELEMENT_FIRE || block->element == ELEMENT_ICE){
+               g_stats.lights++;
+          }
      }
+
+     g_stats.blocks = block_count;
 }
 
 void load_v1_interactives(ObjectArray_t<Interactive_t>* interactive_array, MapInteractiveV1_t* map_interactives, S16 interactive_count){
@@ -1688,6 +1720,7 @@ void load_v1_interactives(ObjectArray_t<Interactive_t>* interactive_array, MapIn
           case INTERACTIVE_TYPE_LIGHT_DETECTOR:
           case INTERACTIVE_TYPE_ICE_DETECTOR:
                interactive->detector = map_interactives[i].detector;
+               g_stats.sensors++;
                break;
           case INTERACTIVE_TYPE_POPUP:
                interactive->popup.lift.up = map_interactives[i].popup.up;
@@ -2010,6 +2043,8 @@ bool load_map_from_file(FILE* file, Coord_t* player_start, TileMap_t* tilemap, O
      // can we load this version ?
      U8 map_version = MAP_VERSION;
      fread(&map_version, sizeof(map_version), 1, file);
+
+     stats_init(&g_stats);
 
      switch(map_version){
      default:
@@ -3451,18 +3486,21 @@ int main(int argc, char** argv){
 
      S64 frame_count = 0;
      F32 dt = 0.0f;
+     F32 second_timer = 0.0f;
+     int one_second_frame_count = 0;
+     float one_second_avg_frame_time = 0;
 
      while(!quit){
           if(!suite || show_suite){
                current_time = system_clock::now();
                duration<double> elapsed_seconds = current_time - last_time;
                dt = (F64)(elapsed_seconds.count());
-               if(dt < 0.0166666f) continue; // limit 60 fps
+               // if(dt < 0.0166666f) continue; // limit 60 fps
           }
 
           // TODO: consider 30fps as minimum for random noobs computers
-          //if(demo_mode) dt = 0.0166666f; // the game always runs as if a 60th of a frame has occurred.
-          dt = 0.0166666f; // the game always runs as if a 60th of a frame has occurred.
+          if(demo_mode) dt = 0.0166666f; // the game always runs as if a 60th of a frame has occurred.
+          // dt = 0.0166666f; // the game always runs as if a 60th of a frame has occurred.
 
           quad_tree_free(block_quad_tree);
           block_quad_tree = quad_tree_build(&block_array);
@@ -3749,6 +3787,7 @@ int main(int argc, char** argv){
                          break;
                     case SDL_SCANCODE_LEFTBRACKET:
                          map_number--;
+                         stats_print(&g_stats, stdout);
                          if(load_map_number(map_number, &player_start, &tilemap, &block_array, &interactive_array)){
                               reset_map(&player, player_start, &interactive_array, &interactive_quad_tree, &arrow_array);
                               destroy(&undo);
@@ -3762,6 +3801,7 @@ int main(int argc, char** argv){
                          break;
                     case SDL_SCANCODE_RIGHTBRACKET:
                          map_number++;
+                         stats_print(&g_stats, stdout);
                          if(load_map_number(map_number, &player_start, &tilemap, &block_array, &interactive_array)){
                               // TODO: compress with code above
                               reset_map(&player, player_start, &interactive_array, &interactive_quad_tree, &arrow_array);
@@ -5453,6 +5493,19 @@ int main(int argc, char** argv){
           }
 
           SDL_GL_SwapWindow(window);
+
+          one_second_frame_count++;
+          float ratio = 1.0f / (float)(one_second_frame_count);
+          one_second_avg_frame_time = (one_second_avg_frame_time * (1.0 - ratio)) + (dt * ratio);
+          second_timer += dt;
+          if(second_timer > 1.0f){
+               second_timer -= 1.0f;
+               g_stats.frame_time_sample_count++;
+               ratio = 1.0f / (float)(g_stats.frame_time_sample_count);
+               g_stats.avg_frame_time = (g_stats.avg_frame_time * (1.0 - ratio)) + (one_second_avg_frame_time * ratio);
+               one_second_avg_frame_time = 0;
+               one_second_frame_count = 0;
+          }
      }
 
      switch(demo_mode){
