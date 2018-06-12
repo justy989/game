@@ -48,6 +48,17 @@ DirectionMask_t direction_mask_remove(DirectionMask_t mask, Direction_t dir){
      return (DirectionMask_t)(mask & ~direction_to_direction_mask(dir)); // C++ makes this annoying
 }
 
+DirectionMask_t direction_mask_opposite(DirectionMask_t mask){
+     DirectionMask_t result = DIRECTION_MASK_NONE;
+
+     if(mask & DIRECTION_MASK_LEFT) result = direction_mask_add(result, DIRECTION_MASK_RIGHT);
+     if(mask & DIRECTION_MASK_RIGHT) result = direction_mask_add(result, DIRECTION_MASK_LEFT);
+     if(mask & DIRECTION_MASK_UP) result = direction_mask_add(result, DIRECTION_MASK_DOWN);
+     if(mask & DIRECTION_MASK_DOWN) result = direction_mask_add(result, DIRECTION_MASK_UP);
+
+     return result;
+}
+
 Direction_t direction_opposite(Direction_t dir){
      if(dir == DIRECTION_COUNT) return DIRECTION_COUNT;
      return (Direction_t)(((int)(dir) + 2) % DIRECTION_COUNT);

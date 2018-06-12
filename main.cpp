@@ -2302,10 +2302,12 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
                collided_block_delta = vec_rotate_quadrants(pos_delta_diff, 4 - portal_rotations);
                collided_block_dir = relative_quadrant(position.pixel, block_pos.pixel +
                                                       Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS});
+               Position_t pre_move = collided_block->pos;
+
+#if 0
+               // this stops the block when it moves into the player
                Vec_t rotated_accel = vec_rotate_quadrants(collided_block->accel, portal_rotations);
                Vec_t rotated_vel = vec_rotate_quadrants(collided_block->vel, portal_rotations);
-
-               Position_t pre_move = collided_block->pos;
 
                switch(collided_block_dir){
                default:
@@ -2355,6 +2357,7 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
                     }
                     break;
                }
+#endif
 
                Coord_t coord = pixel_to_coord(collided_block->pos.pixel + Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS});
                Coord_t premove_coord = pixel_to_coord(pre_move.pixel + Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS});
@@ -4412,13 +4415,21 @@ int main(int argc, char** argv){
                player_coord = pos_to_coord(player.pos + player_delta_pos);
 
                if(block_to_push){
-                    F32 before_time = player.push_time;
+                    DirectionMask_t block_move_dir_mask = vec_direction_mask(block_to_push->vel);
+                    if(direction_in_mask(direction_mask_opposite(block_move_dir_mask), player.face))
+                    {
+                         // if the player is pushing against a block moving towards them, the block wins
+                         player.push_time = 0;
+                         block_to_push = nullptr;
+                    }else{
+                         F32 before_time = player.push_time;
 
-                    player.push_time += dt;
-                    if(player.push_time > BLOCK_PUSH_TIME){
-                         if(before_time <= BLOCK_PUSH_TIME) undo_commit(&undo, &player, &tilemap, &block_array, &interactive_array);
-                         block_push(block_to_push, last_block_pushed_direction, &tilemap, interactive_quad_tree, block_quad_tree, false);
-                         if(block_to_push->pos.z > 0) player.push_time = -0.5f;
+                         player.push_time += dt;
+                         if(player.push_time > BLOCK_PUSH_TIME){
+                              if(before_time <= BLOCK_PUSH_TIME) undo_commit(&undo, &player, &tilemap, &block_array, &interactive_array);
+                              block_push(block_to_push, last_block_pushed_direction, &tilemap, interactive_quad_tree, block_quad_tree, false);
+                              if(block_to_push->pos.z > 0) player.push_time = -0.5f;
+                         }
                     }
                }else{
                     player.push_time = 0;
@@ -4686,7 +4697,7 @@ int main(int argc, char** argv){
           draw_quad_wireframe(&collided_with_quad, 255.0f, 0.0f, 255.0f);
 #endif
 
-#if 0
+#if 1
           // light
           glBindTexture(GL_TEXTURE_2D, 0);
           glBegin(GL_QUADS);

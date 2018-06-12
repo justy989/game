@@ -45,6 +45,7 @@ DirectionMask_t direction_mask_add(DirectionMask_t mask, Direction_t dir);
 DirectionMask_t direction_mask_remove(DirectionMask_t a, DirectionMask_t b);
 DirectionMask_t direction_mask_remove(DirectionMask_t a, int b);
 DirectionMask_t direction_mask_remove(DirectionMask_t mask, Direction_t dir);
+DirectionMask_t direction_mask_opposite(DirectionMask_t mask);
 Direction_t direction_opposite(Direction_t dir);
 bool direction_is_horizontal(Direction_t dir);
 U8 direction_rotations_between(Direction_t a, Direction_t b);
