@@ -2235,7 +2235,7 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
                                          Player_t* player, TileMap_t* tilemap,
                                          QuadTreeNode_t<Interactive_t>* interactive_quad_tree, ObjectArray_t<Block_t>* block_array,
                                          Block_t** block_to_push, Direction_t* last_block_pushed_direction,
-                                         bool* collided_with_interactive){
+                                         bool* collided_with_interactive, bool* resetting){
      // figure out tiles that are close by
      Position_t final_player_pos = position + pos_delta;
      Coord_t player_coord = pos_to_coord(final_player_pos);
@@ -2421,7 +2421,7 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
      if(collided_block_dir != DIRECTION_COUNT &&
         (collided_block_dir == direction_opposite(collided_interactive_dir) ||
          collided_block_dir == direction_opposite(collided_tile_dir))){
-
+#if 0
           switch(collided_block_dir){
           default:
                break;
@@ -2454,6 +2454,8 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
                }
                break;
           }
+#endif
+          *resetting = true;
      }
 
      return pos_delta;
@@ -3121,6 +3123,9 @@ int main(int argc, char** argv){
 
      undo_snapshot(&undo, &player, &tilemap, &block_array, &interactive_array);
 
+     bool resetting = false;
+     F32 reset_timer = 1.0f;
+
      bool quit = false;
 
      Vec_t user_movement = {};
@@ -3391,7 +3396,7 @@ int main(int argc, char** argv){
                          if(editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
                               editor.selection_start.x--;
                               editor.selection_end.x--;
-                         }else{
+                         }else if(!resetting){
                               player_action_perform(&player_action, &player, PLAYER_ACTION_TYPE_MOVE_LEFT_START, demo_mode,
                                                     demo_file, frame_count);
                          }
@@ -3400,7 +3405,7 @@ int main(int argc, char** argv){
                          if(editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
                               editor.selection_start.x++;
                               editor.selection_end.x++;
-                         }else{
+                         }else if(!resetting){
                               player_action_perform(&player_action, &player, PLAYER_ACTION_TYPE_MOVE_RIGHT_START, demo_mode,
                                                     demo_file, frame_count);
                          }
@@ -3409,7 +3414,7 @@ int main(int argc, char** argv){
                          if(editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
                               editor.selection_start.y++;
                               editor.selection_end.y++;
-                         }else{
+                         }else if(!resetting){
                               player_action_perform(&player_action, &player, PLAYER_ACTION_TYPE_MOVE_UP_START, demo_mode,
                                                     demo_file, frame_count);
                          }
@@ -3418,18 +3423,22 @@ int main(int argc, char** argv){
                          if(editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
                               editor.selection_start.y--;
                               editor.selection_end.y--;
-                         }else{
+                         }else if(!resetting){
                               player_action_perform(&player_action, &player, PLAYER_ACTION_TYPE_MOVE_DOWN_START, demo_mode,
                                                     demo_file, frame_count);
                          }
                          break;
                     case SDL_SCANCODE_E:
-                         player_action_perform(&player_action, &player, PLAYER_ACTION_TYPE_ACTIVATE_START, demo_mode,
-                                               demo_file, frame_count);
+                         if(!resetting){
+                              player_action_perform(&player_action, &player, PLAYER_ACTION_TYPE_ACTIVATE_START, demo_mode,
+                                                    demo_file, frame_count);
+                         }
                          break;
                     case SDL_SCANCODE_SPACE:
-                         player_action_perform(&player_action, &player, PLAYER_ACTION_TYPE_SHOOT_START, demo_mode,
-                                               demo_file, frame_count);
+                         if(!resetting){
+                              player_action_perform(&player_action, &player, PLAYER_ACTION_TYPE_SHOOT_START, demo_mode,
+                                                    demo_file, frame_count);
+                         }
                          break;
                     case SDL_SCANCODE_L:
                          if(load_map_number(map_number, &player_start, &tilemap, &block_array, &interactive_array)){
@@ -3475,8 +3484,10 @@ int main(int argc, char** argv){
                          save_map(filepath, player_start, &tilemap, &block_array, &interactive_array);
                     } break;
                     case SDL_SCANCODE_U:
-                         player_action_perform(&player_action, &player, PLAYER_ACTION_TYPE_UNDO, demo_mode,
-                                               demo_file, frame_count);
+                         if(!resetting){
+                              player_action_perform(&player_action, &player, PLAYER_ACTION_TYPE_UNDO, demo_mode,
+                                                    demo_file, frame_count);
+                         }
                          break;
                     case SDL_SCANCODE_N:
                     {
@@ -3590,6 +3601,8 @@ int main(int argc, char** argv){
                     case SDL_SCANCODE_M:
                          if(editor.mode == EDITOR_MODE_CATEGORY_SELECT){
                               player_start = mouse_select_world(mouse_screen, camera);
+                         }else if(editor.mode == EDITOR_MODE_OFF){
+                              resetting = true;
                          }
                          break;
                     case SDL_SCANCODE_LCTRL:
@@ -4410,7 +4423,7 @@ int main(int argc, char** argv){
                                                                            &player, &tilemap, interactive_quad_tree,
                                                                            &block_array, &block_to_push,
                                                                            &last_block_pushed_direction,
-                                                                           &collide_with_interactive);
+                                                                           &collide_with_interactive, &resetting);
 
                player_coord = pos_to_coord(player.pos + player_delta_pos);
 
@@ -4455,6 +4468,26 @@ int main(int argc, char** argv){
                }
 
                player.pos += player_delta_pos;
+          }
+
+          if(resetting){
+               reset_timer += dt;
+               if(reset_timer >= RESET_TIME){
+                    resetting = false;
+
+                    // TODO: compress this code
+                    if(load_map_number(map_number, &player_start, &tilemap, &block_array, &interactive_array)){
+                         reset_map(&player, player_start, &interactive_array, &interactive_quad_tree);
+                         destroy(&undo);
+                         init(&undo, UNDO_MEMORY, tilemap.width, tilemap.height, block_array.count, interactive_array.count);
+                         undo_snapshot(&undo, &player, &tilemap, &block_array, &interactive_array);
+                         quad_tree_free(block_quad_tree);
+                         block_quad_tree = quad_tree_build(&block_array);
+                    }
+               }
+          }else{
+               reset_timer -= dt;
+               if(reset_timer <= 0) reset_timer = 0;
           }
 
           if(suite && !show_suite) continue;
@@ -4906,6 +4939,17 @@ int main(int argc, char** argv){
                selection_draw(min_coord, max_coord, screen_camera, 1.0f, 0.0f, 0.0f);
           } break;
           }
+
+          // if(resetting){
+               glBegin(GL_QUADS);
+               glColor4f(0.0f, 0.0f, 0.0f, reset_timer / RESET_TIME);
+               glVertex2f(0, 0);
+               glVertex2f(0, 1);
+               glVertex2f(1, 1);
+               glVertex2f(1, 0);
+               glEnd();
+          // }
+
 
           SDL_GL_SwapWindow(window);
      }
