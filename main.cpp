@@ -2252,6 +2252,7 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
 
      // where the player has collided with blocks
      DirectionMask_t collided_blocks_mask_dir = DIRECTION_MASK_NONE;
+     Block_t* collided_blocks[DIRECTION_COUNT] = {};
 
      for(S16 i = 0; i < block_array->count; i++){
           Vec_t pos_delta_save = pos_delta;
@@ -2374,13 +2375,19 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
                }
 
                auto rotated_player_face = direction_rotate_clockwise(player_face, portal_rotations);
-               if(collided_block_dir == rotated_player_face && (player->accel.x != 0.0f || player->accel.y != 0.0f) &&
-                  *block_to_push == nullptr){ // also check that the player is actually pushing against the block
-                    *block_to_push = block_array->elements + i;
-                    *last_block_pushed_direction = player_face;
+               if(collided_block_dir == rotated_player_face && (player->accel.x != 0.0f || player->accel.y != 0.0f)){
+                    if(*block_to_push == nullptr){ // also check that the player is actually pushing against the block
+                         *block_to_push = block_array->elements + i;
+                         *last_block_pushed_direction = player_face;
+                    }else{
+                         // stop the player from pushing 2 blocks at once
+                         *block_to_push = nullptr;
+                         *last_block_pushed_direction = DIRECTION_COUNT;
+                    }
                }
 
                collided_blocks_mask_dir = direction_mask_add(collided_blocks_mask_dir, collided_block_dir);
+               collided_blocks[collided_block_dir] = collided_block;
           }
      }
 
@@ -2422,15 +2429,23 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
           }
      }
 
+     // TODO do we care about other directions for colliding with interactives and tiles like we do for blocks?
+
+     // check if block is squishing the player against something
      for(S8 d = 0; d < DIRECTION_COUNT; d++){
+          if(!collided_blocks[d]) continue;
+
           Direction_t dir = static_cast<Direction_t>(d);
-          if(!direction_in_mask(collided_blocks_mask_dir, dir)) continue;
+          Direction_t opposite = direction_opposite(dir);
+          DirectionMask_t block_vel_mask = vec_direction_mask(collided_blocks[dir]->vel);
+
+          // ignore if the block is moving away
+          if(direction_in_mask(block_vel_mask, dir)) continue;
 
           // if, on the opposite side of the collision, is a wall, interactive, or block, then kill the player muhahaha
-          if(dir != DIRECTION_COUNT &&
-             (dir == direction_opposite(collided_interactive_dir) ||
+          if((dir == direction_opposite(collided_interactive_dir) ||
               dir == direction_opposite(collided_tile_dir) ||
-             direction_in_mask(collided_blocks_mask_dir, direction_opposite(dir)))){
+              direction_in_mask(collided_blocks_mask_dir, opposite))){
                *resetting = true;
                break;
           }
