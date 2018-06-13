@@ -2249,8 +2249,10 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
 
      // TODO: convert to use quad tree
      Vec_t collided_block_delta {};
-     Direction_t collided_block_dir = DIRECTION_COUNT;
-     Block_t* collided_block = nullptr;
+
+     // where the player has collided with blocks
+     DirectionMask_t collided_blocks_mask_dir = DIRECTION_MASK_NONE;
+
      for(S16 i = 0; i < block_array->count; i++){
           Vec_t pos_delta_save = pos_delta;
 
@@ -2297,11 +2299,11 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
           }
 
           if(collide_with_block){
-               collided_block = block_array->elements + i;
                Vec_t pos_delta_diff = pos_delta - pos_delta_save;
                collided_block_delta = vec_rotate_quadrants(pos_delta_diff, 4 - portal_rotations);
-               collided_block_dir = relative_quadrant(position.pixel, block_pos.pixel +
-                                                      Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS});
+               auto collided_block_dir = relative_quadrant(position.pixel, block_pos.pixel +
+                                                           Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS});
+               auto collided_block = block_array->elements + i;
                Position_t pre_move = collided_block->pos;
 
 #if 0
@@ -2377,6 +2379,8 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
                     *block_to_push = block_array->elements + i;
                     *last_block_pushed_direction = player_face;
                }
+
+               collided_blocks_mask_dir = direction_mask_add(collided_blocks_mask_dir, collided_block_dir);
           }
      }
 
@@ -2418,44 +2422,18 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
           }
      }
 
-     if(collided_block_dir != DIRECTION_COUNT &&
-        (collided_block_dir == direction_opposite(collided_interactive_dir) ||
-         collided_block_dir == direction_opposite(collided_tile_dir))){
-#if 0
-          switch(collided_block_dir){
-          default:
-               break;
-          case DIRECTION_LEFT:
-               if(collided_block->accel.x > 0){
-                    collided_block->pos -= collided_block_delta;
-                    collided_block->accel.x = 0.0f;
-                    collided_block->vel.x = 0.0f;
-               }
-               break;
-          case DIRECTION_RIGHT:
-               if(collided_block->accel.x < 0){
-                    collided_block->pos -= collided_block_delta;
-                    collided_block->accel.x = 0.0f;
-                    collided_block->vel.x = 0.0f;
-               }
-               break;
-          case DIRECTION_DOWN:
-               if(collided_block->accel.y > 0){
-                    collided_block->pos -= collided_block_delta;
-                    collided_block->accel.y = 0.0f;
-                    collided_block->vel.y = 0.0f;
-               }
-               break;
-          case DIRECTION_UP:
-               if(collided_block->accel.y < 0){
-                    collided_block->pos -= collided_block_delta;
-                    collided_block->accel.y = 0.0f;
-                    collided_block->vel.y = 0.0f;
-               }
+     for(S8 d = 0; d < DIRECTION_COUNT; d++){
+          Direction_t dir = static_cast<Direction_t>(d);
+          if(!direction_in_mask(collided_blocks_mask_dir, dir)) continue;
+
+          // if, on the opposite side of the collision, is a wall, interactive, or block, then kill the player muhahaha
+          if(dir != DIRECTION_COUNT &&
+             (dir == direction_opposite(collided_interactive_dir) ||
+              dir == direction_opposite(collided_tile_dir) ||
+             direction_in_mask(collided_blocks_mask_dir, direction_opposite(dir)))){
+               *resetting = true;
                break;
           }
-#endif
-          *resetting = true;
      }
 
      return pos_delta;
