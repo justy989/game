@@ -30,6 +30,8 @@ http://www.simonstalenhag.se/
 #include "undo.h"
 #include "editor.h"
 
+// #define BLOCKS_SQUISH_PLAYER
+
 Direction_t direction_between(Coord_t a, Coord_t b){
      if(a == b) return DIRECTION_COUNT;
 
@@ -815,7 +817,7 @@ void toggle_flag(U16* flags, U16 flag){
 }
 
 void toggle_electricity(TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree, Coord_t coord,
-                        Direction_t direction, bool activated_by_door){
+                        Direction_t direction, bool from_wire, bool activated_by_door){
      Coord_t adjacent_coord = coord + direction;
      Tile_t* tile = tilemap_get_tile(tilemap, adjacent_coord);
      if(!tile) return;
@@ -834,12 +836,13 @@ void toggle_electricity(TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* inter
           } break;
           case INTERACTIVE_TYPE_DOOR:
                interactive->door.lift.up = !interactive->door.lift.up;
+               // open connecting door
                if(!activated_by_door) toggle_electricity(tilemap, interactive_quad_tree,
                                                          coord_move(coord, interactive->door.face, 3),
-                                                         interactive->door.face, true);
+                                                         interactive->door.face, from_wire, true);
                break;
           case INTERACTIVE_TYPE_PORTAL:
-               interactive->portal.on = !interactive->portal.on;
+               if(from_wire) interactive->portal.on = !interactive->portal.on;
                break;
           }
      }
@@ -878,19 +881,19 @@ void toggle_electricity(TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* inter
           }
 
           if(tile->flags & TILE_FLAG_WIRE_LEFT && direction != DIRECTION_RIGHT){
-               toggle_electricity(tilemap, interactive_quad_tree, adjacent_coord, DIRECTION_LEFT, false);
+               toggle_electricity(tilemap, interactive_quad_tree, adjacent_coord, DIRECTION_LEFT, true, false);
           }
 
           if(tile->flags & TILE_FLAG_WIRE_RIGHT && direction != DIRECTION_LEFT){
-               toggle_electricity(tilemap, interactive_quad_tree, adjacent_coord, DIRECTION_RIGHT, false);
+               toggle_electricity(tilemap, interactive_quad_tree, adjacent_coord, DIRECTION_RIGHT, true, false);
           }
 
           if(tile->flags & TILE_FLAG_WIRE_DOWN && direction != DIRECTION_UP){
-               toggle_electricity(tilemap, interactive_quad_tree, adjacent_coord, DIRECTION_DOWN, false);
+               toggle_electricity(tilemap, interactive_quad_tree, adjacent_coord, DIRECTION_DOWN, true, false);
           }
 
           if(tile->flags & TILE_FLAG_WIRE_UP && direction != DIRECTION_DOWN){
-               toggle_electricity(tilemap, interactive_quad_tree, adjacent_coord, DIRECTION_UP, false);
+               toggle_electricity(tilemap, interactive_quad_tree, adjacent_coord, DIRECTION_UP, true, false);
           }
      }else if(tile->flags & (TILE_FLAG_WIRE_CLUSTER_LEFT | TILE_FLAG_WIRE_CLUSTER_MID | TILE_FLAG_WIRE_CLUSTER_RIGHT)){
           bool all_on_before = tile_flags_cluster_all_on(tile->flags);
@@ -964,7 +967,7 @@ void toggle_electricity(TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* inter
           bool all_on_after = tile_flags_cluster_all_on(tile->flags);
 
           if(all_on_before != all_on_after){
-               toggle_electricity(tilemap, interactive_quad_tree, adjacent_coord, cluster_direction, false);
+               toggle_electricity(tilemap, interactive_quad_tree, adjacent_coord, cluster_direction, true, false);
           }
      }
 }
@@ -978,10 +981,10 @@ void activate(TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qua
         interactive->type != INTERACTIVE_TYPE_LIGHT_DETECTOR &&
         interactive->type != INTERACTIVE_TYPE_ICE_DETECTOR) return;
 
-     toggle_electricity(tilemap, interactive_quad_tree, coord, DIRECTION_LEFT, false);
-     toggle_electricity(tilemap, interactive_quad_tree, coord, DIRECTION_RIGHT, false);
-     toggle_electricity(tilemap, interactive_quad_tree, coord, DIRECTION_UP, false);
-     toggle_electricity(tilemap, interactive_quad_tree, coord, DIRECTION_DOWN, false);
+     toggle_electricity(tilemap, interactive_quad_tree, coord, DIRECTION_LEFT, false, false);
+     toggle_electricity(tilemap, interactive_quad_tree, coord, DIRECTION_RIGHT, false, false);
+     toggle_electricity(tilemap, interactive_quad_tree, coord, DIRECTION_UP, false, false);
+     toggle_electricity(tilemap, interactive_quad_tree, coord, DIRECTION_DOWN, false, false);
 }
 
 Interactive_t* block_against_solid_interactive(Block_t* block_to_check, Direction_t direction,
@@ -2307,7 +2310,7 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
                auto collided_block = block_array->elements + i;
                Position_t pre_move = collided_block->pos;
 
-#if 0
+#ifndef BLOCKS_SQUISH_PLAYER
                // this stops the block when it moves into the player
                Vec_t rotated_accel = vec_rotate_quadrants(collided_block->accel, portal_rotations);
                Vec_t rotated_vel = vec_rotate_quadrants(collided_block->vel, portal_rotations);
@@ -2436,6 +2439,8 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
           if(!collided_blocks[d]) continue;
 
           Direction_t dir = static_cast<Direction_t>(d);
+
+#ifdef BLOCKS_SQUISH_PLAYER
           Direction_t opposite = direction_opposite(dir);
           DirectionMask_t block_vel_mask = vec_direction_mask(collided_blocks[dir]->vel);
 
@@ -2449,6 +2454,45 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
                *resetting = true;
                break;
           }
+#else
+          (void)(resetting);
+
+          if(dir != DIRECTION_COUNT &&
+             (dir == direction_opposite(collided_interactive_dir) ||
+              dir == direction_opposite(collided_tile_dir))){
+               switch(dir){
+               default:
+                    break;
+               case DIRECTION_LEFT:
+                    if(collided_blocks[d]->accel.x > 0){
+                         collided_blocks[d]->pos -= collided_block_delta;
+                         collided_blocks[d]->accel.x = 0.0f;
+                         collided_blocks[d]->vel.x = 0.0f;
+                    }
+                    break;
+               case DIRECTION_RIGHT:
+                    if(collided_blocks[d]->accel.x < 0){
+                         collided_blocks[d]->pos -= collided_block_delta;
+                         collided_blocks[d]->accel.x = 0.0f;
+                         collided_blocks[d]->vel.x = 0.0f;
+                    }
+                    break;
+               case DIRECTION_DOWN:
+                    if(collided_blocks[d]->accel.y > 0){
+                         collided_blocks[d]->pos -= collided_block_delta;
+                         collided_blocks[d]->accel.y = 0.0f;
+                         collided_blocks[d]->vel.y = 0.0f;
+                    }
+                    break;
+               case DIRECTION_UP:
+                    if(collided_blocks[d]->accel.y < 0){
+                         collided_blocks[d]->pos -= collided_block_delta;
+                         collided_blocks[d]->accel.y = 0.0f;
+                         collided_blocks[d]->vel.y = 0.0f;
+                    }
+               }
+          }
+#endif
      }
 
      return pos_delta;
@@ -3902,6 +3946,15 @@ int main(int argc, char** argv){
 
                if(arrow->stuck_time > 0.0f){
                     arrow->stuck_time += dt;
+
+                    switch(arrow->stuck_type){
+                    default:
+                         break;
+                    case STUCK_BLOCK:
+                         arrow->pos = arrow->stuck_block->pos + arrow->stuck_offset;
+                         break;
+                    }
+
                     if(arrow->stuck_time > ARROW_DISINTEGRATE_DELAY){
                          arrow->alive = false;
                     }
@@ -3955,13 +4008,22 @@ int main(int argc, char** argv){
                     // blocks on the coordinate and on the ground block light
                     Rect_t block_rect = block_get_rect(blocks[b]);
                     S16 block_index = blocks[b] - block_array.elements;
+                    S16 block_bottom = blocks[b]->pos.z;
+                    S16 block_top = block_bottom + HEIGHT_INTERVAL;
                     if(pixel_in_rect(arrow->pos.pixel, block_rect) && arrow->element_from_block != block_index){
-                         arrow->element_from_block = block_index;
-                         if(arrow->element != blocks[b]->element){
-                              Element_t arrow_element = arrow->element;
-                              arrow->element = transition_element(arrow->element, blocks[b]->element);
-                              if(arrow_element){
-                                   blocks[b]->element = transition_element(blocks[b]->element, arrow_element);
+                         if(arrow->pos.z >= block_bottom && arrow->pos.z <= block_top){
+                              arrow->stuck_time = dt;
+                              arrow->stuck_offset = arrow->pos - blocks[b]->pos;
+                              arrow->stuck_type = STUCK_BLOCK;
+                              arrow->stuck_block = blocks[b];
+                         }else if(arrow->pos.z > block_top && arrow->pos.z < (block_top + HEIGHT_INTERVAL)){
+                              arrow->element_from_block = block_index;
+                              if(arrow->element != blocks[b]->element){
+                                   Element_t arrow_element = arrow->element;
+                                   arrow->element = transition_element(arrow->element, blocks[b]->element);
+                                   if(arrow_element){
+                                        blocks[b]->element = transition_element(blocks[b]->element, arrow_element);
+                                   }
                               }
                          }
                          break;
@@ -4008,6 +4070,12 @@ int main(int argc, char** argv){
                          }else if(interactive->type == INTERACTIVE_TYPE_DOOR){
                               if(interactive->door.lift.ticks < arrow->pos.z){
                                    arrow->stuck_time = dt;
+                                   // TODO: stuck in door
+                              }
+                         }else if(interactive->type == INTERACTIVE_TYPE_POPUP){
+                              if(interactive->popup.lift.ticks < arrow->pos.z){
+                                   arrow->stuck_time = dt;
+                                   // TODO: stuck in popup
                               }
                          }
                     }
@@ -4546,9 +4614,9 @@ int main(int argc, char** argv){
 
                                    S16 px = portal_coord.x * TILE_SIZE_IN_PIXELS;
                                    S16 py = portal_coord.y * TILE_SIZE_IN_PIXELS;
-                                   Rect_t coord_rect {(S16)(px - HALF_TILE_SIZE_IN_PIXELS), (S16)(py - HALF_TILE_SIZE_IN_PIXELS),
-                                                      (S16)(px + TILE_SIZE_IN_PIXELS + HALF_TILE_SIZE_IN_PIXELS),
-                                                      (S16)(py + TILE_SIZE_IN_PIXELS + HALF_TILE_SIZE_IN_PIXELS)};
+                                   Rect_t coord_rect {(S16)(px), (S16)(py),
+                                                      (S16)(px + TILE_SIZE_IN_PIXELS),
+                                                      (S16)(py + TILE_SIZE_IN_PIXELS)};
 
                                    S16 block_count = 0;
                                    Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
