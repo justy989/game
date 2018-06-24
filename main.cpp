@@ -194,22 +194,38 @@ void find_portal_exits_impl(Coord_t coord, TileMap_t* tilemap, QuadTreeNode_t<In
 
      Tile_t* tile = tilemap_get_tile(tilemap, coord);
      if(!tile) return;
-     if((tile->flags & TILE_FLAG_WIRE_STATE) == 0) return;
+     if(tile->flags & TILE_FLAG_WIRE_STATE){
+          if((tile->flags & TILE_FLAG_WIRE_LEFT) && from != DIRECTION_LEFT){
+               find_portal_exits_impl(coord + DIRECTION_LEFT, tilemap, interactive_quad_tree, portal_exit, DIRECTION_RIGHT);
+          }
 
-     if((tile->flags & TILE_FLAG_WIRE_LEFT) && from != DIRECTION_LEFT){
-          find_portal_exits_impl(coord + DIRECTION_LEFT, tilemap, interactive_quad_tree, portal_exit, DIRECTION_RIGHT);
-     }
+          if((tile->flags & TILE_FLAG_WIRE_RIGHT) && from != DIRECTION_RIGHT){
+               find_portal_exits_impl(coord + DIRECTION_RIGHT, tilemap, interactive_quad_tree, portal_exit, DIRECTION_LEFT);
+          }
 
-     if((tile->flags & TILE_FLAG_WIRE_RIGHT) && from != DIRECTION_RIGHT){
-          find_portal_exits_impl(coord + DIRECTION_RIGHT, tilemap, interactive_quad_tree, portal_exit, DIRECTION_LEFT);
-     }
+          if((tile->flags & TILE_FLAG_WIRE_UP) && from != DIRECTION_UP){
+               find_portal_exits_impl(coord + DIRECTION_UP, tilemap, interactive_quad_tree, portal_exit, DIRECTION_DOWN);
+          }
 
-     if((tile->flags & TILE_FLAG_WIRE_UP) && from != DIRECTION_UP){
-          find_portal_exits_impl(coord + DIRECTION_UP, tilemap, interactive_quad_tree, portal_exit, DIRECTION_DOWN);
-     }
+          if((tile->flags & TILE_FLAG_WIRE_DOWN) && from != DIRECTION_DOWN){
+               find_portal_exits_impl(coord + DIRECTION_DOWN, tilemap, interactive_quad_tree, portal_exit, DIRECTION_UP);
+          }
+     }else if(interactive && interactive->type == INTERACTIVE_TYPE_WIRE_CROSS){
+          if(interactive->wire_cross.mask & DIRECTION_MASK_LEFT && from != DIRECTION_LEFT){
+               find_portal_exits_impl(coord + DIRECTION_LEFT, tilemap, interactive_quad_tree, portal_exit, DIRECTION_RIGHT);
+          }
 
-     if((tile->flags & TILE_FLAG_WIRE_DOWN) && from != DIRECTION_DOWN){
-          find_portal_exits_impl(coord + DIRECTION_DOWN, tilemap, interactive_quad_tree, portal_exit, DIRECTION_UP);
+          if(interactive->wire_cross.mask & DIRECTION_MASK_RIGHT && from != DIRECTION_RIGHT){
+               find_portal_exits_impl(coord + DIRECTION_RIGHT, tilemap, interactive_quad_tree, portal_exit, DIRECTION_LEFT);
+          }
+
+          if(interactive->wire_cross.mask & DIRECTION_MASK_UP && from != DIRECTION_UP){
+               find_portal_exits_impl(coord + DIRECTION_UP, tilemap, interactive_quad_tree, portal_exit, DIRECTION_DOWN);
+          }
+
+          if(interactive->wire_cross.mask & DIRECTION_MASK_DOWN && from != DIRECTION_DOWN){
+               find_portal_exits_impl(coord + DIRECTION_DOWN, tilemap, interactive_quad_tree, portal_exit, DIRECTION_UP);
+          }
      }
 }
 
