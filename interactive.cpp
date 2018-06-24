@@ -71,6 +71,11 @@ bool interactive_equal(const Interactive_t* a, const Interactive_t* b){
           break;
      case INTERACTIVE_TYPE_BOW:
           break;
+     case INTERACTIVE_TYPE_WIRE_CROSS:
+          if(a->wire_cross.mask != b->wire_cross.mask){
+               return false;
+          }
+          break;
      }
 
      return true;

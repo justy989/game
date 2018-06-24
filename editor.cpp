@@ -292,6 +292,43 @@ bool init(Editor_t* editor){
           interactive_portal_category->elements[index].elements[0].interactive.portal.on = true;
      }
 
+     auto* interactive_wire_cross_category = editor->category_array.elements + EDITOR_CATEGORY_INTERACTIVE_WIRE_CROSS;
+     init(interactive_wire_cross_category, 12);
+     S8 index = 0;
+
+     for(S8 i = 0; i < DIRECTION_COUNT; i++){
+          for(S8 j = i; j < DIRECTION_COUNT; j++){
+               if(i == j) continue;
+
+               auto mask = direction_to_direction_mask(static_cast<Direction_t>(i));
+               mask = direction_mask_add(mask, static_cast<Direction_t>(j));
+
+               init(interactive_wire_cross_category->elements + index, 1);
+               interactive_wire_cross_category->elements[index].elements[0].type = STAMP_TYPE_INTERACTIVE;
+               interactive_wire_cross_category->elements[index].elements[0].interactive.type = INTERACTIVE_TYPE_WIRE_CROSS;
+               interactive_wire_cross_category->elements[index].elements[0].interactive.wire_cross.mask = mask;
+
+               index++;
+          }
+     }
+
+     for(S8 i = 0; i < DIRECTION_COUNT; i++){
+          for(S8 j = i; j < DIRECTION_COUNT; j++){
+               if(i == j) continue;
+
+               auto mask = direction_to_direction_mask(static_cast<Direction_t>(i));
+               mask = direction_mask_add(mask, static_cast<Direction_t>(j));
+
+               init(interactive_wire_cross_category->elements + index, 1);
+               interactive_wire_cross_category->elements[index].elements[0].type = STAMP_TYPE_INTERACTIVE;
+               interactive_wire_cross_category->elements[index].elements[0].interactive.type = INTERACTIVE_TYPE_WIRE_CROSS;
+               interactive_wire_cross_category->elements[index].elements[0].interactive.wire_cross.mask = mask;
+               interactive_wire_cross_category->elements[index].elements[0].interactive.wire_cross.on = true;
+
+               index++;
+          }
+     }
+
      return true;
 }
 

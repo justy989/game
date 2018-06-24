@@ -20,8 +20,11 @@
 
 #define ON_BIT(value, bit) value |= (1 << bit)
 #define OFF_BIT(value, bit) value &= ~(1 << bit)
+#define ON_BIT_FLAG(value, bit_flag) value |= bit_flag
+#define OFF_BIT_FLAG(value, bit_flag) value &= ~bit_flag
 
 #define TOGGLE_BIT(value, bit){if(value & (1 << bit)){OFF_BIT(value, bit);}else{ON_BIT(value, bit);}}
+#define TOGGLE_BIT_FLAG(value, bit_flag){if(value & bit_flag){OFF_BIT_FLAG(value, bit_flag);}else{ON_BIT_FLAG(value, bit_flag);}}
 
 #define LOG_MISMATCH(name, fmt_spec, chk, act)\
      {                                                                                                                     \

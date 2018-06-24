@@ -847,53 +847,118 @@ void toggle_electricity(TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* inter
           }
      }
 
-     if(tile->flags & (TILE_FLAG_WIRE_LEFT | TILE_FLAG_WIRE_UP | TILE_FLAG_WIRE_RIGHT | TILE_FLAG_WIRE_DOWN)){
-          switch(direction){
-          default:
-               return;
-          case DIRECTION_LEFT:
-               if(!(tile->flags & TILE_FLAG_WIRE_RIGHT)){
-                    return;
-               }
-               break;
-          case DIRECTION_RIGHT:
-               if(!(tile->flags & TILE_FLAG_WIRE_LEFT)){
-                    return;
-               }
-               break;
-          case DIRECTION_UP:
-               if(!(tile->flags & TILE_FLAG_WIRE_DOWN)){
-                    return;
-               }
-               break;
-          case DIRECTION_DOWN:
-               if(!(tile->flags & TILE_FLAG_WIRE_UP)){
-                    return;
-               }
-               break;
-          }
+     if((tile->flags & (TILE_FLAG_WIRE_LEFT | TILE_FLAG_WIRE_UP | TILE_FLAG_WIRE_RIGHT | TILE_FLAG_WIRE_DOWN)) ||
+        (interactive && interactive->type == INTERACTIVE_TYPE_WIRE_CROSS &&
+         interactive->wire_cross.mask & (TILE_FLAG_WIRE_LEFT | TILE_FLAG_WIRE_UP | TILE_FLAG_WIRE_RIGHT | TILE_FLAG_WIRE_DOWN))){
+          bool wire_cross = false;
 
-          // toggle wire state
-          if(tile->flags & TILE_FLAG_WIRE_STATE){
-               tile->flags &= ~TILE_FLAG_WIRE_STATE;
+          if(interactive && interactive->type == INTERACTIVE_TYPE_WIRE_CROSS){
+               switch(direction){
+               default:
+                    return;
+               case DIRECTION_LEFT:
+                    if(tile->flags & TILE_FLAG_WIRE_RIGHT){
+                         TOGGLE_BIT_FLAG(tile->flags, TILE_FLAG_WIRE_STATE);
+                    }else if(interactive->wire_cross.mask & DIRECTION_MASK_RIGHT){
+                         interactive->wire_cross.on = !interactive->wire_cross.on;
+                         wire_cross = true;
+                    }else{
+                         return;
+                    }
+                    break;
+               case DIRECTION_RIGHT:
+                    if(tile->flags & TILE_FLAG_WIRE_LEFT){
+                         TOGGLE_BIT_FLAG(tile->flags, TILE_FLAG_WIRE_STATE);
+                    }else if(interactive->wire_cross.mask & DIRECTION_MASK_LEFT){
+                         interactive->wire_cross.on = !interactive->wire_cross.on;
+                         wire_cross = true;
+                    }else{
+                         return;
+                    }
+                    break;
+               case DIRECTION_UP:
+                    if(tile->flags & TILE_FLAG_WIRE_DOWN){
+                         TOGGLE_BIT_FLAG(tile->flags, TILE_FLAG_WIRE_STATE);
+                    }else if(interactive->wire_cross.mask & DIRECTION_MASK_DOWN){
+                         interactive->wire_cross.on = !interactive->wire_cross.on;
+                         wire_cross = true;
+                    }else{
+                         return;
+                    }
+                    break;
+               case DIRECTION_DOWN:
+                    if(tile->flags & TILE_FLAG_WIRE_UP){
+                         TOGGLE_BIT_FLAG(tile->flags, TILE_FLAG_WIRE_STATE);
+                    }else if(interactive->wire_cross.mask & DIRECTION_MASK_UP){
+                         interactive->wire_cross.on = !interactive->wire_cross.on;
+                         wire_cross = true;
+                    }else{
+                         return;
+                    }
+                    break;
+               }
           }else{
-               tile->flags |= TILE_FLAG_WIRE_STATE;
+               switch(direction){
+               default:
+                    return;
+               case DIRECTION_LEFT:
+                    if(!(tile->flags & TILE_FLAG_WIRE_RIGHT)){
+                         return;
+                    }
+                    break;
+               case DIRECTION_RIGHT:
+                    if(!(tile->flags & TILE_FLAG_WIRE_LEFT)){
+                         return;
+                    }
+                    break;
+               case DIRECTION_UP:
+                    if(!(tile->flags & TILE_FLAG_WIRE_DOWN)){
+                         return;
+                    }
+                    break;
+               case DIRECTION_DOWN:
+                    if(!(tile->flags & TILE_FLAG_WIRE_UP)){
+                         return;
+                    }
+                    break;
+               }
+
+               // toggle wire state
+               TOGGLE_BIT_FLAG(tile->flags, TILE_FLAG_WIRE_STATE);
           }
 
-          if(tile->flags & TILE_FLAG_WIRE_LEFT && direction != DIRECTION_RIGHT){
-               toggle_electricity(tilemap, interactive_quad_tree, adjacent_coord, DIRECTION_LEFT, true, false);
-          }
+          if(wire_cross){
+               if(interactive->wire_cross.mask & DIRECTION_MASK_LEFT && direction != DIRECTION_RIGHT){
+                    toggle_electricity(tilemap, interactive_quad_tree, adjacent_coord, DIRECTION_LEFT, true, false);
+               }
 
-          if(tile->flags & TILE_FLAG_WIRE_RIGHT && direction != DIRECTION_LEFT){
-               toggle_electricity(tilemap, interactive_quad_tree, adjacent_coord, DIRECTION_RIGHT, true, false);
-          }
+               if(interactive->wire_cross.mask & DIRECTION_MASK_RIGHT && direction != DIRECTION_LEFT){
+                    toggle_electricity(tilemap, interactive_quad_tree, adjacent_coord, DIRECTION_RIGHT, true, false);
+               }
 
-          if(tile->flags & TILE_FLAG_WIRE_DOWN && direction != DIRECTION_UP){
-               toggle_electricity(tilemap, interactive_quad_tree, adjacent_coord, DIRECTION_DOWN, true, false);
-          }
+               if(interactive->wire_cross.mask & DIRECTION_MASK_DOWN && direction != DIRECTION_UP){
+                    toggle_electricity(tilemap, interactive_quad_tree, adjacent_coord, DIRECTION_DOWN, true, false);
+               }
 
-          if(tile->flags & TILE_FLAG_WIRE_UP && direction != DIRECTION_DOWN){
-               toggle_electricity(tilemap, interactive_quad_tree, adjacent_coord, DIRECTION_UP, true, false);
+               if(interactive->wire_cross.mask & DIRECTION_MASK_UP && direction != DIRECTION_DOWN){
+                    toggle_electricity(tilemap, interactive_quad_tree, adjacent_coord, DIRECTION_UP, true, false);
+               }
+          }else{
+               if(tile->flags & TILE_FLAG_WIRE_LEFT && direction != DIRECTION_RIGHT){
+                    toggle_electricity(tilemap, interactive_quad_tree, adjacent_coord, DIRECTION_LEFT, true, false);
+               }
+
+               if(tile->flags & TILE_FLAG_WIRE_RIGHT && direction != DIRECTION_LEFT){
+                    toggle_electricity(tilemap, interactive_quad_tree, adjacent_coord, DIRECTION_RIGHT, true, false);
+               }
+
+               if(tile->flags & TILE_FLAG_WIRE_DOWN && direction != DIRECTION_UP){
+                    toggle_electricity(tilemap, interactive_quad_tree, adjacent_coord, DIRECTION_DOWN, true, false);
+               }
+
+               if(tile->flags & TILE_FLAG_WIRE_UP && direction != DIRECTION_DOWN){
+                    toggle_electricity(tilemap, interactive_quad_tree, adjacent_coord, DIRECTION_UP, true, false);
+               }
           }
      }else if(tile->flags & (TILE_FLAG_WIRE_CLUSTER_LEFT | TILE_FLAG_WIRE_CLUSTER_MID | TILE_FLAG_WIRE_CLUSTER_RIGHT)){
           bool all_on_before = tile_flags_cluster_all_on(tile->flags);
@@ -1523,6 +1588,7 @@ struct MapInteractiveV1_t{
           Stairs_t stairs;
           MapDoorV1_t door; // up or down
           Portal_t portal;
+          WireCross_t wire_cross;
      };
 };
 #pragma pack(pop)
@@ -1600,6 +1666,10 @@ bool save_map_to_file(FILE* file, Coord_t player_start, const TileMap_t* tilemap
                map_interactives[i].stairs.face = interactive_array->elements[i].stairs.face;
                break;
           case INTERACTIVE_TYPE_PROMPT:
+               break;
+          case INTERACTIVE_TYPE_WIRE_CROSS:
+               map_interactives[i].wire_cross.mask = interactive_array->elements[i].wire_cross.mask;
+               map_interactives[i].wire_cross.on = interactive_array->elements[i].wire_cross.on;
                break;
           }
      }
@@ -1754,6 +1824,10 @@ bool load_map_from_file(FILE* file, Coord_t* player_start, TileMap_t* tilemap, O
                break;
           case INTERACTIVE_TYPE_PROMPT:
                break;
+          case INTERACTIVE_TYPE_WIRE_CROSS:
+               interactive->wire_cross.on = map_interactives[i].wire_cross.on;
+               interactive->wire_cross.mask = map_interactives[i].wire_cross.mask;
+               break;
           }
      }
 
@@ -1782,13 +1856,13 @@ bool load_map_number(S32 map_number, Coord_t* player_start, TileMap_t* tilemap, 
      DIR* d = opendir("content");
      if(!d) return false;
      struct dirent* dir;
-     char filepath[64] = {};
+     char filepath[512] = {};
      char match[4] = {};
      snprintf(match, 4, "%03d", map_number);
      while((dir = readdir(d)) != nullptr){
           if(strncmp(dir->d_name, match, 3) == 0 &&
              strstr(dir->d_name, ".bm")){ // TODO: create strendswith() func for this?
-               snprintf(filepath, 64, "content/%s", dir->d_name);
+               snprintf(filepath, 512, "content/%s", dir->d_name);
                break;
           }
      }
@@ -2006,6 +2080,15 @@ void interactive_draw(Interactive_t* interactive, Vec_t pos_vec){
 
           draw_theme_frame(theme_frame(interactive->portal.face, 26 + interactive->portal.on), pos_vec);
           break;
+     case INTERACTIVE_TYPE_WIRE_CROSS:
+     {
+          int y_frame = 17 + interactive->wire_cross.on;
+          if(interactive->wire_cross.mask & DIRECTION_MASK_LEFT) draw_theme_frame(theme_frame(6, y_frame), pos_vec);
+          if(interactive->wire_cross.mask & DIRECTION_MASK_UP) draw_theme_frame(theme_frame(7, y_frame), pos_vec);
+          if(interactive->wire_cross.mask & DIRECTION_MASK_RIGHT) draw_theme_frame(theme_frame(8, y_frame), pos_vec);
+          if(interactive->wire_cross.mask & DIRECTION_MASK_DOWN) draw_theme_frame(theme_frame(9, y_frame), pos_vec);
+          break;
+     }
      }
 
 }
@@ -2988,8 +3071,8 @@ int main(int argc, char** argv){
           return 1;
      }
 
-     int window_width = 1024;
-     int window_height = 1024;
+     int window_width = 1080;
+     int window_height = 1080;
      SDL_Window* window = nullptr;
      SDL_GLContext opengl_context = 0;
      GLuint theme_texture = 0;

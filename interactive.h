@@ -69,6 +69,7 @@ struct Portal_t{
 
 struct WireCross_t{
      DirectionMask_t mask;
+     bool on; // can hold a different state than the tile wire state flag
 };
 
 struct Interactive_t{
