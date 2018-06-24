@@ -27,6 +27,7 @@ enum InteractiveType_t{
      INTERACTIVE_TYPE_BOW,
      INTERACTIVE_TYPE_STAIRS,
      INTERACTIVE_TYPE_PROMPT,
+     INTERACTIVE_TYPE_WIRE_CROSS,
 };
 
 struct PressurePlate_t{
@@ -66,6 +67,10 @@ struct Portal_t{
      bool on;
 };
 
+struct WireCross_t{
+     DirectionMask_t mask;
+};
+
 struct Interactive_t{
      InteractiveType_t type;
      Coord_t coord;
@@ -78,6 +83,7 @@ struct Interactive_t{
           Lever_t lever;
           Door_t door;
           Portal_t portal;
+          WireCross_t wire_cross;
      };
 };
 
