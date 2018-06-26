@@ -192,25 +192,22 @@ void find_portal_exits_impl(Coord_t coord, TileMap_t* tilemap, QuadTreeNode_t<In
           return;
      }
 
-     Tile_t* tile = tilemap_get_tile(tilemap, coord);
-     if(!tile) return;
-     if(tile->flags & TILE_FLAG_WIRE_STATE){
-          if((tile->flags & TILE_FLAG_WIRE_LEFT) && from != DIRECTION_LEFT){
-               find_portal_exits_impl(coord + DIRECTION_LEFT, tilemap, interactive_quad_tree, portal_exit, DIRECTION_RIGHT);
+     bool connecting_to_wire_cross = false;
+
+     if(interactive && interactive->type == INTERACTIVE_TYPE_WIRE_CROSS){
+          if(interactive->wire_cross.mask & DIRECTION_MASK_LEFT && from == DIRECTION_LEFT){
+               connecting_to_wire_cross = true;
+          }else if(interactive->wire_cross.mask & DIRECTION_MASK_RIGHT && from == DIRECTION_RIGHT){
+               connecting_to_wire_cross = true;
+          }else if(interactive->wire_cross.mask & DIRECTION_MASK_UP && from == DIRECTION_UP){
+               connecting_to_wire_cross = true;
+          }else if(interactive->wire_cross.mask & DIRECTION_MASK_DOWN && from == DIRECTION_DOWN){
+               connecting_to_wire_cross = true;
           }
 
-          if((tile->flags & TILE_FLAG_WIRE_RIGHT) && from != DIRECTION_RIGHT){
-               find_portal_exits_impl(coord + DIRECTION_RIGHT, tilemap, interactive_quad_tree, portal_exit, DIRECTION_LEFT);
-          }
+     }
 
-          if((tile->flags & TILE_FLAG_WIRE_UP) && from != DIRECTION_UP){
-               find_portal_exits_impl(coord + DIRECTION_UP, tilemap, interactive_quad_tree, portal_exit, DIRECTION_DOWN);
-          }
-
-          if((tile->flags & TILE_FLAG_WIRE_DOWN) && from != DIRECTION_DOWN){
-               find_portal_exits_impl(coord + DIRECTION_DOWN, tilemap, interactive_quad_tree, portal_exit, DIRECTION_UP);
-          }
-     }else if(interactive && interactive->type == INTERACTIVE_TYPE_WIRE_CROSS){
+     if(connecting_to_wire_cross){
           if(interactive->wire_cross.mask & DIRECTION_MASK_LEFT && from != DIRECTION_LEFT){
                find_portal_exits_impl(coord + DIRECTION_LEFT, tilemap, interactive_quad_tree, portal_exit, DIRECTION_RIGHT);
           }
@@ -225,6 +222,26 @@ void find_portal_exits_impl(Coord_t coord, TileMap_t* tilemap, QuadTreeNode_t<In
 
           if(interactive->wire_cross.mask & DIRECTION_MASK_DOWN && from != DIRECTION_DOWN){
                find_portal_exits_impl(coord + DIRECTION_DOWN, tilemap, interactive_quad_tree, portal_exit, DIRECTION_UP);
+          }
+     }else{
+          Tile_t* tile = tilemap_get_tile(tilemap, coord);
+          if(!tile) return;
+          if(tile->flags & TILE_FLAG_WIRE_STATE){
+               if((tile->flags & TILE_FLAG_WIRE_LEFT) && from != DIRECTION_LEFT){
+                    find_portal_exits_impl(coord + DIRECTION_LEFT, tilemap, interactive_quad_tree, portal_exit, DIRECTION_RIGHT);
+               }
+
+               if((tile->flags & TILE_FLAG_WIRE_RIGHT) && from != DIRECTION_RIGHT){
+                    find_portal_exits_impl(coord + DIRECTION_RIGHT, tilemap, interactive_quad_tree, portal_exit, DIRECTION_LEFT);
+               }
+
+               if((tile->flags & TILE_FLAG_WIRE_UP) && from != DIRECTION_UP){
+                    find_portal_exits_impl(coord + DIRECTION_UP, tilemap, interactive_quad_tree, portal_exit, DIRECTION_DOWN);
+               }
+
+               if((tile->flags & TILE_FLAG_WIRE_DOWN) && from != DIRECTION_DOWN){
+                    find_portal_exits_impl(coord + DIRECTION_DOWN, tilemap, interactive_quad_tree, portal_exit, DIRECTION_UP);
+               }
           }
      }
 }
@@ -263,23 +280,35 @@ void find_portal_adjacents_to_skip_collision_check(Coord_t coord, QuadTreeNode_t
      }
 }
 
+bool portal_has_destination(Coord_t coord, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree){
+     bool result = false;
+     // search all portal exits for a portal they can go through
+     PortalExit_t portal_exits = find_portal_exits(coord, tilemap, interactive_quad_tree);
+     for(S8 d = 0; d < DIRECTION_COUNT && !result; d++){
+          for(S8 p = 0; p < portal_exits.directions[d].count; p++){
+               if(portal_exits.directions[d].coords[p] == coord) continue;
+
+               Coord_t portal_dest = portal_exits.directions[d].coords[p];
+               Interactive_t* portal_dest_interactive = quad_tree_find_at(interactive_quad_tree, portal_dest.x, portal_dest.y);
+               if(portal_dest_interactive && portal_dest_interactive->type == INTERACTIVE_TYPE_PORTAL &&
+                  portal_dest_interactive->portal.on){
+                    result = true;
+                    break;
+               }
+          }
+     }
+
+     return result;
+}
+
 Interactive_t* quad_tree_interactive_solid_at(QuadTreeNode_t<Interactive_t>* root, TileMap_t* tilemap, Coord_t coord){
      Interactive_t* interactive = quad_tree_find_at(root, coord.x, coord.y);
      if(interactive){
           if(interactive_is_solid(interactive)){
                return interactive;
-          }else if(interactive->type == INTERACTIVE_TYPE_PORTAL && interactive->portal.on){
-               PortalExit_t portal_exits = find_portal_exits(coord, tilemap, root);
-               for(S8 d = 0; d < DIRECTION_COUNT; d++){
-                    for(S8 p = 0; p < portal_exits.directions[d].count; p++){
-                         if(portal_exits.directions[d].coords[p] == coord) continue;
-
-                         Coord_t through_portal_coord = portal_exits.directions[d].coords[p] - (Direction_t)(d);
-                         Interactive_t* through_portal_interactive = quad_tree_find_at(root, through_portal_coord.x, through_portal_coord.y);
-                         if(through_portal_interactive && interactive_is_solid(through_portal_interactive)){
-                              return through_portal_interactive;
-                         }
-                    }
+          }else if(interactive->type == INTERACTIVE_TYPE_PORTAL){
+               if(interactive->portal.on){
+                    if(!portal_has_destination(coord, tilemap, root)) return interactive;
                }
           }
      }
@@ -291,7 +320,7 @@ S8 teleport_position_across_portal(Position_t* position, Vec_t* pos_delta, QuadT
                                    TileMap_t* tilemap, Coord_t premove_coord, Coord_t postmove_coord){
      if(postmove_coord != premove_coord){
           auto* interactive = quad_tree_interactive_find_at(interactive_quad_tree, postmove_coord);
-          if(interactive && interactive->type == INTERACTIVE_TYPE_PORTAL){
+          if(interactive && interactive->type == INTERACTIVE_TYPE_PORTAL && interactive->portal.on){
                if(interactive->portal.face == direction_opposite(direction_between(postmove_coord, premove_coord))){
                     Position_t offset_from_center = *position - coord_to_pos_at_tile_center(postmove_coord);
                     PortalExit_t portal_exit = find_portal_exits(postmove_coord, tilemap, interactive_quad_tree);
@@ -2026,7 +2055,8 @@ void block_draw(Block_t* block, Vec_t pos_vec){
      }
 }
 
-void interactive_draw(Interactive_t* interactive, Vec_t pos_vec){
+void interactive_draw(Interactive_t* interactive, Vec_t pos_vec, Coord_t coord,
+                      TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree){
      Vec_t tex_vec = {};
      switch(interactive->type){
      default:
@@ -2066,7 +2096,31 @@ void interactive_draw(Interactive_t* interactive, Vec_t pos_vec){
           }
           break;
      case INTERACTIVE_TYPE_PORTAL:
+     {
+          bool draw_wall = false;
           if(!interactive->portal.on){
+               draw_wall = true;
+          }else{
+               draw_wall = true;
+
+               // search all portal exits for a portal they can go through
+               PortalExit_t portal_exits = find_portal_exits(coord, tilemap, interactive_quad_tree);
+               for(S8 d = 0; d < DIRECTION_COUNT && draw_wall; d++){
+                    for(S8 p = 0; p < portal_exits.directions[d].count; p++){
+                         if(portal_exits.directions[d].coords[p] == coord) continue;
+
+                         Coord_t portal_dest = portal_exits.directions[d].coords[p];
+                         Interactive_t* portal_dest_interactive = quad_tree_find_at(interactive_quad_tree, portal_dest.x, portal_dest.y);
+                         if(portal_dest_interactive && portal_dest_interactive->type == INTERACTIVE_TYPE_PORTAL &&
+                            portal_dest_interactive->portal.on){
+                              draw_wall = false;
+                              break;
+                         }
+                    }
+               }
+          }
+
+          if(draw_wall){
                S16 frame_x = 0;
                S16 frame_y = 0;
 
@@ -2096,6 +2150,7 @@ void interactive_draw(Interactive_t* interactive, Vec_t pos_vec){
 
           draw_theme_frame(theme_frame(interactive->portal.face, 26 + interactive->portal.on), pos_vec);
           break;
+     }
      case INTERACTIVE_TYPE_WIRE_CROSS:
      {
           int y_frame = 17 + interactive->wire_cross.on;
@@ -2638,7 +2693,7 @@ void draw_flats(Vec_t pos, Tile_t* tile, Interactive_t* interactive, GLuint them
                     glColor3f(1.0f, 1.0f, 1.0f);
                }
 
-               interactive_draw(interactive, pos);
+               interactive_draw(interactive, pos, Coord_t{-1, -1}, nullptr, nullptr);
           }else if(interactive->type == INTERACTIVE_TYPE_POPUP && interactive->popup.lift.ticks == 1){
                if(interactive->popup.iced){
                     pos.y += interactive->popup.lift.ticks * PIXEL_SIZE;
@@ -2655,10 +2710,10 @@ void draw_flats(Vec_t pos, Tile_t* tile, Interactive_t* interactive, GLuint them
                     glColor3f(1.0f, 1.0f, 1.0f);
                }
 
-               interactive_draw(interactive, pos);
+               interactive_draw(interactive, pos, Coord_t{-1, -1}, nullptr, nullptr);
           }else if(interactive->type == INTERACTIVE_TYPE_LIGHT_DETECTOR ||
                    interactive->type == INTERACTIVE_TYPE_ICE_DETECTOR){
-               interactive_draw(interactive, pos);
+               interactive_draw(interactive, pos, Coord_t{-1, -1}, nullptr, nullptr);
           }
      }
 
@@ -2684,7 +2739,8 @@ void draw_flats(Vec_t pos, Tile_t* tile, Interactive_t* interactive, GLuint them
 
 void draw_solids(Vec_t pos, Interactive_t* interactive, Block_t** blocks, S16 block_count, Player_t* player,
                  Position_t screen_camera, GLuint theme_texture, GLuint player_texture,
-                 Coord_t source_coord, Coord_t destination_coord, U8 portal_rotations){
+                 Coord_t source_coord, Coord_t destination_coord, U8 portal_rotations,
+                 TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree){
      if(interactive){
           if(interactive->type == INTERACTIVE_TYPE_PRESSURE_PLATE ||
              interactive->type == INTERACTIVE_TYPE_ICE_DETECTOR ||
@@ -2692,7 +2748,7 @@ void draw_solids(Vec_t pos, Interactive_t* interactive, Block_t** blocks, S16 bl
              (interactive->type == INTERACTIVE_TYPE_POPUP && interactive->popup.lift.ticks == 1)){
                // pass, these are flat
           }else{
-               interactive_draw(interactive, pos);
+               interactive_draw(interactive, pos, source_coord, tilemap, interactive_quad_tree);
 
                if(interactive->type == INTERACTIVE_TYPE_POPUP && interactive->popup.iced){
                     pos.y += interactive->popup.lift.ticks * PIXEL_SIZE;
@@ -4176,6 +4232,14 @@ int main(int argc, char** argv){
                                    arrow->stuck_time = dt;
                                    // TODO: stuck in popup
                               }
+                         }else if(interactive->type == INTERACTIVE_TYPE_PORTAL){
+                              if(!interactive->portal.on){
+                                   arrow->stuck_time = dt;
+                                   // TODO: arrow drops if portal turns on
+                              }else if(!portal_has_destination(post_move_coord, &tilemap, interactive_quad_tree)){
+                                   // TODO: arrow drops if portal turns on
+                                   arrow->stuck_time = dt;
+                              }
                          }
                     }
 
@@ -4731,12 +4795,12 @@ int main(int argc, char** argv){
                                         player_ptr = &player;
                                    }
                                    draw_solids(tile_pos, portal_interactive, blocks, block_count, player_ptr, screen_camera,
-                                               theme_texture, player_texture, portal_coord, coord, portal_rotations);
-
+                                               theme_texture, player_texture, portal_coord, coord, portal_rotations,
+                                               &tilemap, interactive_quad_tree);
                               }
                          }
 
-                         interactive_draw(interactive, tile_pos);
+                         interactive_draw(interactive, tile_pos, coord, &tilemap, interactive_quad_tree);
                     }
                }
           }
@@ -4775,7 +4839,7 @@ int main(int argc, char** argv){
                     Interactive_t* interactive = quad_tree_find_at(interactive_quad_tree, x, y);
 
                     draw_solids(tile_pos, interactive, blocks, block_count, player_ptr, screen_camera, theme_texture, player_texture,
-                                Coord_t{-1, -1}, Coord_t{-1, -1}, 0);
+                                coord, Coord_t{-1, -1}, 0, &tilemap, interactive_quad_tree);
 
                }
 
@@ -4959,7 +5023,7 @@ int main(int argc, char** argv){
                          } break;
                          case STAMP_TYPE_INTERACTIVE:
                          {
-                              interactive_draw(&stamp->interactive, vec);
+                              interactive_draw(&stamp->interactive, vec, Coord_t{-1, -1}, &tilemap, interactive_quad_tree);
                          } break;
                          }
                     }
@@ -5001,7 +5065,7 @@ int main(int argc, char** argv){
                     } break;
                     case STAMP_TYPE_INTERACTIVE:
                     {
-                         interactive_draw(&stamp->interactive, stamp_pos);
+                         interactive_draw(&stamp->interactive, stamp_pos, Coord_t{-1, -1}, &tilemap, interactive_quad_tree);
                     } break;
                     }
                }
@@ -5039,7 +5103,7 @@ int main(int argc, char** argv){
                               } break;
                               case STAMP_TYPE_INTERACTIVE:
                               {
-                                   interactive_draw(&stamp->interactive, stamp_vec);
+                                   interactive_draw(&stamp->interactive, stamp_vec, Coord_t{-1, -1}, &tilemap, interactive_quad_tree);
                               } break;
                               }
                          }
@@ -5087,7 +5151,7 @@ int main(int argc, char** argv){
                     } break;
                     case STAMP_TYPE_INTERACTIVE:
                     {
-                         interactive_draw(&stamp->interactive, stamp_vec);
+                         interactive_draw(&stamp->interactive, stamp_vec, Coord_t{-1, -1}, &tilemap, interactive_quad_tree);
                     } break;
                     }
                }
