@@ -2362,7 +2362,7 @@ FILE* load_demo_number(S32 map_number, const char** demo_filepath){
 }
 
 void reset_map(Player_t* player, Coord_t player_start, ObjectArray_t<Interactive_t>* interactive_array,
-               QuadTreeNode_t<Interactive_t>** interactive_quad_tree){
+               QuadTreeNode_t<Interactive_t>** interactive_quad_tree, ArrowArray_t* arrow_array){
      *player = {};
      player->walk_frame_delta = 1;
      player->pos = coord_to_pos_at_tile_center(player_start);
@@ -2371,6 +2371,7 @@ void reset_map(Player_t* player, Coord_t player_start, ObjectArray_t<Interactive
      // update interactive quad tree
      quad_tree_free(*interactive_quad_tree);
      *interactive_quad_tree = quad_tree_build(interactive_array);
+     init(arrow_array);
 }
 
 void position_move_against_block(Position_t pos, Position_t block_pos, Vec_t* pos_delta, bool* collide_with_block){
@@ -3308,7 +3309,7 @@ int main(int argc, char** argv){
      QuadTreeNode_t<Interactive_t>* interactive_quad_tree = nullptr;
      QuadTreeNode_t<Block_t>* block_quad_tree = nullptr;
 
-     reset_map(&player, player_start, &interactive_array, &interactive_quad_tree);
+     reset_map(&player, player_start, &interactive_array, &interactive_quad_tree, &arrow_array);
 
      Undo_t undo = {};
      init(&undo, UNDO_MEMORY, tilemap.width, tilemap.height, block_array.count, interactive_array.count);
@@ -3352,7 +3353,7 @@ int main(int argc, char** argv){
           }
 
           // TODO: consider 30fps as minimum for random noobs computers
-          //if(demo_mode) dt = 0.0166666f; // the game always runs as if a 60th of a frame has occurred.
+          // if(demo_mode) dt = 0.0166666f; // the game always runs as if a 60th of a frame has occurred.
           dt = 0.0166666f; // the game always runs as if a 60th of a frame has occurred.
 
           quad_tree_free(block_quad_tree);
@@ -3535,7 +3536,7 @@ int main(int argc, char** argv){
                                         return 0;
                                    }
                                    if(load_map_number(map_number, &player_start, &tilemap, &block_array, &interactive_array)){
-                                        reset_map(&player, player_start, &interactive_array, &interactive_quad_tree);
+                                        reset_map(&player, player_start, &interactive_array, &interactive_quad_tree, &arrow_array);
                                         destroy(&undo);
                                         init(&undo, UNDO_MEMORY, tilemap.width, tilemap.height, block_array.count, interactive_array.count);
                                         undo_snapshot(&undo, &player, &tilemap, &block_array, &interactive_array);
@@ -3634,7 +3635,7 @@ int main(int argc, char** argv){
                          break;
                     case SDL_SCANCODE_L:
                          if(load_map_number(map_number, &player_start, &tilemap, &block_array, &interactive_array)){
-                              reset_map(&player, player_start, &interactive_array, &interactive_quad_tree);
+                              reset_map(&player, player_start, &interactive_array, &interactive_quad_tree, &arrow_array);
                               destroy(&undo);
                               init(&undo, UNDO_MEMORY, tilemap.width, tilemap.height, block_array.count, interactive_array.count);
                               undo_snapshot(&undo, &player, &tilemap, &block_array, &interactive_array);
@@ -3645,7 +3646,7 @@ int main(int argc, char** argv){
                     case SDL_SCANCODE_LEFTBRACKET:
                          map_number--;
                          if(load_map_number(map_number, &player_start, &tilemap, &block_array, &interactive_array)){
-                              reset_map(&player, player_start, &interactive_array, &interactive_quad_tree);
+                              reset_map(&player, player_start, &interactive_array, &interactive_quad_tree, &arrow_array);
                               destroy(&undo);
                               init(&undo, UNDO_MEMORY, tilemap.width, tilemap.height, block_array.count, interactive_array.count);
                               undo_snapshot(&undo, &player, &tilemap, &block_array, &interactive_array);
@@ -3659,7 +3660,7 @@ int main(int argc, char** argv){
                          map_number++;
                          if(load_map_number(map_number, &player_start, &tilemap, &block_array, &interactive_array)){
                               // TODO: compress with code above
-                              reset_map(&player, player_start, &interactive_array, &interactive_quad_tree);
+                              reset_map(&player, player_start, &interactive_array, &interactive_quad_tree, &arrow_array);
                               destroy(&undo);
                               init(&undo, UNDO_MEMORY, tilemap.width, tilemap.height, block_array.count, interactive_array.count);
                               undo_snapshot(&undo, &player, &tilemap, &block_array, &interactive_array);
@@ -4228,7 +4229,8 @@ int main(int argc, char** argv){
                                    // TODO: stuck in door
                               }
                          }else if(interactive->type == INTERACTIVE_TYPE_POPUP){
-                              if(interactive->popup.lift.ticks < arrow->pos.z){
+                              if(interactive->popup.lift.ticks > arrow->pos.z){
+                                   LOG("arrow z: %d, popup lift: %d\n", arrow->pos.z, interactive->popup.lift.ticks);
                                    arrow->stuck_time = dt;
                                    // TODO: stuck in popup
                               }
@@ -4701,7 +4703,7 @@ int main(int argc, char** argv){
 
                     // TODO: compress this code
                     if(load_map_number(map_number, &player_start, &tilemap, &block_array, &interactive_array)){
-                         reset_map(&player, player_start, &interactive_array, &interactive_quad_tree);
+                         reset_map(&player, player_start, &interactive_array, &interactive_quad_tree, &arrow_array);
                          destroy(&undo);
                          init(&undo, UNDO_MEMORY, tilemap.width, tilemap.height, block_array.count, interactive_array.count);
                          undo_snapshot(&undo, &player, &tilemap, &block_array, &interactive_array);
@@ -4954,7 +4956,7 @@ int main(int argc, char** argv){
           draw_quad_wireframe(&collided_with_quad, 255.0f, 0.0f, 255.0f);
 #endif
 
-#if 1
+#if 0
           // light
           glBindTexture(GL_TEXTURE_2D, 0);
           glBegin(GL_QUADS);
