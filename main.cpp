@@ -24,297 +24,17 @@ http://www.simonstalenhag.se/
 #include "object_array.h"
 #include "interactive.h"
 #include "quad_tree.h"
+#include "portal_exit.h"
 #include "player.h"
 #include "block.h"
 #include "arrow.h"
 #include "undo.h"
 #include "editor.h"
+#include "utils.h"
+#include "map_format.h"
+#include "draw.h"
 
 // #define BLOCKS_SQUISH_PLAYER
-
-Direction_t direction_between(Coord_t a, Coord_t b){
-     if(a == b) return DIRECTION_COUNT;
-
-     Coord_t diff = a - b;
-
-     if(abs(diff.x) > abs(diff.y)){
-          if(diff.x > 0){
-               return DIRECTION_LEFT;
-          }else{
-               return DIRECTION_RIGHT;
-          }
-     }
-
-     if(diff.y > 0){
-          return DIRECTION_DOWN;
-     }
-
-     return DIRECTION_UP;
-}
-
-bool directions_meet_expectations(Direction_t a, Direction_t b, Direction_t first_expectation, Direction_t second_expectation){
-     return (a == first_expectation && b == second_expectation) ||
-            (a == second_expectation && b == first_expectation);
-}
-
-DirectionMask_t vec_direction_mask(Vec_t vec){
-     DirectionMask_t mask = DIRECTION_MASK_NONE;
-
-     if(vec.x > 0){
-          mask = direction_mask_add(mask, DIRECTION_MASK_RIGHT);
-     }else if(vec.x < 0){
-          mask = direction_mask_add(mask, DIRECTION_MASK_LEFT);
-     }
-
-     if(vec.y > 0){
-          mask = direction_mask_add(mask, DIRECTION_MASK_UP);
-     }else if(vec.y < 0){
-          mask = direction_mask_add(mask, DIRECTION_MASK_DOWN);
-     }
-
-     return mask;
-}
-
-U8 portal_rotations_between(Direction_t a, Direction_t b){
-     if(a == b) return 2;
-     if(a == direction_opposite(b)) return 0;
-     return direction_rotations_between(a, b);
-}
-
-Vec_t vec_rotate_quadrants(Vec_t vec, S8 rotations_between){
-     for(S8 r = 0; r < rotations_between; r++){
-          auto tmp = vec.x;
-          vec.x = vec.y;
-          vec.y = -tmp;
-     }
-
-     return vec;
-}
-
-Pixel_t pixel_rotate_quadrants(Pixel_t pixel, S8 rotations_between){
-     for(S8 r = 0; r < rotations_between; r++){
-          auto tmp = pixel.x;
-          pixel.x = pixel.y;
-          pixel.y = -tmp;
-     }
-
-     return pixel;
-}
-
-Position_t position_rotate_quadrants(Position_t pos, S8 rotations_between){
-     pos.decimal = vec_rotate_quadrants(pos.decimal, rotations_between);
-     pos.pixel = pixel_rotate_quadrants(pos.pixel, rotations_between);
-     canonicalize(&pos);
-     return pos;
-}
-
-Vec_t rotate_vec_between_dirs(Direction_t a, Direction_t b, Vec_t vec){
-     U8 rotations_between = portal_rotations_between(a, b);
-     return vec_rotate_quadrants(vec, rotations_between);
-}
-
-Vec_t direction_to_vec(Direction_t d){
-     switch(d){
-     default:
-          break;
-     case DIRECTION_LEFT:
-          return Vec_t{-1, 0};
-     case DIRECTION_RIGHT:
-          return Vec_t{1, 0};
-     case DIRECTION_UP:
-          return Vec_t{0, 1};
-     case DIRECTION_DOWN:
-          return Vec_t{0, -1};
-     }
-
-     return Vec_t{0, 0};
-}
-
-Pixel_t direction_to_pixel(Direction_t d){
-     switch(d){
-     default:
-          break;
-     case DIRECTION_LEFT:
-          return Pixel_t{-TILE_SIZE_IN_PIXELS, 0};
-     case DIRECTION_RIGHT:
-          return Pixel_t{TILE_SIZE_IN_PIXELS, 0};
-     case DIRECTION_UP:
-          return Pixel_t{0, TILE_SIZE_IN_PIXELS};
-     case DIRECTION_DOWN:
-          return Pixel_t{0, -TILE_SIZE_IN_PIXELS};
-     }
-
-     return Pixel_t{0, 0};
-}
-
-Rect_t rect_surrounding_adjacent_coords(Coord_t coord){
-     Pixel_t pixel = coord_to_pixel(coord);
-
-     Rect_t rect = {};
-     rect.left = pixel.x - TILE_SIZE_IN_PIXELS;
-     rect.right = pixel.x + (2 * TILE_SIZE_IN_PIXELS);
-     rect.bottom = pixel.y - TILE_SIZE_IN_PIXELS;
-     rect.top = pixel.y + (2 * TILE_SIZE_IN_PIXELS);
-
-     return rect;
-}
-
-#define UNDO_MEMORY (4 * 1024 * 1024)
-
-Interactive_t* quad_tree_interactive_find_at(QuadTreeNode_t<Interactive_t>* root, Coord_t coord){
-     return quad_tree_find_at(root, coord.x, coord.y);
-}
-
-#define MAX_PORTAL_EXITS 4
-
-struct PortalExitCoords_t{
-     Coord_t coords[MAX_PORTAL_EXITS];
-     S8 count;
-};
-
-struct PortalExit_t{
-     PortalExitCoords_t directions[DIRECTION_COUNT];
-};
-
-void portal_exit_add(PortalExit_t* portal_exit, Direction_t direction, Coord_t coord){
-     S8* count = &portal_exit->directions[direction].count;
-     if(*count < MAX_PORTAL_EXITS){
-          portal_exit->directions[direction].coords[*count] = coord;
-          (*count)++;
-     }
-}
-
-void find_portal_exits_impl(Coord_t coord, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree,
-                            PortalExit_t* portal_exit, Direction_t from){
-     Interactive_t* interactive = quad_tree_interactive_find_at(interactive_quad_tree, coord);
-     if(interactive && interactive->type == INTERACTIVE_TYPE_PORTAL && interactive->portal.on){
-          portal_exit_add(portal_exit, interactive->portal.face, coord);
-          return;
-     }
-
-     bool connecting_to_wire_cross = false;
-
-     if(interactive && interactive->type == INTERACTIVE_TYPE_WIRE_CROSS){
-          if(interactive->wire_cross.mask & DIRECTION_MASK_LEFT && from == DIRECTION_LEFT){
-               connecting_to_wire_cross = true;
-          }else if(interactive->wire_cross.mask & DIRECTION_MASK_RIGHT && from == DIRECTION_RIGHT){
-               connecting_to_wire_cross = true;
-          }else if(interactive->wire_cross.mask & DIRECTION_MASK_UP && from == DIRECTION_UP){
-               connecting_to_wire_cross = true;
-          }else if(interactive->wire_cross.mask & DIRECTION_MASK_DOWN && from == DIRECTION_DOWN){
-               connecting_to_wire_cross = true;
-          }
-
-     }
-
-     if(connecting_to_wire_cross){
-          if(interactive->wire_cross.mask & DIRECTION_MASK_LEFT && from != DIRECTION_LEFT){
-               find_portal_exits_impl(coord + DIRECTION_LEFT, tilemap, interactive_quad_tree, portal_exit, DIRECTION_RIGHT);
-          }
-
-          if(interactive->wire_cross.mask & DIRECTION_MASK_RIGHT && from != DIRECTION_RIGHT){
-               find_portal_exits_impl(coord + DIRECTION_RIGHT, tilemap, interactive_quad_tree, portal_exit, DIRECTION_LEFT);
-          }
-
-          if(interactive->wire_cross.mask & DIRECTION_MASK_UP && from != DIRECTION_UP){
-               find_portal_exits_impl(coord + DIRECTION_UP, tilemap, interactive_quad_tree, portal_exit, DIRECTION_DOWN);
-          }
-
-          if(interactive->wire_cross.mask & DIRECTION_MASK_DOWN && from != DIRECTION_DOWN){
-               find_portal_exits_impl(coord + DIRECTION_DOWN, tilemap, interactive_quad_tree, portal_exit, DIRECTION_UP);
-          }
-     }else{
-          Tile_t* tile = tilemap_get_tile(tilemap, coord);
-          if(!tile) return;
-          if(tile->flags & TILE_FLAG_WIRE_STATE){
-               if((tile->flags & TILE_FLAG_WIRE_LEFT) && from != DIRECTION_LEFT){
-                    find_portal_exits_impl(coord + DIRECTION_LEFT, tilemap, interactive_quad_tree, portal_exit, DIRECTION_RIGHT);
-               }
-
-               if((tile->flags & TILE_FLAG_WIRE_RIGHT) && from != DIRECTION_RIGHT){
-                    find_portal_exits_impl(coord + DIRECTION_RIGHT, tilemap, interactive_quad_tree, portal_exit, DIRECTION_LEFT);
-               }
-
-               if((tile->flags & TILE_FLAG_WIRE_UP) && from != DIRECTION_UP){
-                    find_portal_exits_impl(coord + DIRECTION_UP, tilemap, interactive_quad_tree, portal_exit, DIRECTION_DOWN);
-               }
-
-               if((tile->flags & TILE_FLAG_WIRE_DOWN) && from != DIRECTION_DOWN){
-                    find_portal_exits_impl(coord + DIRECTION_DOWN, tilemap, interactive_quad_tree, portal_exit, DIRECTION_UP);
-               }
-          }
-     }
-}
-
-PortalExit_t find_portal_exits(Coord_t coord, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree){
-     PortalExit_t portal_exit = {};
-     Interactive_t* interactive = quad_tree_interactive_find_at(interactive_quad_tree, coord);
-     if(interactive && interactive->type == INTERACTIVE_TYPE_PORTAL){
-          portal_exit_add(&portal_exit, interactive->portal.face, coord);
-          for(S8 d = 0; d < DIRECTION_COUNT; d++){
-               Coord_t adjacent_coord = coord + (Direction_t)(d);
-               Tile_t* tile = tilemap_get_tile(tilemap, adjacent_coord);
-               if(!tile) continue;
-               if((tile->flags & TILE_FLAG_WIRE_STATE) == 0) continue;
-               if((d == DIRECTION_LEFT && tile->flags & TILE_FLAG_WIRE_RIGHT) ||
-                  (d == DIRECTION_UP && tile->flags & TILE_FLAG_WIRE_DOWN) ||
-                  (d == DIRECTION_RIGHT && tile->flags & TILE_FLAG_WIRE_LEFT) ||
-                  (d == DIRECTION_DOWN && tile->flags & TILE_FLAG_WIRE_UP)){
-                    find_portal_exits_impl(adjacent_coord, tilemap, interactive_quad_tree,
-                                           &portal_exit, DIRECTION_COUNT);
-               }
-          }
-     }
-     return portal_exit;
-}
-
-// NOTE: skip_coord needs to be DIRECTION_COUNT size
-void find_portal_adjacents_to_skip_collision_check(Coord_t coord, QuadTreeNode_t<Interactive_t>* interactive_quad_tree,
-                                                   Coord_t* skip_coord){
-     for(S8 i = 0; i < DIRECTION_COUNT; i++) skip_coord[i] = {-1, -1};
-
-     // figure out which coords we can skip collision checking on, because they have portal exits
-     Interactive_t* interactive = quad_tree_interactive_find_at(interactive_quad_tree, coord);
-     if(interactive && interactive->type == INTERACTIVE_TYPE_PORTAL && interactive->portal.on){
-          skip_coord[interactive->portal.face] = coord + interactive->portal.face;
-     }
-}
-
-bool portal_has_destination(Coord_t coord, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree){
-     bool result = false;
-     // search all portal exits for a portal they can go through
-     PortalExit_t portal_exits = find_portal_exits(coord, tilemap, interactive_quad_tree);
-     for(S8 d = 0; d < DIRECTION_COUNT && !result; d++){
-          for(S8 p = 0; p < portal_exits.directions[d].count; p++){
-               if(portal_exits.directions[d].coords[p] == coord) continue;
-
-               Coord_t portal_dest = portal_exits.directions[d].coords[p];
-               Interactive_t* portal_dest_interactive = quad_tree_find_at(interactive_quad_tree, portal_dest.x, portal_dest.y);
-               if(portal_dest_interactive && portal_dest_interactive->type == INTERACTIVE_TYPE_PORTAL &&
-                  portal_dest_interactive->portal.on){
-                    result = true;
-                    break;
-               }
-          }
-     }
-
-     return result;
-}
-
-Interactive_t* quad_tree_interactive_solid_at(QuadTreeNode_t<Interactive_t>* root, TileMap_t* tilemap, Coord_t coord){
-     Interactive_t* interactive = quad_tree_find_at(root, coord.x, coord.y);
-     if(interactive){
-          if(interactive_is_solid(interactive)){
-               return interactive;
-          }else if(interactive->type == INTERACTIVE_TYPE_PORTAL){
-               if(interactive->portal.on){
-                    if(!portal_has_destination(coord, tilemap, root)) return interactive;
-               }
-          }
-     }
-
-     return nullptr;
-}
 
 S8 teleport_position_across_portal(Position_t* position, Vec_t* pos_delta, QuadTreeNode_t<Interactive_t>* interactive_quad_tree,
                                    TileMap_t* tilemap, Coord_t premove_coord, Coord_t postmove_coord){
@@ -381,15 +101,6 @@ bool block_on_ice(Block_t* block, TileMap_t* tilemap, QuadTreeNode_t<Interactive
 
      // TODO: check for blocks below
      return false;
-}
-
-Rect_t rect_to_check_surrounding_blocks(Pixel_t center){
-     Rect_t rect = {};
-     rect.left = center.x - (2 * TILE_SIZE_IN_PIXELS);
-     rect.right = center.x + (2 * TILE_SIZE_IN_PIXELS);
-     rect.bottom = center.y - (2 * TILE_SIZE_IN_PIXELS);
-     rect.top = center.y + (2 * TILE_SIZE_IN_PIXELS);
-     return rect;
 }
 
 Block_t* block_against_block_in_list(Block_t* block_to_check, Block_t** blocks, S16 block_count, Direction_t direction, Pixel_t* offsets){
@@ -759,6 +470,21 @@ Tile_t* block_against_solid_tile(Block_t* block_to_check, Direction_t direction,
      return nullptr;
 }
 
+void resolve_block_colliding_with_itself(Direction_t src_portal_dir, Direction_t dst_portal_dir, DirectionMask_t move_mask,
+                                         Block_t* block, Direction_t check_horizontal, Direction_t check_vertical, Direction_t* push_dir){
+     if(directions_meet_expectations(src_portal_dir, dst_portal_dir, check_horizontal, check_vertical)){
+          if(move_mask & direction_to_direction_mask(check_vertical)){
+               *push_dir = direction_opposite(check_horizontal);
+               block->vel.y = 0;
+               block->accel.y = 0;
+          }else if(move_mask & direction_to_direction_mask(check_horizontal)){
+               *push_dir = direction_opposite(check_vertical);
+               block->vel.x = 0;
+               block->accel.x = 0;
+          }
+     }
+}
+
 Vec_t collide_circle_with_line(Vec_t circle_center, F32 circle_radius, Vec_t a, Vec_t b, bool* collided){
      // move data we care about to the origin
      Vec_t c = circle_center - a;
@@ -776,82 +502,9 @@ Vec_t collide_circle_with_line(Vec_t circle_center, F32 circle_radius, Vec_t a, 
      return vec_zero();
 }
 
-S16 range_passes_tile_boundary(S16 a, S16 b, S16 ignore){
-     if(a == b) return 0;
-     if(a > b){
-          if((b % TILE_SIZE_IN_PIXELS) == 0) return 0;
-          SWAP(a, b);
-     }
-
-     for(S16 i = a; i <= b; i++){
-          if((i % TILE_SIZE_IN_PIXELS) == 0 && i != ignore){
-               return i;
-          }
-     }
-
-     return 0;
-}
-
-GLuint create_texture_from_bitmap(AlphaBitmap_t* bitmap){
-     GLuint texture = 0;
-
-     glGenTextures(1, &texture);
-
-     glBindTexture(GL_TEXTURE_2D, texture);
-
-     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-
-     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, bitmap->width, bitmap->height, 0,  GL_RGBA, GL_UNSIGNED_BYTE, bitmap->pixels);
-
-     return texture;
-}
-
-GLuint transparent_texture_from_file(const char* filepath){
-     Bitmap_t bitmap = bitmap_load_from_file(filepath);
-     if(bitmap.raw.byte_count == 0) return 0;
-     AlphaBitmap_t alpha_bitmap = bitmap_to_alpha_bitmap(&bitmap, BitmapPixel_t{255, 0, 255});
-     free(bitmap.raw.bytes);
-     GLuint texture_id = create_texture_from_bitmap(&alpha_bitmap);
-     free(alpha_bitmap.pixels);
-     return texture_id;
-}
-
-#define THEME_FRAMES_WIDE 16
-#define THEME_FRAMES_TALL 32
-#define THEME_FRAME_WIDTH 0.0625f
-#define THEME_FRAME_HEIGHT 0.03125f
-
-Vec_t theme_frame(S16 x, S16 y){
-     y = (THEME_FRAMES_TALL - 1) - y;
-     return Vec_t{(F32)(x) * THEME_FRAME_WIDTH, (F32)(y) * THEME_FRAME_HEIGHT};
-}
-
-#define ARROW_FRAME_WIDTH 0.25f
-#define ARROW_FRAME_HEIGHT 0.0625f
-#define ARROW_FRAMES_TALL 16
-#define ARROW_FRAMES_WIDE 4
-
-Vec_t arrow_frame(S8 x, S8 y) {
-     y = (ARROW_FRAMES_TALL - 1) - y;
-     return Vec_t{(F32)(x) * ARROW_FRAME_WIDTH, (F32)(y) * ARROW_FRAME_HEIGHT};
-}
-
-#define PLAYER_FRAME_WIDTH 0.25f
-#define PLAYER_FRAME_HEIGHT 0.03125f
-#define PLAYER_FRAMES_WIDE 4
-#define PLAYER_FRAMES_TALL 32
-
 // new quakelive bot settings
 // bot_thinktime
 // challenge mode
-
-Vec_t player_frame(S8 x, S8 y){
-     y = (PLAYER_FRAMES_TALL - 1) - y;
-     return Vec_t{(F32)(x) * PLAYER_FRAME_WIDTH, (F32)(y) * PLAYER_FRAME_HEIGHT};
-}
 
 void toggle_flag(U16* flags, U16 flag){
      if(*flags & flag){
@@ -1597,304 +1250,6 @@ void player_action_perform(PlayerAction_t* player_action, Player_t* player, Play
      }
 }
 
-#define MAP_VERSION 1
-
-#pragma pack(push, 1)
-struct MapTileV1_t{
-     U8 id;
-     U16 flags;
-};
-
-struct MapBlockV1_t{
-     Pixel_t pixel;
-     Direction_t face;
-     Element_t element;
-     S8 z;
-};
-
-struct MapPopupV1_t{
-     bool up;
-     bool iced;
-};
-
-struct MapDoorV1_t{
-     bool up;
-     Direction_t face;
-};
-
-struct MapInteractiveV1_t{
-     InteractiveType_t type;
-     Coord_t coord;
-
-     union{
-          PressurePlate_t pressure_plate;
-          Detector_t detector;
-          MapPopupV1_t popup;
-          Stairs_t stairs;
-          MapDoorV1_t door; // up or down
-          Portal_t portal;
-          WireCross_t wire_cross;
-     };
-};
-#pragma pack(pop)
-
-bool save_map_to_file(FILE* file, Coord_t player_start, const TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array,
-                      ObjectArray_t<Interactive_t>* interactive_array){
-     // alloc and convert map elements to map format
-     S32 map_tile_count = (S32)(tilemap->width) * (S32)(tilemap->height);
-     MapTileV1_t* map_tiles = (MapTileV1_t*)(calloc(map_tile_count, sizeof(*map_tiles)));
-     if(!map_tiles){
-          LOG("%s(): failed to allocate %d tiles\n", __FUNCTION__, map_tile_count);
-          return false;
-     }
-
-     MapBlockV1_t* map_blocks = (MapBlockV1_t*)(calloc(block_array->count, sizeof(*map_blocks)));
-     if(!map_blocks){
-          LOG("%s(): failed to allocate %d blocks\n", __FUNCTION__, block_array->count);
-          return false;
-     }
-
-     MapInteractiveV1_t* map_interactives = (MapInteractiveV1_t*)(calloc(interactive_array->count, sizeof(*map_interactives)));
-     if(!map_interactives){
-          LOG("%s(): failed to allocate %d interactives\n", __FUNCTION__, interactive_array->count);
-          return false;
-     }
-
-     // convert to map formats
-     S32 index = 0;
-     for(S32 y = 0; y < tilemap->height; y++){
-          for(S32 x = 0; x < tilemap->width; x++){
-               map_tiles[index].id = tilemap->tiles[y][x].id;
-               map_tiles[index].flags = tilemap->tiles[y][x].flags;
-               index++;
-          }
-     }
-
-     for(S16 i = 0; i < block_array->count; i++){
-          Block_t* block = block_array->elements + i;
-          map_blocks[i].pixel = block->pos.pixel;
-          map_blocks[i].z = block->pos.z;
-          map_blocks[i].face = block->face;
-          map_blocks[i].element = block->element;
-     }
-
-     for(S16 i = 0; i < interactive_array->count; i++){
-          map_interactives[i].coord = interactive_array->elements[i].coord;
-          map_interactives[i].type = interactive_array->elements[i].type;
-
-          switch(map_interactives[i].type){
-          default:
-          case INTERACTIVE_TYPE_LEVER:
-          case INTERACTIVE_TYPE_BOW:
-               break;
-          case INTERACTIVE_TYPE_PRESSURE_PLATE:
-               map_interactives[i].pressure_plate = interactive_array->elements[i].pressure_plate;
-               break;
-          case INTERACTIVE_TYPE_LIGHT_DETECTOR:
-          case INTERACTIVE_TYPE_ICE_DETECTOR:
-               map_interactives[i].detector = interactive_array->elements[i].detector;
-               break;
-          case INTERACTIVE_TYPE_POPUP:
-               map_interactives[i].popup.up = interactive_array->elements[i].popup.lift.up;
-               map_interactives[i].popup.iced = interactive_array->elements[i].popup.iced;
-               break;
-          case INTERACTIVE_TYPE_DOOR:
-               map_interactives[i].door.up = interactive_array->elements[i].door.lift.up;
-               map_interactives[i].door.face = interactive_array->elements[i].door.face;
-               break;
-          case INTERACTIVE_TYPE_PORTAL:
-               map_interactives[i].portal.face = interactive_array->elements[i].portal.face;
-               map_interactives[i].portal.on = interactive_array->elements[i].portal.on;
-               break;
-          case INTERACTIVE_TYPE_STAIRS:
-               map_interactives[i].stairs.up = interactive_array->elements[i].stairs.up;
-               map_interactives[i].stairs.face = interactive_array->elements[i].stairs.face;
-               break;
-          case INTERACTIVE_TYPE_PROMPT:
-               break;
-          case INTERACTIVE_TYPE_WIRE_CROSS:
-               map_interactives[i].wire_cross.mask = interactive_array->elements[i].wire_cross.mask;
-               map_interactives[i].wire_cross.on = interactive_array->elements[i].wire_cross.on;
-               break;
-          }
-     }
-
-
-     U8 map_version = MAP_VERSION;
-     fwrite(&map_version, sizeof(map_version), 1, file);
-     fwrite(&player_start, sizeof(player_start), 1, file);
-     fwrite(&tilemap->width, sizeof(tilemap->width), 1, file);
-     fwrite(&tilemap->height, sizeof(tilemap->height), 1, file);
-     fwrite(&block_array->count, sizeof(block_array->count), 1, file);
-     fwrite(&interactive_array->count, sizeof(interactive_array->count), 1, file);
-     fwrite(map_tiles, sizeof(*map_tiles), map_tile_count, file);
-     fwrite(map_blocks, sizeof(*map_blocks), block_array->count, file);
-     fwrite(map_interactives, sizeof(*map_interactives), interactive_array->count, file);
-
-     free(map_tiles);
-     free(map_blocks);
-     free(map_interactives);
-
-     return true;
-}
-
-bool save_map(const char* filepath, Coord_t player_start, const TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array,
-              ObjectArray_t<Interactive_t>* interactive_array){
-     // write to file
-     FILE* f = fopen(filepath, "wb");
-     if(!f){
-          LOG("%s: fopen() failed\n", __FUNCTION__);
-          return false;
-     }
-     bool success = save_map_to_file(f, player_start, tilemap, block_array, interactive_array);
-     LOG("saved map %s\n", filepath);
-     fclose(f);
-     return success;
-}
-
-bool load_map_from_file(FILE* file, Coord_t* player_start, TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array,
-                        ObjectArray_t<Interactive_t>* interactive_array, const char* filepath){
-     // read counts from file
-     S16 map_width;
-     S16 map_height;
-     S16 interactive_count;
-     S16 block_count;
-
-     U8 map_version = MAP_VERSION;
-     fread(&map_version, sizeof(map_version), 1, file);
-     if(map_version != MAP_VERSION){
-          LOG("%s(): mismatched version loading '%s', actual %d, expected %d\n", __FUNCTION__, filepath, map_version, MAP_VERSION);
-          return false;
-     }
-
-     fread(player_start, sizeof(*player_start), 1, file);
-     fread(&map_width, sizeof(map_width), 1, file);
-     fread(&map_height, sizeof(map_height), 1, file);
-     fread(&block_count, sizeof(block_count), 1, file);
-     fread(&interactive_count, sizeof(interactive_count), 1, file);
-
-     // alloc and convert map elements to map format
-     S32 map_tile_count = (S32)(map_width) * (S32)(map_height);
-     MapTileV1_t* map_tiles = (MapTileV1_t*)(calloc(map_tile_count, sizeof(*map_tiles)));
-     if(!map_tiles){
-          LOG("%s(): failed to allocate %d tiles\n", __FUNCTION__, map_tile_count);
-          return false;
-     }
-
-     MapBlockV1_t* map_blocks = (MapBlockV1_t*)(calloc(block_count, sizeof(*map_blocks)));
-     if(!map_blocks){
-          LOG("%s(): failed to allocate %d blocks\n", __FUNCTION__, block_count);
-          return false;
-     }
-
-     MapInteractiveV1_t* map_interactives = (MapInteractiveV1_t*)(calloc(interactive_count, sizeof(*map_interactives)));
-     if(!map_interactives){
-          LOG("%s(): failed to allocate %d interactives\n", __FUNCTION__, interactive_count);
-          return false;
-     }
-
-     // read data from file
-     fread(map_tiles, sizeof(*map_tiles), map_tile_count, file);
-     fread(map_blocks, sizeof(*map_blocks), block_count, file);
-     fread(map_interactives, sizeof(*map_interactives), interactive_count, file);
-
-     destroy(tilemap);
-     init(tilemap, map_width, map_height);
-
-     destroy(block_array);
-     init(block_array, block_count);
-
-     destroy(interactive_array);
-     init(interactive_array, interactive_count);
-
-     // convert to map formats
-     S32 index = 0;
-     for(S32 y = 0; y < tilemap->height; y++){
-          for(S32 x = 0; x < tilemap->width; x++){
-               tilemap->tiles[y][x].id = map_tiles[index].id;
-               tilemap->tiles[y][x].flags = map_tiles[index].flags;
-               tilemap->tiles[y][x].light = BASE_LIGHT;
-               index++;
-          }
-     }
-
-     // TODO: a lot of maps have -16, -16 as the first block
-     for(S16 i = 0; i < block_count; i++){
-          Block_t* block = block_array->elements + i;
-          block->pos.pixel = map_blocks[i].pixel;
-          block->pos.z = map_blocks[i].z;
-          block->face = map_blocks[i].face;
-          block->element = map_blocks[i].element;
-     }
-
-     for(S16 i = 0; i < interactive_array->count; i++){
-          Interactive_t* interactive = interactive_array->elements + i;
-          interactive->coord = map_interactives[i].coord;
-          interactive->type = map_interactives[i].type;
-
-          switch(map_interactives[i].type){
-          default:
-          case INTERACTIVE_TYPE_LEVER:
-          case INTERACTIVE_TYPE_BOW:
-               break;
-          case INTERACTIVE_TYPE_PRESSURE_PLATE:
-               interactive->pressure_plate = map_interactives[i].pressure_plate;
-               break;
-          case INTERACTIVE_TYPE_LIGHT_DETECTOR:
-          case INTERACTIVE_TYPE_ICE_DETECTOR:
-               interactive->detector = map_interactives[i].detector;
-               break;
-          case INTERACTIVE_TYPE_POPUP:
-               interactive->popup.lift.up = map_interactives[i].popup.up;
-               interactive->popup.lift.timer = 0.0f;
-               interactive->popup.iced = map_interactives[i].popup.iced;
-               if(interactive->popup.lift.up){
-                    interactive->popup.lift.ticks = HEIGHT_INTERVAL + 1;
-               }else{
-                    interactive->popup.lift.ticks = 1;
-               }
-               break;
-          case INTERACTIVE_TYPE_DOOR:
-               interactive->door.lift.up = map_interactives[i].door.up;
-               interactive->door.lift.timer = 0.0f;
-               interactive->door.face = map_interactives[i].door.face;
-               break;
-          case INTERACTIVE_TYPE_PORTAL:
-               interactive->portal.face = map_interactives[i].portal.face;
-               interactive->portal.on = map_interactives[i].portal.on;
-               break;
-          case INTERACTIVE_TYPE_STAIRS:
-               interactive->stairs.up = map_interactives[i].stairs.up;
-               interactive->stairs.face = map_interactives[i].stairs.face;
-               break;
-          case INTERACTIVE_TYPE_PROMPT:
-               break;
-          case INTERACTIVE_TYPE_WIRE_CROSS:
-               interactive->wire_cross.on = map_interactives[i].wire_cross.on;
-               interactive->wire_cross.mask = map_interactives[i].wire_cross.mask;
-               break;
-          }
-     }
-
-     free(map_tiles);
-     free(map_blocks);
-     free(map_interactives);
-
-     return true;
-}
-
-bool load_map(const char* filepath, Coord_t* player_start, TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array,
-              ObjectArray_t<Interactive_t>* interactive_array){
-     FILE* f = fopen(filepath, "rb");
-     if(!f){
-          LOG("%s(): fopen() failed\n", __FUNCTION__);
-          return false;
-     }
-     bool success = load_map_from_file(f, player_start, tilemap, block_array, interactive_array, filepath);
-     fclose(f);
-     return success;
-}
-
 bool load_map_number(S32 map_number, Coord_t* player_start, TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array,
                      ObjectArray_t<Interactive_t>* interactive_array){
      // search through directory to find file starting with 3 digit map number
@@ -1918,285 +1273,6 @@ bool load_map_number(S32 map_number, Coord_t* player_start, TileMap_t* tilemap, 
 
      LOG("load map %s\n", filepath);
      return load_map(filepath, player_start, tilemap, block_array, interactive_array);
-}
-
-void draw_theme_frame(Vec_t tex_vec, Vec_t pos_vec){
-     glTexCoord2f(tex_vec.x, tex_vec.y);
-     glVertex2f(pos_vec.x, pos_vec.y);
-     glTexCoord2f(tex_vec.x, tex_vec.y + THEME_FRAME_HEIGHT);
-     glVertex2f(pos_vec.x, pos_vec.y + TILE_SIZE);
-     glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y + THEME_FRAME_HEIGHT);
-     glVertex2f(pos_vec.x + TILE_SIZE, pos_vec.y + TILE_SIZE);
-     glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y);
-     glVertex2f(pos_vec.x + TILE_SIZE, pos_vec.y);
-}
-
-void draw_double_theme_frame(Vec_t tex_vec, Vec_t pos_vec){
-     glTexCoord2f(tex_vec.x, tex_vec.y);
-     glVertex2f(pos_vec.x, pos_vec.y);
-     glTexCoord2f(tex_vec.x, tex_vec.y + 2.0f * THEME_FRAME_HEIGHT);
-     glVertex2f(pos_vec.x, pos_vec.y + 2.0f * TILE_SIZE);
-     glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y + 2.0f * THEME_FRAME_HEIGHT);
-     glVertex2f(pos_vec.x + TILE_SIZE, pos_vec.y + 2.0f * TILE_SIZE);
-     glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y);
-     glVertex2f(pos_vec.x + TILE_SIZE, pos_vec.y);
-}
-
-void tile_id_draw(U8 id, Vec_t pos){
-     U8 id_x = id % 16;
-     U8 id_y = id / 16;
-
-     draw_theme_frame(theme_frame(id_x, id_y), pos);
-}
-
-void tile_flags_draw(U16 flags, Vec_t tile_pos){
-     if(flags == 0) return;
-
-     if(flags & TILE_FLAG_CHECKPOINT){
-          draw_theme_frame(theme_frame(0, 21), tile_pos);
-     }
-
-     if(flags & TILE_FLAG_RESET_IMMUNE){
-          draw_theme_frame(theme_frame(1, 21), tile_pos);
-     }
-
-     if(flags & (TILE_FLAG_WIRE_LEFT | TILE_FLAG_WIRE_RIGHT | TILE_FLAG_WIRE_UP | TILE_FLAG_WIRE_DOWN)){
-          S16 frame_y = 9;
-          S16 frame_x = flags >> 4;
-
-          if(flags & TILE_FLAG_WIRE_STATE) frame_y++;
-
-          draw_theme_frame(theme_frame(frame_x, frame_y), tile_pos);
-     }
-
-     if(flags & (TILE_FLAG_WIRE_CLUSTER_LEFT | TILE_FLAG_WIRE_CLUSTER_MID | TILE_FLAG_WIRE_CLUSTER_RIGHT)){
-          S16 frame_y = 17 + tile_flags_cluster_direction(flags);
-          S16 frame_x = 0;
-
-          if(flags & TILE_FLAG_WIRE_CLUSTER_LEFT){
-               if(flags & TILE_FLAG_WIRE_CLUSTER_LEFT_ON){
-                    frame_x = 1;
-               }else{
-                    frame_x = 0;
-               }
-
-               draw_theme_frame(theme_frame(frame_x, frame_y), tile_pos);
-          }
-
-          if(flags & TILE_FLAG_WIRE_CLUSTER_MID){
-               if(flags & TILE_FLAG_WIRE_CLUSTER_MID_ON){
-                    frame_x = 3;
-               }else{
-                    frame_x = 2;
-               }
-
-               draw_theme_frame(theme_frame(frame_x, frame_y), tile_pos);
-          }
-
-          if(flags & TILE_FLAG_WIRE_CLUSTER_RIGHT){
-               if(flags & TILE_FLAG_WIRE_CLUSTER_RIGHT_ON){
-                    frame_x = 5;
-               }else{
-                    frame_x = 4;
-               }
-
-               draw_theme_frame(theme_frame(frame_x, frame_y), tile_pos);
-          }
-     }
-}
-
-void block_draw(Block_t* block, Vec_t pos_vec){
-     Vec_t tex_vec = theme_frame(0, 6);
-     glTexCoord2f(tex_vec.x, tex_vec.y);
-     glVertex2f(pos_vec.x, pos_vec.y);
-     glTexCoord2f(tex_vec.x, tex_vec.y + 2.0f * THEME_FRAME_HEIGHT);
-     glVertex2f(pos_vec.x, pos_vec.y + 2.0f * TILE_SIZE);
-     glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y + 2.0f * THEME_FRAME_HEIGHT);
-     glVertex2f(pos_vec.x + TILE_SIZE, pos_vec.y + 2.0f * TILE_SIZE);
-     glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y);
-     glVertex2f(pos_vec.x + TILE_SIZE, pos_vec.y);
-
-     if(block->element == ELEMENT_ONLY_ICED || block->element == ELEMENT_ICE ){
-          tex_vec = theme_frame(4, 12);
-          glColor4f(1.0f, 1.0f, 1.0f, 0.5f);
-          glTexCoord2f(tex_vec.x, tex_vec.y);
-          glVertex2f(pos_vec.x, pos_vec.y);
-          glTexCoord2f(tex_vec.x, tex_vec.y + 2.0f * THEME_FRAME_HEIGHT);
-          glVertex2f(pos_vec.x, pos_vec.y + 2.0f * TILE_SIZE);
-          glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y + 2.0f * THEME_FRAME_HEIGHT);
-          glVertex2f(pos_vec.x + TILE_SIZE, pos_vec.y + 2.0f * TILE_SIZE);
-          glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y);
-          glVertex2f(pos_vec.x + TILE_SIZE, pos_vec.y);
-          glColor3f(1.0f, 1.0f, 1.0f);
-     }
-
-     if(block->element == ELEMENT_FIRE){
-          tex_vec = theme_frame(1, 6);
-          // TODO: compress
-          glTexCoord2f(tex_vec.x, tex_vec.y);
-          glVertex2f(pos_vec.x, pos_vec.y);
-          glTexCoord2f(tex_vec.x, tex_vec.y + 2.0f * THEME_FRAME_HEIGHT);
-          glVertex2f(pos_vec.x, pos_vec.y + 2.0f * TILE_SIZE);
-          glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y + 2.0f * THEME_FRAME_HEIGHT);
-          glVertex2f(pos_vec.x + TILE_SIZE, pos_vec.y + 2.0f * TILE_SIZE);
-          glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y);
-          glVertex2f(pos_vec.x + TILE_SIZE, pos_vec.y);
-     }else if(block->element == ELEMENT_ICE){
-          tex_vec = theme_frame(5, 6);
-          // TODO: compress
-          glTexCoord2f(tex_vec.x, tex_vec.y);
-          glVertex2f(pos_vec.x, pos_vec.y);
-          glTexCoord2f(tex_vec.x, tex_vec.y + 2.0f * THEME_FRAME_HEIGHT);
-          glVertex2f(pos_vec.x, pos_vec.y + 2.0f * TILE_SIZE);
-          glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y + 2.0f * THEME_FRAME_HEIGHT);
-          glVertex2f(pos_vec.x + TILE_SIZE, pos_vec.y + 2.0f * TILE_SIZE);
-          glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y);
-          glVertex2f(pos_vec.x + TILE_SIZE, pos_vec.y);
-     }
-}
-
-void interactive_draw(Interactive_t* interactive, Vec_t pos_vec, Coord_t coord,
-                      TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree){
-     Vec_t tex_vec = {};
-     switch(interactive->type){
-     default:
-          break;
-     case INTERACTIVE_TYPE_PRESSURE_PLATE:
-     {
-          int frame_x = 7;
-          if(interactive->pressure_plate.down) frame_x++;
-          tex_vec = theme_frame(frame_x, 8);
-          draw_theme_frame(tex_vec, pos_vec);
-     } break;
-     case INTERACTIVE_TYPE_LEVER:
-          tex_vec = theme_frame(0, 12);
-          draw_double_theme_frame(tex_vec, pos_vec);
-          break;
-     case INTERACTIVE_TYPE_BOW:
-          draw_theme_frame(theme_frame(0, 9), pos_vec);
-          break;
-     case INTERACTIVE_TYPE_POPUP:
-          tex_vec = theme_frame(interactive->popup.lift.ticks - 1, 8);
-          draw_double_theme_frame(tex_vec, pos_vec);
-          break;
-     case INTERACTIVE_TYPE_DOOR:
-          tex_vec = theme_frame(interactive->door.lift.ticks + 8, 11 + interactive->door.face);
-          draw_theme_frame(tex_vec, pos_vec);
-          break;
-     case INTERACTIVE_TYPE_LIGHT_DETECTOR:
-          draw_theme_frame(theme_frame(1, 11), pos_vec);
-          if(interactive->detector.on){
-               draw_theme_frame(theme_frame(2, 11), pos_vec);
-          }
-          break;
-     case INTERACTIVE_TYPE_ICE_DETECTOR:
-          draw_theme_frame(theme_frame(1, 12), pos_vec);
-          if(interactive->detector.on){
-               draw_theme_frame(theme_frame(2, 12), pos_vec);
-          }
-          break;
-     case INTERACTIVE_TYPE_PORTAL:
-     {
-          bool draw_wall = false;
-          if(!interactive->portal.on){
-               draw_wall = true;
-          }else{
-               draw_wall = true;
-
-               // search all portal exits for a portal they can go through
-               PortalExit_t portal_exits = find_portal_exits(coord, tilemap, interactive_quad_tree);
-               for(S8 d = 0; d < DIRECTION_COUNT && draw_wall; d++){
-                    for(S8 p = 0; p < portal_exits.directions[d].count; p++){
-                         if(portal_exits.directions[d].coords[p] == coord) continue;
-
-                         Coord_t portal_dest = portal_exits.directions[d].coords[p];
-                         Interactive_t* portal_dest_interactive = quad_tree_find_at(interactive_quad_tree, portal_dest.x, portal_dest.y);
-                         if(portal_dest_interactive && portal_dest_interactive->type == INTERACTIVE_TYPE_PORTAL &&
-                            portal_dest_interactive->portal.on){
-                              draw_wall = false;
-                              break;
-                         }
-                    }
-               }
-          }
-
-          if(draw_wall){
-               S16 frame_x = 0;
-               S16 frame_y = 0;
-
-               switch(interactive->portal.face){
-               default:
-                    break;
-               case DIRECTION_LEFT:
-                    frame_x = 3;
-                    frame_y = 1;
-                    break;
-               case DIRECTION_UP:
-                    frame_x = 0;
-                    frame_y = 2;
-                    break;
-               case DIRECTION_RIGHT:
-                    frame_x = 2;
-                    frame_y = 2;
-                    break;
-               case DIRECTION_DOWN:
-                    frame_x = 1;
-                    frame_y = 1;
-                    break;
-               }
-
-               draw_theme_frame(theme_frame(frame_x, frame_y), pos_vec);
-          }
-
-          draw_theme_frame(theme_frame(interactive->portal.face, 26 + interactive->portal.on), pos_vec);
-          break;
-     }
-     case INTERACTIVE_TYPE_WIRE_CROSS:
-     {
-          int y_frame = 17 + interactive->wire_cross.on;
-          if(interactive->wire_cross.mask & DIRECTION_MASK_LEFT) draw_theme_frame(theme_frame(6, y_frame), pos_vec);
-          if(interactive->wire_cross.mask & DIRECTION_MASK_UP) draw_theme_frame(theme_frame(7, y_frame), pos_vec);
-          if(interactive->wire_cross.mask & DIRECTION_MASK_RIGHT) draw_theme_frame(theme_frame(8, y_frame), pos_vec);
-          if(interactive->wire_cross.mask & DIRECTION_MASK_DOWN) draw_theme_frame(theme_frame(9, y_frame), pos_vec);
-          break;
-     }
-     }
-
-}
-
-struct Quad_t{
-     F32 left;
-     F32 bottom;
-     F32 right;
-     F32 top;
-};
-
-void draw_quad_wireframe(const Quad_t* quad, F32 red, F32 green, F32 blue){
-     glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-
-     glBegin(GL_QUADS);
-     glColor3f(red, green, blue);
-     glVertex2f(quad->left,  quad->top);
-     glVertex2f(quad->left,  quad->bottom);
-     glVertex2f(quad->right, quad->bottom);
-     glVertex2f(quad->right, quad->top);
-     glEnd();
-
-     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-}
-
-void selection_draw(Coord_t selection_start, Coord_t selection_end, Position_t camera, F32 red, F32 green, F32 blue){
-     if(selection_start.x > selection_end.x) SWAP(selection_start.x, selection_end.x);
-     if(selection_start.y > selection_end.y) SWAP(selection_start.y, selection_end.y);
-
-     Position_t start_location = coord_to_pos(selection_start) - camera;
-     Position_t end_location = coord_to_pos(selection_end) - camera;
-     Vec_t start_vec = pos_to_vec(start_location);
-     Vec_t end_vec = pos_to_vec(end_location);
-
-     Quad_t selection_quad {start_vec.x, start_vec.y, end_vec.x + TILE_SIZE, end_vec.y + TILE_SIZE};
-     glBindTexture(GL_TEXTURE_2D, 0);
-     draw_quad_wireframe(&selection_quad, red, green, blue);
 }
 
 Pixel_t mouse_select_pixel(Vec_t mouse_screen){
@@ -2276,6 +1352,7 @@ void apply_stamp(Stamp_t* stamp, Coord_t coord, TileMap_t* tilemap, ObjectArray_
      }
 }
 
+// editor.h
 void coord_clear(Coord_t coord, TileMap_t* tilemap, ObjectArray_t<Interactive_t>* interactive_array,
                  QuadTreeNode_t<Interactive_t>* interactive_quad_tree, ObjectArray_t<Block_t>* block_array){
      Tile_t* tile = tilemap_get_tile(tilemap, coord);
@@ -2354,6 +1431,7 @@ S32 mouse_select_stamp_index(Coord_t screen_coord, ObjectArray_t<ObjectArray_t<S
      return index;
 }
 
+// utils.h
 FILE* load_demo_number(S32 map_number, const char** demo_filepath){
      char filepath[64] = {};
      snprintf(filepath, 64, "content/%03d.bd", map_number);
@@ -2652,200 +1730,6 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
 
      return pos_delta;
 }
-
-void draw_flats(Vec_t pos, Tile_t* tile, Interactive_t* interactive, GLuint theme_texture,
-                U8 portal_rotations){
-     tile_id_draw(tile->id, pos);
-
-     U16 tile_flags = tile->flags;
-     for(U8 i = 0; i < portal_rotations; i++){
-          U16 new_flags = tile_flags & ~(TILE_FLAG_WIRE_LEFT | TILE_FLAG_WIRE_UP | TILE_FLAG_WIRE_RIGHT | TILE_FLAG_WIRE_DOWN);
-
-          if(tile_flags & TILE_FLAG_WIRE_LEFT) new_flags |= TILE_FLAG_WIRE_UP;
-          if(tile_flags & TILE_FLAG_WIRE_UP) new_flags |= TILE_FLAG_WIRE_RIGHT;
-          if(tile_flags & TILE_FLAG_WIRE_RIGHT) new_flags |= TILE_FLAG_WIRE_DOWN;
-          if(tile_flags & TILE_FLAG_WIRE_DOWN) new_flags |= TILE_FLAG_WIRE_LEFT;
-
-          tile_flags = new_flags;
-     }
-
-     tile_flags_draw(tile_flags, pos);
-
-     // draw flat interactives that could be covered by ice
-     if(interactive){
-          if(interactive->type == INTERACTIVE_TYPE_PRESSURE_PLATE){
-               if(!tile_is_iced(tile) && interactive->pressure_plate.iced_under){
-                    // TODO: compress with above ice drawing code
-                    glEnd();
-
-                    // get state ready for ice
-                    glBindTexture(GL_TEXTURE_2D, 0);
-                    glColor4f(196.0f / 255.0f, 217.0f / 255.0f, 1.0f, 0.45f);
-                    glBegin(GL_QUADS);
-                    glVertex2f(pos.x, pos.y);
-                    glVertex2f(pos.x, pos.y + TILE_SIZE);
-                    glVertex2f(pos.x + TILE_SIZE, pos.y + TILE_SIZE);
-                    glVertex2f(pos.x + TILE_SIZE, pos.y);
-                    glEnd();
-
-                    // reset state back to default
-                    glBindTexture(GL_TEXTURE_2D, theme_texture);
-                    glBegin(GL_QUADS);
-                    glColor3f(1.0f, 1.0f, 1.0f);
-               }
-
-               interactive_draw(interactive, pos, Coord_t{-1, -1}, nullptr, nullptr);
-          }else if(interactive->type == INTERACTIVE_TYPE_POPUP && interactive->popup.lift.ticks == 1){
-               if(interactive->popup.iced){
-                    pos.y += interactive->popup.lift.ticks * PIXEL_SIZE;
-                    Vec_t tex_vec = theme_frame(3, 12);
-                    glColor4f(1.0f, 1.0f, 1.0f, 0.5f);
-                    glTexCoord2f(tex_vec.x, tex_vec.y);
-                    glVertex2f(pos.x, pos.y);
-                    glTexCoord2f(tex_vec.x, tex_vec.y + THEME_FRAME_HEIGHT);
-                    glVertex2f(pos.x, pos.y + TILE_SIZE);
-                    glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y + THEME_FRAME_HEIGHT);
-                    glVertex2f(pos.x + TILE_SIZE, pos.y + TILE_SIZE);
-                    glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y);
-                    glVertex2f(pos.x + TILE_SIZE, pos.y);
-                    glColor3f(1.0f, 1.0f, 1.0f);
-               }
-
-               interactive_draw(interactive, pos, Coord_t{-1, -1}, nullptr, nullptr);
-          }else if(interactive->type == INTERACTIVE_TYPE_LIGHT_DETECTOR ||
-                   interactive->type == INTERACTIVE_TYPE_ICE_DETECTOR){
-               interactive_draw(interactive, pos, Coord_t{-1, -1}, nullptr, nullptr);
-          }
-     }
-
-     if(tile_is_iced(tile)){
-          glEnd();
-
-          // get state ready for ice
-          glBindTexture(GL_TEXTURE_2D, 0);
-          glColor4f(196.0f / 255.0f, 217.0f / 255.0f, 1.0f, 0.45f);
-          glBegin(GL_QUADS);
-          glVertex2f(pos.x, pos.y);
-          glVertex2f(pos.x, pos.y + TILE_SIZE);
-          glVertex2f(pos.x + TILE_SIZE, pos.y + TILE_SIZE);
-          glVertex2f(pos.x + TILE_SIZE, pos.y);
-          glEnd();
-
-          // reset state back to default
-          glBindTexture(GL_TEXTURE_2D, theme_texture);
-          glBegin(GL_QUADS);
-          glColor3f(1.0f, 1.0f, 1.0f);
-     }
-}
-
-void draw_solids(Vec_t pos, Interactive_t* interactive, Block_t** blocks, S16 block_count, Player_t* player,
-                 Position_t screen_camera, GLuint theme_texture, GLuint player_texture,
-                 Coord_t source_coord, Coord_t destination_coord, U8 portal_rotations,
-                 TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree){
-     if(interactive){
-          if(interactive->type == INTERACTIVE_TYPE_PRESSURE_PLATE ||
-             interactive->type == INTERACTIVE_TYPE_ICE_DETECTOR ||
-             interactive->type == INTERACTIVE_TYPE_LIGHT_DETECTOR ||
-             (interactive->type == INTERACTIVE_TYPE_POPUP && interactive->popup.lift.ticks == 1)){
-               // pass, these are flat
-          }else{
-               interactive_draw(interactive, pos, source_coord, tilemap, interactive_quad_tree);
-
-               if(interactive->type == INTERACTIVE_TYPE_POPUP && interactive->popup.iced){
-                    pos.y += interactive->popup.lift.ticks * PIXEL_SIZE;
-                    Vec_t tex_vec = theme_frame(3, 12);
-                    glColor4f(1.0f, 1.0f, 1.0f, 0.5f);
-                    glTexCoord2f(tex_vec.x, tex_vec.y);
-                    glVertex2f(pos.x, pos.y);
-                    glTexCoord2f(tex_vec.x, tex_vec.y + THEME_FRAME_HEIGHT);
-                    glVertex2f(pos.x, pos.y + TILE_SIZE);
-                    glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y + THEME_FRAME_HEIGHT);
-                    glVertex2f(pos.x + TILE_SIZE, pos.y + TILE_SIZE);
-                    glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y);
-                    glVertex2f(pos.x + TILE_SIZE, pos.y);
-                    glColor3f(1.0f, 1.0f, 1.0f);
-               }
-          }
-     }
-
-     for(S16 i = 0; i < block_count; i++){
-          Block_t* block = blocks[i];
-          Position_t block_camera_offset = block->pos;
-          block_camera_offset.pixel += Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS};
-          if(destination_coord.x >= 0){
-               Position_t destination_pos = coord_to_pos_at_tile_center(destination_coord);
-               Position_t source_pos = coord_to_pos_at_tile_center(source_coord);
-               Position_t center_delta = block_camera_offset - source_pos;
-               center_delta = position_rotate_quadrants(center_delta, portal_rotations);
-               block_camera_offset = destination_pos + center_delta;
-          }
-
-          block_camera_offset.pixel -= Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS};
-          block_camera_offset -= screen_camera;
-          block_camera_offset.pixel.y += block->pos.z;
-          block_draw(block, pos_to_vec(block_camera_offset));
-     }
-
-     if(player){
-          Vec_t pos_vec = pos_to_vec(player->pos);
-          if(destination_coord.x >= 0){
-               Position_t destination_pos = coord_to_pos_at_tile_center(destination_coord);
-               Position_t source_pos = coord_to_pos_at_tile_center(source_coord);
-               Position_t center_delta = player->pos - source_pos;
-               center_delta = position_rotate_quadrants(center_delta, portal_rotations);
-               pos_vec = pos_to_vec(destination_pos + center_delta);
-          }
-
-          S8 player_frame_y = direction_rotate_clockwise(player->face, portal_rotations);
-          if(player->push_time > FLT_EPSILON) player_frame_y += 4;
-          if(player->has_bow){
-               player_frame_y += 8;
-               if(player->bow_draw_time > (PLAYER_BOW_DRAW_DELAY / 2.0f)){
-                    player_frame_y += 8;
-                    if(player->bow_draw_time >= PLAYER_BOW_DRAW_DELAY){
-                         player_frame_y += 4;
-                    }
-               }
-          }
-          Vec_t tex_vec = player_frame(player->walk_frame, player_frame_y);
-          pos_vec.y += (5.0f * PIXEL_SIZE);
-
-          glEnd();
-          glBindTexture(GL_TEXTURE_2D, player_texture);
-          glBegin(GL_QUADS);
-          glColor3f(1.0f, 1.0f, 1.0f);
-          glTexCoord2f(tex_vec.x, tex_vec.y);
-          glVertex2f(pos_vec.x - HALF_TILE_SIZE, pos_vec.y - HALF_TILE_SIZE);
-          glTexCoord2f(tex_vec.x, tex_vec.y + PLAYER_FRAME_HEIGHT);
-          glVertex2f(pos_vec.x - HALF_TILE_SIZE, pos_vec.y + HALF_TILE_SIZE);
-          glTexCoord2f(tex_vec.x + PLAYER_FRAME_WIDTH, tex_vec.y + PLAYER_FRAME_HEIGHT);
-          glVertex2f(pos_vec.x + HALF_TILE_SIZE, pos_vec.y + HALF_TILE_SIZE);
-          glTexCoord2f(tex_vec.x + PLAYER_FRAME_WIDTH, tex_vec.y);
-          glVertex2f(pos_vec.x + HALF_TILE_SIZE, pos_vec.y - HALF_TILE_SIZE);
-          glEnd();
-
-          glBindTexture(GL_TEXTURE_2D, theme_texture);
-          glBegin(GL_QUADS);
-          glColor3f(1.0f, 1.0f, 1.0f);
-     }
-}
-
-
-void resolve_block_colliding_with_itself(Direction_t src_portal_dir, Direction_t dst_portal_dir, DirectionMask_t move_mask,
-                                         Block_t* block, Direction_t check_horizontal, Direction_t check_vertical, Direction_t* push_dir){
-     if(directions_meet_expectations(src_portal_dir, dst_portal_dir, check_horizontal, check_vertical)){
-          if(move_mask & direction_to_direction_mask(check_vertical)){
-               *push_dir = direction_opposite(check_horizontal);
-               block->vel.y = 0;
-               block->accel.y = 0;
-          }else if(move_mask & direction_to_direction_mask(check_horizontal)){
-               *push_dir = direction_opposite(check_vertical);
-               block->vel.x = 0;
-               block->accel.x = 0;
-          }
-     }
-}
-
 
 void check_block_collision_with_other_blocks(Block_t* block_to_check, QuadTreeNode_t<Block_t>* block_quad_tree,
                                              QuadTreeNode_t<Interactive_t>* interactive_quad_tree, TileMap_t* tilemap,
@@ -4802,7 +3686,7 @@ int main(int argc, char** argv){
                               }
                          }
 
-                         interactive_draw(interactive, tile_pos, coord, &tilemap, interactive_quad_tree);
+                         draw_interactive(interactive, tile_pos, coord, &tilemap, interactive_quad_tree);
                     }
                }
           }
@@ -4813,7 +3697,7 @@ int main(int argc, char** argv){
                     if(tile && tile->id >= 16){
                          Vec_t tile_pos {(F32)(x - min.x) * TILE_SIZE + camera_offset.x,
                                          (F32)(y - min.y) * TILE_SIZE + camera_offset.y};
-                         tile_id_draw(tile->id, tile_pos);
+                         draw_tile_id(tile->id, tile_pos);
                     }
                }
           }
@@ -4978,7 +3862,7 @@ int main(int argc, char** argv){
 #endif
 
           // player start
-          selection_draw(player_start, player_start, screen_camera, 0.0f, 1.0f, 0.0f);
+          draw_selection(player_start, player_start, screen_camera, 0.0f, 1.0f, 0.0f);
 
           // editor
           switch(editor.mode){
@@ -5010,10 +3894,10 @@ int main(int argc, char** argv){
                          default:
                               break;
                          case STAMP_TYPE_TILE_ID:
-                              tile_id_draw(stamp->tile_id, vec);
+                              draw_tile_id(stamp->tile_id, vec);
                               break;
                          case STAMP_TYPE_TILE_FLAGS:
-                              tile_flags_draw(stamp->tile_flags, vec);
+                              draw_tile_flags(stamp->tile_flags, vec);
                               break;
                          case STAMP_TYPE_BLOCK:
                          {
@@ -5021,11 +3905,11 @@ int main(int argc, char** argv){
                               block.element = stamp->block.element;
                               block.face = stamp->block.face;
 
-                              block_draw(&block, vec);
+                              draw_block(&block, vec);
                          } break;
                          case STAMP_TYPE_INTERACTIVE:
                          {
-                              interactive_draw(&stamp->interactive, vec, Coord_t{-1, -1}, &tilemap, interactive_quad_tree);
+                              draw_interactive(&stamp->interactive, vec, Coord_t{-1, -1}, &tilemap, interactive_quad_tree);
                          } break;
                          }
                     }
@@ -5053,21 +3937,21 @@ int main(int argc, char** argv){
                     default:
                          break;
                     case STAMP_TYPE_TILE_ID:
-                         tile_id_draw(stamp->tile_id, stamp_pos);
+                         draw_tile_id(stamp->tile_id, stamp_pos);
                          break;
                     case STAMP_TYPE_TILE_FLAGS:
-                         tile_flags_draw(stamp->tile_flags, stamp_pos);
+                         draw_tile_flags(stamp->tile_flags, stamp_pos);
                          break;
                     case STAMP_TYPE_BLOCK:
                     {
                          Block_t block = {};
                          block.element = stamp->block.element;
                          block.face = stamp->block.face;
-                         block_draw(&block, stamp_pos);
+                         draw_block(&block, stamp_pos);
                     } break;
                     case STAMP_TYPE_INTERACTIVE:
                     {
-                         interactive_draw(&stamp->interactive, stamp_pos, Coord_t{-1, -1}, &tilemap, interactive_quad_tree);
+                         draw_interactive(&stamp->interactive, stamp_pos, Coord_t{-1, -1}, &tilemap, interactive_quad_tree);
                     } break;
                     }
                }
@@ -5091,21 +3975,21 @@ int main(int argc, char** argv){
                               default:
                                    break;
                               case STAMP_TYPE_TILE_ID:
-                                   tile_id_draw(stamp->tile_id, stamp_vec);
+                                   draw_tile_id(stamp->tile_id, stamp_vec);
                                    break;
                               case STAMP_TYPE_TILE_FLAGS:
-                                   tile_flags_draw(stamp->tile_flags, stamp_vec);
+                                   draw_tile_flags(stamp->tile_flags, stamp_vec);
                                    break;
                               case STAMP_TYPE_BLOCK:
                               {
                                    Block_t block = {};
                                    block.element = stamp->block.element;
                                    block.face = stamp->block.face;
-                                   block_draw(&block, stamp_vec);
+                                   draw_block(&block, stamp_vec);
                               } break;
                               case STAMP_TYPE_INTERACTIVE:
                               {
-                                   interactive_draw(&stamp->interactive, stamp_vec, Coord_t{-1, -1}, &tilemap, interactive_quad_tree);
+                                   draw_interactive(&stamp->interactive, stamp_vec, Coord_t{-1, -1}, &tilemap, interactive_quad_tree);
                               } break;
                               }
                          }
@@ -5122,7 +4006,7 @@ int main(int argc, char** argv){
                glEnd();
           } break;
           case EDITOR_MODE_CREATE_SELECTION:
-               selection_draw(editor.selection_start, editor.selection_end, screen_camera, 1.0f, 0.0f, 0.0f);
+               draw_selection(editor.selection_start, editor.selection_end, screen_camera, 1.0f, 0.0f, 0.0f);
                break;
           case EDITOR_MODE_SELECTION_MANIPULATION:
           {
@@ -5139,21 +4023,21 @@ int main(int argc, char** argv){
                     default:
                          break;
                     case STAMP_TYPE_TILE_ID:
-                         tile_id_draw(stamp->tile_id, stamp_vec);
+                         draw_tile_id(stamp->tile_id, stamp_vec);
                          break;
                     case STAMP_TYPE_TILE_FLAGS:
-                         tile_flags_draw(stamp->tile_flags, stamp_vec);
+                         draw_tile_flags(stamp->tile_flags, stamp_vec);
                          break;
                     case STAMP_TYPE_BLOCK:
                     {
                          Block_t block = {};
                          block.element = stamp->block.element;
                          block.face = stamp->block.face;
-                         block_draw(&block, stamp_vec);
+                         draw_block(&block, stamp_vec);
                     } break;
                     case STAMP_TYPE_INTERACTIVE:
                     {
-                         interactive_draw(&stamp->interactive, stamp_vec, Coord_t{-1, -1}, &tilemap, interactive_quad_tree);
+                         draw_interactive(&stamp->interactive, stamp_vec, Coord_t{-1, -1}, &tilemap, interactive_quad_tree);
                     } break;
                     }
                }
@@ -5162,7 +4046,7 @@ int main(int argc, char** argv){
                Rect_t selection_bounds = editor_selection_bounds(&editor);
                Coord_t min_coord {selection_bounds.left, selection_bounds.bottom};
                Coord_t max_coord {selection_bounds.right, selection_bounds.top};
-               selection_draw(min_coord, max_coord, screen_camera, 1.0f, 0.0f, 0.0f);
+               draw_selection(min_coord, max_coord, screen_camera, 1.0f, 0.0f, 0.0f);
           } break;
           }
 

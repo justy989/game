@@ -1,0 +1,209 @@
+#include "utils.h"
+#include "defines.h"
+#include "conversion.h"
+#include "portal_exit.h"
+
+Direction_t direction_between(Coord_t a, Coord_t b){
+     if(a == b) return DIRECTION_COUNT;
+
+     Coord_t diff = a - b;
+
+     if(abs(diff.x) > abs(diff.y)){
+          if(diff.x > 0){
+               return DIRECTION_LEFT;
+          }else{
+               return DIRECTION_RIGHT;
+          }
+     }
+
+     if(diff.y > 0){
+          return DIRECTION_DOWN;
+     }
+
+     return DIRECTION_UP;
+}
+
+bool directions_meet_expectations(Direction_t a, Direction_t b, Direction_t first_expectation, Direction_t second_expectation){
+     return (a == first_expectation && b == second_expectation) ||
+            (a == second_expectation && b == first_expectation);
+}
+
+DirectionMask_t vec_direction_mask(Vec_t vec){
+     DirectionMask_t mask = DIRECTION_MASK_NONE;
+
+     if(vec.x > 0){
+          mask = direction_mask_add(mask, DIRECTION_MASK_RIGHT);
+     }else if(vec.x < 0){
+          mask = direction_mask_add(mask, DIRECTION_MASK_LEFT);
+     }
+
+     if(vec.y > 0){
+          mask = direction_mask_add(mask, DIRECTION_MASK_UP);
+     }else if(vec.y < 0){
+          mask = direction_mask_add(mask, DIRECTION_MASK_DOWN);
+     }
+
+     return mask;
+}
+
+U8 portal_rotations_between(Direction_t a, Direction_t b){
+     if(a == b) return 2;
+     if(a == direction_opposite(b)) return 0;
+     return direction_rotations_between(a, b);
+}
+
+Vec_t vec_rotate_quadrants(Vec_t vec, S8 rotations_between){
+     for(S8 r = 0; r < rotations_between; r++){
+          auto tmp = vec.x;
+          vec.x = vec.y;
+          vec.y = -tmp;
+     }
+
+     return vec;
+}
+
+Pixel_t pixel_rotate_quadrants(Pixel_t pixel, S8 rotations_between){
+     for(S8 r = 0; r < rotations_between; r++){
+          auto tmp = pixel.x;
+          pixel.x = pixel.y;
+          pixel.y = -tmp;
+     }
+
+     return pixel;
+}
+
+Position_t position_rotate_quadrants(Position_t pos, S8 rotations_between){
+     pos.decimal = vec_rotate_quadrants(pos.decimal, rotations_between);
+     pos.pixel = pixel_rotate_quadrants(pos.pixel, rotations_between);
+     canonicalize(&pos);
+     return pos;
+}
+
+Vec_t rotate_vec_between_dirs(Direction_t a, Direction_t b, Vec_t vec){
+     U8 rotations_between = portal_rotations_between(a, b);
+     return vec_rotate_quadrants(vec, rotations_between);
+}
+
+Vec_t direction_to_vec(Direction_t d){
+     switch(d){
+     default:
+          break;
+     case DIRECTION_LEFT:
+          return Vec_t{-1, 0};
+     case DIRECTION_RIGHT:
+          return Vec_t{1, 0};
+     case DIRECTION_UP:
+          return Vec_t{0, 1};
+     case DIRECTION_DOWN:
+          return Vec_t{0, -1};
+     }
+
+     return Vec_t{0, 0};
+}
+
+Pixel_t direction_to_pixel(Direction_t d){
+     switch(d){
+     default:
+          break;
+     case DIRECTION_LEFT:
+          return Pixel_t{-TILE_SIZE_IN_PIXELS, 0};
+     case DIRECTION_RIGHT:
+          return Pixel_t{TILE_SIZE_IN_PIXELS, 0};
+     case DIRECTION_UP:
+          return Pixel_t{0, TILE_SIZE_IN_PIXELS};
+     case DIRECTION_DOWN:
+          return Pixel_t{0, -TILE_SIZE_IN_PIXELS};
+     }
+
+     return Pixel_t{0, 0};
+}
+
+Rect_t rect_surrounding_adjacent_coords(Coord_t coord){
+     Pixel_t pixel = coord_to_pixel(coord);
+
+     Rect_t rect = {};
+     rect.left = pixel.x - TILE_SIZE_IN_PIXELS;
+     rect.right = pixel.x + (2 * TILE_SIZE_IN_PIXELS);
+     rect.bottom = pixel.y - TILE_SIZE_IN_PIXELS;
+     rect.top = pixel.y + (2 * TILE_SIZE_IN_PIXELS);
+
+     return rect;
+}
+
+Interactive_t* quad_tree_interactive_find_at(QuadTreeNode_t<Interactive_t>* root, Coord_t coord){
+     return quad_tree_find_at(root, coord.x, coord.y);
+}
+
+Interactive_t* quad_tree_interactive_solid_at(QuadTreeNode_t<Interactive_t>* root, TileMap_t* tilemap, Coord_t coord){
+     Interactive_t* interactive = quad_tree_find_at(root, coord.x, coord.y);
+     if(interactive){
+          if(interactive_is_solid(interactive)){
+               return interactive;
+          }else if(interactive->type == INTERACTIVE_TYPE_PORTAL){
+               if(interactive->portal.on){
+                    if(!portal_has_destination(coord, tilemap, root)) return interactive;
+               }
+          }
+     }
+
+     return nullptr;
+}
+
+Rect_t rect_to_check_surrounding_blocks(Pixel_t center){
+     Rect_t rect = {};
+     rect.left = center.x - (2 * TILE_SIZE_IN_PIXELS);
+     rect.right = center.x + (2 * TILE_SIZE_IN_PIXELS);
+     rect.bottom = center.y - (2 * TILE_SIZE_IN_PIXELS);
+     rect.top = center.y + (2 * TILE_SIZE_IN_PIXELS);
+     return rect;
+}
+
+// NOTE: skip_coord needs to be DIRECTION_COUNT size
+void find_portal_adjacents_to_skip_collision_check(Coord_t coord, QuadTreeNode_t<Interactive_t>* interactive_quad_tree,
+                                                   Coord_t* skip_coord){
+     for(S8 i = 0; i < DIRECTION_COUNT; i++) skip_coord[i] = {-1, -1};
+
+     // figure out which coords we can skip collision checking on, because they have portal exits
+     Interactive_t* interactive = quad_tree_interactive_find_at(interactive_quad_tree, coord);
+     if(interactive && interactive->type == INTERACTIVE_TYPE_PORTAL && interactive->portal.on){
+          skip_coord[interactive->portal.face] = coord + interactive->portal.face;
+     }
+}
+
+bool portal_has_destination(Coord_t coord, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree){
+     bool result = false;
+     // search all portal exits for a portal they can go through
+     PortalExit_t portal_exits = find_portal_exits(coord, tilemap, interactive_quad_tree);
+     for(S8 d = 0; d < DIRECTION_COUNT && !result; d++){
+          for(S8 p = 0; p < portal_exits.directions[d].count; p++){
+               if(portal_exits.directions[d].coords[p] == coord) continue;
+
+               Coord_t portal_dest = portal_exits.directions[d].coords[p];
+               Interactive_t* portal_dest_interactive = quad_tree_find_at(interactive_quad_tree, portal_dest.x, portal_dest.y);
+               if(portal_dest_interactive && portal_dest_interactive->type == INTERACTIVE_TYPE_PORTAL &&
+                  portal_dest_interactive->portal.on){
+                    result = true;
+                    break;
+               }
+          }
+     }
+
+     return result;
+}
+
+S16 range_passes_tile_boundary(S16 a, S16 b, S16 ignore){
+     if(a == b) return 0;
+     if(a > b){
+          if((b % TILE_SIZE_IN_PIXELS) == 0) return 0;
+          SWAP(a, b);
+     }
+
+     for(S16 i = a; i <= b; i++){
+          if((i % TILE_SIZE_IN_PIXELS) == 0 && i != ignore){
+               return i;
+          }
+     }
+
+     return 0;
+}
+

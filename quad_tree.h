@@ -2,6 +2,10 @@
 #define QUAD_TREE_H
 
 #include "rect.h"
+#include "object_array.h"
+
+#include <stdlib.h>
+#include <assert.h>
 
 #define QUAD_TREE_NODE_ENTRY_COUNT 4
 
