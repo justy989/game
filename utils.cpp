@@ -207,3 +207,29 @@ S16 range_passes_tile_boundary(S16 a, S16 b, S16 ignore){
      return 0;
 }
 
+Pixel_t mouse_select_pixel(Vec_t mouse_screen){
+     return {(S16)(mouse_screen.x * (F32)(ROOM_PIXEL_SIZE)), (S16)(mouse_screen.y * (F32)(ROOM_PIXEL_SIZE))};
+}
+
+Pixel_t mouse_select_world_pixel(Vec_t mouse_screen, Position_t camera){
+     return mouse_select_pixel(mouse_screen) + (camera.pixel - Pixel_t{ROOM_PIXEL_SIZE / 2, ROOM_PIXEL_SIZE / 2});
+}
+
+Coord_t mouse_select_coord(Vec_t mouse_screen){
+     return {(S16)(mouse_screen.x * (F32)(ROOM_TILE_SIZE)), (S16)(mouse_screen.y * (F32)(ROOM_TILE_SIZE))};
+}
+
+Coord_t mouse_select_world(Vec_t mouse_screen, Position_t camera){
+     return mouse_select_coord(mouse_screen) + (pos_to_coord(camera) - Coord_t{ROOM_TILE_SIZE / 2, ROOM_TILE_SIZE / 2});
+}
+
+S32 mouse_select_index(Vec_t mouse_screen){
+     Coord_t coord = mouse_select_coord(mouse_screen);
+     return coord.y * ROOM_TILE_SIZE + coord.x;
+}
+
+Vec_t coord_to_screen_position(Coord_t coord){
+     Pixel_t pixel = coord_to_pixel(coord);
+     Position_t relative_loc {pixel, 0, {0.0f, 0.0f}};
+     return pos_to_vec(relative_loc);
+}

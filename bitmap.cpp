@@ -15,6 +15,7 @@ static bool bitmap_interpret_bytes(Bitmap_t* bitmap){
           return false;
      }
 
+     // we only support one version
      if(bitmap->info->size != BITMAP_SUPPORTED_SIZE){
           LOG("%s() failed: bitmap info size is %d instead of expected %d\n", __FUNCTION__, bitmap->info->size, BITMAP_SUPPORTED_SIZE);
           return false;

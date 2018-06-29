@@ -1,5 +1,8 @@
-#ifndef PLAYER_H
-#define PLAYER_H
+#pragma once
+
+#include "position.h"
+#include "vec.h"
+#include "direction.h"
 
 #define PLAYER_RADIUS (3.5f / 272.0f)
 #define PLAYER_SPEED 5.5f
@@ -19,5 +22,3 @@ struct Player_t{
      bool has_bow;
      F32 bow_draw_time;
 };
-
-#endif

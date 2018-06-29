@@ -1,25 +1,9 @@
 #include "editor.h"
 #include "defines.h"
-#include "tile.h"
+#include "conversion.h"
+#include "utils.h"
 
 #include <string.h>
-
-Coord_t stamp_array_dimensions(ObjectArray_t<Stamp_t>* object_array){
-     Coord_t min {0, 0};
-     Coord_t max {0, 0};
-
-     for(S32 i = 0; i < object_array->count; ++i){
-          Stamp_t* stamp = object_array->elements + i;
-
-          if(stamp->offset.x < min.x){min.x = stamp->offset.x;}
-          if(stamp->offset.y < min.y){min.y = stamp->offset.y;}
-
-          if(stamp->offset.x > max.x){max.x = stamp->offset.x;}
-          if(stamp->offset.y > max.y){max.y = stamp->offset.y;}
-     }
-
-     return (max - min) + Coord_t{1, 1};
-}
 
 bool init(Editor_t* editor){
      memset(editor, 0, sizeof(*editor));
@@ -344,3 +328,150 @@ void destroy(Editor_t* editor){
      destroy(&editor->selection);
      destroy(&editor->clipboard);
 }
+
+Coord_t stamp_array_dimensions(ObjectArray_t<Stamp_t>* object_array){
+     Coord_t min {0, 0};
+     Coord_t max {0, 0};
+
+     for(S32 i = 0; i < object_array->count; ++i){
+          Stamp_t* stamp = object_array->elements + i;
+
+          if(stamp->offset.x < min.x){min.x = stamp->offset.x;}
+          if(stamp->offset.y < min.y){min.y = stamp->offset.y;}
+
+          if(stamp->offset.x > max.x){max.x = stamp->offset.x;}
+          if(stamp->offset.y > max.y){max.y = stamp->offset.y;}
+     }
+
+     return (max - min) + Coord_t{1, 1};
+}
+
+void apply_stamp(Stamp_t* stamp, Coord_t coord, TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array, ObjectArray_t<Interactive_t>* interactive_array,
+                 QuadTreeNode_t<Interactive_t>** interactive_quad_tree, bool combine){
+     switch(stamp->type){
+     default:
+          break;
+     case STAMP_TYPE_TILE_ID:
+     {
+          Tile_t* tile = tilemap_get_tile(tilemap, coord);
+          if(tile) tile->id = stamp->tile_id;
+     } break;
+     case STAMP_TYPE_TILE_FLAGS:
+     {
+          Tile_t* tile = tilemap_get_tile(tilemap, coord);
+          if(tile){
+               if(combine){
+                    tile->flags |= stamp->tile_flags;
+               }else{
+                    tile->flags = stamp->tile_flags;
+               }
+          }
+     } break;
+     case STAMP_TYPE_BLOCK:
+     {
+          int index = block_array->count;
+          resize(block_array, block_array->count + 1);
+          // TODO: Check if block is in the way with the quad tree
+
+          Block_t* block = block_array->elements + index;
+          *block = {};
+          block->pos = coord_to_pos(coord);
+          block->vel = vec_zero();
+          block->accel = vec_zero();
+          block->element = stamp->block.element;
+          block->face = stamp->block.face;
+     } break;
+     case STAMP_TYPE_INTERACTIVE:
+     {
+          Interactive_t* interactive = quad_tree_interactive_find_at(*interactive_quad_tree, coord);
+          if(interactive) return;
+
+          int index = interactive_array->count;
+          resize(interactive_array, interactive_array->count + 1);
+          interactive_array->elements[index] = stamp->interactive;
+          interactive_array->elements[index].coord = coord;
+          quad_tree_free(*interactive_quad_tree);
+          *interactive_quad_tree = quad_tree_build(interactive_array);
+     } break;
+     }
+}
+
+// editor.h
+void coord_clear(Coord_t coord, TileMap_t* tilemap, ObjectArray_t<Interactive_t>* interactive_array,
+                 QuadTreeNode_t<Interactive_t>* interactive_quad_tree, ObjectArray_t<Block_t>* block_array){
+     Tile_t* tile = tilemap_get_tile(tilemap, coord);
+     if(tile){
+          tile->id = 0;
+          tile->flags = 0;
+     }
+
+     auto* interactive = quad_tree_interactive_find_at(interactive_quad_tree, coord);
+     if(interactive){
+          S16 index = interactive - interactive_array->elements;
+          if(index >= 0){
+               remove(interactive_array, index);
+               quad_tree_free(interactive_quad_tree);
+               interactive_quad_tree = quad_tree_build(interactive_array);
+          }
+     }
+
+     S16 block_index = -1;
+     for(S16 i = 0; i < block_array->count; i++){
+          if(pos_to_coord(block_array->elements[i].pos) == coord){
+               block_index = i;
+               break;
+          }
+     }
+
+     if(block_index >= 0){
+          remove(block_array, block_index);
+     }
+}
+
+Rect_t editor_selection_bounds(Editor_t* editor){
+     Rect_t rect {};
+     for(S16 i = 0; i < editor->selection.count; i++){
+          auto* stamp = editor->selection.elements + i;
+          if(rect.left > stamp->offset.x) rect.left = stamp->offset.x;
+          if(rect.bottom > stamp->offset.y) rect.bottom = stamp->offset.y;
+          if(rect.right < stamp->offset.x) rect.right = stamp->offset.x;
+          if(rect.top < stamp->offset.y) rect.top = stamp->offset.y;
+     }
+
+     rect.left += editor->selection_start.x;
+     rect.right += editor->selection_start.x;
+     rect.top += editor->selection_start.y;
+     rect.bottom += editor->selection_start.y;
+
+     return rect;
+}
+
+S32 mouse_select_stamp_index(Coord_t screen_coord, ObjectArray_t<ObjectArray_t<Stamp_t>>* stamp_array){
+     S32 index = -1;
+     Rect_t current_rect = {};
+     S16 row_height = 0;
+     for(S16 i = 0; i < stamp_array->count; i++){
+          Coord_t dimensions = stamp_array_dimensions(stamp_array->elements + i);
+
+          if(row_height < dimensions.y) row_height = dimensions.y; // track max
+
+          current_rect.right = current_rect.left + dimensions.x;
+          current_rect.top = current_rect.bottom + dimensions.y;
+
+          if(screen_coord.x >= current_rect.left && screen_coord.x < current_rect.right &&
+             screen_coord.y >= current_rect.bottom && screen_coord.y < current_rect.top){
+               index = i;
+               break;
+          }
+
+          current_rect.left += dimensions.x;
+
+          // wrap around to next row if necessary
+          if(current_rect.left >= ROOM_TILE_SIZE){
+               current_rect.left = 0;
+               current_rect.bottom += row_height;
+          }
+     }
+     return index;
+}
+

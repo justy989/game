@@ -4,6 +4,10 @@
 #include "interactive.h"
 #include "element.h"
 #include "object_array.h"
+#include "tile.h"
+#include "block.h"
+#include "interactive.h"
+#include "quad_tree.h"
 
 enum StampType_t{
      STAMP_TYPE_NONE,
@@ -73,8 +77,17 @@ struct Editor_t{
      ObjectArray_t<Stamp_t> clipboard;
 };
 
-Coord_t stamp_array_dimensions(ObjectArray_t<Stamp_t>* object_array);
 bool init(Editor_t* editor);
 void destroy(Editor_t* editor);
+
+Coord_t stamp_array_dimensions(ObjectArray_t<Stamp_t>* object_array);
+void apply_stamp(Stamp_t* stamp, Coord_t coord, TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array, ObjectArray_t<Interactive_t>* interactive_array,
+                 QuadTreeNode_t<Interactive_t>** interactive_quad_tree, bool combine);
+
+void coord_clear(Coord_t coord, TileMap_t* tilemap, ObjectArray_t<Interactive_t>* interactive_array,
+                 QuadTreeNode_t<Interactive_t>* interactive_quad_tree, ObjectArray_t<Block_t>* block_array);
+
+Rect_t editor_selection_bounds(Editor_t* editor);
+S32 mouse_select_stamp_index(Coord_t screen_coord, ObjectArray_t<ObjectArray_t<Stamp_t>>* stamp_array);
 
 #endif

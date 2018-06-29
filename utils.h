@@ -32,3 +32,10 @@ void find_portal_adjacents_to_skip_collision_check(Coord_t coord, QuadTreeNode_t
 bool portal_has_destination(Coord_t coord, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree);
 
 S16 range_passes_tile_boundary(S16 a, S16 b, S16 ignore);
+
+Pixel_t mouse_select_pixel(Vec_t mouse_screen);
+Pixel_t mouse_select_world_pixel(Vec_t mouse_screen, Position_t camera);
+Coord_t mouse_select_coord(Vec_t mouse_screen);
+Coord_t mouse_select_world(Vec_t mouse_screen, Position_t camera);
+S32 mouse_select_index(Vec_t mouse_screen);
+Vec_t coord_to_screen_position(Coord_t coord);
