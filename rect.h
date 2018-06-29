@@ -1,5 +1,4 @@
-#ifndef RECT_H
-#define RECT_H
+#pragma once
 
 #include "pixel.h"
 #include "coord.h"
@@ -18,5 +17,3 @@ bool pixel_in_rect(Pixel_t p, Rect_t r);
 Rect_t coord_range(Coord_t bottom_left, Coord_t top_right);
 bool coord_in_rect(Coord_t c, Rect_t r);
 bool rect_in_rect(Rect_t a, Rect_t b);
-
-#endif

@@ -1,5 +1,4 @@
-#ifndef BITMAP_H
-#define BITMAP_H
+#pragma once
 
 #include "types.h"
 #include "raw.h"
@@ -62,5 +61,3 @@ struct AlphaBitmap_t{
 };
 
 AlphaBitmap_t bitmap_to_alpha_bitmap(const Bitmap_t* bitmap, BitmapPixel_t color_key);
-
-#endif

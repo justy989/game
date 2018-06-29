@@ -1,5 +1,4 @@
-#ifndef PIXEL_H
-#define PIXEL_H
+#pragma once
 
 #include "types.h"
 
@@ -15,5 +14,3 @@ void operator-=(Pixel_t& a, Pixel_t b);
 bool operator!=(Pixel_t a, Pixel_t b);
 bool operator==(Pixel_t a, Pixel_t b);
 double pixel_distance_between(Pixel_t a, Pixel_t b);
-
-#endif

@@ -1,5 +1,4 @@
-#ifndef ARROW_H
-#define ARROW_H
+#pragma once
 
 #include "position.h"
 #include "direction.h"
@@ -47,5 +46,3 @@ struct ArrowArray_t{
 
 bool init(ArrowArray_t* arrow_array);
 Arrow_t* arrow_spawn(ArrowArray_t* arrow_array, Position_t pos, Direction_t face);
-
-#endif

@@ -1,5 +1,4 @@
-#ifndef EDITOR_H
-#define EDITOR_H
+#pragma once
 
 #include "interactive.h"
 #include "element.h"
@@ -89,5 +88,3 @@ void coord_clear(Coord_t coord, TileMap_t* tilemap, ObjectArray_t<Interactive_t>
 
 Rect_t editor_selection_bounds(Editor_t* editor);
 S32 mouse_select_stamp_index(Coord_t screen_coord, ObjectArray_t<ObjectArray_t<Stamp_t>>* stamp_array);
-
-#endif

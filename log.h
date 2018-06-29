@@ -1,5 +1,4 @@
-#ifndef LOG_H
-#define LOG_H
+#pragma once
 
 #include <stdio.h>
 
@@ -15,6 +14,4 @@ struct Log_t{
 #else
      // log to file and stdout on linux
      #define LOG(msg...) fprintf(Log_t::log, msg); printf(msg);
-#endif
-
 #endif

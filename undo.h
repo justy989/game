@@ -1,5 +1,4 @@
-#ifndef UNDO_H
-#define UNDO_H
+#pragma once
 
 #include "tile.h"
 #include "block.h"
@@ -65,5 +64,3 @@ void undo_commit(Undo_t* undo, Player_t* player, TileMap_t* tilemap, ObjectArray
                  ObjectArray_t<Interactive_t>* interactive_array);
 void undo_revert(Undo_t* undo, Player_t* player, TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array,
                  ObjectArray_t<Interactive_t>* interactive_array);
-
-#endif

@@ -1,5 +1,4 @@
-#ifndef TILE_H
-#define TILE_H
+#pragma once
 
 #include "types.h"
 #include "coord.h"
@@ -55,5 +54,3 @@ bool tilemap_is_iced(TileMap_t* tilemap, Coord_t coord);
 Direction_t tile_flags_cluster_direction(U16 flags);
 void tile_flags_set_cluster_direction(U16* flags, Direction_t dir);
 bool tile_flags_cluster_all_on(U16 flags);
-
-#endif

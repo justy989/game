@@ -1,5 +1,4 @@
-#ifndef DEFINES_H
-#define DEFINES_H
+#pragma once
 
 #define SWAP(a, b) {auto c = a; a = b; b = c;}
 
@@ -63,5 +62,3 @@
 #define MAX_CONNECTED_PORTALS 8
 
 #define LIGHT_MAX_LINE_LEN 8
-
-#endif

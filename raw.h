@@ -1,5 +1,4 @@
-#ifndef RAW_H
-#define RAW_H
+#pragma once
 
 #include "types.h"
 
@@ -9,5 +8,3 @@ struct Raw_t{
 };
 
 Raw_t raw_load_file(const char* filename);
-
-#endif

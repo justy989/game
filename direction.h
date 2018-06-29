@@ -1,5 +1,4 @@
-#ifndef DIRECTION_H
-#define DIRECTION_H
+#pragma once
 
 #include "types.h"
 
@@ -55,5 +54,3 @@ DirectionMask_t direction_mask_rotate_clockwise(DirectionMask_t mask);
 DirectionMask_t direction_mask_flip_horizontal(DirectionMask_t mask);
 DirectionMask_t direction_mask_flip_vertical(DirectionMask_t mask);
 const char* direction_to_string(Direction_t dir);
-
-#endif

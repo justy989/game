@@ -1,5 +1,4 @@
-#ifndef CONVERSION_H
-#define CONVERSION_H
+#pragma once
 
 #include "position.h"
 #include "coord.h"
@@ -18,5 +17,3 @@ Position_t pixel_to_pos(Pixel_t v);
 DirectionMask_t directions_between(Coord_t a, Coord_t b);
 DirectionMask_t directions_between(Pixel_t a, Pixel_t b);
 Direction_t relative_quadrant(Pixel_t a, Pixel_t b);
-
-#endif

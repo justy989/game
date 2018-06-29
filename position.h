@@ -1,5 +1,4 @@
-#ifndef POSITION_H
-#define POSITION_H
+#pragma once
 
 #include "pixel.h"
 #include "vec.h"
@@ -22,5 +21,3 @@ Position_t operator-(Position_t a, Position_t b);
 void operator+=(Position_t& a, Position_t b);
 void operator-=(Position_t& a, Position_t b);
 Position_t operator*(Position_t p, float scale);
-
-#endif
