@@ -593,7 +593,9 @@ S8 teleport_position_across_portal(Position_t* position, Vec_t* pos_delta, QuadT
      return -1;
 }
 
-void illuminate_line(Coord_t start, Coord_t end, U8 value, TileMap_t* tilemap, QuadTreeNode_t<Block_t>* block_quad_tree){
+void illuminate_line(Coord_t start, Coord_t end, U8 value, TileMap_t* tilemap,
+                     QuadTreeNode_t<Interactive_t>* interactive_quad_tree, QuadTreeNode_t<Block_t>* block_quad_tree,
+                     Coord_t from_portal){
      Coord_t coords[LIGHT_MAX_LINE_LEN];
      S8 coord_count = 0;
 
@@ -648,22 +650,19 @@ void illuminate_line(Coord_t start, Coord_t end, U8 value, TileMap_t* tilemap, Q
 
           U8 new_value = value - (distance * LIGHT_DECAY);
 
-#if 0
-          if(tile->solid.type == SOLID_PORTAL && tile->solid.portal.on){
-               ConnectedPortals_t connected_portals = {};
-               find_connected_portals(tilemap, coords[i], &connected_portals);
-               Coord_t end_offset = end - coords[i];
-               Coord_t prev_offset = coords[i] - coords[i - 1];
-
-               for(S32 p = 0; p < connected_portals.coord_count; ++p){
-                    if(connected_portals.coords[p] != coords[i]){
-                         Coord_t dst_coord = connected_portals.coords[p] + prev_offset;
-                         illuminate_line(dst_coord, dst_coord + end_offset, new_value, tilemap, block_array);
+          if(coords[i] != from_portal){
+               Interactive_t* interactive = quad_tree_interactive_find_at(interactive_quad_tree, coords[i]);
+               if(is_active_portal(interactive)){
+                    PortalExit_t portal_exits = find_portal_exits(coords[i], tilemap, interactive_quad_tree);
+                    for(S8 d = 0; d < DIRECTION_COUNT; d++){
+                         for(S8 p = 0; p < portal_exits.directions[d].count; p++){
+                              if(portal_exits.directions[d].coords[p] == coords[i]) continue;
+                              illuminate(portal_exits.directions[d].coords[p], new_value, tilemap, interactive_quad_tree, block_quad_tree,
+                                         portal_exits.directions[d].coords[p]);
+                         }
                     }
                }
-               break;
           }
-#endif
 
           Block_t* block = nullptr;
           if(coords[i] != start){
@@ -692,7 +691,9 @@ void illuminate_line(Coord_t start, Coord_t end, U8 value, TileMap_t* tilemap, Q
      }
 }
 
-void illuminate(Coord_t coord, U8 value, TileMap_t* tilemap, QuadTreeNode_t<Block_t>* block_quad_tree){
+void illuminate(Coord_t coord, U8 value, TileMap_t* tilemap,
+                QuadTreeNode_t<Interactive_t>* interactive_quad_tree, QuadTreeNode_t<Block_t>* block_quad_tree,
+                Coord_t from_portal){
      if(coord.x < 0 || coord.y < 0 || coord.x >= tilemap->width || coord.y >= tilemap->height) return;
 
      S16 radius = ((value - BASE_LIGHT) / LIGHT_DECAY) + 1;
@@ -705,26 +706,23 @@ void illuminate(Coord_t coord, U8 value, TileMap_t* tilemap, QuadTreeNode_t<Bloc
 
      for(S16 j = min.y + 1; j < max.y; ++j) {
           // bottom of box
-          illuminate_line(coord, Coord_t{min.x, j}, value, tilemap, block_quad_tree);
+          illuminate_line(coord, Coord_t{min.x, j}, value, tilemap, interactive_quad_tree, block_quad_tree, from_portal);
 
           // top of box
-          illuminate_line(coord, Coord_t{max.x, j}, value, tilemap, block_quad_tree);
+          illuminate_line(coord, Coord_t{max.x, j}, value, tilemap, interactive_quad_tree, block_quad_tree, from_portal);
      }
 
      for(S16 i = min.x + 1; i < max.x; ++i) {
           // left of box
-          illuminate_line(coord, Coord_t{i, min.y,}, value, tilemap, block_quad_tree);
+          illuminate_line(coord, Coord_t{i, min.y,}, value, tilemap, interactive_quad_tree, block_quad_tree, from_portal);
 
           // right of box
-          illuminate_line(coord, Coord_t{i, max.y,}, value, tilemap, block_quad_tree);
+          illuminate_line(coord, Coord_t{i, max.y,}, value, tilemap, interactive_quad_tree, block_quad_tree, from_portal);
      }
 }
 
 static void impact_ice(Coord_t center, S16 radius, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree,
                        QuadTreeNode_t<Block_t>* block_quad_tree, bool teleported, bool spread_the_ice){
-     // TODO: teleport element!
-     (void)(teleported);
-
      Coord_t delta {radius, radius};
      Coord_t min = center - delta;
      Coord_t max = center + delta;
@@ -790,7 +788,7 @@ static void impact_ice(Coord_t center, S16 radius, TileMap_t* tilemap, QuadTreeN
                          }
                     }
 
-                    if(is_active_portal(interactive)){
+                    if(is_active_portal(interactive) && !teleported){
                          auto portal_exits = find_portal_exits(coord, tilemap, interactive_quad_tree);
                          for(S8 d = 0; d < DIRECTION_COUNT; d++){
                               for(S8 p = 0; p < portal_exits.directions[d].count; p++){

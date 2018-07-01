@@ -1010,7 +1010,7 @@ int main(int argc, char** argv){
                Coord_t pre_move_coord = pixel_to_coord(arrow->pos.pixel);
 
                if(arrow->element == ELEMENT_FIRE){
-                    illuminate(pre_move_coord, 255 - LIGHT_DECAY, &tilemap, block_quad_tree);
+                    illuminate(pre_move_coord, 255 - LIGHT_DECAY, &tilemap, interactive_quad_tree, block_quad_tree);
                }
 
                if(arrow->stuck_time > 0.0f){
@@ -1479,7 +1479,7 @@ int main(int argc, char** argv){
           for(S16 i = 0; i < block_array.count; i++){
                Block_t* block = block_array.elements + i;
                if(block->element == ELEMENT_FIRE){
-                    illuminate(block_get_coord(block), 255, &tilemap, block_quad_tree);
+                    illuminate(block_get_coord(block), 255, &tilemap, interactive_quad_tree, block_quad_tree);
                }else if(block->element == ELEMENT_ICE){
                     auto block_coord = block_get_coord(block);
                     spread_ice(block_coord, 1, &tilemap, interactive_quad_tree, block_quad_tree, false);
@@ -1841,7 +1841,7 @@ int main(int argc, char** argv){
           draw_quad_wireframe(&collided_with_quad, 255.0f, 0.0f, 255.0f);
 #endif
 
-#if 0
+#if 1
           // light
           glBindTexture(GL_TEXTURE_2D, 0);
           glBegin(GL_QUADS);

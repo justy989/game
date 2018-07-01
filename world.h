@@ -28,8 +28,12 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
 S8 teleport_position_across_portal(Position_t* position, Vec_t* pos_delta, QuadTreeNode_t<Interactive_t>* interactive_quad_tree,
                                    TileMap_t* tilemap, Coord_t premove_coord, Coord_t postmove_coord);
 
-void illuminate_line(Coord_t start, Coord_t end, U8 value, TileMap_t* tilemap, QuadTreeNode_t<Block_t>* block_quad_tree);
-void illuminate(Coord_t coord, U8 value, TileMap_t* tilemap, QuadTreeNode_t<Block_t>* block_quad_tree);
+void illuminate_line(Coord_t start, Coord_t end, U8 value, TileMap_t* tilemap,
+                     QuadTreeNode_t<Interactive_t>* interactive_quad_tree, QuadTreeNode_t<Block_t>* block_quad_tree,
+                     Coord_t from_portal = Coord_t{-1, -1});
+void illuminate(Coord_t coord, U8 value, TileMap_t* tilemap,
+                QuadTreeNode_t<Interactive_t>* interactive_quad_tree, QuadTreeNode_t<Block_t>* block_quad_tree,
+                Coord_t from_portal = Coord_t{-1, -1});
 
 void spread_ice(Coord_t center, S16 radius, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree,
                 QuadTreeNode_t<Block_t>* block_quad_tree, bool teleported);
