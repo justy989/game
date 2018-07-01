@@ -12,7 +12,7 @@ void portal_exit_add(PortalExit_t* portal_exit, Direction_t direction, Coord_t c
 void find_portal_exits_impl(Coord_t coord, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree,
                             PortalExit_t* portal_exit, Direction_t from){
      Interactive_t* interactive = quad_tree_interactive_find_at(interactive_quad_tree, coord);
-     if(interactive && interactive->type == INTERACTIVE_TYPE_PORTAL && interactive->portal.on){
+     if(is_active_portal(interactive)){
           portal_exit_add(portal_exit, interactive->portal.face, coord);
           return;
      }

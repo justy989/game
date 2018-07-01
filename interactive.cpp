@@ -81,3 +81,7 @@ bool interactive_equal(const Interactive_t* a, const Interactive_t* b){
 
      return true;
 }
+
+bool is_active_portal(const Interactive_t* interactive){
+     return interactive && interactive->type == INTERACTIVE_TYPE_PORTAL && interactive->portal.on;
+}

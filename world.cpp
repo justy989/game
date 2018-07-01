@@ -337,7 +337,7 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
                     Coord_t check_coord = block_coord + (Direction_t)(r);
                     Interactive_t* interactive = quad_tree_interactive_find_at(interactive_quad_tree, check_coord);
 
-                    if(interactive && interactive->type == INTERACTIVE_TYPE_PORTAL && interactive->portal.on){
+                    if(is_active_portal(interactive)){
                          PortalExit_t portal_exits = find_portal_exits(check_coord, tilemap, interactive_quad_tree);
 
                          for(S8 d = 0; d < DIRECTION_COUNT && !collide_with_block; d++){
@@ -352,7 +352,7 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
 
                                    if(collide_with_block){
                                         block_pos = portal_pos;
-                                        if(interactive && interactive->type == INTERACTIVE_TYPE_PORTAL && interactive->portal.on){
+                                        if(is_active_portal(interactive)){
                                              player_face = direction_opposite(interactive->portal.face);
                                              portal_rotations = portal_rotations_between(interactive->portal.face, (Direction_t)(d));
                                              break;
@@ -560,7 +560,7 @@ S8 teleport_position_across_portal(Position_t* position, Vec_t* pos_delta, QuadT
                                    TileMap_t* tilemap, Coord_t premove_coord, Coord_t postmove_coord){
      if(postmove_coord != premove_coord){
           auto* interactive = quad_tree_interactive_find_at(interactive_quad_tree, postmove_coord);
-          if(interactive && interactive->type == INTERACTIVE_TYPE_PORTAL && interactive->portal.on){
+          if(is_active_portal(interactive)){
                if(interactive->portal.face == direction_opposite(direction_between(postmove_coord, premove_coord))){
                     Position_t offset_from_center = *position - coord_to_pos_at_tile_center(postmove_coord);
                     PortalExit_t portal_exit = find_portal_exits(postmove_coord, tilemap, interactive_quad_tree);
@@ -723,6 +723,9 @@ void illuminate(Coord_t coord, U8 value, TileMap_t* tilemap, QuadTreeNode_t<Bloc
 
 static void impact_ice(Coord_t center, S16 radius, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree,
                        QuadTreeNode_t<Block_t>* block_quad_tree, bool teleported, bool spread_the_ice){
+     // TODO: teleport element!
+     (void)(teleported);
+
      Coord_t delta {radius, radius};
      Coord_t min = center - delta;
      Coord_t max = center + delta;
@@ -788,7 +791,7 @@ static void impact_ice(Coord_t center, S16 radius, TileMap_t* tilemap, QuadTreeN
                          }
                     }
 
-                    if(interactive && interactive->type == INTERACTIVE_TYPE_PORTAL && interactive->portal.on && !teleported){
+                    if(is_active_portal(interactive)){
                          auto portal_exits = find_portal_exits(coord, tilemap, interactive_quad_tree);
                          for(S8 d = 0; d < DIRECTION_COUNT; d++){
                               for(S8 p = 0; p < portal_exits.directions[d].count; p++){

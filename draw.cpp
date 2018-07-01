@@ -210,8 +210,7 @@ void draw_interactive(Interactive_t* interactive, Vec_t pos_vec, Coord_t coord,
 
                          Coord_t portal_dest = portal_exits.directions[d].coords[p];
                          Interactive_t* portal_dest_interactive = quad_tree_find_at(interactive_quad_tree, portal_dest.x, portal_dest.y);
-                         if(portal_dest_interactive && portal_dest_interactive->type == INTERACTIVE_TYPE_PORTAL &&
-                            portal_dest_interactive->portal.on){
+                         if(is_active_portal(portal_dest_interactive)){
                               draw_wall = false;
                               break;
                          }

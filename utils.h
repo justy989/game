@@ -43,3 +43,5 @@ Coord_t mouse_select_coord(Vec_t mouse_screen);
 Coord_t mouse_select_world(Vec_t mouse_screen, Position_t camera);
 S32 mouse_select_index(Vec_t mouse_screen);
 Vec_t coord_to_screen_position(Coord_t coord);
+
+Vec_t mass_move(Vec_t* vel, Vec_t accel, F32 dt);

@@ -4,6 +4,8 @@
 #include "conversion.h"
 #include "portal_exit.h"
 
+#include <string.h>
+
 Pixel_t g_collided_with_pixel = {};
 
 void block_push(Block_t* block, Direction_t direction, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree,
@@ -57,7 +59,7 @@ bool block_adjacent_pixels_to_check(Block_t* block_to_check, Direction_t directi
           *a = pixel;
 
           // top corner
-          pixel.y += (TILE_SIZE_IN_PIXELS - 1);
+          pixel.y += BLOCK_SOLID_SIZE_IN_PIXELS;
           *b = pixel;
           return true;
      };
@@ -69,7 +71,7 @@ bool block_adjacent_pixels_to_check(Block_t* block_to_check, Direction_t directi
           *a = pixel;
 
           // check top corner
-          pixel.y += (TILE_SIZE_IN_PIXELS - 1);
+          pixel.y += BLOCK_SOLID_SIZE_IN_PIXELS;
           *b = pixel;
           return true;
      };
@@ -81,7 +83,7 @@ bool block_adjacent_pixels_to_check(Block_t* block_to_check, Direction_t directi
           *a = pixel;
 
           // check right corner
-          pixel.x += (TILE_SIZE_IN_PIXELS - 1);
+          pixel.x += BLOCK_SOLID_SIZE_IN_PIXELS;
           *b = pixel;
           return true;
      };
@@ -93,7 +95,7 @@ bool block_adjacent_pixels_to_check(Block_t* block_to_check, Direction_t directi
           *a = pixel;
 
           // check right corner
-          pixel.x += (TILE_SIZE_IN_PIXELS - 1);
+          pixel.x += BLOCK_SOLID_SIZE_IN_PIXELS;
           *b = pixel;
           return true;
      };
@@ -163,7 +165,6 @@ Block_t* block_against_block_in_list(Block_t* block_to_check, Block_t** blocks, 
      return nullptr;
 }
 
-// TODO: the form of this function looks a lot like block_inside_another_block(), see if we can compress these
 Block_t* block_against_another_block(Block_t* block_to_check, Direction_t direction, QuadTreeNode_t<Block_t>* block_quad_tree,
                                      QuadTreeNode_t<Interactive_t>* interactive_quad_tree, TileMap_t* tilemap, Direction_t* push_dir){
      Rect_t rect = rect_to_check_surrounding_blocks(block_center_pixel(block_to_check));
@@ -173,10 +174,7 @@ Block_t* block_against_another_block(Block_t* block_to_check, Direction_t direct
      quad_tree_find_in(block_quad_tree, rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
 
      Pixel_t portal_offsets[BLOCK_QUAD_TREE_MAX_QUERY];
-     for(S8 i = 0; i < BLOCK_QUAD_TREE_MAX_QUERY; i++){
-          portal_offsets[i].x = 0;
-          portal_offsets[i].y = 0;
-     }
+     memset(portal_offsets, 0, sizeof(portal_offsets));
 
      Block_t* collided_block = block_against_block_in_list(block_to_check, blocks, block_count, direction, portal_offsets);
      if(collided_block){
@@ -194,7 +192,7 @@ Block_t* block_against_another_block(Block_t* block_to_check, Direction_t direct
                Coord_t src_coord = {x, y};
 
                Interactive_t* interactive = quad_tree_interactive_find_at(interactive_quad_tree, src_coord);
-               if(interactive && interactive->type == INTERACTIVE_TYPE_PORTAL && interactive->portal.on){
+               if(is_active_portal(interactive)){
                     auto portal_exits = find_portal_exits(src_coord, tilemap, interactive_quad_tree);
                     for(S8 d = 0; d < DIRECTION_COUNT; d++){
                          for(S8 p = 0; p < portal_exits.directions[d].count; p++){
@@ -241,8 +239,8 @@ Interactive_t* block_against_solid_interactive(Block_t* block_to_check, Directio
 
 Block_t* block_inside_block_list(Block_t* block_to_check, Block_t** blocks, S16 block_count, Position_t* collided_with, Pixel_t* portal_offsets){
      Rect_t rect = {block_to_check->pos.pixel.x, block_to_check->pos.pixel.y,
-                    (S16)(block_to_check->pos.pixel.x + TILE_SIZE_IN_PIXELS - 1),
-                    (S16)(block_to_check->pos.pixel.y + TILE_SIZE_IN_PIXELS - 1)};
+                    (S16)(block_to_check->pos.pixel.x + BLOCK_SOLID_SIZE_IN_PIXELS),
+                    (S16)(block_to_check->pos.pixel.y + BLOCK_SOLID_SIZE_IN_PIXELS)};
 
      for(S16 i = 0; i < block_count; i++){
           if(blocks[i] == block_to_check && portal_offsets[i].x == 0 && portal_offsets[i].y == 0) continue;
@@ -250,14 +248,10 @@ Block_t* block_inside_block_list(Block_t* block_to_check, Block_t** blocks, S16 
 
           Pixel_t pixel_to_check = block->pos.pixel + portal_offsets[i];
 
-          Pixel_t top_left {pixel_to_check.x, (S16)(pixel_to_check.y + TILE_SIZE_IN_PIXELS - 1)};
-          Pixel_t top_right {(S16)(pixel_to_check.x + TILE_SIZE_IN_PIXELS - 1), (S16)(pixel_to_check.y + TILE_SIZE_IN_PIXELS - 1)};
-          Pixel_t bottom_right {(S16)(pixel_to_check.x + TILE_SIZE_IN_PIXELS - 1), pixel_to_check.y};
-
           if(pixel_in_rect(pixel_to_check, rect) ||
-             pixel_in_rect(top_left, rect) ||
-             pixel_in_rect(top_right, rect) ||
-             pixel_in_rect(bottom_right, rect)){
+             pixel_in_rect(block_top_left_pixel(pixel_to_check), rect) ||
+             pixel_in_rect(block_top_right_pixel(pixel_to_check), rect) ||
+             pixel_in_rect(block_bottom_right_pixel(pixel_to_check), rect)){
                *collided_with = block_get_center(block);
                collided_with->pixel += portal_offsets[i];
                g_collided_with_pixel = collided_with->pixel;
@@ -279,10 +273,7 @@ BlockInsideResult_t block_inside_another_block(Block_t* block_to_check, QuadTree
      quad_tree_find_in(block_quad_tree, surrounding_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
 
      Pixel_t portal_offsets[BLOCK_QUAD_TREE_MAX_QUERY];
-     for(S8 i = 0; i < BLOCK_QUAD_TREE_MAX_QUERY; i++){
-          portal_offsets[i].x = 0;
-          portal_offsets[i].y = 0;
-     }
+     memset(portal_offsets, 0, sizeof(portal_offsets));
 
      Block_t* collided_block = block_inside_block_list(block_to_check, blocks, block_count, &result.collision_pos, portal_offsets);
      if(collided_block){
@@ -300,7 +291,7 @@ BlockInsideResult_t block_inside_another_block(Block_t* block_to_check, QuadTree
                Coord_t src_coord = {x, y};
 
                Interactive_t* interactive = quad_tree_interactive_find_at(interactive_quad_tree, src_coord);
-               if(interactive && interactive->type == INTERACTIVE_TYPE_PORTAL && interactive->portal.on){
+               if(is_active_portal(interactive)){
                     auto portal_exits = find_portal_exits(src_coord, tilemap, interactive_quad_tree);
                     for(S8 d = 0; d < DIRECTION_COUNT; d++){
                          for(S8 p = 0; p < portal_exits.directions[d].count; p++){
@@ -375,8 +366,8 @@ Tile_t* block_against_solid_tile(Block_t* block_to_check, Direction_t direction,
 Block_t* block_held_up_by_another_block(Block_t* block_to_check, QuadTreeNode_t<Block_t>* block_quad_tree){
      // TODO: need more complicated function to detect this
      Rect_t rect = {block_to_check->pos.pixel.x, block_to_check->pos.pixel.y,
-                    (S16)(block_to_check->pos.pixel.x + TILE_SIZE_IN_PIXELS - 1),
-                    (S16)(block_to_check->pos.pixel.y + TILE_SIZE_IN_PIXELS - 1)};
+                    (S16)(block_to_check->pos.pixel.x + BLOCK_SOLID_SIZE_IN_PIXELS),
+                    (S16)(block_to_check->pos.pixel.y + BLOCK_SOLID_SIZE_IN_PIXELS)};
      Rect_t surrounding_rect = rect_to_check_surrounding_blocks(block_center_pixel(block_to_check));
      S16 block_count = 0;
      Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
@@ -386,14 +377,10 @@ Block_t* block_held_up_by_another_block(Block_t* block_to_check, QuadTreeNode_t<
           Block_t* block = blocks[i];
           if(block == block_to_check || block->pos.z != held_at_height) continue;
 
-          Pixel_t top_left {block->pos.pixel.x, (S16)(block->pos.pixel.y + TILE_SIZE_IN_PIXELS - 1)};
-          Pixel_t top_right {(S16)(block->pos.pixel.x + TILE_SIZE_IN_PIXELS - 1), (S16)(block->pos.pixel.y + TILE_SIZE_IN_PIXELS - 1)};
-          Pixel_t bottom_right {(S16)(block->pos.pixel.x + TILE_SIZE_IN_PIXELS - 1), block->pos.pixel.y};
-
           if(pixel_in_rect(block->pos.pixel, rect) ||
-             pixel_in_rect(top_left, rect) ||
-             pixel_in_rect(top_right, rect) ||
-             pixel_in_rect(bottom_right, rect)){
+             pixel_in_rect(block_top_left_pixel(block->pos.pixel), rect) ||
+             pixel_in_rect(block_top_right_pixel(block->pos.pixel), rect) ||
+             pixel_in_rect(block_bottom_right_pixel(block->pos.pixel), rect)){
                return block;
           }
      }

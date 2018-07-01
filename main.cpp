@@ -37,10 +37,6 @@ http://www.simonstalenhag.se/
 
 // #define BLOCKS_SQUISH_PLAYER
 
-// new quakelive bot settings
-// bot_thinktime
-// challenge mode
-
 FILE* load_demo_number(S32 map_number, const char** demo_filepath){
      char filepath[64] = {};
      snprintf(filepath, 64, "content/%03d.bd", map_number);
@@ -1155,24 +1151,30 @@ int main(int argc, char** argv){
 
                     Interactive_t* interactive = quad_tree_interactive_find_at(interactive_quad_tree, post_move_coord);
                     if(interactive){
-                         if(interactive->type == INTERACTIVE_TYPE_LEVER){
+                         switch(interactive->type){
+                         default:
+                              break;
+                         case INTERACTIVE_TYPE_LEVER:
                               if(arrow->pos.z >= HEIGHT_INTERVAL){
                                    activate(&tilemap, interactive_quad_tree, post_move_coord);
                               }else{
                                    arrow->stuck_time = dt;
                               }
-                         }else if(interactive->type == INTERACTIVE_TYPE_DOOR){
+                              break;
+                         case INTERACTIVE_TYPE_DOOR:
                               if(interactive->door.lift.ticks < arrow->pos.z){
                                    arrow->stuck_time = dt;
                                    // TODO: stuck in door
                               }
-                         }else if(interactive->type == INTERACTIVE_TYPE_POPUP){
+                              break;
+                         case INTERACTIVE_TYPE_POPUP:
                               if(interactive->popup.lift.ticks > arrow->pos.z){
                                    LOG("arrow z: %d, popup lift: %d\n", arrow->pos.z, interactive->popup.lift.ticks);
                                    arrow->stuck_time = dt;
                                    // TODO: stuck in popup
                               }
-                         }else if(interactive->type == INTERACTIVE_TYPE_PORTAL){
+                              break;
+                         case INTERACTIVE_TYPE_PORTAL:
                               if(!interactive->portal.on){
                                    arrow->stuck_time = dt;
                                    // TODO: arrow drops if portal turns on
@@ -1180,6 +1182,7 @@ int main(int argc, char** argv){
                                    // TODO: arrow drops if portal turns on
                                    arrow->stuck_time = dt;
                               }
+                              break;
                          }
                     }
 
@@ -1311,18 +1314,13 @@ int main(int argc, char** argv){
           Position_t camera_movement = room_center - camera;
           camera += camera_movement * 0.05f;
 
-          float drag = 0.625f;
-
           // block movement
           for(S16 i = 0; i < block_array.count; i++){
                Block_t* block = block_array.elements + i;
 
                //Coord_t block_prev_coord = pos_to_coord(block->pos);
 
-               // TODO: compress with player movement
-               Vec_t pos_delta = (block->accel * dt * dt * 0.5f) + (block->vel * dt);
-               block->vel += block->accel * dt;
-               block->vel *= drag;
+               Vec_t pos_delta = mass_move(&block->vel, block->accel, dt);
 
                // TODO: blocks with velocity need to be checked against other blocks
 
@@ -1564,9 +1562,7 @@ int main(int argc, char** argv){
                user_movement = vec_normalize(user_movement);
                player.accel = user_movement * PLAYER_SPEED;
 
-               Vec_t pos_delta = (player.accel * dt * dt * 0.5f) + (player.vel * dt);
-               player.vel += player.accel * dt;
-               player.vel *= drag;
+               Vec_t pos_delta = mass_move(&player.vel, player.accel, dt);
 
                if(fabs(vec_magnitude(player.vel)) > PLAYER_SPEED){
                     player.vel = vec_normalize(player.vel) * PLAYER_SPEED;
@@ -1674,7 +1670,7 @@ int main(int argc, char** argv){
 
                     Tile_t* tile = tilemap.tiles[y] + x;
                     Interactive_t* interactive = quad_tree_find_at(interactive_quad_tree, x, y);
-                    if(interactive && interactive->type == INTERACTIVE_TYPE_PORTAL && interactive->portal.on){
+                    if(is_active_portal(interactive)){
                          Coord_t coord {x, y};
                          PortalExit_t portal_exits = find_portal_exits(coord, &tilemap, interactive_quad_tree);
 
@@ -1702,7 +1698,7 @@ int main(int argc, char** argv){
                     Coord_t coord {x, y};
                     Interactive_t* interactive = quad_tree_find_at(interactive_quad_tree, coord.x, coord.y);
 
-                    if(interactive && interactive->type == INTERACTIVE_TYPE_PORTAL && interactive->portal.on){
+                    if(is_active_portal(interactive)){
                          PortalExit_t portal_exits = find_portal_exits(coord, &tilemap, interactive_quad_tree);
 
                          for(S8 d = 0; d < DIRECTION_COUNT; d++){

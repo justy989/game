@@ -166,10 +166,8 @@ Interactive_t* quad_tree_interactive_solid_at(QuadTreeNode_t<Interactive_t>* roo
      if(interactive){
           if(interactive_is_solid(interactive)){
                return interactive;
-          }else if(interactive->type == INTERACTIVE_TYPE_PORTAL){
-               if(interactive->portal.on){
-                    if(!portal_has_destination(coord, tilemap, root)) return interactive;
-               }
+          }else if(is_active_portal(interactive)){
+               if(!portal_has_destination(coord, tilemap, root)) return interactive;
           }
      }
 
@@ -192,7 +190,7 @@ void find_portal_adjacents_to_skip_collision_check(Coord_t coord, QuadTreeNode_t
 
      // figure out which coords we can skip collision checking on, because they have portal exits
      Interactive_t* interactive = quad_tree_interactive_find_at(interactive_quad_tree, coord);
-     if(interactive && interactive->type == INTERACTIVE_TYPE_PORTAL && interactive->portal.on){
+     if(is_active_portal(interactive)){
           skip_coord[interactive->portal.face] = coord + interactive->portal.face;
      }
 }
@@ -207,8 +205,7 @@ bool portal_has_destination(Coord_t coord, TileMap_t* tilemap, QuadTreeNode_t<In
 
                Coord_t portal_dest = portal_exits.directions[d].coords[p];
                Interactive_t* portal_dest_interactive = quad_tree_find_at(interactive_quad_tree, portal_dest.x, portal_dest.y);
-               if(portal_dest_interactive && portal_dest_interactive->type == INTERACTIVE_TYPE_PORTAL &&
-                  portal_dest_interactive->portal.on){
+               if(is_active_portal(portal_dest_interactive)){
                     result = true;
                     break;
                }
@@ -259,4 +256,11 @@ Vec_t coord_to_screen_position(Coord_t coord){
      Pixel_t pixel = coord_to_pixel(coord);
      Position_t relative_loc {pixel, 0, {0.0f, 0.0f}};
      return pos_to_vec(relative_loc);
+}
+
+Vec_t mass_move(Vec_t* vel, Vec_t accel, F32 dt){
+     Vec_t pos_dt = (accel * dt * dt * 0.5f) + (*vel * dt);
+     *vel += accel * dt;
+     *vel *= MASS_DRAG;
+     return pos_dt;
 }

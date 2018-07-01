@@ -57,3 +57,16 @@ bool block_x_tile_aligned(Block_t* block){
      return (block->pos.decimal.x == 0.0f &&
              (block->pos.pixel.x % TILE_SIZE_IN_PIXELS) == 0);
 }
+
+Pixel_t block_bottom_right_pixel(Pixel_t block_pixel){
+     return Pixel_t{(S16)(block_pixel.x + BLOCK_SOLID_SIZE_IN_PIXELS), block_pixel.y};
+}
+
+Pixel_t block_top_left_pixel(Pixel_t block_pixel){
+     return Pixel_t{block_pixel.x, (S16)(block_pixel.y + BLOCK_SOLID_SIZE_IN_PIXELS)};
+}
+
+Pixel_t block_top_right_pixel(Pixel_t block_pixel){
+     return Pixel_t{(S16)(block_pixel.x + BLOCK_SOLID_SIZE_IN_PIXELS),
+                    (S16)(block_pixel.y + BLOCK_SOLID_SIZE_IN_PIXELS)};
+}
