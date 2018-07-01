@@ -16,6 +16,7 @@ struct Block_t{
      Element_t element;
      Pixel_t push_start;
      F32 fall_time;
+     S16 entangle_index;
 };
 
 S16 get_object_x(Block_t* block);

@@ -8,7 +8,7 @@
 
 #include <stdio.h>
 
-#define MAP_VERSION 1
+#define MAP_VERSION 2
 
 #pragma pack(push, 1)
 struct MapTileV1_t{
@@ -21,6 +21,14 @@ struct MapBlockV1_t{
      Direction_t face;
      Element_t element;
      S8 z;
+};
+
+struct MapBlockV2_t{
+     Pixel_t pixel;
+     Direction_t face;
+     Element_t element;
+     S8 z;
+     S16 entangle_index;
 };
 
 struct MapPopupV1_t{
