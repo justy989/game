@@ -48,44 +48,45 @@ GLuint transparent_texture_from_file(const char* filepath){
      return texture_id;
 }
 
-void draw_theme_frame(Vec_t tex_vec, Vec_t pos_vec){
-     glTexCoord2f(tex_vec.x, tex_vec.y);
-     glVertex2f(pos_vec.x, pos_vec.y);
-     glTexCoord2f(tex_vec.x, tex_vec.y + THEME_FRAME_HEIGHT);
-     glVertex2f(pos_vec.x, pos_vec.y + TILE_SIZE);
-     glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y + THEME_FRAME_HEIGHT);
-     glVertex2f(pos_vec.x + TILE_SIZE, pos_vec.y + TILE_SIZE);
-     glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y);
-     glVertex2f(pos_vec.x + TILE_SIZE, pos_vec.y);
+void draw_screen_texture(Vec_t pos, Vec_t tex, Vec_t dim, Vec_t tex_dim){
+     glTexCoord2f(tex.x, tex.y);
+     glVertex2f(pos.x, pos.y);
+     glTexCoord2f(tex.x, tex.y + tex_dim.y);
+     glVertex2f(pos.x, pos.y + dim.y);
+     glTexCoord2f(tex.x + tex_dim.x, tex.y + tex_dim.y);
+     glVertex2f(pos.x + dim.x, pos.y + dim.y);
+     glTexCoord2f(tex.x + tex_dim.x, tex.y);
+     glVertex2f(pos.x + dim.x, pos.y);
 }
 
-void draw_double_theme_frame(Vec_t tex_vec, Vec_t pos_vec){
-     glTexCoord2f(tex_vec.x, tex_vec.y);
-     glVertex2f(pos_vec.x, pos_vec.y);
-     glTexCoord2f(tex_vec.x, tex_vec.y + 2.0f * THEME_FRAME_HEIGHT);
-     glVertex2f(pos_vec.x, pos_vec.y + 2.0f * TILE_SIZE);
-     glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y + 2.0f * THEME_FRAME_HEIGHT);
-     glVertex2f(pos_vec.x + TILE_SIZE, pos_vec.y + 2.0f * TILE_SIZE);
-     glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y);
-     glVertex2f(pos_vec.x + TILE_SIZE, pos_vec.y);
+void draw_theme_frame(Vec_t pos, Vec_t tex){
+     Vec_t dim {TILE_SIZE, TILE_SIZE};
+     Vec_t tex_dim {THEME_FRAME_WIDTH, THEME_FRAME_HEIGHT};
+     draw_screen_texture(pos, tex, dim, tex_dim);
+}
+
+void draw_double_theme_frame(Vec_t pos, Vec_t tex){
+     Vec_t dim {TILE_SIZE, 2.0f * TILE_SIZE};
+     Vec_t tex_dim {THEME_FRAME_WIDTH, 2.0f * THEME_FRAME_HEIGHT};
+     draw_screen_texture(pos, tex, dim, tex_dim);
 }
 
 void draw_tile_id(U8 id, Vec_t pos){
      U8 id_x = id % 16;
      U8 id_y = id / 16;
 
-     draw_theme_frame(theme_frame(id_x, id_y), pos);
+     draw_theme_frame(pos, theme_frame(id_x, id_y));
 }
 
 void draw_tile_flags(U16 flags, Vec_t tile_pos){
      if(flags == 0) return;
 
      if(flags & TILE_FLAG_CHECKPOINT){
-          draw_theme_frame(theme_frame(0, 21), tile_pos);
+          draw_theme_frame(tile_pos, theme_frame(0, 21));
      }
 
      if(flags & TILE_FLAG_RESET_IMMUNE){
-          draw_theme_frame(theme_frame(1, 21), tile_pos);
+          draw_theme_frame(tile_pos, theme_frame(1, 21));
      }
 
      if(flags & (TILE_FLAG_WIRE_LEFT | TILE_FLAG_WIRE_RIGHT | TILE_FLAG_WIRE_UP | TILE_FLAG_WIRE_DOWN)){
@@ -94,7 +95,7 @@ void draw_tile_flags(U16 flags, Vec_t tile_pos){
 
           if(flags & TILE_FLAG_WIRE_STATE) frame_y++;
 
-          draw_theme_frame(theme_frame(frame_x, frame_y), tile_pos);
+          draw_theme_frame(tile_pos, theme_frame(frame_x, frame_y));
      }
 
      if(flags & (TILE_FLAG_WIRE_CLUSTER_LEFT | TILE_FLAG_WIRE_CLUSTER_MID | TILE_FLAG_WIRE_CLUSTER_RIGHT)){
@@ -108,7 +109,7 @@ void draw_tile_flags(U16 flags, Vec_t tile_pos){
                     frame_x = 0;
                }
 
-               draw_theme_frame(theme_frame(frame_x, frame_y), tile_pos);
+               draw_theme_frame(tile_pos, theme_frame(frame_x, frame_y));
           }
 
           if(flags & TILE_FLAG_WIRE_CLUSTER_MID){
@@ -118,7 +119,7 @@ void draw_tile_flags(U16 flags, Vec_t tile_pos){
                     frame_x = 2;
                }
 
-               draw_theme_frame(theme_frame(frame_x, frame_y), tile_pos);
+               draw_theme_frame(tile_pos, theme_frame(frame_x, frame_y));
           }
 
           if(flags & TILE_FLAG_WIRE_CLUSTER_RIGHT){
@@ -128,58 +129,28 @@ void draw_tile_flags(U16 flags, Vec_t tile_pos){
                     frame_x = 4;
                }
 
-               draw_theme_frame(theme_frame(frame_x, frame_y), tile_pos);
+               draw_theme_frame(tile_pos, theme_frame(frame_x, frame_y));
           }
      }
 }
 
 void draw_block(Block_t* block, Vec_t pos_vec){
      Vec_t tex_vec = theme_frame(0, 6);
-     glTexCoord2f(tex_vec.x, tex_vec.y);
-     glVertex2f(pos_vec.x, pos_vec.y);
-     glTexCoord2f(tex_vec.x, tex_vec.y + 2.0f * THEME_FRAME_HEIGHT);
-     glVertex2f(pos_vec.x, pos_vec.y + 2.0f * TILE_SIZE);
-     glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y + 2.0f * THEME_FRAME_HEIGHT);
-     glVertex2f(pos_vec.x + TILE_SIZE, pos_vec.y + 2.0f * TILE_SIZE);
-     glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y);
-     glVertex2f(pos_vec.x + TILE_SIZE, pos_vec.y);
+     draw_double_theme_frame(pos_vec, tex_vec);
 
      if(block->element == ELEMENT_ONLY_ICED || block->element == ELEMENT_ICE ){
           tex_vec = theme_frame(4, 12);
           glColor4f(1.0f, 1.0f, 1.0f, 0.5f);
-          glTexCoord2f(tex_vec.x, tex_vec.y);
-          glVertex2f(pos_vec.x, pos_vec.y);
-          glTexCoord2f(tex_vec.x, tex_vec.y + 2.0f * THEME_FRAME_HEIGHT);
-          glVertex2f(pos_vec.x, pos_vec.y + 2.0f * TILE_SIZE);
-          glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y + 2.0f * THEME_FRAME_HEIGHT);
-          glVertex2f(pos_vec.x + TILE_SIZE, pos_vec.y + 2.0f * TILE_SIZE);
-          glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y);
-          glVertex2f(pos_vec.x + TILE_SIZE, pos_vec.y);
+          draw_double_theme_frame(pos_vec, tex_vec);
           glColor3f(1.0f, 1.0f, 1.0f);
      }
 
      if(block->element == ELEMENT_FIRE){
           tex_vec = theme_frame(1, 6);
-          // TODO: compress
-          glTexCoord2f(tex_vec.x, tex_vec.y);
-          glVertex2f(pos_vec.x, pos_vec.y);
-          glTexCoord2f(tex_vec.x, tex_vec.y + 2.0f * THEME_FRAME_HEIGHT);
-          glVertex2f(pos_vec.x, pos_vec.y + 2.0f * TILE_SIZE);
-          glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y + 2.0f * THEME_FRAME_HEIGHT);
-          glVertex2f(pos_vec.x + TILE_SIZE, pos_vec.y + 2.0f * TILE_SIZE);
-          glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y);
-          glVertex2f(pos_vec.x + TILE_SIZE, pos_vec.y);
+          draw_double_theme_frame(pos_vec, tex_vec);
      }else if(block->element == ELEMENT_ICE){
           tex_vec = theme_frame(5, 6);
-          // TODO: compress
-          glTexCoord2f(tex_vec.x, tex_vec.y);
-          glVertex2f(pos_vec.x, pos_vec.y);
-          glTexCoord2f(tex_vec.x, tex_vec.y + 2.0f * THEME_FRAME_HEIGHT);
-          glVertex2f(pos_vec.x, pos_vec.y + 2.0f * TILE_SIZE);
-          glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y + 2.0f * THEME_FRAME_HEIGHT);
-          glVertex2f(pos_vec.x + TILE_SIZE, pos_vec.y + 2.0f * TILE_SIZE);
-          glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y);
-          glVertex2f(pos_vec.x + TILE_SIZE, pos_vec.y);
+          draw_double_theme_frame(pos_vec, tex_vec);
      }
 }
 
@@ -194,33 +165,33 @@ void draw_interactive(Interactive_t* interactive, Vec_t pos_vec, Coord_t coord,
           int frame_x = 7;
           if(interactive->pressure_plate.down) frame_x++;
           tex_vec = theme_frame(frame_x, 8);
-          draw_theme_frame(tex_vec, pos_vec);
+          draw_theme_frame(pos_vec, tex_vec);
      } break;
      case INTERACTIVE_TYPE_LEVER:
           tex_vec = theme_frame(0, 12);
-          draw_double_theme_frame(tex_vec, pos_vec);
+          draw_double_theme_frame(pos_vec, tex_vec);
           break;
      case INTERACTIVE_TYPE_BOW:
-          draw_theme_frame(theme_frame(0, 9), pos_vec);
+          draw_theme_frame(pos_vec, theme_frame(0, 9));
           break;
      case INTERACTIVE_TYPE_POPUP:
           tex_vec = theme_frame(interactive->popup.lift.ticks - 1, 8);
-          draw_double_theme_frame(tex_vec, pos_vec);
+          draw_double_theme_frame(pos_vec, tex_vec);
           break;
      case INTERACTIVE_TYPE_DOOR:
           tex_vec = theme_frame(interactive->door.lift.ticks + 8, 11 + interactive->door.face);
-          draw_theme_frame(tex_vec, pos_vec);
+          draw_theme_frame(pos_vec, tex_vec);
           break;
      case INTERACTIVE_TYPE_LIGHT_DETECTOR:
-          draw_theme_frame(theme_frame(1, 11), pos_vec);
+          draw_theme_frame(pos_vec, theme_frame(1, 11));
           if(interactive->detector.on){
-               draw_theme_frame(theme_frame(2, 11), pos_vec);
+               draw_theme_frame(pos_vec, theme_frame(2, 11));
           }
           break;
      case INTERACTIVE_TYPE_ICE_DETECTOR:
-          draw_theme_frame(theme_frame(1, 12), pos_vec);
+          draw_theme_frame(pos_vec, theme_frame(1, 12));
           if(interactive->detector.on){
-               draw_theme_frame(theme_frame(2, 12), pos_vec);
+               draw_theme_frame(pos_vec, theme_frame(2, 12));
           }
           break;
      case INTERACTIVE_TYPE_PORTAL:
@@ -273,19 +244,19 @@ void draw_interactive(Interactive_t* interactive, Vec_t pos_vec, Coord_t coord,
                     break;
                }
 
-               draw_theme_frame(theme_frame(frame_x, frame_y), pos_vec);
+               draw_theme_frame(pos_vec, theme_frame(frame_x, frame_y));
           }
 
-          draw_theme_frame(theme_frame(interactive->portal.face, 26 + interactive->portal.on), pos_vec);
+          draw_theme_frame(pos_vec, theme_frame(interactive->portal.face, 26 + interactive->portal.on));
           break;
      }
      case INTERACTIVE_TYPE_WIRE_CROSS:
      {
           int y_frame = 17 + interactive->wire_cross.on;
-          if(interactive->wire_cross.mask & DIRECTION_MASK_LEFT) draw_theme_frame(theme_frame(6, y_frame), pos_vec);
-          if(interactive->wire_cross.mask & DIRECTION_MASK_UP) draw_theme_frame(theme_frame(7, y_frame), pos_vec);
-          if(interactive->wire_cross.mask & DIRECTION_MASK_RIGHT) draw_theme_frame(theme_frame(8, y_frame), pos_vec);
-          if(interactive->wire_cross.mask & DIRECTION_MASK_DOWN) draw_theme_frame(theme_frame(9, y_frame), pos_vec);
+          if(interactive->wire_cross.mask & DIRECTION_MASK_LEFT) draw_theme_frame(pos_vec, theme_frame(6, y_frame));
+          if(interactive->wire_cross.mask & DIRECTION_MASK_UP) draw_theme_frame(pos_vec, theme_frame(7, y_frame));
+          if(interactive->wire_cross.mask & DIRECTION_MASK_RIGHT) draw_theme_frame(pos_vec, theme_frame(8, y_frame));
+          if(interactive->wire_cross.mask & DIRECTION_MASK_DOWN) draw_theme_frame(pos_vec, theme_frame(9, y_frame));
           break;
      }
      }
@@ -320,6 +291,25 @@ void draw_selection(Coord_t selection_start, Coord_t selection_end, Position_t c
      draw_quad_wireframe(&selection_quad, red, green, blue);
 }
 
+static void draw_ice(Vec_t pos, GLuint theme_texture){
+     glEnd();
+
+     // get state ready for ice
+     glBindTexture(GL_TEXTURE_2D, 0);
+     glColor4f(196.0f / 255.0f, 217.0f / 255.0f, 1.0f, 0.45f);
+     glBegin(GL_QUADS);
+     glVertex2f(pos.x, pos.y);
+     glVertex2f(pos.x, pos.y + TILE_SIZE);
+     glVertex2f(pos.x + TILE_SIZE, pos.y + TILE_SIZE);
+     glVertex2f(pos.x + TILE_SIZE, pos.y);
+     glEnd();
+
+     // reset state back to default
+     glBindTexture(GL_TEXTURE_2D, theme_texture);
+     glBegin(GL_QUADS);
+     glColor3f(1.0f, 1.0f, 1.0f);
+}
+
 void draw_flats(Vec_t pos, Tile_t* tile, Interactive_t* interactive, GLuint theme_texture,
                 U8 portal_rotations){
      draw_tile_id(tile->id, pos);
@@ -342,23 +332,7 @@ void draw_flats(Vec_t pos, Tile_t* tile, Interactive_t* interactive, GLuint them
      if(interactive){
           if(interactive->type == INTERACTIVE_TYPE_PRESSURE_PLATE){
                if(!tile_is_iced(tile) && interactive->pressure_plate.iced_under){
-                    // TODO: compress with above ice drawing code
-                    glEnd();
-
-                    // get state ready for ice
-                    glBindTexture(GL_TEXTURE_2D, 0);
-                    glColor4f(196.0f / 255.0f, 217.0f / 255.0f, 1.0f, 0.45f);
-                    glBegin(GL_QUADS);
-                    glVertex2f(pos.x, pos.y);
-                    glVertex2f(pos.x, pos.y + TILE_SIZE);
-                    glVertex2f(pos.x + TILE_SIZE, pos.y + TILE_SIZE);
-                    glVertex2f(pos.x + TILE_SIZE, pos.y);
-                    glEnd();
-
-                    // reset state back to default
-                    glBindTexture(GL_TEXTURE_2D, theme_texture);
-                    glBegin(GL_QUADS);
-                    glColor3f(1.0f, 1.0f, 1.0f);
+                    draw_ice(pos, theme_texture);
                }
 
                draw_interactive(interactive, pos, Coord_t{-1, -1}, nullptr, nullptr);
@@ -367,14 +341,7 @@ void draw_flats(Vec_t pos, Tile_t* tile, Interactive_t* interactive, GLuint them
                     pos.y += interactive->popup.lift.ticks * PIXEL_SIZE;
                     Vec_t tex_vec = theme_frame(3, 12);
                     glColor4f(1.0f, 1.0f, 1.0f, 0.5f);
-                    glTexCoord2f(tex_vec.x, tex_vec.y);
-                    glVertex2f(pos.x, pos.y);
-                    glTexCoord2f(tex_vec.x, tex_vec.y + THEME_FRAME_HEIGHT);
-                    glVertex2f(pos.x, pos.y + TILE_SIZE);
-                    glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y + THEME_FRAME_HEIGHT);
-                    glVertex2f(pos.x + TILE_SIZE, pos.y + TILE_SIZE);
-                    glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y);
-                    glVertex2f(pos.x + TILE_SIZE, pos.y);
+                    draw_theme_frame(pos, tex_vec);
                     glColor3f(1.0f, 1.0f, 1.0f);
                }
 
@@ -385,24 +352,7 @@ void draw_flats(Vec_t pos, Tile_t* tile, Interactive_t* interactive, GLuint them
           }
      }
 
-     if(tile_is_iced(tile)){
-          glEnd();
-
-          // get state ready for ice
-          glBindTexture(GL_TEXTURE_2D, 0);
-          glColor4f(196.0f / 255.0f, 217.0f / 255.0f, 1.0f, 0.45f);
-          glBegin(GL_QUADS);
-          glVertex2f(pos.x, pos.y);
-          glVertex2f(pos.x, pos.y + TILE_SIZE);
-          glVertex2f(pos.x + TILE_SIZE, pos.y + TILE_SIZE);
-          glVertex2f(pos.x + TILE_SIZE, pos.y);
-          glEnd();
-
-          // reset state back to default
-          glBindTexture(GL_TEXTURE_2D, theme_texture);
-          glBegin(GL_QUADS);
-          glColor3f(1.0f, 1.0f, 1.0f);
-     }
+     if(tile_is_iced(tile)) draw_ice(pos, theme_texture);
 }
 
 void draw_solids(Vec_t pos, Interactive_t* interactive, Block_t** blocks, S16 block_count, Player_t* player,
@@ -422,14 +372,7 @@ void draw_solids(Vec_t pos, Interactive_t* interactive, Block_t** blocks, S16 bl
                     pos.y += interactive->popup.lift.ticks * PIXEL_SIZE;
                     Vec_t tex_vec = theme_frame(3, 12);
                     glColor4f(1.0f, 1.0f, 1.0f, 0.5f);
-                    glTexCoord2f(tex_vec.x, tex_vec.y);
-                    glVertex2f(pos.x, pos.y);
-                    glTexCoord2f(tex_vec.x, tex_vec.y + THEME_FRAME_HEIGHT);
-                    glVertex2f(pos.x, pos.y + TILE_SIZE);
-                    glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y + THEME_FRAME_HEIGHT);
-                    glVertex2f(pos.x + TILE_SIZE, pos.y + TILE_SIZE);
-                    glTexCoord2f(tex_vec.x + THEME_FRAME_WIDTH, tex_vec.y);
-                    glVertex2f(pos.x + TILE_SIZE, pos.y);
+                    draw_theme_frame(pos, tex_vec);
                     glColor3f(1.0f, 1.0f, 1.0f);
                }
           }
@@ -443,7 +386,7 @@ void draw_solids(Vec_t pos, Interactive_t* interactive, Block_t** blocks, S16 bl
                Position_t destination_pos = coord_to_pos_at_tile_center(destination_coord);
                Position_t source_pos = coord_to_pos_at_tile_center(source_coord);
                Position_t center_delta = block_camera_offset - source_pos;
-               center_delta = position_rotate_quadrants(center_delta, portal_rotations);
+               center_delta = position_rotate_quadrants_clockwise(center_delta, portal_rotations);
                block_camera_offset = destination_pos + center_delta;
           }
 
@@ -459,7 +402,7 @@ void draw_solids(Vec_t pos, Interactive_t* interactive, Block_t** blocks, S16 bl
                Position_t destination_pos = coord_to_pos_at_tile_center(destination_coord);
                Position_t source_pos = coord_to_pos_at_tile_center(source_coord);
                Position_t center_delta = player->pos - source_pos;
-               center_delta = position_rotate_quadrants(center_delta, portal_rotations);
+               center_delta = position_rotate_quadrants_clockwise(center_delta, portal_rotations);
                pos_vec = pos_to_vec(destination_pos + center_delta);
           }
 

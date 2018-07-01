@@ -15,10 +15,14 @@ U8 portal_rotations_between(Direction_t a, Direction_t b);
 Vec_t direction_to_vec(Direction_t d);
 Pixel_t direction_to_pixel(Direction_t d);
 
-Vec_t vec_rotate_quadrants(Vec_t vec, S8 rotations_between);
-Pixel_t pixel_rotate_quadrants(Pixel_t pixel, S8 rotations_between);
-Position_t position_rotate_quadrants(Position_t pos, S8 rotations_between);
-Vec_t rotate_vec_between_dirs(Direction_t a, Direction_t b, Vec_t vec);
+Vec_t vec_rotate_quadrants_clockwise(Vec_t vec, S8 rotations_between);
+Pixel_t pixel_rotate_quadrants_clockwise(Pixel_t pixel, S8 rotations_between);
+Position_t position_rotate_quadrants_clockwise(Position_t pos, S8 rotations_between);
+Vec_t vec_rotate_quadrants_counter_clockwise(Vec_t vec, S8 rotations_between);
+Pixel_t pixel_rotate_quadrants_counter_clockwise(Pixel_t pixel, S8 rotations_between);
+Position_t position_rotate_quadrants_counter_clockwise(Position_t pos, S8 rotations_between);
+
+Vec_t rotate_vec_between_dirs_clockwise(Direction_t a, Direction_t b, Vec_t vec);
 
 Rect_t rect_surrounding_adjacent_coords(Coord_t coord);
 

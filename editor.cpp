@@ -316,6 +316,11 @@ bool init(Editor_t* editor){
      return true;
 }
 
+void sort_selection(Editor_t* editor){
+     if(editor->selection_start.x > editor->selection_end.x) SWAP(editor->selection_start.x, editor->selection_end.x);
+     if(editor->selection_start.y > editor->selection_end.y) SWAP(editor->selection_start.y, editor->selection_end.y);
+}
+
 void destroy(Editor_t* editor){
      for(S16 i = 0; i < editor->category_array.count; i++){
           for(int j = 0; j < editor->category_array.elements[i].count; j++){

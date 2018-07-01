@@ -49,6 +49,17 @@ void reset_map(Player_t* player, Coord_t player_start, ObjectArray_t<Interactive
      init(arrow_array);
 }
 
+void setup_map(Player_t* player, Coord_t player_start, ObjectArray_t<Interactive_t>* interactive_array,
+               QuadTreeNode_t<Interactive_t>** interactive_quad_tree, ObjectArray_t<Block_t>* block_array,
+               QuadTreeNode_t<Block_t>** block_quad_tree, Undo_t* undo, TileMap_t* tilemap, ArrowArray_t* arrow_array){
+     reset_map(player, player_start, interactive_array, interactive_quad_tree, arrow_array);
+     destroy(undo);
+     init(undo, UNDO_MEMORY, tilemap->width, tilemap->height, block_array->count, interactive_array->count);
+     undo_snapshot(undo, player, tilemap, block_array, interactive_array);
+     quad_tree_free(*block_quad_tree);
+     *block_quad_tree = quad_tree_build(block_array);
+}
+
 void activate(TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree, Coord_t coord){
      Interactive_t* interactive = quad_tree_interactive_find_at(interactive_quad_tree, coord);
      if(!interactive) return;
@@ -330,7 +341,7 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
                          PortalExit_t portal_exits = find_portal_exits(check_coord, tilemap, interactive_quad_tree);
 
                          for(S8 d = 0; d < DIRECTION_COUNT && !collide_with_block; d++){
-                              Vec_t final_coord_offset = rotate_vec_between_dirs(interactive->portal.face, (Direction_t)(d), coord_offset);
+                              Vec_t final_coord_offset = rotate_vec_between_dirs_clockwise(interactive->portal.face, (Direction_t)(d), coord_offset);
 
                               for(S8 p = 0; p < portal_exits.directions[d].count; p++){
                                    if(portal_exits.directions[d].coords[p] == check_coord) continue;
@@ -355,7 +366,7 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
 
           if(collide_with_block){
                Vec_t pos_delta_diff = pos_delta - pos_delta_save;
-               collided_block_delta = vec_rotate_quadrants(pos_delta_diff, 4 - portal_rotations);
+               collided_block_delta = vec_rotate_quadrants_clockwise(pos_delta_diff, 4 - portal_rotations);
                auto collided_block_dir = relative_quadrant(position.pixel, block_pos.pixel +
                                                            Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS});
                auto collided_block = block_array->elements + i;
@@ -363,8 +374,8 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
 
 #ifndef BLOCKS_SQUISH_PLAYER
                // this stops the block when it moves into the player
-               Vec_t rotated_accel = vec_rotate_quadrants(collided_block->accel, portal_rotations);
-               Vec_t rotated_vel = vec_rotate_quadrants(collided_block->vel, portal_rotations);
+               Vec_t rotated_accel = vec_rotate_quadrants_clockwise(collided_block->accel, portal_rotations);
+               Vec_t rotated_vel = vec_rotate_quadrants_clockwise(collided_block->vel, portal_rotations);
 
                switch(collided_block_dir){
                default:
@@ -375,9 +386,8 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
                          pos_delta -= pos_delta_diff;
                          rotated_accel.x = 0.0f;
                          rotated_vel.x = 0.0f;
-                         U8 unrotations = 4 - portal_rotations;
-                         collided_block->accel = vec_rotate_quadrants(rotated_accel, unrotations);
-                         collided_block->vel = vec_rotate_quadrants(rotated_vel, unrotations);
+                         collided_block->accel = vec_rotate_quadrants_counter_clockwise(rotated_accel, portal_rotations);
+                         collided_block->vel = vec_rotate_quadrants_counter_clockwise(rotated_vel, portal_rotations);
                     }
                     break;
                case DIRECTION_RIGHT:
@@ -386,9 +396,8 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
                          pos_delta -= pos_delta_diff;
                          rotated_accel.x = 0.0f;
                          rotated_vel.x = 0.0f;
-                         U8 unrotations = 4 - portal_rotations;
-                         collided_block->accel = vec_rotate_quadrants(rotated_accel, unrotations);
-                         collided_block->vel = vec_rotate_quadrants(rotated_vel, unrotations);
+                         collided_block->accel = vec_rotate_quadrants_counter_clockwise(rotated_accel, portal_rotations);
+                         collided_block->vel = vec_rotate_quadrants_counter_clockwise(rotated_vel, portal_rotations);
                     }
                     break;
                case DIRECTION_UP:
@@ -397,9 +406,8 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
                          pos_delta -= pos_delta_diff;
                          rotated_accel.y = 0.0f;
                          rotated_vel.y = 0.0f;
-                         U8 unrotations = 4 - portal_rotations;
-                         collided_block->accel = vec_rotate_quadrants(rotated_accel, unrotations);
-                         collided_block->vel = vec_rotate_quadrants(rotated_vel, unrotations);
+                         collided_block->accel = vec_rotate_quadrants_counter_clockwise(rotated_accel, portal_rotations);
+                         collided_block->vel = vec_rotate_quadrants_counter_clockwise(rotated_vel, portal_rotations);
                     }
                     break;
                case DIRECTION_DOWN:
@@ -408,9 +416,8 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
                          pos_delta -= pos_delta_diff;
                          rotated_accel.y = 0.0f;
                          rotated_vel.y = 0.0f;
-                         U8 unrotations = 4 - portal_rotations;
-                         collided_block->accel = vec_rotate_quadrants(rotated_accel, unrotations);
-                         collided_block->vel = vec_rotate_quadrants(rotated_vel, unrotations);
+                         collided_block->accel = vec_rotate_quadrants_counter_clockwise(rotated_accel, portal_rotations);
+                         collided_block->vel = vec_rotate_quadrants_counter_clockwise(rotated_vel, portal_rotations);
                     }
                     break;
                }
@@ -565,22 +572,14 @@ S8 teleport_position_across_portal(Position_t* position, Vec_t* pos_delta, QuadT
                                    Direction_t opposite = direction_opposite((Direction_t)(d));
                                    U8 rotations_between = direction_rotations_between(interactive->portal.face, opposite);
 
-                                   // TODO: compress these rotations
-                                   for(U8 r = 0; r < rotations_between; r++){
-                                        auto save_pixel_x = final_offset.pixel.x;
-                                        final_offset.pixel.x = -final_offset.pixel.y;
-                                        final_offset.pixel.y = save_pixel_x;
-
-                                        auto save_decimal_x = final_offset.decimal.x;
-                                        final_offset.decimal.x = -final_offset.decimal.y;
-                                        final_offset.decimal.y = save_decimal_x;
-
-                                   }
+                                   final_offset = position_rotate_quadrants_counter_clockwise(final_offset, rotations_between);
+                                   // final_offset.pixel = pixel_rotate_quadrants_counter_clockwise(final_offset.pixel, rotations_between);
+                                   // final_offset.decimal = vec_rotate_quadrants_counter_clockwise(final_offset.decimal, rotations_between);
 
                                    rotations_between = portal_rotations_between(interactive->portal.face, (Direction_t)(d));
 
                                    if(pos_delta){
-                                        *pos_delta = vec_rotate_quadrants(*pos_delta, rotations_between);
+                                        *pos_delta = vec_rotate_quadrants_clockwise(*pos_delta, rotations_between);
                                    }
 
                                    *position = coord_to_pos_at_tile_center(portal_exit.directions[d].coords[p] + opposite) + final_offset;
@@ -722,13 +721,12 @@ void illuminate(Coord_t coord, U8 value, TileMap_t* tilemap, QuadTreeNode_t<Bloc
      }
 }
 
-void spread_ice(Coord_t center, S16 radius, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree,
-                QuadTreeNode_t<Block_t>* block_quad_tree, bool teleported){
+static void impact_ice(Coord_t center, S16 radius, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree,
+                       QuadTreeNode_t<Block_t>* block_quad_tree, bool teleported, bool spread_the_ice){
      Coord_t delta {radius, radius};
      Coord_t min = center - delta;
      Coord_t max = center + delta;
 
-     // TODO: compress with melt_ice()
      for(S16 y = min.y; y <= max.y; ++y){
           for(S16 x = min.x; x <= max.x; ++x){
                Coord_t coord{x, y};
@@ -750,24 +748,43 @@ void spread_ice(Coord_t center, S16 radius, TileMap_t* tilemap, QuadTreeNode_t<I
                     Interactive_t* interactive = quad_tree_find_at(interactive_quad_tree, coord.x, coord.y);
 
                     if(block){
-                         if(block->element == ELEMENT_NONE) block->element = ELEMENT_ONLY_ICED;
+                         if(spread_the_ice){
+                              if(block->element == ELEMENT_NONE) block->element = ELEMENT_ONLY_ICED;
+                         }else{
+                              if(block->element == ELEMENT_ONLY_ICED) block->element = ELEMENT_NONE;
+                         }
                     }else{
                          if(interactive){
                               // TODO: switch
                               if(interactive->type == INTERACTIVE_TYPE_POPUP){
                                    if(interactive->popup.lift.ticks == 1){
-                                        interactive->popup.iced = false;
-                                        tile->flags |= TILE_FLAG_ICED;
+                                        if(spread_the_ice){
+                                             interactive->popup.iced = false;
+                                             tile->flags |= TILE_FLAG_ICED;
+                                        }else{
+                                             tile->flags &= ~TILE_FLAG_ICED;
+                                        }
                                    }else{
-                                        interactive->popup.iced = true;
+                                        interactive->popup.iced = spread_the_ice;
                                    }
                               }else if(interactive->type == INTERACTIVE_TYPE_PRESSURE_PLATE ||
                                        interactive->type == INTERACTIVE_TYPE_ICE_DETECTOR ||
                                        interactive->type == INTERACTIVE_TYPE_LIGHT_DETECTOR){
-                                   tile->flags |= TILE_FLAG_ICED;
+                                   if(spread_the_ice){
+                                        tile->flags |= TILE_FLAG_ICED;
+                                   }else{
+                                        tile->flags &= ~TILE_FLAG_ICED;
+                                        if(interactive->type == INTERACTIVE_TYPE_PRESSURE_PLATE){
+                                             interactive->pressure_plate.iced_under = false;
+                                        }
+                                   }
                               }
                          }else{
-                              tile->flags |= TILE_FLAG_ICED;
+                              if(spread_the_ice){
+                                   tile->flags |= TILE_FLAG_ICED;
+                              }else{
+                                   tile->flags &= ~TILE_FLAG_ICED;
+                              }
                          }
                     }
 
@@ -781,8 +798,8 @@ void spread_ice(Coord_t center, S16 radius, TileMap_t* tilemap, QuadTreeNode_t<I
                                    U8 distance_from_center = (U8)(sqrt(x_diff * x_diff + y_diff * y_diff));
                                    Direction_t opposite = direction_opposite((Direction_t)(d));
 
-                                   spread_ice(portal_exits.directions[d].coords[p] + opposite, radius - distance_from_center,
-                                              tilemap, interactive_quad_tree, block_quad_tree, true);
+                                   impact_ice(portal_exits.directions[d].coords[p] + opposite, radius - distance_from_center,
+                                              tilemap, interactive_quad_tree, block_quad_tree, true, spread_the_ice);
                               }
                          }
                     }
@@ -791,73 +808,14 @@ void spread_ice(Coord_t center, S16 radius, TileMap_t* tilemap, QuadTreeNode_t<I
      }
 }
 
+void spread_ice(Coord_t center, S16 radius, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree,
+                QuadTreeNode_t<Block_t>* block_quad_tree, bool teleported){
+     impact_ice(center, radius, tilemap, interactive_quad_tree, block_quad_tree, teleported, true);
+}
+
 void melt_ice(Coord_t center, S16 radius, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree,
               QuadTreeNode_t<Block_t>* block_quad_tree, bool teleported){
-     Coord_t delta {radius, radius};
-     Coord_t min = center - delta;
-     Coord_t max = center + delta;
-
-     for(S16 y = min.y; y <= max.y; ++y){
-          for(S16 x = min.x; x <= max.x; ++x){
-               Coord_t coord{x, y};
-               Tile_t* tile = tilemap_get_tile(tilemap, coord);
-               if(tile && !tile_is_solid(tile)){
-                    Rect_t coord_rect = rect_surrounding_adjacent_coords(coord);
-
-                    S16 block_count = 0;
-                    Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
-                    quad_tree_find_in(block_quad_tree, coord_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
-
-                    Block_t* block = nullptr;
-                    for(S16 i = 0; i < block_count; i++){
-                         if(block_get_coord(blocks[i]) == coord && blocks[i]->pos.z == 0){
-                              block = blocks[i];
-                              break;
-                         }
-                    }
-
-                    Interactive_t* interactive = quad_tree_find_at(interactive_quad_tree, coord.x, coord.y);
-
-                    if(block){
-                         if(block->element == ELEMENT_ONLY_ICED) block->element = ELEMENT_NONE;
-                    }else{
-                         if(interactive){
-                              if(interactive->type == INTERACTIVE_TYPE_POPUP){
-                                   if(interactive->popup.lift.ticks == 1){
-                                        tile->flags &= ~TILE_FLAG_ICED;
-                                   }else{
-                                        interactive->popup.iced = false;
-                                   }
-                              }else if(interactive->type == INTERACTIVE_TYPE_PRESSURE_PLATE){
-                                   interactive->pressure_plate.iced_under = false;
-                                   tile->flags &= ~TILE_FLAG_ICED;
-                              }else if(interactive->type == INTERACTIVE_TYPE_ICE_DETECTOR ||
-                                       interactive->type == INTERACTIVE_TYPE_LIGHT_DETECTOR){
-                                   tile->flags &= ~TILE_FLAG_ICED;
-                              }
-                         }else{
-                              tile->flags &= ~TILE_FLAG_ICED;
-                         }
-                    }
-
-                    if(interactive && interactive->type == INTERACTIVE_TYPE_PORTAL && interactive->portal.on && !teleported){
-                         auto portal_exits = find_portal_exits(coord, tilemap, interactive_quad_tree);
-                         for(S8 d = 0; d < DIRECTION_COUNT; d++){
-                              for(S8 p = 0; p < portal_exits.directions[d].count; p++){
-                                   if(portal_exits.directions[d].coords[p] == coord) continue;
-                                   S16 x_diff = coord.x - center.x;
-                                   S16 y_diff = coord.y - center.y;
-                                   U8 distance_from_center = (U8)(sqrt(x_diff * x_diff + y_diff * y_diff));
-                                   Direction_t opposite = direction_opposite((Direction_t)(d));
-
-                                   melt_ice(portal_exits.directions[d].coords[p] + opposite, radius - distance_from_center,
-                                            tilemap, interactive_quad_tree, block_quad_tree, true);
-                              }
-                         }
-                    }
-               }
-          }
-     }
+     impact_ice(center, radius, tilemap, interactive_quad_tree, block_quad_tree, teleported, false);
 }
 
 void describe_coord(Coord_t coord, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree, QuadTreeNode_t<Block_t>* block_quad_tree){

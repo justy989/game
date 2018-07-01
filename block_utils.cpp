@@ -583,7 +583,7 @@ void search_portal_destination_for_blocks(QuadTreeNode_t<Block_t>* block_quad_tr
 
      for(S8 o = 0; o < *block_count; o++){
           Pixel_t offset = block_center_pixel(blocks[o]) - dst_center_pixel;
-          Pixel_t src_fake_pixel = src_portal_center_pixel + pixel_rotate_quadrants(offset, rotations_between_portals);
+          Pixel_t src_fake_pixel = src_portal_center_pixel + pixel_rotate_quadrants_clockwise(offset, rotations_between_portals);
           offsets[o] = src_fake_pixel - block_center_pixel(blocks[o]);
      }
 }

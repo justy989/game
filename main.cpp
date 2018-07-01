@@ -341,6 +341,14 @@ int main(int argc, char** argv){
                          }else{
                               bool test_passed = true;
 
+#define LOG_MISMATCH(name, fmt_spec, chk, act)\
+     {                                                                                                                     \
+          char mismatch_fmt_string[128];                                                                                   \
+          snprintf(mismatch_fmt_string, 128, "mismatched '%s' value. demo '%s', actual '%s'\n", name, fmt_spec, fmt_spec); \
+          LOG(mismatch_fmt_string, chk, act);                                                                              \
+          test_passed = false;                                                                                             \
+     }
+
                               fread(&check_player_pixel, sizeof(check_player_pixel), 1, demo_file);
                               if(check_tilemap.width != tilemap.width){
                                    LOG_MISMATCH("tilemap width", "%d", check_tilemap.width, tilemap.width);
@@ -582,23 +590,15 @@ int main(int argc, char** argv){
                          break;
                     case SDL_SCANCODE_L:
                          if(load_map_number(map_number, &player_start, &tilemap, &block_array, &interactive_array)){
-                              reset_map(&player, player_start, &interactive_array, &interactive_quad_tree, &arrow_array);
-                              destroy(&undo);
-                              init(&undo, UNDO_MEMORY, tilemap.width, tilemap.height, block_array.count, interactive_array.count);
-                              undo_snapshot(&undo, &player, &tilemap, &block_array, &interactive_array);
-                              quad_tree_free(block_quad_tree);
-                              block_quad_tree = quad_tree_build(&block_array);
+                              setup_map(&player, player_start, &interactive_array, &interactive_quad_tree, &block_array,
+                                        &block_quad_tree, &undo, &tilemap, &arrow_array);
                          }
                          break;
                     case SDL_SCANCODE_LEFTBRACKET:
                          map_number--;
                          if(load_map_number(map_number, &player_start, &tilemap, &block_array, &interactive_array)){
-                              reset_map(&player, player_start, &interactive_array, &interactive_quad_tree, &arrow_array);
-                              destroy(&undo);
-                              init(&undo, UNDO_MEMORY, tilemap.width, tilemap.height, block_array.count, interactive_array.count);
-                              undo_snapshot(&undo, &player, &tilemap, &block_array, &interactive_array);
-                              quad_tree_free(block_quad_tree);
-                              block_quad_tree = quad_tree_build(&block_array);
+                              setup_map(&player, player_start, &interactive_array, &interactive_quad_tree, &block_array,
+                                        &block_quad_tree, &undo, &tilemap, &arrow_array);
                          }else{
                               map_number++;
                          }
@@ -606,13 +606,8 @@ int main(int argc, char** argv){
                     case SDL_SCANCODE_RIGHTBRACKET:
                          map_number++;
                          if(load_map_number(map_number, &player_start, &tilemap, &block_array, &interactive_array)){
-                              // TODO: compress with code above
-                              reset_map(&player, player_start, &interactive_array, &interactive_quad_tree, &arrow_array);
-                              destroy(&undo);
-                              init(&undo, UNDO_MEMORY, tilemap.width, tilemap.height, block_array.count, interactive_array.count);
-                              undo_snapshot(&undo, &player, &tilemap, &block_array, &interactive_array);
-                              quad_tree_free(block_quad_tree);
-                              block_quad_tree = quad_tree_build(&block_array);
+                              setup_map(&player, player_start, &interactive_array, &interactive_quad_tree, &block_array,
+                                        &block_quad_tree, &undo, &tilemap, &arrow_array);
                          }else{
                               map_number--;
                          }
@@ -710,9 +705,7 @@ int main(int argc, char** argv){
                          break;
                     case SDL_SCANCODE_T:
                          if(editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
-                              // TODO: compress selection sort
-                              if(editor.selection_start.x > editor.selection_end.x) SWAP(editor.selection_start.x, editor.selection_end.x);
-                              if(editor.selection_start.y > editor.selection_end.y) SWAP(editor.selection_start.y, editor.selection_end.y);
+                              sort_selection(&editor);
 
                               S16 height_offset = (editor.selection_end.y - editor.selection_start.y) - 1;
 
@@ -910,9 +903,7 @@ int main(int argc, char** argv){
                          {
                               editor.selection_end = mouse_select_world(mouse_screen, camera);
 
-                              // sort selection range
-                              if(editor.selection_start.x > editor.selection_end.x) SWAP(editor.selection_start.x, editor.selection_end.x);
-                              if(editor.selection_start.y > editor.selection_end.y) SWAP(editor.selection_start.y, editor.selection_end.y);
+                              sort_selection(&editor);
 
                               destroy(&editor.selection);
 
@@ -1482,8 +1473,8 @@ int main(int argc, char** argv){
                     block->pos = block_center;
                     block->pos.pixel -= Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS};
 
-                    block->vel = vec_rotate_quadrants(block->vel, rotations_between);
-                    block->accel = vec_rotate_quadrants(block->accel, rotations_between);
+                    block->vel = vec_rotate_quadrants_clockwise(block->vel, rotations_between);
+                    block->accel = vec_rotate_quadrants_clockwise(block->accel, rotations_between);
 
                     check_block_collision_with_other_blocks(block, block_quad_tree, interactive_quad_tree, &tilemap,
                                                             &player, last_block_pushed, last_block_pushed_direction);
@@ -1501,8 +1492,8 @@ int main(int argc, char** argv){
                          block->pos = block_center;
                          block->pos.pixel -= Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS};
 
-                         block->vel = vec_rotate_quadrants(block->vel, rotations_between);
-                         block->accel = vec_rotate_quadrants(block->accel, rotations_between);
+                         block->vel = vec_rotate_quadrants_clockwise(block->vel, rotations_between);
+                         block->accel = vec_rotate_quadrants_clockwise(block->accel, rotations_between);
                     }
                }
           }
@@ -1630,8 +1621,8 @@ int main(int argc, char** argv){
 
                if(rotations_between >= 0){
                     player.face = direction_rotate_clockwise(player.face, rotations_between);
-                    player.vel = vec_rotate_quadrants(player.vel, rotations_between);
-                    player.accel = vec_rotate_quadrants(player.accel, rotations_between);
+                    player.vel = vec_rotate_quadrants_clockwise(player.vel, rotations_between);
+                    player.accel = vec_rotate_quadrants_clockwise(player.accel, rotations_between);
 
                     // set rotations for each direction the player wants to move
                     if(player_action.move_left) player_action.move_left_rotation = (player_action.move_left_rotation + rotations_between) % DIRECTION_COUNT;
@@ -1648,14 +1639,9 @@ int main(int argc, char** argv){
                if(reset_timer >= RESET_TIME){
                     resetting = false;
 
-                    // TODO: compress this code
                     if(load_map_number(map_number, &player_start, &tilemap, &block_array, &interactive_array)){
-                         reset_map(&player, player_start, &interactive_array, &interactive_quad_tree, &arrow_array);
-                         destroy(&undo);
-                         init(&undo, UNDO_MEMORY, tilemap.width, tilemap.height, block_array.count, interactive_array.count);
-                         undo_snapshot(&undo, &player, &tilemap, &block_array, &interactive_array);
-                         quad_tree_free(block_quad_tree);
-                         block_quad_tree = quad_tree_build(&block_array);
+                         setup_map(&player, player_start, &interactive_array, &interactive_quad_tree, &block_array,
+                                   &block_quad_tree, &undo, &tilemap, &arrow_array);
                     }
                }
           }else{

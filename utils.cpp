@@ -52,7 +52,7 @@ U8 portal_rotations_between(Direction_t a, Direction_t b){
      return direction_rotations_between(a, b);
 }
 
-Vec_t vec_rotate_quadrants(Vec_t vec, S8 rotations_between){
+Vec_t vec_rotate_quadrants_clockwise(Vec_t vec, S8 rotations_between){
      for(S8 r = 0; r < rotations_between; r++){
           auto tmp = vec.x;
           vec.x = vec.y;
@@ -62,7 +62,7 @@ Vec_t vec_rotate_quadrants(Vec_t vec, S8 rotations_between){
      return vec;
 }
 
-Pixel_t pixel_rotate_quadrants(Pixel_t pixel, S8 rotations_between){
+Pixel_t pixel_rotate_quadrants_clockwise(Pixel_t pixel, S8 rotations_between){
      for(S8 r = 0; r < rotations_between; r++){
           auto tmp = pixel.x;
           pixel.x = pixel.y;
@@ -72,16 +72,43 @@ Pixel_t pixel_rotate_quadrants(Pixel_t pixel, S8 rotations_between){
      return pixel;
 }
 
-Position_t position_rotate_quadrants(Position_t pos, S8 rotations_between){
-     pos.decimal = vec_rotate_quadrants(pos.decimal, rotations_between);
-     pos.pixel = pixel_rotate_quadrants(pos.pixel, rotations_between);
+Position_t position_rotate_quadrants_clockwise(Position_t pos, S8 rotations_between){
+     pos.decimal = vec_rotate_quadrants_clockwise(pos.decimal, rotations_between);
+     pos.pixel = pixel_rotate_quadrants_clockwise(pos.pixel, rotations_between);
      canonicalize(&pos);
      return pos;
 }
 
-Vec_t rotate_vec_between_dirs(Direction_t a, Direction_t b, Vec_t vec){
+Vec_t vec_rotate_quadrants_counter_clockwise(Vec_t vec, S8 rotations_between){
+     for(S8 r = 0; r < rotations_between; r++){
+          auto tmp = vec.x;
+          vec.x = -vec.y;
+          vec.y = tmp;
+     }
+
+     return vec;
+}
+
+Pixel_t pixel_rotate_quadrants_counter_clockwise(Pixel_t pixel, S8 rotations_between){
+     for(S8 r = 0; r < rotations_between; r++){
+          auto tmp = pixel.x;
+          pixel.x = -pixel.y;
+          pixel.y = tmp;
+     }
+
+     return pixel;
+}
+
+Position_t position_rotate_quadrants_counter_clockwise(Position_t pos, S8 rotations_between){
+     pos.decimal = vec_rotate_quadrants_counter_clockwise(pos.decimal, rotations_between);
+     pos.pixel = pixel_rotate_quadrants_counter_clockwise(pos.pixel, rotations_between);
+     canonicalize(&pos);
+     return pos;
+}
+
+Vec_t rotate_vec_between_dirs_clockwise(Direction_t a, Direction_t b, Vec_t vec){
      U8 rotations_between = portal_rotations_between(a, b);
-     return vec_rotate_quadrants(vec, rotations_between);
+     return vec_rotate_quadrants_clockwise(vec, rotations_between);
 }
 
 Vec_t direction_to_vec(Direction_t d){
