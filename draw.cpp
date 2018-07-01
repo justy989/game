@@ -380,7 +380,7 @@ void draw_solids(Vec_t pos, Interactive_t* interactive, Block_t** blocks, S16 bl
      for(S16 i = 0; i < block_count; i++){
           Block_t* block = blocks[i];
           Position_t block_camera_offset = block->pos;
-          block_camera_offset.pixel += Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS};
+          block_camera_offset.pixel += HALF_TILE_SIZE_PIXEL;
           if(destination_coord.x >= 0){
                Position_t destination_pos = coord_to_pos_at_tile_center(destination_coord);
                Position_t source_pos = coord_to_pos_at_tile_center(source_coord);
@@ -389,7 +389,7 @@ void draw_solids(Vec_t pos, Interactive_t* interactive, Block_t** blocks, S16 bl
                block_camera_offset = destination_pos + center_delta;
           }
 
-          block_camera_offset.pixel -= Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS};
+          block_camera_offset.pixel -= HALF_TILE_SIZE_PIXEL;
           block_camera_offset -= screen_camera;
           block_camera_offset.pixel.y += block->pos.z;
           draw_block(block, pos_to_vec(block_camera_offset));

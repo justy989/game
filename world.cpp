@@ -331,7 +331,7 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
           if(!collide_with_block){
                // check if the block is in a portal and try to collide with it
                Vec_t coord_offset = pos_to_vec(block_array->elements[i].pos +
-                                               pixel_to_pos(Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS}) -
+                                               pixel_to_pos(HALF_TILE_SIZE_PIXEL) -
                                                coord_to_pos_at_tile_center(block_coord));
                for(S8 r = 0; r < DIRECTION_COUNT && !collide_with_block; r++){
                     Coord_t check_coord = block_coord + (Direction_t)(r);
@@ -347,7 +347,7 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
                                    if(portal_exits.directions[d].coords[p] == check_coord) continue;
 
                                    Position_t portal_pos = coord_to_pos_at_tile_center(portal_exits.directions[d].coords[p]) + final_coord_offset -
-                                                           pixel_to_pos(Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS});
+                                                           pixel_to_pos(HALF_TILE_SIZE_PIXEL);
                                    position_collide_with_rect(position, portal_pos, &pos_delta, &collide_with_block);
 
                                    if(collide_with_block){
@@ -367,8 +367,7 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
           if(collide_with_block){
                Vec_t pos_delta_diff = pos_delta - pos_delta_save;
                collided_block_delta = vec_rotate_quadrants_clockwise(pos_delta_diff, 4 - portal_rotations);
-               auto collided_block_dir = relative_quadrant(position.pixel, block_pos.pixel +
-                                                           Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS});
+               auto collided_block_dir = relative_quadrant(position.pixel, block_pos.pixel + HALF_TILE_SIZE_PIXEL);
                auto collided_block = block_array->elements + i;
                Position_t pre_move = collided_block->pos;
 
@@ -423,16 +422,16 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
                }
 #endif
 
-               Coord_t coord = pixel_to_coord(collided_block->pos.pixel + Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS});
-               Coord_t premove_coord = pixel_to_coord(pre_move.pixel + Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS});
+               Coord_t coord = pixel_to_coord(collided_block->pos.pixel + HALF_TILE_SIZE_PIXEL);
+               Coord_t premove_coord = pixel_to_coord(pre_move.pixel + HALF_TILE_SIZE_PIXEL);
 
                Position_t block_center = collided_block->pos;
-               block_center.pixel += Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS};
+               block_center.pixel += HALF_TILE_SIZE_PIXEL;
                S8 rotations_between = teleport_position_across_portal(&block_center, NULL, interactive_quad_tree, tilemap, premove_coord,
                                                                       coord);
                if(rotations_between >= 0){
                     collided_block->pos = block_center;
-                    collided_block->pos.pixel -= Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS};
+                    collided_block->pos.pixel -= HALF_TILE_SIZE_PIXEL;
                }
 
                auto rotated_player_face = direction_rotate_clockwise(player_face, portal_rotations);

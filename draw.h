@@ -39,6 +39,7 @@ Vec_t player_frame(S8 x, S8 y);
 GLuint create_texture_from_bitmap(AlphaBitmap_t* bitmap);
 GLuint transparent_texture_from_file(const char* filepath);
 
+void draw_screen_texture(Vec_t pos, Vec_t tex, Vec_t dim, Vec_t tex_dim);
 void draw_theme_frame(Vec_t tex_vec, Vec_t pos_vec);
 void draw_double_theme_frame(Vec_t tex_vec, Vec_t pos_vec);
 void draw_tile_id(U8 id, Vec_t pos);

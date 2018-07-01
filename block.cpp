@@ -11,17 +11,17 @@ S16 get_object_y(Block_t* block){
 }
 
 Pixel_t block_center_pixel(Block_t* block){
-     return block->pos.pixel + Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS};
+     return block->pos.pixel + HALF_TILE_SIZE_PIXEL;
 }
 
 Position_t block_get_center(Block_t* block){
      Position_t pos = block->pos;
-     pos.pixel += Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS};
+     pos.pixel += HALF_TILE_SIZE_PIXEL;
      return pos;
 }
 
 Coord_t block_get_coord(Block_t* block){
-     Pixel_t center = block->pos.pixel + Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS};
+     Pixel_t center = block->pos.pixel + HALF_TILE_SIZE_PIXEL;
      return pixel_to_coord(center);
 }
 

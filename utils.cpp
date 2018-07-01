@@ -147,14 +147,18 @@ Pixel_t direction_to_pixel(Direction_t d){
 
 Rect_t rect_surrounding_adjacent_coords(Coord_t coord){
      Pixel_t pixel = coord_to_pixel(coord);
+     return Rect_t {(S16)(pixel.x - TILE_SIZE_IN_PIXELS),
+                    (S16)(pixel.y - TILE_SIZE_IN_PIXELS),
+                    (S16)(pixel.x + (2 * TILE_SIZE_IN_PIXELS)),
+                    (S16)(pixel.y + (2 * TILE_SIZE_IN_PIXELS))};
+}
 
-     Rect_t rect = {};
-     rect.left = pixel.x - TILE_SIZE_IN_PIXELS;
-     rect.right = pixel.x + (2 * TILE_SIZE_IN_PIXELS);
-     rect.bottom = pixel.y - TILE_SIZE_IN_PIXELS;
-     rect.top = pixel.y + (2 * TILE_SIZE_IN_PIXELS);
-
-     return rect;
+Rect_t rect_surrounding_coord(Coord_t coord){
+     Pixel_t pixel = coord_to_pixel(coord);
+     return Rect_t{pixel.x,
+                   pixel.y,
+                   (S16)(pixel.x + TILE_SIZE_IN_PIXELS),
+                   (S16)(pixel.y + TILE_SIZE_IN_PIXELS)};
 }
 
 Interactive_t* quad_tree_interactive_find_at(QuadTreeNode_t<Interactive_t>* root, Coord_t coord){

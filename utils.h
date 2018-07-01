@@ -25,6 +25,7 @@ Position_t position_rotate_quadrants_counter_clockwise(Position_t pos, S8 rotati
 Vec_t rotate_vec_between_dirs_clockwise(Direction_t a, Direction_t b, Vec_t vec);
 
 Rect_t rect_surrounding_adjacent_coords(Coord_t coord);
+Rect_t rect_surrounding_coord(Coord_t coord);
 
 Interactive_t* quad_tree_interactive_find_at(QuadTreeNode_t<Interactive_t>* root, Coord_t coord);
 Interactive_t* quad_tree_interactive_solid_at(QuadTreeNode_t<Interactive_t>* root, TileMap_t* tilemap, Coord_t coord);

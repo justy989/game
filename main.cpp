@@ -17,15 +17,9 @@ http://www.simonstalenhag.se/
 #include "direction.h"
 #include "bitmap.h"
 #include "conversion.h"
-#include "tile.h"
 #include "object_array.h"
-#include "interactive.h"
-#include "quad_tree.h"
 #include "portal_exit.h"
-#include "player.h"
 #include "block.h"
-#include "arrow.h"
-#include "undo.h"
 #include "editor.h"
 #include "utils.h"
 #include "map_format.h"
@@ -482,10 +476,12 @@ int main(int argc, char** argv){
                               }else if(suite){
                                    map_number++;
                                    S16 maps_tested = map_number - first_map_number;
+
                                    if(map_count > 0 && maps_tested >= map_count){
                                         LOG("Done Testing %d maps.\n", map_count);
                                         return 0;
                                    }
+
                                    if(load_map_number(map_number, &player_start, &tilemap, &block_array, &interactive_array)){
                                         reset_map(&player, player_start, &interactive_array, &interactive_quad_tree, &arrow_array);
                                         destroy(&undo);
@@ -625,38 +621,22 @@ int main(int argc, char** argv){
                          Tile_t* tile = tilemap_get_tile(&tilemap, mouse_select_world(mouse_screen, camera));
                          if(tile){
                               if(tile->flags & TILE_FLAG_WIRE_CLUSTER_LEFT){
-                                   if(tile->flags & TILE_FLAG_WIRE_CLUSTER_LEFT_ON){
-                                        tile->flags &= ~TILE_FLAG_WIRE_CLUSTER_LEFT_ON;
-                                   }else{
-                                        tile->flags |= TILE_FLAG_WIRE_CLUSTER_LEFT_ON;
-                                   }
+                                   TOGGLE_BIT_FLAG(tile->flags, TILE_FLAG_WIRE_CLUSTER_LEFT_ON);
                               }
 
                               if(tile->flags & TILE_FLAG_WIRE_CLUSTER_MID){
-                                   if(tile->flags & TILE_FLAG_WIRE_CLUSTER_MID_ON){
-                                        tile->flags &= ~TILE_FLAG_WIRE_CLUSTER_MID_ON;
-                                   }else{
-                                        tile->flags |= TILE_FLAG_WIRE_CLUSTER_MID_ON;
-                                   }
+                                   TOGGLE_BIT_FLAG(tile->flags, TILE_FLAG_WIRE_CLUSTER_MID_ON);
                               }
 
                               if(tile->flags & TILE_FLAG_WIRE_CLUSTER_RIGHT){
-                                   if(tile->flags & TILE_FLAG_WIRE_CLUSTER_RIGHT_ON){
-                                        tile->flags &= ~TILE_FLAG_WIRE_CLUSTER_RIGHT_ON;
-                                   }else{
-                                        tile->flags |= TILE_FLAG_WIRE_CLUSTER_RIGHT_ON;
-                                   }
+                                   TOGGLE_BIT_FLAG(tile->flags, TILE_FLAG_WIRE_CLUSTER_RIGHT_ON);
                               }
 
                               if(tile->flags & TILE_FLAG_WIRE_LEFT ||
                                  tile->flags & TILE_FLAG_WIRE_UP ||
                                  tile->flags & TILE_FLAG_WIRE_RIGHT ||
                                  tile->flags & TILE_FLAG_WIRE_DOWN){
-                                   if(tile->flags & TILE_FLAG_WIRE_STATE){
-                                        tile->flags &= ~TILE_FLAG_WIRE_STATE;
-                                   }else{
-                                        tile->flags |= TILE_FLAG_WIRE_STATE;
-                                   }
+                                   TOGGLE_BIT_FLAG(tile->flags, TILE_FLAG_WIRE_STATE);
                               }
                          }
                     } break;
@@ -752,7 +732,7 @@ int main(int argc, char** argv){
                     } break;
 #endif
                     case SDL_SCANCODE_5:
-                         player.pos.pixel = mouse_select_world_pixel(mouse_screen, camera) + Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS};
+                         player.pos.pixel = mouse_select_world_pixel(mouse_screen, camera) + HALF_TILE_SIZE_PIXEL;
                          player.pos.decimal.x = 0;
                          player.pos.decimal.y = 0;
                          break;
@@ -994,12 +974,11 @@ int main(int argc, char** argv){
                          Tile_t* tile = tilemap_get_tile(&tilemap, interactive->coord);
                          if(tile){
                               if(!tile_is_iced(tile)){
-                                   Pixel_t center = coord_to_pixel(interactive->coord) + Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS};
-                                   Rect_t rect = {};
-                                   rect.left = center.x - (2 * TILE_SIZE_IN_PIXELS);
-                                   rect.right = center.x + (2 * TILE_SIZE_IN_PIXELS);
-                                   rect.bottom = center.y - (2 * TILE_SIZE_IN_PIXELS);
-                                   rect.top = center.y + (2 * TILE_SIZE_IN_PIXELS);
+                                   Pixel_t center = coord_to_pixel(interactive->coord) + HALF_TILE_SIZE_PIXEL;
+                                   Rect_t rect = {(S16)(center.x - (2 * TILE_SIZE_IN_PIXELS)),
+                                                  (S16)(center.y - (2 * TILE_SIZE_IN_PIXELS)),
+                                                  (S16)(center.x + (2 * TILE_SIZE_IN_PIXELS)),
+                                                  (S16)(center.y + (2 * TILE_SIZE_IN_PIXELS))};
 
                                    S16 block_count = 0;
                                    Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
@@ -1337,7 +1316,7 @@ int main(int argc, char** argv){
                }
 
                // get the current coord of the center of the block
-               Pixel_t center = block->pos.pixel + Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS};
+               Pixel_t center = block->pos.pixel + HALF_TILE_SIZE_PIXEL;
                Coord_t coord = pixel_to_coord(center);
 
                Coord_t skip_coord[DIRECTION_COUNT];
@@ -1460,16 +1439,16 @@ int main(int argc, char** argv){
                     }
                }
 
-               coord = pixel_to_coord(block->pos.pixel + Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS});
-               Coord_t premove_coord = pixel_to_coord(pre_move.pixel + Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS});
+               coord = pixel_to_coord(block->pos.pixel + HALF_TILE_SIZE_PIXEL);
+               Coord_t premove_coord = pixel_to_coord(pre_move.pixel + HALF_TILE_SIZE_PIXEL);
 
                Position_t block_center = block->pos;
-               block_center.pixel += Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS};
+               block_center.pixel += HALF_TILE_SIZE_PIXEL;
                S8 rotations_between = teleport_position_across_portal(&block_center, NULL, interactive_quad_tree, &tilemap, premove_coord,
                                                                       coord);
                if(rotations_between >= 0){
                     block->pos = block_center;
-                    block->pos.pixel -= Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS};
+                    block->pos.pixel -= HALF_TILE_SIZE_PIXEL;
 
                     block->vel = vec_rotate_quadrants_clockwise(block->vel, rotations_between);
                     block->accel = vec_rotate_quadrants_clockwise(block->accel, rotations_between);
@@ -1478,17 +1457,17 @@ int main(int argc, char** argv){
                                                             &player, last_block_pushed, last_block_pushed_direction);
 
                     // try teleporting if we collided with a block
-                    premove_coord = pixel_to_coord(block_center.pixel + Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS});
-                    coord = pixel_to_coord(block->pos.pixel + Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS});
+                    premove_coord = pixel_to_coord(block_center.pixel + HALF_TILE_SIZE_PIXEL);
+                    coord = pixel_to_coord(block->pos.pixel + HALF_TILE_SIZE_PIXEL);
 
                     block_center = block->pos;
-                    block_center.pixel += Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS};
+                    block_center.pixel += HALF_TILE_SIZE_PIXEL;
 
-                    rotations_between = teleport_position_across_portal(&block_center, NULL, interactive_quad_tree, &tilemap, premove_coord,
-                                                    coord);
+                    rotations_between = teleport_position_across_portal(&block_center, NULL, interactive_quad_tree,
+                                                                        &tilemap, premove_coord, coord);
                     if(rotations_between >= 0){
                          block->pos = block_center;
-                         block->pos.pixel -= Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS};
+                         block->pos.pixel -= HALF_TILE_SIZE_PIXEL;
 
                          block->vel = vec_rotate_quadrants_clockwise(block->vel, rotations_between);
                          block->accel = vec_rotate_quadrants_clockwise(block->accel, rotations_between);
@@ -1705,12 +1684,7 @@ int main(int argc, char** argv){
                               for(S8 i = 0; i < portal_exits.directions[d].count; i++){
                                    if(portal_exits.directions[d].coords[i] == coord) continue;
                                    Coord_t portal_coord = portal_exits.directions[d].coords[i] + direction_opposite((Direction_t)(d));
-
-                                   S16 px = portal_coord.x * TILE_SIZE_IN_PIXELS;
-                                   S16 py = portal_coord.y * TILE_SIZE_IN_PIXELS;
-                                   Rect_t coord_rect {(S16)(px), (S16)(py),
-                                                      (S16)(px + TILE_SIZE_IN_PIXELS),
-                                                      (S16)(py + TILE_SIZE_IN_PIXELS)};
+                                   Rect_t coord_rect = rect_surrounding_coord(portal_coord);
 
                                    S16 block_count = 0;
                                    Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
@@ -1753,15 +1727,9 @@ int main(int argc, char** argv){
 
                for(S16 x = min.x; x <= max.x; x++){
                     Coord_t coord {x, y};
-
+                    Rect_t coord_rect = rect_surrounding_adjacent_coords(coord);
                     Vec_t tile_pos {(F32)(x - min.x) * TILE_SIZE + camera_offset.x,
                                     (F32)(y - min.y) * TILE_SIZE + camera_offset.y};
-
-                    S16 px = coord.x * TILE_SIZE_IN_PIXELS;
-                    S16 py = coord.y * TILE_SIZE_IN_PIXELS;
-                    Rect_t coord_rect {(S16)(px - HALF_TILE_SIZE_IN_PIXELS), (S16)(py - HALF_TILE_SIZE_IN_PIXELS),
-                                       (S16)(px + TILE_SIZE_IN_PIXELS + HALF_TILE_SIZE_IN_PIXELS),
-                                       (S16)(py + TILE_SIZE_IN_PIXELS + HALF_TILE_SIZE_IN_PIXELS)};
 
                     S16 block_count = 0;
                     Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
@@ -1799,14 +1767,9 @@ int main(int argc, char** argv){
                     // shadow
                     //arrow_vec.y -= (arrow->pos.z * PIXEL_SIZE);
                     Vec_t tex_vec = arrow_frame(arrow->face, 1);
-                    glTexCoord2f(tex_vec.x, tex_vec.y);
-                    glVertex2f(arrow_vec.x, arrow_vec.y);
-                    glTexCoord2f(tex_vec.x, tex_vec.y + ARROW_FRAME_HEIGHT);
-                    glVertex2f(arrow_vec.x, arrow_vec.y + TILE_SIZE);
-                    glTexCoord2f(tex_vec.x + ARROW_FRAME_WIDTH, tex_vec.y + ARROW_FRAME_HEIGHT);
-                    glVertex2f(arrow_vec.x + TILE_SIZE, arrow_vec.y + TILE_SIZE);
-                    glTexCoord2f(tex_vec.x + ARROW_FRAME_WIDTH, tex_vec.y);
-                    glVertex2f(arrow_vec.x + TILE_SIZE, arrow_vec.y);
+                    Vec_t dim {TILE_SIZE, TILE_SIZE};
+                    Vec_t tex_dim {ARROW_FRAME_WIDTH, ARROW_FRAME_HEIGHT};
+                    draw_screen_texture(arrow_vec, tex_vec, dim, tex_dim);
 
                     arrow_vec.y += (arrow->pos.z * PIXEL_SIZE);
 
@@ -1814,14 +1777,7 @@ int main(int argc, char** argv){
                     if(arrow->element) y_frame = 2 + ((arrow->element - 1) * 4);
 
                     tex_vec = arrow_frame(arrow->face, y_frame);
-                    glTexCoord2f(tex_vec.x, tex_vec.y);
-                    glVertex2f(arrow_vec.x, arrow_vec.y);
-                    glTexCoord2f(tex_vec.x, tex_vec.y + ARROW_FRAME_HEIGHT);
-                    glVertex2f(arrow_vec.x, arrow_vec.y + TILE_SIZE);
-                    glTexCoord2f(tex_vec.x + ARROW_FRAME_WIDTH, tex_vec.y + ARROW_FRAME_HEIGHT);
-                    glVertex2f(arrow_vec.x + TILE_SIZE, arrow_vec.y + TILE_SIZE);
-                    glTexCoord2f(tex_vec.x + ARROW_FRAME_WIDTH, tex_vec.y);
-                    glVertex2f(arrow_vec.x + TILE_SIZE, arrow_vec.y);
+                    draw_screen_texture(arrow_vec, tex_vec, dim, tex_dim);
 
                     glEnd();
 
@@ -2095,7 +2051,7 @@ int main(int argc, char** argv){
           } break;
           }
 
-          // if(resetting){
+          if(reset_timer >= 0.0f){
                glBegin(GL_QUADS);
                glColor4f(0.0f, 0.0f, 0.0f, reset_timer / RESET_TIME);
                glVertex2f(0, 0);
@@ -2103,7 +2059,7 @@ int main(int argc, char** argv){
                glVertex2f(1, 1);
                glVertex2f(1, 0);
                glEnd();
-          // }
+          }
 
 
           SDL_GL_SwapWindow(window);

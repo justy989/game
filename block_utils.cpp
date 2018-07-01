@@ -430,7 +430,7 @@ void check_block_collision_with_other_blocks(Block_t* block_to_check, QuadTreeNo
           block_inside_result.block->vel.y = 0.0f;
           block_inside_result.block->accel.y = 0.0f;
 #else
-          auto block_center_pixel = block_to_check->pos.pixel + Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS};
+          auto block_center_pixel = block_to_check->pos.pixel + HALF_TILE_SIZE_PIXEL;
           auto quadrant = relative_quadrant(block_center_pixel, block_inside_result.collision_pos.pixel);
 
           // check if they are on ice before we adjust the position on our block to check
