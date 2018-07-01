@@ -29,7 +29,6 @@ void find_portal_exits_impl(Coord_t coord, TileMap_t* tilemap, QuadTreeNode_t<In
           }else if(interactive->wire_cross.mask & DIRECTION_MASK_DOWN && from == DIRECTION_DOWN){
                connecting_to_wire_cross = true;
           }
-
      }
 
      if(connecting_to_wire_cross){
@@ -50,8 +49,7 @@ void find_portal_exits_impl(Coord_t coord, TileMap_t* tilemap, QuadTreeNode_t<In
           }
      }else{
           Tile_t* tile = tilemap_get_tile(tilemap, coord);
-          if(!tile) return;
-          if(tile->flags & TILE_FLAG_WIRE_STATE){
+          if(tile && tile->flags & TILE_FLAG_WIRE_STATE){
                if((tile->flags & TILE_FLAG_WIRE_LEFT) && from != DIRECTION_LEFT){
                     find_portal_exits_impl(coord + DIRECTION_LEFT, tilemap, interactive_quad_tree, portal_exit, DIRECTION_RIGHT);
                }
@@ -74,17 +72,17 @@ void find_portal_exits_impl(Coord_t coord, TileMap_t* tilemap, QuadTreeNode_t<In
 PortalExit_t find_portal_exits(Coord_t coord, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree){
      PortalExit_t portal_exit = {};
      Interactive_t* interactive = quad_tree_interactive_find_at(interactive_quad_tree, coord);
-     if(interactive && interactive->type == INTERACTIVE_TYPE_PORTAL){
+     if(is_active_portal(interactive)){
           portal_exit_add(&portal_exit, interactive->portal.face, coord);
           for(S8 d = 0; d < DIRECTION_COUNT; d++){
                Coord_t adjacent_coord = coord + (Direction_t)(d);
                Tile_t* tile = tilemap_get_tile(tilemap, adjacent_coord);
                if(!tile) continue;
                if((tile->flags & TILE_FLAG_WIRE_STATE) == 0) continue;
-               if((d == DIRECTION_LEFT && tile->flags & TILE_FLAG_WIRE_RIGHT) ||
-                  (d == DIRECTION_UP && tile->flags & TILE_FLAG_WIRE_DOWN) ||
-                  (d == DIRECTION_RIGHT && tile->flags & TILE_FLAG_WIRE_LEFT) ||
-                  (d == DIRECTION_DOWN && tile->flags & TILE_FLAG_WIRE_UP)){
+               if((d == DIRECTION_LEFT  && (tile->flags & TILE_FLAG_WIRE_RIGHT)) ||
+                  (d == DIRECTION_UP    && (tile->flags & TILE_FLAG_WIRE_DOWN)) ||
+                  (d == DIRECTION_RIGHT && (tile->flags & TILE_FLAG_WIRE_LEFT)) ||
+                  (d == DIRECTION_DOWN  && (tile->flags & TILE_FLAG_WIRE_UP))){
                     find_portal_exits_impl(adjacent_coord, tilemap, interactive_quad_tree,
                                            &portal_exit, DIRECTION_COUNT);
                }

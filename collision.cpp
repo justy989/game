@@ -41,6 +41,8 @@ void position_slide_against_rect(Position_t pos, Coord_t coord, F32 player_radiu
      Coord_t player_coord = pos_to_coord(pos);
      Position_t relative = coord_to_pos(coord) - pos;
      Vec_t bottom_left = pos_to_vec(relative);
+     if(vec_magnitude(bottom_left) > (2 * TILE_SIZE)) return;
+
      Vec_t top_left {bottom_left.x, bottom_left.y + TILE_SIZE};
      Vec_t top_right {bottom_left.x + TILE_SIZE, bottom_left.y + TILE_SIZE};
      Vec_t bottom_right {bottom_left.x + TILE_SIZE, bottom_left.y};

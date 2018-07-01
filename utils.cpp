@@ -145,6 +145,14 @@ Pixel_t direction_to_pixel(Direction_t d){
      return Pixel_t{0, 0};
 }
 
+Rect_t rect_surrounding_coord(Coord_t coord){
+     Pixel_t pixel = coord_to_pixel(coord);
+     return Rect_t{pixel.x,
+                   pixel.y,
+                   (S16)(pixel.x + TILE_SIZE_IN_PIXELS),
+                   (S16)(pixel.y + TILE_SIZE_IN_PIXELS)};
+}
+
 Rect_t rect_surrounding_adjacent_coords(Coord_t coord){
      Pixel_t pixel = coord_to_pixel(coord);
      return Rect_t {(S16)(pixel.x - TILE_SIZE_IN_PIXELS),
@@ -153,12 +161,13 @@ Rect_t rect_surrounding_adjacent_coords(Coord_t coord){
                     (S16)(pixel.y + (2 * TILE_SIZE_IN_PIXELS))};
 }
 
-Rect_t rect_surrounding_coord(Coord_t coord){
-     Pixel_t pixel = coord_to_pixel(coord);
-     return Rect_t{pixel.x,
-                   pixel.y,
-                   (S16)(pixel.x + TILE_SIZE_IN_PIXELS),
-                   (S16)(pixel.y + TILE_SIZE_IN_PIXELS)};
+Rect_t rect_to_check_surrounding_blocks(Pixel_t center){
+     Rect_t rect = {};
+     rect.left = center.x - (2 * TILE_SIZE_IN_PIXELS);
+     rect.right = center.x + (2 * TILE_SIZE_IN_PIXELS);
+     rect.bottom = center.y - (2 * TILE_SIZE_IN_PIXELS);
+     rect.top = center.y + (2 * TILE_SIZE_IN_PIXELS);
+     return rect;
 }
 
 Interactive_t* quad_tree_interactive_find_at(QuadTreeNode_t<Interactive_t>* root, Coord_t coord){
@@ -176,15 +185,6 @@ Interactive_t* quad_tree_interactive_solid_at(QuadTreeNode_t<Interactive_t>* roo
      }
 
      return nullptr;
-}
-
-Rect_t rect_to_check_surrounding_blocks(Pixel_t center){
-     Rect_t rect = {};
-     rect.left = center.x - (2 * TILE_SIZE_IN_PIXELS);
-     rect.right = center.x + (2 * TILE_SIZE_IN_PIXELS);
-     rect.bottom = center.y - (2 * TILE_SIZE_IN_PIXELS);
-     rect.top = center.y + (2 * TILE_SIZE_IN_PIXELS);
-     return rect;
 }
 
 // NOTE: skip_coord needs to be DIRECTION_COUNT size

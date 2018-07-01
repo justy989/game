@@ -82,7 +82,6 @@ bool save_map_to_file(FILE* file, Coord_t player_start, const TileMap_t* tilemap
           }
      }
 
-
      U8 map_version = MAP_VERSION;
      fwrite(&map_version, sizeof(map_version), 1, file);
      fwrite(&player_start, sizeof(player_start), 1, file);
