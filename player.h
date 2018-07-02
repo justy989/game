@@ -14,11 +14,11 @@ struct Player_t{
      Position_t pos;
      Vec_t accel;
      Vec_t vel;
-     Direction_t face;
-     F32 push_time;
-     S8 walk_frame;
-     S8 walk_frame_delta;
-     F32 walk_frame_time;
-     bool has_bow;
-     F32 bow_draw_time;
+     Direction_t face = DIRECTION_LEFT;
+     F32 push_time = 0.0f;
+     S8 walk_frame = 0;
+     S8 walk_frame_delta = 0;
+     F32 walk_frame_time = 0.0;
+     bool has_bow = false;
+     F32 bow_draw_time = 0.0;
 };

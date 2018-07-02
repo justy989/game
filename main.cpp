@@ -38,11 +38,20 @@ FILE* load_demo_number(S32 map_number, const char** demo_filepath){
      return fopen(*demo_filepath, "rb");
 }
 
+struct World_t{
+     Player_t player;
+     TileMap_t tilemap = {};
+     ObjectArray_t<Block_t> block_array = {};
+     ObjectArray_t<Interactive_t> interactive_array = {};
+     ArrowArray_t arrow_array = {};
+
+     QuadTreeNode_t<Interactive_t>* interactive_quad_tree = nullptr;
+     QuadTreeNode_t<Block_t>* block_quad_tree = nullptr;
+};
+
 using namespace std::chrono;
 
 int main(int argc, char** argv){
-     DemoMode_t demo_mode = DEMO_MODE_NONE;
-     const char* demo_filepath = nullptr;
      const char* load_map_filepath = nullptr;
      bool test = false;
      bool suite = false;
@@ -51,17 +60,19 @@ int main(int argc, char** argv){
      S16 first_map_number = 0;
      S16 map_count = 0;
 
+     Demo_t demo;
+
      for(int i = 1; i < argc; i++){
           if(strcmp(argv[i], "-play") == 0){
                int next = i + 1;
                if(next >= argc) continue;
-               demo_filepath = argv[next];
-               demo_mode = DEMO_MODE_PLAY;
+               demo.filepath = argv[next];
+               demo.mode = DEMO_MODE_PLAY;
           }else if(strcmp(argv[i], "-record") == 0){
                int next = i + 1;
                if(next >= argc) continue;
-               demo_filepath = argv[next];
-               demo_mode = DEMO_MODE_RECORD;
+               demo.filepath = argv[next];
+               demo.mode = DEMO_MODE_RECORD;
           }else if(strcmp(argv[i], "-load") == 0){
                int next = i + 1;
                if(next >= argc) continue;
@@ -143,36 +154,28 @@ int main(int argc, char** argv){
           if(arrow_texture == 0) return 1;
      }
 
-     S64 demo_last_frame = 0;
-     S64 demo_entry_index = 0;
-     S64 demo_seek_frame = -1;
-     F32 demo_dt_multiplier = 1.0f;
-     bool demo_paused = false;
-     DemoEntries_t demo_entries;
-
-     FILE* demo_file = nullptr;
-     switch(demo_mode){
+     switch(demo.mode){
      default:
           break;
      case DEMO_MODE_RECORD:
-          demo_file = fopen(demo_filepath, "w");
-          if(!demo_file){
-               LOG("failed to open demo file: %s\n", demo_filepath);
+          demo.file = fopen(demo.filepath, "w");
+          if(!demo.file){
+               LOG("failed to open demo file: %s\n", demo.filepath);
                return 1;
           }
           // TODO: write header
           break;
      case DEMO_MODE_PLAY:
-          demo_file = fopen(demo_filepath, "r");
-          if(!demo_file){
-               LOG("failed to open demo file: %s\n", demo_filepath);
+          demo.file = fopen(demo.filepath, "r");
+          if(!demo.file){
+               LOG("failed to open demo file: %s\n", demo.filepath);
                return 1;
           }
           // TODO: read header
-          demo_entries = demo_entries_get(demo_file);
-          demo_last_frame = demo_entries.entries[demo_entries.count - 1].frame;
-          LOG("playing demo %s: with %ld actions across %ld frames\n", demo_filepath,
-              demo_entries.count, demo_last_frame);
+          demo.entries = demo_entries_get(demo.file);
+          demo.last_frame = demo.entries.entries[demo.entries.count - 1].frame;
+          LOG("playing demo %s: with %ld actions across %ld frames\n", demo.filepath,
+              demo.entries.count, demo.last_frame);
           break;
      }
 
@@ -199,22 +202,22 @@ int main(int argc, char** argv){
           deep_copy(&block_array, &demo_starting_block_array);
           deep_copy(&interactive_array, &demo_starting_interactive_array);
 
-          demo_mode = DEMO_MODE_PLAY;
-          demo_file = load_demo_number(map_number, &demo_filepath);
-          if(!demo_file){
+          demo.mode = DEMO_MODE_PLAY;
+          demo.file = load_demo_number(map_number, &demo.filepath);
+          if(!demo.file){
                LOG("missing map %d corresponding demo.\n", map_number);
                return 1;
           }
-          demo_entries = demo_entries_get(demo_file);
-          demo_last_frame = demo_entries.entries[demo_entries.count - 1].frame;
-          LOG("testing demo %s: with %ld actions across %ld frames\n", demo_filepath,
-              demo_entries.count, demo_last_frame);
+          demo.entries = demo_entries_get(demo.file);
+          demo.last_frame = demo.entries.entries[demo.entries.count - 1].frame;
+          LOG("testing demo %s: with %ld actions across %ld frames\n", demo.filepath,
+              demo.entries.count, demo.last_frame);
      }else if(map_number){
           if(!load_map_number(map_number, &player_start, &tilemap, &block_array, &interactive_array)){
                return 1;
           }
 
-          if(demo_mode == DEMO_MODE_PLAY){
+          if(demo.mode == DEMO_MODE_PLAY){
                deep_copy(&tilemap, &demo_starting_tilemap);
                deep_copy(&block_array, &demo_starting_block_array);
                deep_copy(&interactive_array, &demo_starting_interactive_array);
@@ -310,28 +313,28 @@ int main(int argc, char** argv){
      Quad_t pct_bar_outline_quad = {0, 2.0f * PIXEL_SIZE, 1.0f, 0.02f};
 
      while(!quit){
-          if((!suite || show_suite) && demo_seek_frame < 0){
+          if((!suite || show_suite) && demo.seek_frame < 0){
                current_time = system_clock::now();
                duration<double> elapsed_seconds = current_time - last_time;
                dt = (F64)(elapsed_seconds.count());
 
-               if(demo_mode == DEMO_MODE_PLAY){
-                    if(dt < (0.0166666f * demo_dt_multiplier)) continue;
+               if(demo.mode == DEMO_MODE_PLAY){
+                    if(dt < (0.0166666f * demo.dt_multiplier)) continue;
                }else{
                     if(dt < 0.0166666f) continue; // limit 60 fps
                }
           }
 
           // TODO: consider 30fps as minimum for random noobs computers
-          // if(demo_mode) dt = 0.0166666f; // the game always runs as if a 60th of a frame has occurred.
+          // if(demo.mode) dt = 0.0166666f; // the game always runs as if a 60th of a frame has occurred.
           dt = 0.0166666f; // the game always runs as if a 60th of a frame has occurred.
 
           quad_tree_free(block_quad_tree);
           block_quad_tree = quad_tree_build(&block_array);
 
-          if(!demo_paused || demo_seek_frame >= 0){
+          if(!demo.paused || demo.seek_frame >= 0){
                frame_count++;
-               if(demo_seek_frame == frame_count) demo_seek_frame = -1;
+               if(demo.seek_frame == frame_count) demo.seek_frame = -1;
           }
 
           last_time = current_time;
@@ -342,15 +345,15 @@ int main(int argc, char** argv){
           player_action.last_activate = player_action.activate;
           player_action.reface = false;
 
-          if(demo_mode == DEMO_MODE_PLAY){
+          if(demo.mode == DEMO_MODE_PLAY){
                bool end_of_demo = false;
-               if(demo_entries.entries[demo_entry_index].player_action_type == PLAYER_ACTION_TYPE_END_DEMO){
-                    end_of_demo = (frame_count == demo_entries.entries[demo_entry_index].frame);
+               if(demo.entries.entries[demo.entry_index].player_action_type == PLAYER_ACTION_TYPE_END_DEMO){
+                    end_of_demo = (frame_count == demo.entries.entries[demo.entry_index].frame);
                }else{
-                    while(frame_count == demo_entries.entries[demo_entry_index].frame){
-                         player_action_perform(&player_action, &player, demo_entries.entries[demo_entry_index].player_action_type, demo_mode,
-                                               demo_file, frame_count);
-                         demo_entry_index++;
+                    while(frame_count == demo.entries.entries[demo.entry_index].frame){
+                         player_action_perform(&player_action, &player, demo.entries.entries[demo.entry_index].player_action_type, demo.mode,
+                                               demo.file, frame_count);
+                         demo.entry_index++;
                     }
                }
 
@@ -361,9 +364,9 @@ int main(int argc, char** argv){
                          ObjectArray_t<Interactive_t> check_interactive_array = {};
                          Coord_t check_player_start;
                          Pixel_t check_player_pixel;
-                         if(!load_map_from_file(demo_file, &check_player_start, &check_tilemap, &check_block_array, &check_interactive_array, demo_filepath)){
+                         if(!load_map_from_file(demo.file, &check_player_start, &check_tilemap, &check_block_array, &check_interactive_array, demo.filepath)){
                               LOG("failed to load map state from end of file\n");
-                              demo_mode = DEMO_MODE_NONE;
+                              demo.mode = DEMO_MODE_NONE;
                          }else{
                               bool test_passed = true;
 
@@ -375,7 +378,7 @@ int main(int argc, char** argv){
           test_passed = false;                                                                                             \
      }
 
-                              fread(&check_player_pixel, sizeof(check_player_pixel), 1, demo_file);
+                              fread(&check_player_pixel, sizeof(check_player_pixel), 1, demo.file);
                               if(check_tilemap.width != tilemap.width){
                                    LOG_MISMATCH("tilemap width", "%d", check_tilemap.width, tilemap.width);
                               }else if(check_tilemap.height != tilemap.height){
@@ -507,7 +510,7 @@ int main(int argc, char** argv){
 
                               if(!test_passed){
                                    LOG("test failed\n");
-                                   demo_mode = DEMO_MODE_NONE;
+                                   demo.mode = DEMO_MODE_NONE;
                                    if(suite && !show_suite) return 1;
                               }else if(suite){
                                    map_number++;
@@ -532,16 +535,16 @@ int main(int argc, char** argv){
                                         last_block_pushed_direction = DIRECTION_LEFT;
                                         block_to_push = nullptr;
 
-                                        fclose(demo_file);
-                                        demo_file = load_demo_number(map_number, &demo_filepath);
-                                        if(demo_file){
-                                             free(demo_entries.entries);
-                                             demo_entry_index = 0;
-                                             demo_entries = demo_entries_get(demo_file);
+                                        fclose(demo.file);
+                                        demo.file = load_demo_number(map_number, &demo.filepath);
+                                        if(demo.file){
+                                             free(demo.entries.entries);
+                                             demo.entry_index = 0;
+                                             demo.entries = demo_entries_get(demo.file);
                                              frame_count = 0;
-                                             demo_last_frame = demo_entries.entries[demo_entries.count - 1].frame;
-                                             LOG("testing demo %s: with %ld actions across %ld frames\n", demo_filepath,
-                                                 demo_entries.count, demo_last_frame);
+                                             demo.last_frame = demo.entries.entries[demo.entries.count - 1].frame;
+                                             LOG("testing demo %s: with %ld actions across %ld frames\n", demo.filepath,
+                                                 demo.entries.count, demo.last_frame);
                                              continue; // reset to the top of the loop
                                         }else{
                                              LOG("missing map %d corresponding demo.\n", map_number);
@@ -556,7 +559,7 @@ int main(int argc, char** argv){
                               }
                          }
                     }else{
-                         demo_mode = DEMO_MODE_NONE;
+                         demo.mode = DEMO_MODE_NONE;
                     }
                }
           }
@@ -578,8 +581,8 @@ int main(int argc, char** argv){
                               editor.selection_start.x--;
                               editor.selection_end.x--;
                          }else if(!resetting){
-                              player_action_perform(&player_action, &player, PLAYER_ACTION_TYPE_MOVE_LEFT_START, demo_mode,
-                                                    demo_file, frame_count);
+                              player_action_perform(&player_action, &player, PLAYER_ACTION_TYPE_MOVE_LEFT_START, demo.mode,
+                                                    demo.file, frame_count);
                          }
                          break;
                     case SDL_SCANCODE_RIGHT:
@@ -587,8 +590,8 @@ int main(int argc, char** argv){
                               editor.selection_start.x++;
                               editor.selection_end.x++;
                          }else if(!resetting){
-                              player_action_perform(&player_action, &player, PLAYER_ACTION_TYPE_MOVE_RIGHT_START, demo_mode,
-                                                    demo_file, frame_count);
+                              player_action_perform(&player_action, &player, PLAYER_ACTION_TYPE_MOVE_RIGHT_START, demo.mode,
+                                                    demo.file, frame_count);
                          }
                          break;
                     case SDL_SCANCODE_UP:
@@ -596,8 +599,8 @@ int main(int argc, char** argv){
                               editor.selection_start.y++;
                               editor.selection_end.y++;
                          }else if(!resetting){
-                              player_action_perform(&player_action, &player, PLAYER_ACTION_TYPE_MOVE_UP_START, demo_mode,
-                                                    demo_file, frame_count);
+                              player_action_perform(&player_action, &player, PLAYER_ACTION_TYPE_MOVE_UP_START, demo.mode,
+                                                    demo.file, frame_count);
                          }
                          break;
                     case SDL_SCANCODE_DOWN:
@@ -605,23 +608,23 @@ int main(int argc, char** argv){
                               editor.selection_start.y--;
                               editor.selection_end.y--;
                          }else if(!resetting){
-                              player_action_perform(&player_action, &player, PLAYER_ACTION_TYPE_MOVE_DOWN_START, demo_mode,
-                                                    demo_file, frame_count);
+                              player_action_perform(&player_action, &player, PLAYER_ACTION_TYPE_MOVE_DOWN_START, demo.mode,
+                                                    demo.file, frame_count);
                          }
                          break;
                     case SDL_SCANCODE_E:
                          if(!resetting){
-                              player_action_perform(&player_action, &player, PLAYER_ACTION_TYPE_ACTIVATE_START, demo_mode,
-                                                    demo_file, frame_count);
+                              player_action_perform(&player_action, &player, PLAYER_ACTION_TYPE_ACTIVATE_START, demo.mode,
+                                                    demo.file, frame_count);
                          }
                          break;
                     case SDL_SCANCODE_SPACE:
-                         if(demo_mode == DEMO_MODE_PLAY){
-                              demo_paused = !demo_paused;
+                         if(demo.mode == DEMO_MODE_PLAY){
+                              demo.paused = !demo.paused;
                          }else{
                               if(!resetting){
-                                   player_action_perform(&player_action, &player, PLAYER_ACTION_TYPE_SHOOT_START, demo_mode,
-                                                         demo_file, frame_count);
+                                   player_action_perform(&player_action, &player, PLAYER_ACTION_TYPE_SHOOT_START, demo.mode,
+                                                         demo.file, frame_count);
                               }
                          }
                          break;
@@ -630,7 +633,7 @@ int main(int argc, char** argv){
                               setup_map(&player, player_start, &interactive_array, &interactive_quad_tree, &block_array,
                                         &block_quad_tree, &undo, &tilemap, &arrow_array);
 
-                              if(demo_mode == DEMO_MODE_PLAY){
+                              if(demo.mode == DEMO_MODE_PLAY){
                                    deep_copy(&tilemap, &demo_starting_tilemap);
                                    deep_copy(&block_array, &demo_starting_block_array);
                                    deep_copy(&interactive_array, &demo_starting_interactive_array);
@@ -644,7 +647,7 @@ int main(int argc, char** argv){
                                         &block_quad_tree, &undo, &tilemap, &arrow_array);
 
                               // TODO: compress all dis with other places that duplicate this
-                              if(demo_mode == DEMO_MODE_PLAY){
+                              if(demo.mode == DEMO_MODE_PLAY){
                                    deep_copy(&tilemap, &demo_starting_tilemap);
                                    deep_copy(&block_array, &demo_starting_block_array);
                                    deep_copy(&interactive_array, &demo_starting_interactive_array);
@@ -655,16 +658,16 @@ int main(int argc, char** argv){
                                    last_block_pushed_direction = DIRECTION_LEFT;
                                    block_to_push = nullptr;
 
-                                   fclose(demo_file);
-                                   demo_file = load_demo_number(map_number, &demo_filepath);
-                                   if(demo_file){
-                                        free(demo_entries.entries);
-                                        demo_entry_index = 0;
-                                        demo_entries = demo_entries_get(demo_file);
+                                   fclose(demo.file);
+                                   demo.file = load_demo_number(map_number, &demo.filepath);
+                                   if(demo.file){
+                                        free(demo.entries.entries);
+                                        demo.entry_index = 0;
+                                        demo.entries = demo_entries_get(demo.file);
                                         frame_count = 0;
-                                        demo_last_frame = demo_entries.entries[demo_entries.count - 1].frame;
-                                        LOG("testing demo %s: with %ld actions across %ld frames\n", demo_filepath,
-                                            demo_entries.count, demo_last_frame);
+                                        demo.last_frame = demo.entries.entries[demo.entries.count - 1].frame;
+                                        LOG("testing demo %s: with %ld actions across %ld frames\n", demo.filepath,
+                                            demo.entries.count, demo.last_frame);
                                         continue; // reset to the top of the loop
                                    }else{
                                         LOG("missing map %d corresponding demo.\n", map_number);
@@ -681,7 +684,7 @@ int main(int argc, char** argv){
                               setup_map(&player, player_start, &interactive_array, &interactive_quad_tree, &block_array,
                                         &block_quad_tree, &undo, &tilemap, &arrow_array);
 
-                              if(demo_mode == DEMO_MODE_PLAY){
+                              if(demo.mode == DEMO_MODE_PLAY){
                                    deep_copy(&tilemap, &demo_starting_tilemap);
                                    deep_copy(&block_array, &demo_starting_block_array);
                                    deep_copy(&interactive_array, &demo_starting_interactive_array);
@@ -692,16 +695,16 @@ int main(int argc, char** argv){
                                    last_block_pushed_direction = DIRECTION_LEFT;
                                    block_to_push = nullptr;
 
-                                   fclose(demo_file);
-                                   demo_file = load_demo_number(map_number, &demo_filepath);
-                                   if(demo_file){
-                                        free(demo_entries.entries);
-                                        demo_entry_index = 0;
-                                        demo_entries = demo_entries_get(demo_file);
+                                   fclose(demo.file);
+                                   demo.file = load_demo_number(map_number, &demo.filepath);
+                                   if(demo.file){
+                                        free(demo.entries.entries);
+                                        demo.entry_index = 0;
+                                        demo.entries = demo_entries_get(demo.file);
                                         frame_count = 0;
-                                        demo_last_frame = demo_entries.entries[demo_entries.count - 1].frame;
-                                        LOG("testing demo %s: with %ld actions across %ld frames\n", demo_filepath,
-                                            demo_entries.count, demo_last_frame);
+                                        demo.last_frame = demo.entries.entries[demo.entries.count - 1].frame;
+                                        LOG("testing demo %s: with %ld actions across %ld frames\n", demo.filepath,
+                                            demo.entries.count, demo.last_frame);
                                         continue; // reset to the top of the loop
                                    }else{
                                         LOG("missing map %d corresponding demo.\n", map_number);
@@ -713,17 +716,17 @@ int main(int argc, char** argv){
                          }
                          break;
                     case SDL_SCANCODE_MINUS:
-                         if(demo_mode == DEMO_MODE_PLAY){
-                              if(demo_dt_multiplier > 0.1f){
-                                   demo_dt_multiplier -= 0.1f;
-                                   LOG("demo dt multiplier: %f\n", demo_dt_multiplier);
+                         if(demo.mode == DEMO_MODE_PLAY){
+                              if(demo.dt_multiplier > 0.1f){
+                                   demo.dt_multiplier -= 0.1f;
+                                   LOG("demo dt multiplier: %f\n", demo.dt_multiplier);
                               }
                          }
                          break;
                     case SDL_SCANCODE_EQUALS:
-                         if(demo_mode == DEMO_MODE_PLAY){
-                              demo_dt_multiplier += 0.1f;
-                              LOG("demo dt multiplier: %f\n", demo_dt_multiplier);
+                         if(demo.mode == DEMO_MODE_PLAY){
+                              demo.dt_multiplier += 0.1f;
+                              LOG("demo dt multiplier: %f\n", demo.dt_multiplier);
                          }
                          break;
                     case SDL_SCANCODE_V:
@@ -734,8 +737,8 @@ int main(int argc, char** argv){
                     } break;
                     case SDL_SCANCODE_U:
                          if(!resetting){
-                              player_action_perform(&player_action, &player, PLAYER_ACTION_TYPE_UNDO, demo_mode,
-                                                    demo_file, frame_count);
+                              player_action_perform(&player_action, &player, PLAYER_ACTION_TYPE_UNDO, demo.mode,
+                                                    demo.file, frame_count);
                          }
                          break;
                     case SDL_SCANCODE_N:
@@ -918,28 +921,28 @@ int main(int argc, char** argv){
                          quit = true;
                          break;
                     case SDL_SCANCODE_LEFT:
-                         player_action_perform(&player_action, &player, PLAYER_ACTION_TYPE_MOVE_LEFT_STOP, demo_mode,
-                                               demo_file, frame_count);
+                         player_action_perform(&player_action, &player, PLAYER_ACTION_TYPE_MOVE_LEFT_STOP, demo.mode,
+                                               demo.file, frame_count);
                          break;
                     case SDL_SCANCODE_RIGHT:
-                         player_action_perform(&player_action, &player, PLAYER_ACTION_TYPE_MOVE_RIGHT_STOP, demo_mode,
-                                               demo_file, frame_count);
+                         player_action_perform(&player_action, &player, PLAYER_ACTION_TYPE_MOVE_RIGHT_STOP, demo.mode,
+                                               demo.file, frame_count);
                          break;
                     case SDL_SCANCODE_UP:
-                         player_action_perform(&player_action, &player, PLAYER_ACTION_TYPE_MOVE_UP_STOP, demo_mode,
-                                               demo_file, frame_count);
+                         player_action_perform(&player_action, &player, PLAYER_ACTION_TYPE_MOVE_UP_STOP, demo.mode,
+                                               demo.file, frame_count);
                          break;
                     case SDL_SCANCODE_DOWN:
-                         player_action_perform(&player_action, &player, PLAYER_ACTION_TYPE_MOVE_DOWN_STOP, demo_mode,
-                                               demo_file, frame_count);
+                         player_action_perform(&player_action, &player, PLAYER_ACTION_TYPE_MOVE_DOWN_STOP, demo.mode,
+                                               demo.file, frame_count);
                          break;
                     case SDL_SCANCODE_E:
-                         player_action_perform(&player_action, &player, PLAYER_ACTION_TYPE_ACTIVATE_STOP, demo_mode,
-                                               demo_file, frame_count);
+                         player_action_perform(&player_action, &player, PLAYER_ACTION_TYPE_ACTIVATE_STOP, demo.mode,
+                                               demo.file, frame_count);
                          break;
                     case SDL_SCANCODE_SPACE:
-                         player_action_perform(&player_action, &player, PLAYER_ACTION_TYPE_SHOOT_STOP, demo_mode,
-                                               demo_file, frame_count);
+                         player_action_perform(&player_action, &player, PLAYER_ACTION_TYPE_SHOOT_STOP, demo.mode,
+                                               demo.file, frame_count);
                          break;
                     case SDL_SCANCODE_LCTRL:
                          ctrl_down = false;
@@ -955,13 +958,13 @@ int main(int argc, char** argv){
                          default:
                               break;
                          case EDITOR_MODE_OFF:
-                              if(demo_mode == DEMO_MODE_PLAY){
+                              if(demo.mode == DEMO_MODE_PLAY){
                                    if(vec_in_quad(&pct_bar_outline_quad, mouse_screen)){
                                         seeked_with_mouse = true;
 
-                                        demo_seek_frame = (S64)((F32)(demo_last_frame) * mouse_screen.x);
+                                        demo.seek_frame = (S64)((F32)(demo.last_frame) * mouse_screen.x);
 
-                                        if(demo_seek_frame < frame_count){
+                                        if(demo.seek_frame < frame_count){
                                              // TODO: compress with same comment elsewhere in this file
                                              deep_copy(&demo_starting_tilemap, &tilemap);
                                              deep_copy(&demo_starting_block_array, &block_array);
@@ -975,10 +978,10 @@ int main(int argc, char** argv){
                                              last_block_pushed_direction = DIRECTION_LEFT;
                                              block_to_push = nullptr;
 
-                                             demo_entry_index = 0;
+                                             demo.entry_index = 0;
                                              frame_count = 0;
-                                        }else if(demo_seek_frame == frame_count){
-                                             demo_seek_frame = -1;
+                                        }else if(demo.seek_frame == frame_count){
+                                             demo.seek_frame = -1;
                                         }
                                    }
                               }
@@ -1141,10 +1144,10 @@ int main(int argc, char** argv){
                          break;
                     }
 
-                    if(seeked_with_mouse && demo_mode == DEMO_MODE_PLAY){
-                         demo_seek_frame = (S64)((F32)(demo_last_frame) * mouse_screen.x);
+                    if(seeked_with_mouse && demo.mode == DEMO_MODE_PLAY){
+                         demo.seek_frame = (S64)((F32)(demo.last_frame) * mouse_screen.x);
 
-                         if(demo_seek_frame < frame_count){
+                         if(demo.seek_frame < frame_count){
                               // TODO: compress with same comment elsewhere in this file
                               deep_copy(&demo_starting_tilemap, &tilemap);
                               deep_copy(&demo_starting_block_array, &block_array);
@@ -1159,17 +1162,17 @@ int main(int argc, char** argv){
                               last_block_pushed_direction = DIRECTION_LEFT;
                               block_to_push = nullptr;
 
-                              demo_entry_index = 0;
+                              demo.entry_index = 0;
                               frame_count = 0;
-                         }else if(demo_seek_frame == frame_count){
-                              demo_seek_frame = -1;
+                         }else if(demo.seek_frame == frame_count){
+                              demo.seek_frame = -1;
                          }
                     }
                     break;
                }
           }
 
-          if(!demo_paused || demo_seek_frame >= 0){
+          if(!demo.paused || demo.seek_frame >= 0){
                // reset base light
                for(S16 j = 0; j < tilemap.height; j++){
                     for(S16 i = 0; i < tilemap.width; i++){
@@ -1851,7 +1854,7 @@ int main(int argc, char** argv){
                }
           }
 
-          if((suite && !show_suite) || demo_seek_frame >= 0) continue;
+          if((suite && !show_suite) || demo.seek_frame >= 0) continue;
 
           glClear(GL_COLOR_BUFFER_BIT);
 
@@ -2288,8 +2291,8 @@ int main(int argc, char** argv){
                glEnd();
           }
 
-          if(demo_mode == DEMO_MODE_PLAY){
-               F32 demo_pct = (F32)(frame_count) / (F32)(demo_last_frame);
+          if(demo.mode == DEMO_MODE_PLAY){
+               F32 demo_pct = (F32)(frame_count) / (F32)(demo.last_frame);
                Quad_t pct_bar_quad = {pct_bar_outline_quad.left, pct_bar_outline_quad.bottom, demo_pct, pct_bar_outline_quad.top};
                draw_quad_filled(&pct_bar_quad, 255.0f, 255.0f, 255.0f);
                draw_quad_wireframe(&pct_bar_outline_quad, 255.0f, 255.0f, 255.0f);
@@ -2298,19 +2301,19 @@ int main(int argc, char** argv){
           SDL_GL_SwapWindow(window);
      }
 
-     switch(demo_mode){
+     switch(demo.mode){
      default:
           break;
      case DEMO_MODE_RECORD:
-          player_action_perform(&player_action, &player, PLAYER_ACTION_TYPE_END_DEMO, demo_mode,
-                                demo_file, frame_count);
+          player_action_perform(&player_action, &player, PLAYER_ACTION_TYPE_END_DEMO, demo.mode,
+                                demo.file, frame_count);
           // save map and player position
-          save_map_to_file(demo_file, player_start, &tilemap, &block_array, &interactive_array);
-          fwrite(&player.pos.pixel, sizeof(player.pos.pixel), 1, demo_file);
-          fclose(demo_file);
+          save_map_to_file(demo.file, player_start, &tilemap, &block_array, &interactive_array);
+          fwrite(&player.pos.pixel, sizeof(player.pos.pixel), 1, demo.file);
+          fclose(demo.file);
           break;
      case DEMO_MODE_PLAY:
-          fclose(demo_file);
+          fclose(demo.file);
           break;
      }
 
