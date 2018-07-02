@@ -1,8 +1,59 @@
 #include "demo.h"
 
-void demo_entry_get(DemoEntry_t* demo_entry, FILE* file){
-     size_t read_count = fread(demo_entry, sizeof(*demo_entry), 1, file);
-     if(read_count != 1) demo_entry->frame = (S64)(-1);
+#include <stdlib.h>
+
+struct DemoEntryNode_t{
+     DemoEntry_t entry;
+     DemoEntryNode_t* next;
+};
+
+DemoEntries_t demo_entries_get(FILE* file){
+     S64 entry_count = 0;
+
+     // read into a linked list
+     DemoEntryNode_t* head = nullptr;
+     DemoEntryNode_t* itr = nullptr;
+     DemoEntryNode_t* prev = nullptr;
+
+     while(!itr || itr->entry.player_action_type != PLAYER_ACTION_TYPE_END_DEMO){
+          itr = (DemoEntryNode_t*)(malloc(sizeof(*itr)));
+          itr->entry.frame = -1;
+          itr->entry.player_action_type = PLAYER_ACTION_TYPE_MOVE_LEFT_START;
+          itr->next = nullptr;
+
+          size_t read_count = fread(&itr->entry, sizeof(itr->entry), 1, file);
+          if(prev){
+               prev->next = itr;
+          }else{
+               head = itr;
+          }
+
+          prev = itr;
+          entry_count++;
+
+          if(read_count != 1){
+               break;
+          }
+     }
+
+     // allocate array
+     DemoEntries_t entries = {};
+     entries.entries = (DemoEntry_t*)(malloc(entry_count * sizeof(*entries.entries)));
+     if(entries.entries == nullptr) return entries;
+     entries.count = entry_count;
+
+     // convert linked list to array
+     S64 index = 0;
+     itr = head;
+     while(itr){
+          entries.entries[index] = itr->entry;
+          index++;
+          DemoEntryNode_t* tmp = itr;
+          itr = itr->next;
+          free(tmp);
+     }
+
+     return entries;
 }
 
 void player_action_perform(PlayerAction_t* player_action, Player_t* player, PlayerActionType_t player_action_type,

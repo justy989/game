@@ -48,6 +48,11 @@ struct DemoEntry_t{
      PlayerActionType_t player_action_type;
 };
 
-void demo_entry_get(DemoEntry_t* demo_entry, FILE* file);
+struct DemoEntries_t{
+     DemoEntry_t* entries;
+     S64 count;
+};
+
+DemoEntries_t demo_entries_get(FILE* file);
 void player_action_perform(PlayerAction_t* player_action, Player_t* player, PlayerActionType_t player_action_type,
                            DemoMode_t demo_mode, FILE* demo_file, S64 frame_count);

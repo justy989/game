@@ -281,6 +281,16 @@ void draw_quad_wireframe(const Quad_t* quad, F32 red, F32 green, F32 blue){
      glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 }
 
+void draw_quad_filled(const Quad_t* quad, F32 red, F32 green, F32 blue){
+     glBegin(GL_QUADS);
+     glColor3f(red, green, blue);
+     glVertex2f(quad->left,  quad->top);
+     glVertex2f(quad->left,  quad->bottom);
+     glVertex2f(quad->right, quad->bottom);
+     glVertex2f(quad->right, quad->top);
+     glEnd();
+}
+
 void draw_selection(Coord_t selection_start, Coord_t selection_end, Position_t camera, F32 red, F32 green, F32 blue){
      if(selection_start.x > selection_end.x) SWAP(selection_start.x, selection_end.x);
      if(selection_start.y > selection_end.y) SWAP(selection_start.y, selection_end.y);

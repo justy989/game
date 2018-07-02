@@ -54,5 +54,6 @@ void draw_solids(Vec_t pos, Interactive_t* interactive, Block_t** blocks, S16 bl
                  Coord_t source_coord, Coord_t destination_coord, U8 portal_rotations,
                  TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree);
 void draw_quad_wireframe(const Quad_t* quad, F32 red, F32 green, F32 blue);
+void draw_quad_filled(const Quad_t* quad, F32 red, F32 green, F32 blue);
 
 void draw_selection(Coord_t selection_start, Coord_t selection_end, Position_t camera, F32 red, F32 green, F32 blue);
