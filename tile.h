@@ -45,6 +45,7 @@ struct TileMap_t{
 };
 
 bool init(TileMap_t* tilemap, S16 width, S16 height);
+void deep_copy(TileMap_t* a, TileMap_t* b);
 void destroy(TileMap_t* tilemap);
 bool tile_is_solid(Tile_t* tile);
 bool tile_is_iced(Tile_t* tile);

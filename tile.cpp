@@ -19,6 +19,16 @@ bool init(TileMap_t* tilemap, S16 width, S16 height){
      return true;
 }
 
+void deep_copy(TileMap_t* a, TileMap_t* b){
+     destroy(b);
+     init(b, a->width, a->height);
+     for(S16 i = 0; i < a->height; i++){
+          for(S16 j = 0; j < a->width; j++){
+               b->tiles[i][j] = a->tiles[i][j];
+          }
+     }
+}
+
 void destroy(TileMap_t* tilemap){
      for(S16 i = 0; i < tilemap->height; i++){
           free(tilemap->tiles[i]);

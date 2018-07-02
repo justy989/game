@@ -21,6 +21,16 @@ bool init(ObjectArray_t<T>* object_array, S16 count){
      return true;
 }
 
+// this only works when T is shallow copy-able
+template <typename T>
+void deep_copy(ObjectArray_t<T>* a, ObjectArray_t<T>* b){
+     destroy(b);
+     init(b, a->count);
+     for(S16 i = 0; i < a->count; i++){
+          b->elements[i] = a->elements[i];
+     }
+}
+
 template <typename T>
 bool resize(ObjectArray_t<T>* object_array, S16 new_count){
      if(new_count == 0){

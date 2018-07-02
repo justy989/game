@@ -182,6 +182,10 @@ int main(int argc, char** argv){
      ArrowArray_t arrow_array = {};
      Coord_t player_start {2, 8};
 
+     TileMap_t demo_starting_tilemap = {};
+     ObjectArray_t<Block_t> demo_starting_block_array = {};
+     ObjectArray_t<Interactive_t> demo_starting_interactive_array = {};
+
      if(load_map_filepath){
           if(!load_map(load_map_filepath, &player_start, &tilemap, &block_array, &interactive_array)){
                return 1;
@@ -190,6 +194,10 @@ int main(int argc, char** argv){
           if(!load_map_number(map_number, &player_start, &tilemap, &block_array, &interactive_array)){
                return 1;
           }
+
+          deep_copy(&tilemap, &demo_starting_tilemap);
+          deep_copy(&block_array, &demo_starting_block_array);
+          deep_copy(&interactive_array, &demo_starting_interactive_array);
 
           demo_mode = DEMO_MODE_PLAY;
           demo_file = load_demo_number(map_number, &demo_filepath);
@@ -204,6 +212,12 @@ int main(int argc, char** argv){
      }else if(map_number){
           if(!load_map_number(map_number, &player_start, &tilemap, &block_array, &interactive_array)){
                return 1;
+          }
+
+          if(demo_mode == DEMO_MODE_PLAY){
+               deep_copy(&tilemap, &demo_starting_tilemap);
+               deep_copy(&block_array, &demo_starting_block_array);
+               deep_copy(&interactive_array, &demo_starting_interactive_array);
           }
      }else{
           init(&tilemap, ROOM_TILE_SIZE, ROOM_TILE_SIZE);
@@ -508,6 +522,10 @@ int main(int argc, char** argv){
                                         setup_map(&player, player_start, &interactive_array, &interactive_quad_tree, &block_array,
                                                   &block_quad_tree, &undo, &tilemap, &arrow_array);
 
+                                        deep_copy(&tilemap, &demo_starting_tilemap);
+                                        deep_copy(&block_array, &demo_starting_block_array);
+                                        deep_copy(&interactive_array, &demo_starting_interactive_array);
+
                                         // reset some vars
                                         player_action = {};
                                         last_block_pushed = nullptr;
@@ -539,7 +557,6 @@ int main(int argc, char** argv){
                          }
                     }else{
                          demo_mode = DEMO_MODE_NONE;
-                         LOG("end of demo %s\n", demo_filepath);
                     }
                }
           }
@@ -612,36 +629,101 @@ int main(int argc, char** argv){
                          if(load_map_number(map_number, &player_start, &tilemap, &block_array, &interactive_array)){
                               setup_map(&player, player_start, &interactive_array, &interactive_quad_tree, &block_array,
                                         &block_quad_tree, &undo, &tilemap, &arrow_array);
+
+                              if(demo_mode == DEMO_MODE_PLAY){
+                                   deep_copy(&tilemap, &demo_starting_tilemap);
+                                   deep_copy(&block_array, &demo_starting_block_array);
+                                   deep_copy(&interactive_array, &demo_starting_interactive_array);
+                              }
                          }
                          break;
                     case SDL_SCANCODE_LEFTBRACKET:
+                         map_number--;
+                         if(load_map_number(map_number, &player_start, &tilemap, &block_array, &interactive_array)){
+                              setup_map(&player, player_start, &interactive_array, &interactive_quad_tree, &block_array,
+                                        &block_quad_tree, &undo, &tilemap, &arrow_array);
+
+                              // TODO: compress all dis with other places that duplicate this
+                              if(demo_mode == DEMO_MODE_PLAY){
+                                   deep_copy(&tilemap, &demo_starting_tilemap);
+                                   deep_copy(&block_array, &demo_starting_block_array);
+                                   deep_copy(&interactive_array, &demo_starting_interactive_array);
+
+                                   // reset some vars
+                                   player_action = {};
+                                   last_block_pushed = nullptr;
+                                   last_block_pushed_direction = DIRECTION_LEFT;
+                                   block_to_push = nullptr;
+
+                                   fclose(demo_file);
+                                   demo_file = load_demo_number(map_number, &demo_filepath);
+                                   if(demo_file){
+                                        free(demo_entries.entries);
+                                        demo_entry_index = 0;
+                                        demo_entries = demo_entries_get(demo_file);
+                                        frame_count = 0;
+                                        demo_last_frame = demo_entries.entries[demo_entries.count - 1].frame;
+                                        LOG("testing demo %s: with %ld actions across %ld frames\n", demo_filepath,
+                                            demo_entries.count, demo_last_frame);
+                                        continue; // reset to the top of the loop
+                                   }else{
+                                        LOG("missing map %d corresponding demo.\n", map_number);
+                                        return 1;
+                                   }
+                              }
+                         }else{
+                              map_number++;
+                         }
+                         break;
+                    case SDL_SCANCODE_RIGHTBRACKET:
+                         map_number++;
+                         if(load_map_number(map_number, &player_start, &tilemap, &block_array, &interactive_array)){
+                              setup_map(&player, player_start, &interactive_array, &interactive_quad_tree, &block_array,
+                                        &block_quad_tree, &undo, &tilemap, &arrow_array);
+
+                              if(demo_mode == DEMO_MODE_PLAY){
+                                   deep_copy(&tilemap, &demo_starting_tilemap);
+                                   deep_copy(&block_array, &demo_starting_block_array);
+                                   deep_copy(&interactive_array, &demo_starting_interactive_array);
+
+                                   // reset some vars
+                                   player_action = {};
+                                   last_block_pushed = nullptr;
+                                   last_block_pushed_direction = DIRECTION_LEFT;
+                                   block_to_push = nullptr;
+
+                                   fclose(demo_file);
+                                   demo_file = load_demo_number(map_number, &demo_filepath);
+                                   if(demo_file){
+                                        free(demo_entries.entries);
+                                        demo_entry_index = 0;
+                                        demo_entries = demo_entries_get(demo_file);
+                                        frame_count = 0;
+                                        demo_last_frame = demo_entries.entries[demo_entries.count - 1].frame;
+                                        LOG("testing demo %s: with %ld actions across %ld frames\n", demo_filepath,
+                                            demo_entries.count, demo_last_frame);
+                                        continue; // reset to the top of the loop
+                                   }else{
+                                        LOG("missing map %d corresponding demo.\n", map_number);
+                                        return 1;
+                                   }
+                              }
+                         }else{
+                              map_number--;
+                         }
+                         break;
+                    case SDL_SCANCODE_MINUS:
                          if(demo_mode == DEMO_MODE_PLAY){
                               if(demo_dt_multiplier > 0.1f){
                                    demo_dt_multiplier -= 0.1f;
                                    LOG("demo dt multiplier: %f\n", demo_dt_multiplier);
                               }
-                         }else{
-                              map_number--;
-                              if(load_map_number(map_number, &player_start, &tilemap, &block_array, &interactive_array)){
-                                   setup_map(&player, player_start, &interactive_array, &interactive_quad_tree, &block_array,
-                                             &block_quad_tree, &undo, &tilemap, &arrow_array);
-                              }else{
-                                   map_number++;
-                              }
                          }
                          break;
-                    case SDL_SCANCODE_RIGHTBRACKET:
+                    case SDL_SCANCODE_EQUALS:
                          if(demo_mode == DEMO_MODE_PLAY){
                               demo_dt_multiplier += 0.1f;
                               LOG("demo dt multiplier: %f\n", demo_dt_multiplier);
-                         }else{
-                              map_number++;
-                              if(load_map_number(map_number, &player_start, &tilemap, &block_array, &interactive_array)){
-                                   setup_map(&player, player_start, &interactive_array, &interactive_quad_tree, &block_array,
-                                             &block_quad_tree, &undo, &tilemap, &arrow_array);
-                              }else{
-                                   map_number--;
-                              }
                          }
                          break;
                     case SDL_SCANCODE_V:
@@ -877,21 +959,26 @@ int main(int argc, char** argv){
                                    if(vec_in_quad(&pct_bar_outline_quad, mouse_screen)){
                                         seeked_with_mouse = true;
 
-                                        auto save_player_pos = player.pos;
-                                        if(load_map_number(map_number, &player_start, &tilemap, &block_array, &interactive_array)){
+                                        demo_seek_frame = (S64)((F32)(demo_last_frame) * mouse_screen.x);
+
+                                        if(demo_seek_frame < frame_count){
+                                             // TODO: compress with same comment elsewhere in this file
+                                             deep_copy(&demo_starting_tilemap, &tilemap);
+                                             deep_copy(&demo_starting_block_array, &block_array);
+                                             deep_copy(&demo_starting_interactive_array, &interactive_array);
+
                                              setup_map(&player, player_start, &interactive_array, &interactive_quad_tree, &block_array,
                                                        &block_quad_tree, &undo, &tilemap, &arrow_array);
-                                             // TODO: compress with same comment elsewhere in this file
                                              // reset some vars
                                              player_action = {};
                                              last_block_pushed = nullptr;
                                              last_block_pushed_direction = DIRECTION_LEFT;
                                              block_to_push = nullptr;
 
-                                             demo_seek_frame = (S64)((F32)(demo_last_frame) * mouse_screen.x);
                                              demo_entry_index = 0;
                                              frame_count = 0;
-                                             LOG("seek: %d, %d -> %d, %d\n", save_player_pos.pixel.x, save_player_pos.pixel.y, player.pos.pixel.x, player.pos.pixel.y);
+                                        }else if(demo_seek_frame == frame_count){
+                                             demo_seek_frame = -1;
                                         }
                                    }
                               }
@@ -1055,21 +1142,27 @@ int main(int argc, char** argv){
                     }
 
                     if(seeked_with_mouse && demo_mode == DEMO_MODE_PLAY){
-                         auto save_player_pos = player.pos;
-                         if(load_map_number(map_number, &player_start, &tilemap, &block_array, &interactive_array)){
+                         demo_seek_frame = (S64)((F32)(demo_last_frame) * mouse_screen.x);
+
+                         if(demo_seek_frame < frame_count){
+                              // TODO: compress with same comment elsewhere in this file
+                              deep_copy(&demo_starting_tilemap, &tilemap);
+                              deep_copy(&demo_starting_block_array, &block_array);
+                              deep_copy(&demo_starting_interactive_array, &interactive_array);
+
                               setup_map(&player, player_start, &interactive_array, &interactive_quad_tree, &block_array,
                                         &block_quad_tree, &undo, &tilemap, &arrow_array);
-                              // TODO: compress with same comment elsewhere in this file
+
                               // reset some vars
                               player_action = {};
                               last_block_pushed = nullptr;
                               last_block_pushed_direction = DIRECTION_LEFT;
                               block_to_push = nullptr;
 
-                              demo_seek_frame = (S64)((F32)(demo_last_frame) * mouse_screen.x);
                               demo_entry_index = 0;
                               frame_count = 0;
-                              LOG("seek: %d, %d -> %d, %d\n", save_player_pos.pixel.x, save_player_pos.pixel.y, player.pos.pixel.x, player.pos.pixel.y);
+                         }else if(demo_seek_frame == frame_count){
+                              demo_seek_frame = -1;
                          }
                     }
                     break;
