@@ -281,16 +281,17 @@ int main(int argc, char** argv){
      Direction_t last_block_pushed_direction = DIRECTION_LEFT;
      Block_t* block_to_push = nullptr;
 
-     // bool left_click_down = false;
      Vec_t mouse_screen = {}; // 0.0f to 1.0f
      Position_t mouse_world = {};
-     bool ctrl_down;
+     bool ctrl_down = false;
 
      Editor_t editor;
      init(&editor);
 
      S64 frame_count = 0;
      F32 dt = 0.0f;
+
+     bool seeked_with_mouse = false;
 
      Quad_t pct_bar_outline_quad = {0, 2.0f * PIXEL_SIZE, 1.0f, 0.02f};
 
@@ -868,14 +869,14 @@ int main(int argc, char** argv){
                     default:
                          break;
                     case SDL_BUTTON_LEFT:
-                         // left_click_down = true;
-
                          switch(editor.mode){
                          default:
                               break;
                          case EDITOR_MODE_OFF:
                               if(demo_mode == DEMO_MODE_PLAY){
                                    if(vec_in_quad(&pct_bar_outline_quad, mouse_screen)){
+                                        seeked_with_mouse = true;
+
                                         auto save_player_pos = player.pos;
                                         if(load_map_number(map_number, &player_start, &tilemap, &block_array, &interactive_array)){
                                              setup_map(&player, player_start, &interactive_array, &interactive_quad_tree, &block_array,
@@ -975,7 +976,8 @@ int main(int argc, char** argv){
                     default:
                          break;
                     case SDL_BUTTON_LEFT:
-                         // left_click_down = false;
+                         seeked_with_mouse = false;
+
                          switch(editor.mode){
                          default:
                               break;
@@ -1050,6 +1052,25 @@ int main(int argc, char** argv){
                               editor.selection_end = pos_to_coord(mouse_world);
                          }
                          break;
+                    }
+
+                    if(seeked_with_mouse && demo_mode == DEMO_MODE_PLAY){
+                         auto save_player_pos = player.pos;
+                         if(load_map_number(map_number, &player_start, &tilemap, &block_array, &interactive_array)){
+                              setup_map(&player, player_start, &interactive_array, &interactive_quad_tree, &block_array,
+                                        &block_quad_tree, &undo, &tilemap, &arrow_array);
+                              // TODO: compress with same comment elsewhere in this file
+                              // reset some vars
+                              player_action = {};
+                              last_block_pushed = nullptr;
+                              last_block_pushed_direction = DIRECTION_LEFT;
+                              block_to_push = nullptr;
+
+                              demo_seek_frame = (S64)((F32)(demo_last_frame) * mouse_screen.x);
+                              demo_entry_index = 0;
+                              frame_count = 0;
+                              LOG("seek: %d, %d -> %d, %d\n", save_player_pos.pixel.x, save_player_pos.pixel.y, player.pos.pixel.x, player.pos.pixel.y);
+                         }
                     }
                     break;
                }
