@@ -7,6 +7,9 @@
 
 bool init(Editor_t* editor){
      memset(editor, 0, sizeof(*editor));
+
+     editor->block_entangle_index_save = -1;
+
      init(&editor->category_array, EDITOR_CATEGORY_COUNT);
 
      auto* tile_category = editor->category_array.elements + EDITOR_CATEGORY_TILE_ID;

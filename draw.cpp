@@ -152,6 +152,11 @@ void draw_block(Block_t* block, Vec_t pos_vec){
           tex_vec = theme_frame(5, 6);
           draw_double_theme_frame(pos_vec, tex_vec);
      }
+
+     if(block->entangle_index >= 0){
+          tex_vec = theme_frame(0, 22);
+          draw_theme_frame(pos_vec, tex_vec);
+     }
 }
 
 void draw_interactive(Interactive_t* interactive, Vec_t pos_vec, Coord_t coord,

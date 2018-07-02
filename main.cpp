@@ -120,7 +120,8 @@ int main(int argc, char** argv){
 
           opengl_context = SDL_GL_CreateContext(window);
 
-          SDL_GL_SetSwapInterval(SDL_TRUE);
+          // SDL_GL_SetSwapInterval(SDL_TRUE);
+          SDL_GL_SetSwapInterval(SDL_FALSE);
           glViewport(0, 0, window_width, window_height);
           glClearColor(0.0, 0.0, 0.0, 1.0);
           glEnable(GL_TEXTURE_2D);
@@ -280,13 +281,19 @@ int main(int argc, char** argv){
 
      S64 frame_count = 0;
      F32 dt = 0.0f;
+     F32 demo_dt_multiplier = 1.0f;
 
      while(!quit){
           if(!suite || show_suite){
                current_time = system_clock::now();
                duration<double> elapsed_seconds = current_time - last_time;
                dt = (F64)(elapsed_seconds.count());
-               if(dt < 0.0166666f) continue; // limit 60 fps
+
+               if(demo_mode == DEMO_MODE_PLAY){
+                    if(dt < (0.0166666f * demo_dt_multiplier)) continue;
+               }else{
+                    if(dt < 0.0166666f) continue; // limit 60 fps
+               }
           }
 
           // TODO: consider 30fps as minimum for random noobs computers
@@ -587,21 +594,33 @@ int main(int argc, char** argv){
                          }
                          break;
                     case SDL_SCANCODE_LEFTBRACKET:
-                         map_number--;
-                         if(load_map_number(map_number, &player_start, &tilemap, &block_array, &interactive_array)){
-                              setup_map(&player, player_start, &interactive_array, &interactive_quad_tree, &block_array,
-                                        &block_quad_tree, &undo, &tilemap, &arrow_array);
+                         if(demo_mode == DEMO_MODE_PLAY){
+                              if(demo_dt_multiplier > 0.1f){
+                                   demo_dt_multiplier -= 0.1f;
+                                   LOG("demo dt multiplier: %f\n", demo_dt_multiplier);
+                              }
                          }else{
-                              map_number++;
+                              map_number--;
+                              if(load_map_number(map_number, &player_start, &tilemap, &block_array, &interactive_array)){
+                                   setup_map(&player, player_start, &interactive_array, &interactive_quad_tree, &block_array,
+                                             &block_quad_tree, &undo, &tilemap, &arrow_array);
+                              }else{
+                                   map_number++;
+                              }
                          }
                          break;
                     case SDL_SCANCODE_RIGHTBRACKET:
-                         map_number++;
-                         if(load_map_number(map_number, &player_start, &tilemap, &block_array, &interactive_array)){
-                              setup_map(&player, player_start, &interactive_array, &interactive_quad_tree, &block_array,
-                                        &block_quad_tree, &undo, &tilemap, &arrow_array);
+                         if(demo_mode == DEMO_MODE_PLAY){
+                              demo_dt_multiplier += 0.1f;
+                              LOG("demo dt multiplier: %f\n", demo_dt_multiplier);
                          }else{
-                              map_number--;
+                              map_number++;
+                              if(load_map_number(map_number, &player_start, &tilemap, &block_array, &interactive_array)){
+                                   setup_map(&player, player_start, &interactive_array, &interactive_quad_tree, &block_array,
+                                             &block_quad_tree, &undo, &tilemap, &arrow_array);
+                              }else{
+                                   map_number--;
+                              }
                          }
                          break;
                     case SDL_SCANCODE_V:
@@ -640,6 +659,50 @@ int main(int argc, char** argv){
                               }
                          }
                     } break;
+                    case SDL_SCANCODE_8:
+                         if(editor.mode == EDITOR_MODE_CATEGORY_SELECT){
+                              auto coord = mouse_select_world(mouse_screen, camera);
+                              auto rect = rect_surrounding_coord(coord);
+
+                              S16 block_count = 0;
+                              Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
+                              quad_tree_find_in(block_quad_tree, rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
+
+                              if(block_count > 1){
+                                   LOG("error: too man blocks in coord, unsure which one to entangle!\\n");
+                              }else if(block_count == 1){
+                                   S32 block_index = blocks[0] - block_array.elements;
+                                   if(block_index >= 0 && block_index < block_array.count){
+                                        if(editor.block_entangle_index_save >= 0 && editor.block_entangle_index_save != block_index){
+                                             undo_commit(&undo, &player, &tilemap, &block_array, &interactive_array);
+
+                                             // the magic happens here
+                                             Block_t* other = block_array.elements + editor.block_entangle_index_save;
+
+                                             // TODO: Probably not what we want in the future when things are
+                                             //       circularly entangled, but fine for now
+                                             if(other->entangle_index >= 0){
+                                                  Block_t* other_other = block_array.elements + other->entangle_index;
+                                                  other_other->entangle_index = -1;
+                                             }
+
+                                             other->entangle_index = block_index;
+                                             blocks[0]->entangle_index = editor.block_entangle_index_save;
+
+                                             // reset once we are done
+                                             editor.block_entangle_index_save = -1;
+                                             LOG("editor: entangled: %d <-> %d\n", blocks[0]->entangle_index, block_index);
+                                        }else{
+                                             editor.block_entangle_index_save = block_index;
+                                             LOG("editor: entangle index save: %d\n", block_index);
+                                        }
+                                   }
+                              }else if(block_count == 0){
+                                   LOG("editor: clear entangle index save (was %d)\n", editor.block_entangle_index_save);
+                                   editor.block_entangle_index_save = -1;
+                              }
+                         }
+                         break;
                     // TODO: #ifdef DEBUG
                     case SDL_SCANCODE_GRAVE:
                          if(editor.mode == EDITOR_MODE_OFF){
@@ -648,6 +711,7 @@ int main(int argc, char** argv){
                               editor.mode = EDITOR_MODE_OFF;
                               editor.selection_start = {};
                               editor.selection_end = {};
+                              editor.block_entangle_index_save = -1;
                          }
                          break;
                     case SDL_SCANCODE_TAB:
@@ -1092,6 +1156,10 @@ int main(int argc, char** argv){
                                    arrow->element = transition_element(arrow->element, blocks[b]->element);
                                    if(arrow_element){
                                         blocks[b]->element = transition_element(blocks[b]->element, arrow_element);
+                                        if(blocks[b]->entangle_index >= 0 && blocks[b]->entangle_index < block_array.count){
+                                             Block_t* entangled_block = block_array.elements + blocks[b]->entangle_index;
+                                             entangled_block->element = transition_element(entangled_block->element, arrow_element);
+                                        }
                                    }
                               }
                          }
@@ -1576,11 +1644,16 @@ int main(int argc, char** argv){
                     }else{
                          F32 before_time = player.push_time;
 
+                         // TODO: get back to this once we improve our demo tools
                          player.push_time += dt;
-                         if(player.push_time > BLOCK_PUSH_TIME){
+                         if(player.push_time > BLOCK_PUSH_TIME){ // && !direction_in_mask(vec_direction_mask(block_to_push->vel), last_block_pushed_direction)){
                               if(before_time <= BLOCK_PUSH_TIME) undo_commit(&undo, &player, &tilemap, &block_array, &interactive_array);
-                              block_push(block_to_push, last_block_pushed_direction, &tilemap, interactive_quad_tree, block_quad_tree, false);
-                              if(block_to_push->pos.z > 0) player.push_time = -0.5f;
+                              bool pushed = block_push(block_to_push, last_block_pushed_direction, &tilemap, interactive_quad_tree, block_quad_tree, false);
+                              if(pushed && block_to_push->entangle_index >= 0){
+                                   Block_t* entangled_block = block_array.elements + block_to_push->entangle_index;
+                                   block_push(entangled_block, last_block_pushed_direction, &tilemap, interactive_quad_tree, block_quad_tree, false);
+                              }
+                              if(block_to_push->pos.z > 0) player.push_time = -0.5f; // TODO: wtf is this line?
                          }
                     }
                }else{
@@ -2061,6 +2134,9 @@ int main(int argc, char** argv){
                glEnd();
           }
 
+          if(demo_mode == DEMO_MODE_PLAY){
+
+          }
 
           SDL_GL_SwapWindow(window);
      }

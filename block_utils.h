@@ -14,7 +14,7 @@ struct BlockInsideResult_t{
      Coord_t dst_portal_coord;
 };
 
-void block_push(Block_t* block, Direction_t direction, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree,
+bool block_push(Block_t* block, Direction_t direction, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree,
                 QuadTreeNode_t<Block_t>* block_quad_tree, bool pushed_by_ice);
 
 bool block_adjacent_pixels_to_check(Block_t* block_to_check, Direction_t direction, Pixel_t* a, Pixel_t* b);

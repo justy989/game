@@ -108,6 +108,7 @@ void undo_snapshot(Undo_t* undo, Player_t* player, TileMap_t* tilemap, ObjectArr
           undo_block->element = block->element;
           undo_block->accel = block->accel;
           undo_block->vel = block->vel;
+          undo_block->entangle_index = block->entangle_index;
      }
 
      if(undo->interactive_array.count != interactive_array->count){
@@ -147,7 +148,6 @@ void undo_commit(Undo_t* undo, Player_t* player, TileMap_t* tilemap, ObjectArray
                     *undo_tile_flags = undo->tile_flags[y][x];
                     undo_history_add(&undo->history, UNDO_DIFF_TYPE_TILE_FLAGS, y * tilemap->width + x);
                     diff_count++;
-
                }
           }
      }
@@ -174,7 +174,8 @@ void undo_commit(Undo_t* undo, Player_t* player, TileMap_t* tilemap, ObjectArray
 
                     if(last_block->pixel == block->pos.pixel &&
                        last_block->z == block->pos.z &&
-                       last_block->element == block->element){
+                       last_block->element == block->element &&
+                       last_block->entangle_index == block->entangle_index){
                          found = true;
                          auto* undo_block_entry = (UndoBlock_t*)(undo->history.current);
                          *undo_block_entry = undo->block_array.elements[i];
@@ -200,7 +201,8 @@ void undo_commit(Undo_t* undo, Player_t* player, TileMap_t* tilemap, ObjectArray
 
                if(undo_block->pixel != block->pos.pixel ||
                   undo_block->z != block->pos.z ||
-                  undo_block->element != block->element){
+                  undo_block->element != block->element ||
+                  undo_block->entangle_index != block->entangle_index){
                     auto* undo_block_entry = (UndoBlock_t*)(undo->history.current);
                     *undo_block_entry = *undo_block;
                     undo_history_add(&undo->history, UNDO_DIFF_TYPE_BLOCK, i);
@@ -323,6 +325,7 @@ void undo_revert(Undo_t* undo, Player_t* player, TileMap_t* tilemap, ObjectArray
                block->element = block_entry->element;
                block->accel = block_entry->accel;
                block->vel = block_entry->vel;
+               block->entangle_index = block_entry->entangle_index;
           } break;
           case UNDO_DIFF_TYPE_BLOCK_INSERT:
           {
@@ -342,6 +345,7 @@ void undo_revert(Undo_t* undo, Player_t* player, TileMap_t* tilemap, ObjectArray
                block->element = block_entry->element;
                block->accel = block_entry->accel;
                block->vel = block_entry->vel;
+               block->entangle_index = block_entry->entangle_index;
           } break;
           case UNDO_DIFF_TYPE_BLOCK_REMOVE:
           {

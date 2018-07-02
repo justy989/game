@@ -61,10 +61,11 @@ enum EditorCategory_t : U8{
 
 struct Editor_t{
      ObjectArray_t<ObjectArray_t<ObjectArray_t<Stamp_t>>> category_array;
-     EditorMode_t mode = EDITOR_MODE_OFF;
+     EditorMode_t mode;
 
-     S32 category = 0;
-     S32 stamp = 0;
+     S32 category;
+     S32 stamp;
+     S32 block_entangle_index_save;
 
      Coord_t selection_start;
      Coord_t selection_end;
