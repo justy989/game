@@ -7,6 +7,7 @@
 #include "quad_tree.h"
 #include "tile.h"
 #include "interactive.h"
+#include "quad.h"
 
 Direction_t direction_between(Coord_t a, Coord_t b);
 bool directions_meet_expectations(Direction_t a, Direction_t b, Direction_t first_expectation, Direction_t second_expectation);
@@ -43,5 +44,7 @@ Coord_t mouse_select_coord(Vec_t mouse_screen);
 Coord_t mouse_select_world(Vec_t mouse_screen, Position_t camera);
 S32 mouse_select_index(Vec_t mouse_screen);
 Vec_t coord_to_screen_position(Coord_t coord);
+
+bool vec_in_quad(const Quad_t* q, Vec_t v);
 
 Vec_t mass_move(Vec_t* vel, Vec_t accel, F32 dt);

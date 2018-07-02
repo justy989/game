@@ -7,6 +7,7 @@
 #include "quad_tree.h"
 #include "tile.h"
 #include "player.h"
+#include "quad.h"
 
 #include <SDL2/SDL_opengl.h>
 
@@ -24,13 +25,6 @@
 #define PLAYER_FRAME_HEIGHT 0.03125f
 #define PLAYER_FRAMES_WIDE 4
 #define PLAYER_FRAMES_TALL 32
-
-struct Quad_t{
-     F32 left;
-     F32 bottom;
-     F32 right;
-     F32 top;
-};
 
 Vec_t theme_frame(S16 x, S16 y);
 Vec_t arrow_frame(S8 x, S8 y);

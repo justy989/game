@@ -145,6 +145,9 @@ int main(int argc, char** argv){
 
      S64 demo_last_frame = 0;
      S64 demo_entry_index = 0;
+     S64 demo_seek_frame = -1;
+     F32 demo_dt_multiplier = 1.0f;
+     bool demo_paused = false;
      DemoEntries_t demo_entries;
 
      FILE* demo_file = nullptr;
@@ -288,11 +291,11 @@ int main(int argc, char** argv){
 
      S64 frame_count = 0;
      F32 dt = 0.0f;
-     F32 demo_dt_multiplier = 1.0f;
-     bool demo_paused = false;
+
+     Quad_t pct_bar_outline_quad = {0, 2.0f * PIXEL_SIZE, 1.0f, 0.02f};
 
      while(!quit){
-          if(!suite || show_suite){
+          if((!suite || show_suite) && demo_seek_frame < 0){
                current_time = system_clock::now();
                duration<double> elapsed_seconds = current_time - last_time;
                dt = (F64)(elapsed_seconds.count());
@@ -311,7 +314,10 @@ int main(int argc, char** argv){
           quad_tree_free(block_quad_tree);
           block_quad_tree = quad_tree_build(&block_array);
 
-          if(!demo_paused) frame_count++;
+          if(!demo_paused || demo_seek_frame >= 0){
+               frame_count++;
+               if(demo_seek_frame == frame_count) demo_seek_frame = -1;
+          }
 
           last_time = current_time;
 
@@ -498,10 +504,8 @@ int main(int argc, char** argv){
                                    }
 
                                    if(load_map_number(map_number, &player_start, &tilemap, &block_array, &interactive_array)){
-                                        reset_map(&player, player_start, &interactive_array, &interactive_quad_tree, &arrow_array);
-                                        destroy(&undo);
-                                        init(&undo, UNDO_MEMORY, tilemap.width, tilemap.height, block_array.count, interactive_array.count);
-                                        undo_snapshot(&undo, &player, &tilemap, &block_array, &interactive_array);
+                                        setup_map(&player, player_start, &interactive_array, &interactive_quad_tree, &block_array,
+                                                  &block_quad_tree, &undo, &tilemap, &arrow_array);
 
                                         // reset some vars
                                         player_action = {};
@@ -870,6 +874,26 @@ int main(int argc, char** argv){
                          default:
                               break;
                          case EDITOR_MODE_OFF:
+                              if(demo_mode == DEMO_MODE_PLAY){
+                                   if(vec_in_quad(&pct_bar_outline_quad, mouse_screen)){
+                                        auto save_player_pos = player.pos;
+                                        if(load_map_number(map_number, &player_start, &tilemap, &block_array, &interactive_array)){
+                                             setup_map(&player, player_start, &interactive_array, &interactive_quad_tree, &block_array,
+                                                       &block_quad_tree, &undo, &tilemap, &arrow_array);
+                                             // TODO: compress with same comment elsewhere in this file
+                                             // reset some vars
+                                             player_action = {};
+                                             last_block_pushed = nullptr;
+                                             last_block_pushed_direction = DIRECTION_LEFT;
+                                             block_to_push = nullptr;
+
+                                             demo_seek_frame = (S64)((F32)(demo_last_frame) * mouse_screen.x);
+                                             demo_entry_index = 0;
+                                             frame_count = 0;
+                                             LOG("seek: %d, %d -> %d, %d\n", save_player_pos.pixel.x, save_player_pos.pixel.y, player.pos.pixel.x, player.pos.pixel.y);
+                                        }
+                                   }
+                              }
                               break;
                          case EDITOR_MODE_CATEGORY_SELECT:
                          case EDITOR_MODE_SELECTION_MANIPULATION:
@@ -1030,7 +1054,8 @@ int main(int argc, char** argv){
                     break;
                }
           }
-          if(!demo_paused){
+
+          if(!demo_paused || demo_seek_frame >= 0){
                // reset base light
                for(S16 j = 0; j < tilemap.height; j++){
                     for(S16 i = 0; i < tilemap.width; i++){
@@ -1618,8 +1643,6 @@ int main(int argc, char** argv){
                     }
                }
 
-               // Position_t portal_player_pos = {};
-
                // player movement
                {
                     user_movement = vec_normalize(user_movement);
@@ -1714,7 +1737,7 @@ int main(int argc, char** argv){
                }
           }
 
-          if(suite && !show_suite) continue;
+          if((suite && !show_suite) || demo_seek_frame >= 0) continue;
 
           glClear(GL_COLOR_BUFFER_BIT);
 
@@ -2153,9 +2176,8 @@ int main(int argc, char** argv){
 
           if(demo_mode == DEMO_MODE_PLAY){
                F32 demo_pct = (F32)(frame_count) / (F32)(demo_last_frame);
-               Quad_t pct_bar_quad = {0, PIXEL_SIZE, demo_pct, 0.02f};
+               Quad_t pct_bar_quad = {pct_bar_outline_quad.left, pct_bar_outline_quad.bottom, demo_pct, pct_bar_outline_quad.top};
                draw_quad_filled(&pct_bar_quad, 255.0f, 255.0f, 255.0f);
-               Quad_t pct_bar_outline_quad = {0, PIXEL_SIZE, 1.0f, 0.02f};
                draw_quad_wireframe(&pct_bar_outline_quad, 255.0f, 255.0f, 255.0f);
           }
 

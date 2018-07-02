@@ -268,3 +268,8 @@ Vec_t mass_move(Vec_t* vel, Vec_t accel, F32 dt){
      *vel *= MASS_DRAG;
      return pos_dt;
 }
+
+bool vec_in_quad(const Quad_t* q, Vec_t v){
+     return (v.x >= q->left && v.x <= q->right &&
+             v.y >= q->bottom && v.y <= q->top);
+}
