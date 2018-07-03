@@ -291,9 +291,7 @@ void activate(World_t* world, Coord_t coord){
 }
 
 Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, Direction_t player_face, Coord_t* skip_coord,
-                                         Player_t* player, TileMap_t* tilemap,
-                                         QuadTreeNode_t<Interactive_t>* interactive_quad_tree, ObjectArray_t<Block_t>* block_array,
-                                         Block_t** block_to_push, Direction_t* last_block_pushed_direction,
+                                         Player_t* player, World_t* world, Block_t** block_to_push, Direction_t* last_block_pushed_direction,
                                          bool* collided_with_interactive, bool* resetting){
      // figure out tiles that are close by
      Position_t final_player_pos = position + pos_delta;
@@ -303,8 +301,8 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
      Coord_t min = player_coord - Coord_t{1, 1};
      Coord_t max = player_coord + Coord_t{1, 1};
      // S8 player_top = player.pos.z + 2 * HEIGHT_INTERVAL;
-     min = coord_clamp_zero_to_dim(min, tilemap->width - 1, tilemap->height - 1);
-     max = coord_clamp_zero_to_dim(max, tilemap->width - 1, tilemap->height - 1);
+     min = coord_clamp_zero_to_dim(min, world->tilemap.width - 1, world->tilemap.height - 1);
+     max = coord_clamp_zero_to_dim(max, world->tilemap.width - 1, world->tilemap.height - 1);
 
      // TODO: convert to use quad tree
      Vec_t collided_block_delta {};
@@ -313,26 +311,26 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
      DirectionMask_t collided_blocks_mask_dir = DIRECTION_MASK_NONE;
      Block_t* collided_blocks[DIRECTION_COUNT] = {};
 
-     for(S16 i = 0; i < block_array->count; i++){
+     for(S16 i = 0; i < world->blocks.count; i++){
           Vec_t pos_delta_save = pos_delta;
 
           bool collide_with_block = false;
-          Position_t block_pos = block_array->elements[i].pos;
+          Position_t block_pos = world->blocks.elements[i].pos;
           position_collide_with_rect(position, block_pos, &pos_delta, &collide_with_block);
-          Coord_t block_coord = block_get_coord(block_array->elements + i);
+          Coord_t block_coord = block_get_coord(world->blocks.elements + i);
           U8 portal_rotations = 0;
 
           if(!collide_with_block){
                // check if the block is in a portal and try to collide with it
-               Vec_t coord_offset = pos_to_vec(block_array->elements[i].pos +
+               Vec_t coord_offset = pos_to_vec(world->blocks.elements[i].pos +
                                                pixel_to_pos(HALF_TILE_SIZE_PIXEL) -
                                                coord_to_pos_at_tile_center(block_coord));
                for(S8 r = 0; r < DIRECTION_COUNT && !collide_with_block; r++){
                     Coord_t check_coord = block_coord + (Direction_t)(r);
-                    Interactive_t* interactive = quad_tree_interactive_find_at(interactive_quad_tree, check_coord);
+                    Interactive_t* interactive = quad_tree_interactive_find_at(world->interactive_qt, check_coord);
 
                     if(is_active_portal(interactive)){
-                         PortalExit_t portal_exits = find_portal_exits(check_coord, tilemap, interactive_quad_tree);
+                         PortalExit_t portal_exits = find_portal_exits(check_coord, &world->tilemap, world->interactive_qt);
 
                          for(S8 d = 0; d < DIRECTION_COUNT && !collide_with_block; d++){
                               Vec_t final_coord_offset = rotate_vec_between_dirs_clockwise(interactive->portal.face, (Direction_t)(d), coord_offset);
@@ -362,7 +360,7 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
                Vec_t pos_delta_diff = pos_delta - pos_delta_save;
                collided_block_delta = vec_rotate_quadrants_clockwise(pos_delta_diff, 4 - portal_rotations);
                auto collided_block_dir = relative_quadrant(position.pixel, block_pos.pixel + HALF_TILE_SIZE_PIXEL);
-               auto collided_block = block_array->elements + i;
+               auto collided_block = world->blocks.elements + i;
                Position_t pre_move = collided_block->pos;
 
 #ifndef BLOCKS_SQUISH_PLAYER
@@ -421,7 +419,7 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
 
                Position_t block_center = collided_block->pos;
                block_center.pixel += HALF_TILE_SIZE_PIXEL;
-               S8 rotations_between = teleport_position_across_portal(&block_center, NULL, interactive_quad_tree, tilemap, premove_coord,
+               S8 rotations_between = teleport_position_across_portal(&block_center, NULL, world, premove_coord,
                                                                       coord);
                if(rotations_between >= 0){
                     collided_block->pos = block_center;
@@ -431,7 +429,7 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
                auto rotated_player_face = direction_rotate_clockwise(player_face, portal_rotations);
                if(collided_block_dir == rotated_player_face && (player->accel.x != 0.0f || player->accel.y != 0.0f)){
                     if(*block_to_push == nullptr){ // also check that the player is actually pushing against the block
-                         *block_to_push = block_array->elements + i;
+                         *block_to_push = world->blocks.elements + i;
                          *last_block_pushed_direction = player_face;
                     }else{
                          // stop the player from pushing 2 blocks at once
@@ -448,7 +446,7 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
      Direction_t collided_tile_dir = DIRECTION_COUNT;
      for(S16 y = min.y; y <= max.y; y++){
           for(S16 x = min.x; x <= max.x; x++){
-               if(tilemap->tiles[y][x].id){
+               if(world->tilemap.tiles[y][x].id){
                     Coord_t coord {x, y};
                     bool skip = false;
                     for(S16 d = 0; d < DIRECTION_COUNT; d++){
@@ -471,7 +469,7 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
           for(S16 x = min.x; x <= max.x; x++){
                Coord_t coord {x, y};
 
-               Interactive_t* interactive = quad_tree_interactive_solid_at(interactive_quad_tree, tilemap, coord);
+               Interactive_t* interactive = quad_tree_interactive_solid_at(world->interactive_qt, &world->tilemap, coord);
                if(interactive){
                     bool collided = false;
                     position_slide_against_rect(position, coord, PLAYER_RADIUS, &pos_delta, &collided);
@@ -549,14 +547,14 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
      return pos_delta;
 }
 
-S8 teleport_position_across_portal(Position_t* position, Vec_t* pos_delta, QuadTreeNode_t<Interactive_t>* interactive_quad_tree,
-                                   TileMap_t* tilemap, Coord_t premove_coord, Coord_t postmove_coord){
+S8 teleport_position_across_portal(Position_t* position, Vec_t* pos_delta, World_t* world, Coord_t premove_coord,
+                                   Coord_t postmove_coord){
      if(postmove_coord != premove_coord){
-          auto* interactive = quad_tree_interactive_find_at(interactive_quad_tree, postmove_coord);
+          auto* interactive = quad_tree_interactive_find_at(world->interactive_qt, postmove_coord);
           if(is_active_portal(interactive)){
                if(interactive->portal.face == direction_opposite(direction_between(postmove_coord, premove_coord))){
                     Position_t offset_from_center = *position - coord_to_pos_at_tile_center(postmove_coord);
-                    PortalExit_t portal_exit = find_portal_exits(postmove_coord, tilemap, interactive_quad_tree);
+                    PortalExit_t portal_exit = find_portal_exits(postmove_coord, &world->tilemap, world->interactive_qt);
 
                     for(S8 d = 0; d < DIRECTION_COUNT; d++){
                          for(S8 p = 0; p < portal_exit.directions[d].count; p++){

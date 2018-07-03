@@ -1363,8 +1363,8 @@ int main(int argc, char** argv){
                               }
                          }
 
-                         S8 rotations_between = teleport_position_across_portal(&arrow->pos, NULL, world.interactive_qt, &world.tilemap, pre_move_coord,
-                                                                                post_move_coord);
+                         S8 rotations_between = teleport_position_across_portal(&arrow->pos, NULL, &world,
+                                                                                pre_move_coord, post_move_coord);
                          if(rotations_between >= 0){
                               arrow->face = direction_rotate_clockwise(arrow->face, rotations_between);
                          }
@@ -1642,7 +1642,7 @@ int main(int argc, char** argv){
 
                     Position_t block_center = block->pos;
                     block_center.pixel += HALF_TILE_SIZE_PIXEL;
-                    S8 rotations_between = teleport_position_across_portal(&block_center, NULL, world.interactive_qt, &world.tilemap, premove_coord,
+                    S8 rotations_between = teleport_position_across_portal(&block_center, NULL, &world, premove_coord,
                                                                            coord);
                     if(rotations_between >= 0){
                          block->pos = block_center;
@@ -1661,8 +1661,8 @@ int main(int argc, char** argv){
                          block_center = block->pos;
                          block_center.pixel += HALF_TILE_SIZE_PIXEL;
 
-                         rotations_between = teleport_position_across_portal(&block_center, NULL, world.interactive_qt,
-                                                                             &world.tilemap, premove_coord, coord);
+                         rotations_between = teleport_position_across_portal(&block_center, NULL, &world,
+                                                                             premove_coord, coord);
                          if(rotations_between >= 0){
                               block->pos = block_center;
                               block->pos.pixel -= HALF_TILE_SIZE_PIXEL;
@@ -1748,15 +1748,15 @@ int main(int argc, char** argv){
                     Coord_t player_coord = pos_to_coord(world.player.pos + pos_delta);
 
                     find_portal_adjacents_to_skip_collision_check(player_coord, world.interactive_qt, skip_coord);
-                    S8 rotations_between = teleport_position_across_portal(&world.player.pos, &pos_delta, world.interactive_qt, &world.tilemap, player_previous_coord,
-                                                                           player_coord);
+                    S8 rotations_between = teleport_position_across_portal(&world.player.pos, &pos_delta, &world,
+                                                                           player_previous_coord, player_coord);
 
                     player_coord = pos_to_coord(world.player.pos + pos_delta);
 
                     bool collide_with_interactive = false;
-                    Vec_t player_delta_pos = move_player_position_through_world(world.player.pos, pos_delta, world.player.face, skip_coord,
-                                                                                &world.player, &world.tilemap, world.interactive_qt,
-                                                                                &world.blocks, &block_to_push,
+                    Vec_t player_delta_pos = move_player_position_through_world(world.player.pos, pos_delta,
+                                                                                world.player.face, skip_coord,
+                                                                                &world.player, &world, &block_to_push,
                                                                                 &last_block_pushed_direction,
                                                                                 &collide_with_interactive, &resetting);
 
@@ -1789,10 +1789,11 @@ int main(int argc, char** argv){
                     }
 
                     if(rotations_between < 0){
-                         rotations_between = teleport_position_across_portal(&world.player.pos, &player_delta_pos, world.interactive_qt, &world.tilemap, player_previous_coord,
-                                                                             player_coord);
+                         rotations_between = teleport_position_across_portal(&world.player.pos, &player_delta_pos, &world,
+                                                                             player_previous_coord, player_coord);
                     }else{
-                         teleport_position_across_portal(&world.player.pos, &player_delta_pos, world.interactive_qt, &world.tilemap, player_previous_coord, player_coord);
+                         teleport_position_across_portal(&world.player.pos, &player_delta_pos, &world,
+                                                         player_previous_coord, player_coord);
                     }
 
                     if(rotations_between >= 0){
