@@ -38,6 +38,46 @@ FILE* load_demo_number(S32 map_number, const char** demo_filepath){
      return fopen(*demo_filepath, "rb");
 }
 
+void cache_for_demo_seek(World_t* world, TileMap_t* demo_starting_tilemap, ObjectArray_t<Block_t>* demo_starting_blocks,
+                         ObjectArray_t<Interactive_t>* demo_starting_interactives){
+     deep_copy(&world->tilemap, demo_starting_tilemap);
+     deep_copy(&world->blocks, demo_starting_blocks);
+     deep_copy(&world->interactives, demo_starting_interactives);
+}
+
+void fetch_cache_for_demo_seek(World_t* world, TileMap_t* demo_starting_tilemap, ObjectArray_t<Block_t>* demo_starting_blocks,
+                               ObjectArray_t<Interactive_t>* demo_starting_interactives){
+     deep_copy(demo_starting_tilemap, &world->tilemap);
+     deep_copy(demo_starting_blocks, &world->blocks);
+     deep_copy(demo_starting_interactives, &world->interactives);
+}
+
+void reset_player_state_vars(PlayerAction_t* player_action, Block_t** last_block_pushed,
+                             Direction_t* last_block_pushed_direction, Block_t** block_to_push){
+     *player_action = {};
+     *last_block_pushed = nullptr;
+     *last_block_pushed_direction = DIRECTION_LEFT;
+     *block_to_push = nullptr;
+}
+
+bool load_map_number_demo(Demo_t* demo, S16 map_number, S64* frame_count){
+     fclose(demo->file);
+     demo->file = load_demo_number(map_number, &demo->filepath);
+     if(demo->file){
+          free(demo->entries.entries);
+          demo->entry_index = 0;
+          demo->entries = demo_entries_get(demo->file);
+          *frame_count = 0;
+          demo->last_frame = demo->entries.entries[demo->entries.count - 1].frame;
+          LOG("testing demo %s: with %ld actions across %ld frames\n", demo->filepath,
+              demo->entries.count, demo->last_frame);
+          return true;
+     }
+
+     LOG("missing map %d corresponding demo.\n", map_number);
+     return false;
+}
+
 using namespace std::chrono;
 
 int main(int argc, char** argv){
@@ -208,9 +248,7 @@ int main(int argc, char** argv){
                return 1;
           }
 
-          deep_copy(&world.tilemap, &demo_starting_tilemap);
-          deep_copy(&world.blocks, &demo_starting_blocks);
-          deep_copy(&world.interactives, &demo_starting_interactives);
+          cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
 
           demo.mode = DEMO_MODE_PLAY;
           demo.file = load_demo_number(map_number, &demo.filepath);
@@ -228,9 +266,7 @@ int main(int argc, char** argv){
           }
 
           if(demo.mode == DEMO_MODE_PLAY){
-               deep_copy(&world.tilemap, &demo_starting_tilemap);
-               deep_copy(&world.blocks, &demo_starting_blocks);
-               deep_copy(&world.interactives, &demo_starting_interactives);
+               cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
           }
      }else{
           init(&world.tilemap, ROOM_TILE_SIZE, ROOM_TILE_SIZE);
@@ -500,30 +536,13 @@ int main(int argc, char** argv){
 
                                    if(load_map_number(map_number, &player_start, &world)){
                                         setup_map(player_start, &world, &undo);
+                                        cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
+                                        reset_player_state_vars(&player_action, &last_block_pushed,
+                                                                &last_block_pushed_direction, &block_to_push);
 
-                                        deep_copy(&world.tilemap, &demo_starting_tilemap);
-                                        deep_copy(&world.blocks, &demo_starting_blocks);
-                                        deep_copy(&world.interactives, &demo_starting_interactives);
-
-                                        // reset some vars
-                                        player_action = {};
-                                        last_block_pushed = nullptr;
-                                        last_block_pushed_direction = DIRECTION_LEFT;
-                                        block_to_push = nullptr;
-
-                                        fclose(demo.file);
-                                        demo.file = load_demo_number(map_number, &demo.filepath);
-                                        if(demo.file){
-                                             free(demo.entries.entries);
-                                             demo.entry_index = 0;
-                                             demo.entries = demo_entries_get(demo.file);
-                                             frame_count = 0;
-                                             demo.last_frame = demo.entries.entries[demo.entries.count - 1].frame;
-                                             LOG("testing demo %s: with %ld actions across %ld frames\n", demo.filepath,
-                                                 demo.entries.count, demo.last_frame);
+                                        if(load_map_number_demo(&demo, map_number, &frame_count)){
                                              continue; // reset to the top of the loop
                                         }else{
-                                             LOG("missing map %d corresponding demo.\n", map_number);
                                              return 1;
                                         }
                                    }else{
@@ -607,11 +626,11 @@ int main(int argc, char** argv){
                     case SDL_SCANCODE_L:
                          if(load_map_number(map_number, &player_start, &world)){
                               setup_map(player_start, &world, &undo);
+                              reset_player_state_vars(&player_action, &last_block_pushed,
+                                                      &last_block_pushed_direction, &block_to_push);
 
                               if(demo.mode == DEMO_MODE_PLAY){
-                                   deep_copy(&world.tilemap, &demo_starting_tilemap);
-                                   deep_copy(&world.blocks, &demo_starting_blocks);
-                                   deep_copy(&world.interactives, &demo_starting_interactives);
+                                   cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
                               }
                          }
                          break;
@@ -619,32 +638,16 @@ int main(int argc, char** argv){
                          map_number--;
                          if(load_map_number(map_number, &player_start, &world)){
                               setup_map(player_start, &world, &undo);
+                              reset_player_state_vars(&player_action, &last_block_pushed,
+                                                      &last_block_pushed_direction, &block_to_push);
 
                               // TODO: compress all dis with other places that duplicate this
                               if(demo.mode == DEMO_MODE_PLAY){
-                                   deep_copy(&world.tilemap, &demo_starting_tilemap);
-                                   deep_copy(&world.blocks, &demo_starting_blocks);
-                                   deep_copy(&world.interactives, &demo_starting_interactives);
+                                   cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
 
-                                   // reset some vars
-                                   player_action = {};
-                                   last_block_pushed = nullptr;
-                                   last_block_pushed_direction = DIRECTION_LEFT;
-                                   block_to_push = nullptr;
-
-                                   fclose(demo.file);
-                                   demo.file = load_demo_number(map_number, &demo.filepath);
-                                   if(demo.file){
-                                        free(demo.entries.entries);
-                                        demo.entry_index = 0;
-                                        demo.entries = demo_entries_get(demo.file);
-                                        frame_count = 0;
-                                        demo.last_frame = demo.entries.entries[demo.entries.count - 1].frame;
-                                        LOG("testing demo %s: with %ld actions across %ld frames\n", demo.filepath,
-                                            demo.entries.count, demo.last_frame);
+                                   if(load_map_number_demo(&demo, map_number, &frame_count)){
                                         continue; // reset to the top of the loop
                                    }else{
-                                        LOG("missing map %d corresponding demo.\n", map_number);
                                         return 1;
                                    }
                               }
@@ -656,31 +659,15 @@ int main(int argc, char** argv){
                          map_number++;
                          if(load_map_number(map_number, &player_start, &world)){
                               setup_map(player_start, &world, &undo);
+                              reset_player_state_vars(&player_action, &last_block_pushed,
+                                                      &last_block_pushed_direction, &block_to_push);
 
                               if(demo.mode == DEMO_MODE_PLAY){
-                                   deep_copy(&world.tilemap, &demo_starting_tilemap);
-                                   deep_copy(&world.blocks, &demo_starting_blocks);
-                                   deep_copy(&world.interactives, &demo_starting_interactives);
+                                   cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
 
-                                   // reset some vars
-                                   player_action = {};
-                                   last_block_pushed = nullptr;
-                                   last_block_pushed_direction = DIRECTION_LEFT;
-                                   block_to_push = nullptr;
-
-                                   fclose(demo.file);
-                                   demo.file = load_demo_number(map_number, &demo.filepath);
-                                   if(demo.file){
-                                        free(demo.entries.entries);
-                                        demo.entry_index = 0;
-                                        demo.entries = demo_entries_get(demo.file);
-                                        frame_count = 0;
-                                        demo.last_frame = demo.entries.entries[demo.entries.count - 1].frame;
-                                        LOG("testing demo %s: with %ld actions across %ld frames\n", demo.filepath,
-                                            demo.entries.count, demo.last_frame);
+                                   if(load_map_number_demo(&demo, map_number, &frame_count)){
                                         continue; // reset to the top of the loop
                                    }else{
-                                        LOG("missing map %d corresponding demo.\n", map_number);
                                         return 1;
                                    }
                               }
@@ -939,9 +926,7 @@ int main(int argc, char** argv){
 
                                         if(demo.seek_frame < frame_count){
                                              // TODO: compress with same comment elsewhere in this file
-                                             deep_copy(&demo_starting_tilemap, &world.tilemap);
-                                             deep_copy(&demo_starting_blocks, &world.blocks);
-                                             deep_copy(&demo_starting_interactives, &world.interactives);
+                                             fetch_cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
 
                                              setup_map(player_start, &world, &undo);
 
@@ -1122,9 +1107,7 @@ int main(int argc, char** argv){
 
                          if(demo.seek_frame < frame_count){
                               // TODO: compress with same comment elsewhere in this file
-                              deep_copy(&demo_starting_tilemap, &world.tilemap);
-                              deep_copy(&demo_starting_blocks, &world.blocks);
-                              deep_copy(&demo_starting_interactives, &world.interactives);
+                              fetch_cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
 
                               setup_map(player_start, &world, &undo);
 
@@ -1818,6 +1801,8 @@ int main(int argc, char** argv){
 
                          if(load_map_number(map_number, &player_start, &world)){
                               setup_map(player_start, &world, &undo);
+                              reset_player_state_vars(&player_action, &last_block_pushed,
+                                                      &last_block_pushed_direction, &block_to_push);
                          }
                     }
                }else{
