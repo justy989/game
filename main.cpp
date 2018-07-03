@@ -170,10 +170,6 @@ int main(int argc, char** argv){
 
      World_t world;
 
-     ArrowArray_t arrow_array = {};
-
-     QuadTreeNode_t<Block_t>* block_quad_tree = nullptr;
-
      Editor_t editor;
      Undo_t undo = {};
 
@@ -284,7 +280,7 @@ int main(int argc, char** argv){
           world.blocks.elements[0].pos = coord_to_pos(Coord_t{-1, -1});
      }
 
-     reset_map(&world.player, player_start, &world.interactives, &world.interactive_qt, &arrow_array);
+     reset_map(&world.player, player_start, &world.interactives, &world.interactive_qt, &world.arrows);
      init(&undo, UNDO_MEMORY, world.tilemap.width, world.tilemap.height, world.blocks.count, world.interactives.count);
      undo_snapshot(&undo, &world.player, &world.tilemap, &world.blocks, &world.interactives);
      init(&editor);
@@ -312,8 +308,8 @@ int main(int argc, char** argv){
           // if(demo.mode) dt = 0.0166666f; // the game always runs as if a 60th of a frame has occurred.
           dt = 0.0166666f; // the game always runs as if a 60th of a frame has occurred.
 
-          quad_tree_free(block_quad_tree);
-          block_quad_tree = quad_tree_build(&world.blocks);
+          quad_tree_free(world.block_qt);
+          world.block_qt = quad_tree_build(&world.blocks);
 
           if(!demo.paused || demo.seek_frame >= 0){
                frame_count++;
@@ -506,7 +502,7 @@ int main(int argc, char** argv){
 
                                    if(load_map_number(map_number, &player_start, &world.tilemap, &world.blocks, &world.interactives)){
                                         setup_map(&world.player, player_start, &world.interactives, &world.interactive_qt, &world.blocks,
-                                                  &block_quad_tree, &undo, &world.tilemap, &arrow_array);
+                                                  &world.block_qt, &undo, &world.tilemap, &world.arrows);
 
                                         deep_copy(&world.tilemap, &demo_starting_tilemap);
                                         deep_copy(&world.blocks, &demo_starting_blocks);
@@ -614,7 +610,7 @@ int main(int argc, char** argv){
                     case SDL_SCANCODE_L:
                          if(load_map_number(map_number, &player_start, &world.tilemap, &world.blocks, &world.interactives)){
                               setup_map(&world.player, player_start, &world.interactives, &world.interactive_qt, &world.blocks,
-                                        &block_quad_tree, &undo, &world.tilemap, &arrow_array);
+                                        &world.block_qt, &undo, &world.tilemap, &world.arrows);
 
                               if(demo.mode == DEMO_MODE_PLAY){
                                    deep_copy(&world.tilemap, &demo_starting_tilemap);
@@ -627,7 +623,7 @@ int main(int argc, char** argv){
                          map_number--;
                          if(load_map_number(map_number, &player_start, &world.tilemap, &world.blocks, &world.interactives)){
                               setup_map(&world.player, player_start, &world.interactives, &world.interactive_qt, &world.blocks,
-                                        &block_quad_tree, &undo, &world.tilemap, &arrow_array);
+                                        &world.block_qt, &undo, &world.tilemap, &world.arrows);
 
                               // TODO: compress all dis with other places that duplicate this
                               if(demo.mode == DEMO_MODE_PLAY){
@@ -665,7 +661,7 @@ int main(int argc, char** argv){
                          map_number++;
                          if(load_map_number(map_number, &player_start, &world.tilemap, &world.blocks, &world.interactives)){
                               setup_map(&world.player, player_start, &world.interactives, &world.interactive_qt, &world.blocks,
-                                        &block_quad_tree, &undo, &world.tilemap, &arrow_array);
+                                        &world.block_qt, &undo, &world.tilemap, &world.arrows);
 
                               if(demo.mode == DEMO_MODE_PLAY){
                                    deep_copy(&world.tilemap, &demo_starting_tilemap);
@@ -755,7 +751,7 @@ int main(int argc, char** argv){
 
                               S16 block_count = 0;
                               Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
-                              quad_tree_find_in(block_quad_tree, rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
+                              quad_tree_find_in(world.block_qt, rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
 
                               if(block_count > 1){
                                    LOG("error: too man blocks in coord, unsure which one to entangle!\\n");
@@ -892,7 +888,7 @@ int main(int argc, char** argv){
                     case SDL_SCANCODE_H:
                     {
                          Coord_t coord = mouse_select_world(mouse_screen, camera);
-                         describe_coord(coord, &world.tilemap, world.interactive_qt, block_quad_tree);
+                         describe_coord(coord, &world.tilemap, world.interactive_qt, world.block_qt);
                     } break;
                     }
                     break;
@@ -954,7 +950,7 @@ int main(int argc, char** argv){
                                              deep_copy(&demo_starting_interactives, &world.interactives);
 
                                              setup_map(&world.player, player_start, &world.interactives, &world.interactive_qt, &world.blocks,
-                                                       &block_quad_tree, &undo, &world.tilemap, &arrow_array);
+                                                       &world.block_qt, &undo, &world.tilemap, &world.arrows);
                                              // reset some vars
                                              player_action = {};
                                              last_block_pushed = nullptr;
@@ -1001,8 +997,8 @@ int main(int argc, char** argv){
                                                     &world.tilemap, &world.blocks, &world.interactives, &world.interactive_qt, ctrl_down);
                                    }
 
-                                   quad_tree_free(block_quad_tree);
-                                   block_quad_tree = quad_tree_build(&world.blocks);
+                                   quad_tree_free(world.block_qt);
+                                   world.block_qt = quad_tree_build(&world.blocks);
                               }
                          } break;
                          }
@@ -1137,7 +1133,7 @@ int main(int argc, char** argv){
                               deep_copy(&demo_starting_interactives, &world.interactives);
 
                               setup_map(&world.player, player_start, &world.interactives, &world.interactive_qt, &world.blocks,
-                                        &block_quad_tree, &undo, &world.tilemap, &arrow_array);
+                                        &world.block_qt, &undo, &world.tilemap, &world.arrows);
 
                               // reset some vars
                               player_action = {};
@@ -1187,7 +1183,7 @@ int main(int argc, char** argv){
 
                                         S16 block_count = 0;
                                         Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
-                                        quad_tree_find_in(block_quad_tree, rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
+                                        quad_tree_find_in(world.block_qt, rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
 
                                         for(S16 b = 0; b < block_count; b++){
                                              Coord_t block_coord = block_get_coord(blocks[b]);
@@ -1209,13 +1205,13 @@ int main(int argc, char** argv){
 
                // update arrows
                for(S16 i = 0; i < ARROW_ARRAY_MAX; i++){
-                    Arrow_t* arrow = arrow_array.arrows + i;
+                    Arrow_t* arrow = world.arrows.arrows + i;
                     if(!arrow->alive) continue;
 
                     Coord_t pre_move_coord = pixel_to_coord(arrow->pos.pixel);
 
                     if(arrow->element == ELEMENT_FIRE){
-                         illuminate(pre_move_coord, 255 - LIGHT_DECAY, &world.tilemap, world.interactive_qt, block_quad_tree);
+                         illuminate(pre_move_coord, 255 - LIGHT_DECAY, &world.tilemap, world.interactive_qt, world.block_qt);
                     }
 
                     if(arrow->stuck_time > 0.0f){
@@ -1277,7 +1273,7 @@ int main(int argc, char** argv){
 
                     S16 block_count = 0;
                     Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
-                    quad_tree_find_in(block_quad_tree, coord_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
+                    quad_tree_find_in(world.block_qt, coord_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
                     for(S16 b = 0; b < block_count; b++){
                          // blocks on the coordinate and on the ground block light
                          Rect_t block_rect = block_get_rect(blocks[b]);
@@ -1332,9 +1328,9 @@ int main(int argc, char** argv){
 
                          // catch or give elements
                          if(arrow->element == ELEMENT_FIRE){
-                              melt_ice(post_move_coord, 0, &world.tilemap, world.interactive_qt, block_quad_tree, false);
+                              melt_ice(post_move_coord, 0, &world.tilemap, world.interactive_qt, world.block_qt, false);
                          }else if(arrow->element == ELEMENT_ICE){
-                              spread_ice(post_move_coord, 0, &world.tilemap, world.interactive_qt, block_quad_tree, false);
+                              spread_ice(post_move_coord, 0, &world.tilemap, world.interactive_qt, world.block_qt, false);
                          }
 
                          Interactive_t* interactive = quad_tree_interactive_find_at(world.interactive_qt, post_move_coord);
@@ -1423,8 +1419,8 @@ int main(int argc, char** argv){
                     undo_revert(&undo, &world.player, &world.tilemap, &world.blocks, &world.interactives);
                     quad_tree_free(world.interactive_qt);
                     world.interactive_qt = quad_tree_build(&world.interactives);
-                    quad_tree_free(block_quad_tree);
-                    block_quad_tree = quad_tree_build(&world.blocks);
+                    quad_tree_free(world.block_qt);
+                    world.block_qt = quad_tree_build(&world.blocks);
                     player_action.undo = false;
                }
 
@@ -1453,7 +1449,7 @@ int main(int argc, char** argv){
                               break;
                          }
                          arrow_pos.z += ARROW_SHOOT_HEIGHT;
-                         arrow_spawn(&arrow_array, arrow_pos, world.player.face);
+                         arrow_spawn(&world.arrows, arrow_pos, world.player.face);
                     }
                     world.player.bow_draw_time = 0.0f;
                }
@@ -1520,7 +1516,7 @@ int main(int argc, char** argv){
                     bool held_up = false;
 
                     if(pos_delta.x != 0.0f || pos_delta.y != 0.0f){
-                         check_block_collision_with_other_blocks(block, block_quad_tree, world.interactive_qt, &world.tilemap,
+                         check_block_collision_with_other_blocks(block, world.block_qt, world.interactive_qt, &world.tilemap,
                                                                  &world.player, last_block_pushed, last_block_pushed_direction);
                     }
 
@@ -1618,7 +1614,7 @@ int main(int argc, char** argv){
                          }
                     }
 
-                    held_up = block_held_up_by_another_block(block, block_quad_tree);
+                    held_up = block_held_up_by_another_block(block, world.block_qt);
 
                     // TODO: should we care about the decimal component of the position ?
                     auto* interactive = quad_tree_interactive_find_at(world.interactive_qt, coord);
@@ -1662,7 +1658,7 @@ int main(int argc, char** argv){
                          block->vel = vec_rotate_quadrants_clockwise(block->vel, rotations_between);
                          block->accel = vec_rotate_quadrants_clockwise(block->accel, rotations_between);
 
-                         check_block_collision_with_other_blocks(block, block_quad_tree, world.interactive_qt, &world.tilemap,
+                         check_block_collision_with_other_blocks(block, world.block_qt, world.interactive_qt, &world.tilemap,
                                                                  &world.player, last_block_pushed, last_block_pushed_direction);
 
                          // try teleporting if we collided with a block
@@ -1688,10 +1684,10 @@ int main(int argc, char** argv){
                for(S16 i = 0; i < world.blocks.count; i++){
                     Block_t* block = world.blocks.elements + i;
                     if(block->element == ELEMENT_FIRE){
-                         illuminate(block_get_coord(block), 255, &world.tilemap, world.interactive_qt, block_quad_tree);
+                         illuminate(block_get_coord(block), 255, &world.tilemap, world.interactive_qt, world.block_qt);
                     }else if(block->element == ELEMENT_ICE){
                          auto block_coord = block_get_coord(block);
-                         spread_ice(block_coord, 1, &world.tilemap, world.interactive_qt, block_quad_tree, false);
+                         spread_ice(block_coord, 1, &world.tilemap, world.interactive_qt, world.block_qt, false);
                     }
                }
 
@@ -1699,7 +1695,7 @@ int main(int argc, char** argv){
                for(S16 i = 0; i < world.blocks.count; i++){
                     Block_t* block = world.blocks.elements + i;
                     if(block->element == ELEMENT_FIRE){
-                         melt_ice(block_get_coord(block), 1, &world.tilemap, world.interactive_qt, block_quad_tree, false);
+                         melt_ice(block_get_coord(block), 1, &world.tilemap, world.interactive_qt, world.block_qt, false);
                     }
                }
 
@@ -1711,7 +1707,7 @@ int main(int argc, char** argv){
 
                          S16 block_count = 0;
                          Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
-                         quad_tree_find_in(block_quad_tree, coord_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
+                         quad_tree_find_in(world.block_qt, coord_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
 
                          Block_t* block = nullptr;
                          for(S16 b = 0; b < block_count; b++){
@@ -1787,10 +1783,10 @@ int main(int argc, char** argv){
                               world.player.push_time += dt;
                               if(world.player.push_time > BLOCK_PUSH_TIME){ // && !direction_in_mask(vec_direction_mask(block_to_push->vel), last_block_pushed_direction)){
                                    if(before_time <= BLOCK_PUSH_TIME) undo_commit(&undo, &world.player, &world.tilemap, &world.blocks, &world.interactives);
-                                   bool pushed = block_push(block_to_push, last_block_pushed_direction, &world.tilemap, world.interactive_qt, block_quad_tree, false);
+                                   bool pushed = block_push(block_to_push, last_block_pushed_direction, &world.tilemap, world.interactive_qt, world.block_qt, false);
                                    if(pushed && block_to_push->entangle_index >= 0){
                                         Block_t* entangled_block = world.blocks.elements + block_to_push->entangle_index;
-                                        block_push(entangled_block, last_block_pushed_direction, &world.tilemap, world.interactive_qt, block_quad_tree, false);
+                                        block_push(entangled_block, last_block_pushed_direction, &world.tilemap, world.interactive_qt, world.block_qt, false);
                                    }
                                    if(block_to_push->pos.z > 0) world.player.push_time = -0.5f; // TODO: wtf is this line?
                               }
@@ -1828,7 +1824,7 @@ int main(int argc, char** argv){
 
                          if(load_map_number(map_number, &player_start, &world.tilemap, &world.blocks, &world.interactives)){
                               setup_map(&world.player, player_start, &world.interactives, &world.interactive_qt, &world.blocks,
-                                        &block_quad_tree, &undo, &world.tilemap, &arrow_array);
+                                        &world.block_qt, &undo, &world.tilemap, &world.arrows);
                          }
                     }
                }else{
@@ -1902,7 +1898,7 @@ int main(int argc, char** argv){
                                    S16 block_count = 0;
                                    Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
 
-                                   quad_tree_find_in(block_quad_tree, coord_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
+                                   quad_tree_find_in(world.block_qt, coord_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
 
                                    Interactive_t* portal_interactive = quad_tree_find_at(world.interactive_qt, portal_coord.x, portal_coord.y);
 
@@ -1946,7 +1942,7 @@ int main(int argc, char** argv){
 
                     S16 block_count = 0;
                     Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
-                    quad_tree_find_in(block_quad_tree, coord_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
+                    quad_tree_find_in(world.block_qt, coord_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
 
                     Interactive_t* interactive = quad_tree_find_at(world.interactive_qt, x, y);
 
@@ -1964,7 +1960,7 @@ int main(int argc, char** argv){
                };
 
                for(S16 a = 0; a < ARROW_ARRAY_MAX; a++){
-                    Arrow_t* arrow = arrow_array.arrows + a;
+                    Arrow_t* arrow = world.arrows.arrows + a;
                     if(!arrow->alive) continue;
                     if((arrow->pos.pixel.y / TILE_SIZE_IN_PIXELS) != y) continue;
 
@@ -2301,7 +2297,7 @@ int main(int argc, char** argv){
      }
 
      quad_tree_free(world.interactive_qt);
-     quad_tree_free(block_quad_tree);
+     quad_tree_free(world.block_qt);
 
      destroy(&world.blocks);
      destroy(&world.interactives);
