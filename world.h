@@ -8,6 +8,17 @@
 #include "quad_tree.h"
 #include "undo.h"
 
+struct World_t{
+     Player_t player;
+     TileMap_t tilemap = {};
+     ObjectArray_t<Block_t> block_array = {};
+     ObjectArray_t<Interactive_t> interactive_array = {};
+     ArrowArray_t arrow_array = {};
+
+     QuadTreeNode_t<Interactive_t>* interactive_quad_tree = nullptr;
+     QuadTreeNode_t<Block_t>* block_quad_tree = nullptr;
+};
+
 bool load_map_number(S32 map_number, Coord_t* player_start, TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array,
                      ObjectArray_t<Interactive_t>* interactive_array);
 void reset_map(Player_t* player, Coord_t player_start, ObjectArray_t<Interactive_t>* interactive_array,
