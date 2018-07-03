@@ -62,7 +62,7 @@ struct Demo_t{
      S64 last_frame = 0;
      S64 entry_index = 0;
      S64 seek_frame = -1;
-     F32 dt_multiplier = 1.0f;
+     F32 dt_scalar = 1.0f;
      bool paused = false;
      DemoEntries_t entries;
 };

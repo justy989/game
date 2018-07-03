@@ -63,18 +63,32 @@ void reset_player_state_vars(PlayerAction_t* player_action, Block_t** last_block
 bool load_map_number_demo(Demo_t* demo, S16 map_number, S64* frame_count){
      fclose(demo->file);
      demo->file = load_demo_number(map_number, &demo->filepath);
-     if(demo->file){
-          free(demo->entries.entries);
-          demo->entry_index = 0;
-          demo->entries = demo_entries_get(demo->file);
-          *frame_count = 0;
-          demo->last_frame = demo->entries.entries[demo->entries.count - 1].frame;
-          LOG("testing demo %s: with %ld actions across %ld frames\n", demo->filepath,
-              demo->entries.count, demo->last_frame);
+     if(!demo->file){
+          LOG("missing map %d corresponding demo.\n", map_number);
+          return false;
+     }
+
+     free(demo->entries.entries);
+     demo->entry_index = 0;
+     demo->entries = demo_entries_get(demo->file);
+     *frame_count = 0;
+     demo->last_frame = demo->entries.entries[demo->entries.count - 1].frame;
+     LOG("testing demo %s: with %ld actions across %ld frames\n", demo->filepath,
+         demo->entries.count, demo->last_frame);
+     return true;
+}
+
+bool load_map_number_map(S16 map_number, World_t* world, Undo_t* undo,
+                         PlayerAction_t* player_action, Block_t** last_block_pushed,
+                         Direction_t* last_block_pushed_direction, Block_t** block_to_push){
+     Coord_t player_start;
+     if(load_map_number(map_number, &player_start, world)){
+          setup_map(player_start, world, undo);
+          reset_player_state_vars(player_action, last_block_pushed,
+                                  last_block_pushed_direction, block_to_push);
           return true;
      }
 
-     LOG("missing map %d corresponding demo.\n", map_number);
      return false;
 }
 
@@ -332,7 +346,7 @@ int main(int argc, char** argv){
                dt = (F64)(elapsed_seconds.count());
 
                if(demo.mode == DEMO_MODE_PLAY){
-                    if(dt < (0.0166666f * demo.dt_multiplier)) continue;
+                    if(dt < (0.0166666f / demo.dt_scalar)) continue;
                }else{
                     if(dt < 0.0166666f) continue; // limit 60 fps
                }
@@ -534,11 +548,10 @@ int main(int argc, char** argv){
                                         return 0;
                                    }
 
-                                   if(load_map_number(map_number, &player_start, &world)){
-                                        setup_map(player_start, &world, &undo);
+                                   if(load_map_number_map(map_number, &world, &undo, &player_action, &last_block_pushed,
+                                                          &last_block_pushed_direction, &block_to_push)){
+
                                         cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
-                                        reset_player_state_vars(&player_action, &last_block_pushed,
-                                                                &last_block_pushed_direction, &block_to_push);
 
                                         if(load_map_number_demo(&demo, map_number, &frame_count)){
                                              continue; // reset to the top of the loop
@@ -624,11 +637,8 @@ int main(int argc, char** argv){
                          }
                          break;
                     case SDL_SCANCODE_L:
-                         if(load_map_number(map_number, &player_start, &world)){
-                              setup_map(player_start, &world, &undo);
-                              reset_player_state_vars(&player_action, &last_block_pushed,
-                                                      &last_block_pushed_direction, &block_to_push);
-
+                         if(load_map_number_map(map_number, &world, &undo, &player_action, &last_block_pushed,
+                                                &last_block_pushed_direction, &block_to_push)){
                               if(demo.mode == DEMO_MODE_PLAY){
                                    cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
                               }
@@ -636,12 +646,8 @@ int main(int argc, char** argv){
                          break;
                     case SDL_SCANCODE_LEFTBRACKET:
                          map_number--;
-                         if(load_map_number(map_number, &player_start, &world)){
-                              setup_map(player_start, &world, &undo);
-                              reset_player_state_vars(&player_action, &last_block_pushed,
-                                                      &last_block_pushed_direction, &block_to_push);
-
-                              // TODO: compress all dis with other places that duplicate this
+                         if(load_map_number_map(map_number, &world, &undo, &player_action, &last_block_pushed,
+                                                &last_block_pushed_direction, &block_to_push)){
                               if(demo.mode == DEMO_MODE_PLAY){
                                    cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
 
@@ -657,11 +663,8 @@ int main(int argc, char** argv){
                          break;
                     case SDL_SCANCODE_RIGHTBRACKET:
                          map_number++;
-                         if(load_map_number(map_number, &player_start, &world)){
-                              setup_map(player_start, &world, &undo);
-                              reset_player_state_vars(&player_action, &last_block_pushed,
-                                                      &last_block_pushed_direction, &block_to_push);
-
+                         if(load_map_number_map(map_number, &world, &undo, &player_action, &last_block_pushed,
+                                                &last_block_pushed_direction, &block_to_push)){
                               if(demo.mode == DEMO_MODE_PLAY){
                                    cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
 
@@ -677,16 +680,16 @@ int main(int argc, char** argv){
                          break;
                     case SDL_SCANCODE_MINUS:
                          if(demo.mode == DEMO_MODE_PLAY){
-                              if(demo.dt_multiplier > 0.1f){
-                                   demo.dt_multiplier -= 0.1f;
-                                   LOG("demo dt multiplier: %f\n", demo.dt_multiplier);
+                              if(demo.dt_scalar > 0.1f){
+                                   demo.dt_scalar -= 0.1f;
+                                   LOG("demo dt scalar: %.1f\n", demo.dt_scalar);
                               }
                          }
                          break;
                     case SDL_SCANCODE_EQUALS:
                          if(demo.mode == DEMO_MODE_PLAY){
-                              demo.dt_multiplier += 0.1f;
-                              LOG("demo dt multiplier: %f\n", demo.dt_multiplier);
+                              demo.dt_scalar += 0.1f;
+                              LOG("demo dt scalar: %.1f\n", demo.dt_scalar);
                          }
                          break;
                     case SDL_SCANCODE_V:
@@ -1799,11 +1802,8 @@ int main(int argc, char** argv){
                     if(reset_timer >= RESET_TIME){
                          resetting = false;
 
-                         if(load_map_number(map_number, &player_start, &world)){
-                              setup_map(player_start, &world, &undo);
-                              reset_player_state_vars(&player_action, &last_block_pushed,
-                                                      &last_block_pushed_direction, &block_to_push);
-                         }
+                         load_map_number_map(map_number, &world, &undo, &player_action, &last_block_pushed,
+                                             &last_block_pushed_direction, &block_to_push);
                     }
                }else{
                     reset_timer -= dt;
