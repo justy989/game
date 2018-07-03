@@ -11,12 +11,12 @@
 struct World_t{
      Player_t player;
      TileMap_t tilemap = {};
-     ObjectArray_t<Block_t> block_array = {};
-     ObjectArray_t<Interactive_t> interactive_array = {};
-     ArrowArray_t arrow_array = {};
+     ObjectArray_t<Block_t> blocks = {};
+     ObjectArray_t<Interactive_t> interactives = {};
+     ArrowArray_t arrows = {};
 
-     QuadTreeNode_t<Interactive_t>* interactive_quad_tree = nullptr;
-     QuadTreeNode_t<Block_t>* block_quad_tree = nullptr;
+     QuadTreeNode_t<Interactive_t>* interactive_qt = nullptr;
+     QuadTreeNode_t<Block_t>* block_qt = nullptr;
 };
 
 bool load_map_number(S32 map_number, Coord_t* player_start, TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array,
