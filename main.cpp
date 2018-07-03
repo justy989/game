@@ -170,7 +170,6 @@ int main(int argc, char** argv){
 
      World_t world;
 
-     ObjectArray_t<Interactive_t> interactive_array = {};
      ArrowArray_t arrow_array = {};
 
      QuadTreeNode_t<Interactive_t>* interactive_quad_tree = nullptr;
@@ -206,17 +205,17 @@ int main(int argc, char** argv){
      Quad_t pct_bar_outline_quad = {0, 2.0f * PIXEL_SIZE, 1.0f, 0.02f};
 
      if(load_map_filepath){
-          if(!load_map(load_map_filepath, &player_start, &world.tilemap, &world.block_array, &interactive_array)){
+          if(!load_map(load_map_filepath, &player_start, &world.tilemap, &world.block_array, &world.interactive_array)){
                return 1;
           }
      }else if(suite){
-          if(!load_map_number(map_number, &player_start, &world.tilemap, &world.block_array, &interactive_array)){
+          if(!load_map_number(map_number, &player_start, &world.tilemap, &world.block_array, &world.interactive_array)){
                return 1;
           }
 
           deep_copy(&world.tilemap, &demo_starting_tilemap);
           deep_copy(&world.block_array, &demo_starting_block_array);
-          deep_copy(&interactive_array, &demo_starting_interactive_array);
+          deep_copy(&world.interactive_array, &demo_starting_interactive_array);
 
           demo.mode = DEMO_MODE_PLAY;
           demo.file = load_demo_number(map_number, &demo.filepath);
@@ -229,14 +228,14 @@ int main(int argc, char** argv){
           LOG("testing demo %s: with %ld actions across %ld frames\n", demo.filepath,
               demo.entries.count, demo.last_frame);
      }else if(map_number){
-          if(!load_map_number(map_number, &player_start, &world.tilemap, &world.block_array, &interactive_array)){
+          if(!load_map_number(map_number, &player_start, &world.tilemap, &world.block_array, &world.interactive_array)){
                return 1;
           }
 
           if(demo.mode == DEMO_MODE_PLAY){
                deep_copy(&world.tilemap, &demo_starting_tilemap);
                deep_copy(&world.block_array, &demo_starting_block_array);
-               deep_copy(&interactive_array, &demo_starting_interactive_array);
+               deep_copy(&world.interactive_array, &demo_starting_interactive_array);
           }
      }else{
           init(&world.tilemap, ROOM_TILE_SIZE, ROOM_TILE_SIZE);
@@ -274,11 +273,11 @@ int main(int argc, char** argv){
           world.tilemap.tiles[0][16].id = 43;
           world.tilemap.tiles[1][15].id = 26;
           world.tilemap.tiles[1][16].id = 27;
-          if(!init(&interactive_array, 1)){
+          if(!init(&world.interactive_array, 1)){
                return 1;
           }
-          interactive_array.elements[0].coord.x = -1;
-          interactive_array.elements[0].coord.y = -1;
+          world.interactive_array.elements[0].coord.x = -1;
+          world.interactive_array.elements[0].coord.y = -1;
 
           if(!init(&world.block_array, 1)){
                return 1;
@@ -286,9 +285,9 @@ int main(int argc, char** argv){
           world.block_array.elements[0].pos = coord_to_pos(Coord_t{-1, -1});
      }
 
-     reset_map(&world.player, player_start, &interactive_array, &interactive_quad_tree, &arrow_array);
-     init(&undo, UNDO_MEMORY, world.tilemap.width, world.tilemap.height, world.block_array.count, interactive_array.count);
-     undo_snapshot(&undo, &world.player, &world.tilemap, &world.block_array, &interactive_array);
+     reset_map(&world.player, player_start, &world.interactive_array, &interactive_quad_tree, &arrow_array);
+     init(&undo, UNDO_MEMORY, world.tilemap.width, world.tilemap.height, world.block_array.count, world.interactive_array.count);
+     undo_snapshot(&undo, &world.player, &world.tilemap, &world.block_array, &world.interactive_array);
      init(&editor);
 
      S64 frame_count = 0;
@@ -421,13 +420,13 @@ int main(int argc, char** argv){
                                    }
                               }
 
-                              if(check_interactive_array.count != interactive_array.count){
-                                   LOG_MISMATCH("interactive count", "%d", check_interactive_array.count, interactive_array.count);
+                              if(check_interactive_array.count != world.interactive_array.count){
+                                   LOG_MISMATCH("interactive count", "%d", check_interactive_array.count, world.interactive_array.count);
                               }else{
                                    for(S16 i = 0; i < check_interactive_array.count; i++){
                                         // TODO: consider checking other things
                                         Interactive_t* check_interactive = check_interactive_array.elements + i;
-                                        Interactive_t* interactive = interactive_array.elements + i;
+                                        Interactive_t* interactive = world.interactive_array.elements + i;
 
                                         if(check_interactive->type != interactive->type){
                                              LOG_MISMATCH("interactive type", "%d", check_interactive->type, interactive->type);
@@ -506,13 +505,13 @@ int main(int argc, char** argv){
                                         return 0;
                                    }
 
-                                   if(load_map_number(map_number, &player_start, &world.tilemap, &world.block_array, &interactive_array)){
-                                        setup_map(&world.player, player_start, &interactive_array, &interactive_quad_tree, &world.block_array,
+                                   if(load_map_number(map_number, &player_start, &world.tilemap, &world.block_array, &world.interactive_array)){
+                                        setup_map(&world.player, player_start, &world.interactive_array, &interactive_quad_tree, &world.block_array,
                                                   &block_quad_tree, &undo, &world.tilemap, &arrow_array);
 
                                         deep_copy(&world.tilemap, &demo_starting_tilemap);
                                         deep_copy(&world.block_array, &demo_starting_block_array);
-                                        deep_copy(&interactive_array, &demo_starting_interactive_array);
+                                        deep_copy(&world.interactive_array, &demo_starting_interactive_array);
 
                                         // reset some vars
                                         player_action = {};
@@ -614,28 +613,28 @@ int main(int argc, char** argv){
                          }
                          break;
                     case SDL_SCANCODE_L:
-                         if(load_map_number(map_number, &player_start, &world.tilemap, &world.block_array, &interactive_array)){
-                              setup_map(&world.player, player_start, &interactive_array, &interactive_quad_tree, &world.block_array,
+                         if(load_map_number(map_number, &player_start, &world.tilemap, &world.block_array, &world.interactive_array)){
+                              setup_map(&world.player, player_start, &world.interactive_array, &interactive_quad_tree, &world.block_array,
                                         &block_quad_tree, &undo, &world.tilemap, &arrow_array);
 
                               if(demo.mode == DEMO_MODE_PLAY){
                                    deep_copy(&world.tilemap, &demo_starting_tilemap);
                                    deep_copy(&world.block_array, &demo_starting_block_array);
-                                   deep_copy(&interactive_array, &demo_starting_interactive_array);
+                                   deep_copy(&world.interactive_array, &demo_starting_interactive_array);
                               }
                          }
                          break;
                     case SDL_SCANCODE_LEFTBRACKET:
                          map_number--;
-                         if(load_map_number(map_number, &player_start, &world.tilemap, &world.block_array, &interactive_array)){
-                              setup_map(&world.player, player_start, &interactive_array, &interactive_quad_tree, &world.block_array,
+                         if(load_map_number(map_number, &player_start, &world.tilemap, &world.block_array, &world.interactive_array)){
+                              setup_map(&world.player, player_start, &world.interactive_array, &interactive_quad_tree, &world.block_array,
                                         &block_quad_tree, &undo, &world.tilemap, &arrow_array);
 
                               // TODO: compress all dis with other places that duplicate this
                               if(demo.mode == DEMO_MODE_PLAY){
                                    deep_copy(&world.tilemap, &demo_starting_tilemap);
                                    deep_copy(&world.block_array, &demo_starting_block_array);
-                                   deep_copy(&interactive_array, &demo_starting_interactive_array);
+                                   deep_copy(&world.interactive_array, &demo_starting_interactive_array);
 
                                    // reset some vars
                                    player_action = {};
@@ -665,14 +664,14 @@ int main(int argc, char** argv){
                          break;
                     case SDL_SCANCODE_RIGHTBRACKET:
                          map_number++;
-                         if(load_map_number(map_number, &player_start, &world.tilemap, &world.block_array, &interactive_array)){
-                              setup_map(&world.player, player_start, &interactive_array, &interactive_quad_tree, &world.block_array,
+                         if(load_map_number(map_number, &player_start, &world.tilemap, &world.block_array, &world.interactive_array)){
+                              setup_map(&world.player, player_start, &world.interactive_array, &interactive_quad_tree, &world.block_array,
                                         &block_quad_tree, &undo, &world.tilemap, &arrow_array);
 
                               if(demo.mode == DEMO_MODE_PLAY){
                                    deep_copy(&world.tilemap, &demo_starting_tilemap);
                                    deep_copy(&world.block_array, &demo_starting_block_array);
-                                   deep_copy(&interactive_array, &demo_starting_interactive_array);
+                                   deep_copy(&world.interactive_array, &demo_starting_interactive_array);
 
                                    // reset some vars
                                    player_action = {};
@@ -718,7 +717,7 @@ int main(int argc, char** argv){
                     {
                          char filepath[64];
                          snprintf(filepath, 64, "content/%03d.bm", map_number);
-                         save_map(filepath, player_start, &world.tilemap, &world.block_array, &interactive_array);
+                         save_map(filepath, player_start, &world.tilemap, &world.block_array, &world.interactive_array);
                     } break;
                     case SDL_SCANCODE_U:
                          if(!resetting){
@@ -765,7 +764,7 @@ int main(int argc, char** argv){
                                    S32 block_index = blocks[0] - world.block_array.elements;
                                    if(block_index >= 0 && block_index < world.block_array.count){
                                         if(editor.block_entangle_index_save >= 0 && editor.block_entangle_index_save != block_index){
-                                             undo_commit(&undo, &world.player, &world.tilemap, &world.block_array, &interactive_array);
+                                             undo_commit(&undo, &world.player, &world.tilemap, &world.block_array, &world.interactive_array);
 
                                              // the magic happens here
                                              Block_t* other = world.block_array.elements + editor.block_entangle_index_save;
@@ -814,21 +813,21 @@ int main(int argc, char** argv){
                          break;
                     case SDL_SCANCODE_RETURN:
                          if(editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
-                              undo_commit(&undo, &world.player, &world.tilemap, &world.block_array, &interactive_array);
+                              undo_commit(&undo, &world.player, &world.tilemap, &world.block_array, &world.interactive_array);
 
                               // clear coords below stamp
                               Rect_t selection_bounds = editor_selection_bounds(&editor);
                               for(S16 j = selection_bounds.bottom; j <= selection_bounds.top; j++){
                                    for(S16 i = selection_bounds.left; i <= selection_bounds.right; i++){
                                         Coord_t coord {i, j};
-                                        coord_clear(coord, &world.tilemap, &interactive_array, interactive_quad_tree, &world.block_array);
+                                        coord_clear(coord, &world.tilemap, &world.interactive_array, interactive_quad_tree, &world.block_array);
                                    }
                               }
 
                               for(int i = 0; i < editor.selection.count; i++){
                                    Coord_t coord = editor.selection_start + editor.selection.elements[i].offset;
                                    apply_stamp(editor.selection.elements + i, coord,
-                                               &world.tilemap, &world.block_array, &interactive_array, &interactive_quad_tree, ctrl_down);
+                                               &world.tilemap, &world.block_array, &world.interactive_array, &interactive_quad_tree, ctrl_down);
                               }
 
                               editor.mode = EDITOR_MODE_CATEGORY_SELECT;
@@ -875,13 +874,13 @@ int main(int argc, char** argv){
                     case SDL_SCANCODE_B:
 #if 0
                     {
-                         undo_commit(&undo, &world.player, &world.tilemap, &world.block_array, &interactive_array);
+                         undo_commit(&undo, &world.player, &world.tilemap, &world.block_array, &world.interactive_array);
                          Coord_t min = pos_to_coord(world.player.pos) - Coord_t{1, 1};
                          Coord_t max = pos_to_coord(world.player.pos) + Coord_t{1, 1};
                          for(S16 y = min.y; y <= max.y; y++){
                               for(S16 x = min.x; x <= max.x; x++){
                                    Coord_t coord {x, y};
-                                   coord_clear(coord, &world.tilemap, &interactive_array, interactive_quad_tree, &world.block_array);
+                                   coord_clear(coord, &world.tilemap, &world.interactive_array, interactive_quad_tree, &world.block_array);
                               }
                          }
                     } break;
@@ -953,9 +952,9 @@ int main(int argc, char** argv){
                                              // TODO: compress with same comment elsewhere in this file
                                              deep_copy(&demo_starting_tilemap, &world.tilemap);
                                              deep_copy(&demo_starting_block_array, &world.block_array);
-                                             deep_copy(&demo_starting_interactive_array, &interactive_array);
+                                             deep_copy(&demo_starting_interactive_array, &world.interactive_array);
 
-                                             setup_map(&world.player, player_start, &interactive_array, &interactive_quad_tree, &world.block_array,
+                                             setup_map(&world.player, player_start, &world.interactive_array, &interactive_quad_tree, &world.block_array,
                                                        &block_quad_tree, &undo, &world.tilemap, &arrow_array);
                                              // reset some vars
                                              player_action = {};
@@ -994,13 +993,13 @@ int main(int argc, char** argv){
                               if(editor.mode != EDITOR_MODE_STAMP_HIDE && select_index < editor.category_array.elements[editor.category].count && select_index >= 0){
                                    editor.stamp = select_index;
                               }else{
-                                   undo_commit(&undo, &world.player, &world.tilemap, &world.block_array, &interactive_array);
+                                   undo_commit(&undo, &world.player, &world.tilemap, &world.block_array, &world.interactive_array);
                                    Coord_t select_coord = mouse_select_world(mouse_screen, camera);
                                    auto* stamp_array = editor.category_array.elements[editor.category].elements + editor.stamp;
                                    for(S16 s = 0; s < stamp_array->count; s++){
                                         auto* stamp = stamp_array->elements + s;
                                         apply_stamp(stamp, select_coord + stamp->offset,
-                                                    &world.tilemap, &world.block_array, &interactive_array, &interactive_quad_tree, ctrl_down);
+                                                    &world.tilemap, &world.block_array, &world.interactive_array, &interactive_quad_tree, ctrl_down);
                                    }
 
                                    quad_tree_free(block_quad_tree);
@@ -1014,31 +1013,31 @@ int main(int argc, char** argv){
                          default:
                               break;
                          case EDITOR_MODE_CATEGORY_SELECT:
-                              undo_commit(&undo, &world.player, &world.tilemap, &world.block_array, &interactive_array);
-                              coord_clear(mouse_select_world(mouse_screen, camera), &world.tilemap, &interactive_array,
+                              undo_commit(&undo, &world.player, &world.tilemap, &world.block_array, &world.interactive_array);
+                              coord_clear(mouse_select_world(mouse_screen, camera), &world.tilemap, &world.interactive_array,
                                           interactive_quad_tree, &world.block_array);
                               break;
                          case EDITOR_MODE_STAMP_SELECT:
                          case EDITOR_MODE_STAMP_HIDE:
                          {
-                              undo_commit(&undo, &world.player, &world.tilemap, &world.block_array, &interactive_array);
+                              undo_commit(&undo, &world.player, &world.tilemap, &world.block_array, &world.interactive_array);
                               Coord_t start = mouse_select_world(mouse_screen, camera);
                               Coord_t end = start + stamp_array_dimensions(editor.category_array.elements[editor.category].elements + editor.stamp);
                               for(S16 j = start.y; j < end.y; j++){
                                    for(S16 i = start.x; i < end.x; i++){
                                         Coord_t coord {i, j};
-                                        coord_clear(coord, &world.tilemap, &interactive_array, interactive_quad_tree, &world.block_array);
+                                        coord_clear(coord, &world.tilemap, &world.interactive_array, interactive_quad_tree, &world.block_array);
                                    }
                               }
                          } break;
                          case EDITOR_MODE_SELECTION_MANIPULATION:
                          {
-                              undo_commit(&undo, &world.player, &world.tilemap, &world.block_array, &interactive_array);
+                              undo_commit(&undo, &world.player, &world.tilemap, &world.block_array, &world.interactive_array);
                               Rect_t selection_bounds = editor_selection_bounds(&editor);
                               for(S16 j = selection_bounds.bottom; j <= selection_bounds.top; j++){
                                    for(S16 i = selection_bounds.left; i <= selection_bounds.right; i++){
                                         Coord_t coord {i, j};
-                                        coord_clear(coord, &world.tilemap, &interactive_array, interactive_quad_tree, &world.block_array);
+                                        coord_clear(coord, &world.tilemap, &world.interactive_array, interactive_quad_tree, &world.block_array);
                                    }
                               }
                          } break;
@@ -1136,9 +1135,9 @@ int main(int argc, char** argv){
                               // TODO: compress with same comment elsewhere in this file
                               deep_copy(&demo_starting_tilemap, &world.tilemap);
                               deep_copy(&demo_starting_block_array, &world.block_array);
-                              deep_copy(&demo_starting_interactive_array, &interactive_array);
+                              deep_copy(&demo_starting_interactive_array, &world.interactive_array);
 
-                              setup_map(&world.player, player_start, &interactive_array, &interactive_quad_tree, &world.block_array,
+                              setup_map(&world.player, player_start, &world.interactive_array, &interactive_quad_tree, &world.block_array,
                                         &block_quad_tree, &undo, &world.tilemap, &arrow_array);
 
                               // reset some vars
@@ -1166,8 +1165,8 @@ int main(int argc, char** argv){
                }
 
                // update interactives
-               for(S16 i = 0; i < interactive_array.count; i++){
-                    Interactive_t* interactive = interactive_array.elements + i;
+               for(S16 i = 0; i < world.interactive_array.count; i++){
+                    Interactive_t* interactive = world.interactive_array.elements + i;
                     if(interactive->type == INTERACTIVE_TYPE_POPUP){
                          lift_update(&interactive->popup.lift, POPUP_TICK_DELAY, dt, 1, HEIGHT_INTERVAL + 1);
                     }else if(interactive->type == INTERACTIVE_TYPE_DOOR){
@@ -1416,15 +1415,15 @@ int main(int argc, char** argv){
                }
 
                if(player_action.activate && !player_action.last_activate){
-                    undo_commit(&undo, &world.player, &world.tilemap, &world.block_array, &interactive_array);
+                    undo_commit(&undo, &world.player, &world.tilemap, &world.block_array, &world.interactive_array);
                     activate(&world.tilemap, interactive_quad_tree, pos_to_coord(world.player.pos) + world.player.face);
                }
 
                if(player_action.undo){
-                    undo_commit(&undo, &world.player, &world.tilemap, &world.block_array, &interactive_array);
-                    undo_revert(&undo, &world.player, &world.tilemap, &world.block_array, &interactive_array);
+                    undo_commit(&undo, &world.player, &world.tilemap, &world.block_array, &world.interactive_array);
+                    undo_revert(&undo, &world.player, &world.tilemap, &world.block_array, &world.interactive_array);
                     quad_tree_free(interactive_quad_tree);
-                    interactive_quad_tree = quad_tree_build(&interactive_array);
+                    interactive_quad_tree = quad_tree_build(&world.interactive_array);
                     quad_tree_free(block_quad_tree);
                     block_quad_tree = quad_tree_build(&world.block_array);
                     player_action.undo = false;
@@ -1434,7 +1433,7 @@ int main(int argc, char** argv){
                     world.player.bow_draw_time += dt;
                }else if(!player_action.shoot){
                     if(world.player.bow_draw_time >= PLAYER_BOW_DRAW_DELAY){
-                         undo_commit(&undo, &world.player, &world.tilemap, &world.block_array, &interactive_array);
+                         undo_commit(&undo, &world.player, &world.tilemap, &world.block_array, &world.interactive_array);
                          Position_t arrow_pos = world.player.pos;
                          switch(world.player.face){
                          default:
@@ -1705,8 +1704,8 @@ int main(int argc, char** argv){
                     }
                }
 
-               for(S16 i = 0; i < interactive_array.count; i++){
-                    Interactive_t* interactive = interactive_array.elements + i;
+               for(S16 i = 0; i < world.interactive_array.count; i++){
+                    Interactive_t* interactive = world.interactive_array.elements + i;
                     if(interactive->type == INTERACTIVE_TYPE_LIGHT_DETECTOR){
                          Tile_t* tile = tilemap_get_tile(&world.tilemap, interactive->coord);
                          Rect_t coord_rect = rect_surrounding_adjacent_coords(interactive->coord);
@@ -1788,7 +1787,7 @@ int main(int argc, char** argv){
                               // TODO: get back to this once we improve our demo tools
                               world.player.push_time += dt;
                               if(world.player.push_time > BLOCK_PUSH_TIME){ // && !direction_in_mask(vec_direction_mask(block_to_push->vel), last_block_pushed_direction)){
-                                   if(before_time <= BLOCK_PUSH_TIME) undo_commit(&undo, &world.player, &world.tilemap, &world.block_array, &interactive_array);
+                                   if(before_time <= BLOCK_PUSH_TIME) undo_commit(&undo, &world.player, &world.tilemap, &world.block_array, &world.interactive_array);
                                    bool pushed = block_push(block_to_push, last_block_pushed_direction, &world.tilemap, interactive_quad_tree, block_quad_tree, false);
                                    if(pushed && block_to_push->entangle_index >= 0){
                                         Block_t* entangled_block = world.block_array.elements + block_to_push->entangle_index;
@@ -1828,8 +1827,8 @@ int main(int argc, char** argv){
                     if(reset_timer >= RESET_TIME){
                          resetting = false;
 
-                         if(load_map_number(map_number, &player_start, &world.tilemap, &world.block_array, &interactive_array)){
-                              setup_map(&world.player, player_start, &interactive_array, &interactive_quad_tree, &world.block_array,
+                         if(load_map_number(map_number, &player_start, &world.tilemap, &world.block_array, &world.interactive_array)){
+                              setup_map(&world.player, player_start, &world.interactive_array, &interactive_quad_tree, &world.block_array,
                                         &block_quad_tree, &undo, &world.tilemap, &arrow_array);
                          }
                     }
@@ -2293,7 +2292,7 @@ int main(int argc, char** argv){
           player_action_perform(&player_action, &world.player, PLAYER_ACTION_TYPE_END_DEMO, demo.mode,
                                 demo.file, frame_count);
           // save map and player position
-          save_map_to_file(demo.file, player_start, &world.tilemap, &world.block_array, &interactive_array);
+          save_map_to_file(demo.file, player_start, &world.tilemap, &world.block_array, &world.interactive_array);
           fwrite(&world.player.pos.pixel, sizeof(world.player.pos.pixel), 1, demo.file);
           fclose(demo.file);
           break;
@@ -2306,7 +2305,7 @@ int main(int argc, char** argv){
      quad_tree_free(block_quad_tree);
 
      destroy(&world.block_array);
-     destroy(&interactive_array);
+     destroy(&world.interactive_array);
      destroy(&undo);
      destroy(&world.tilemap);
      destroy(&editor);
