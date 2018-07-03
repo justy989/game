@@ -92,8 +92,6 @@ bool load_map_number_map(S16 map_number, World_t* world, Undo_t* undo,
      return false;
 }
 
-using namespace std::chrono;
-
 int main(int argc, char** argv){
      const char* load_map_filepath = nullptr;
      bool test = false;
@@ -257,6 +255,10 @@ int main(int argc, char** argv){
           if(!load_map(load_map_filepath, &player_start, &world.tilemap, &world.blocks, &world.interactives)){
                return 1;
           }
+
+          if(demo.mode == DEMO_MODE_PLAY){
+               cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
+          }
      }else if(suite){
           if(!load_map_number(map_number, &player_start, &world)){
                return 1;
@@ -336,13 +338,13 @@ int main(int argc, char** argv){
      S64 frame_count = 0;
      F32 dt = 0.0f;
 
-     auto last_time = system_clock::now();
+     auto last_time = std::chrono::system_clock::now();
      auto current_time = last_time;
 
      while(!quit){
           if((!suite || show_suite) && demo.seek_frame < 0){
-               current_time = system_clock::now();
-               duration<double> elapsed_seconds = current_time - last_time;
+               current_time = std::chrono::system_clock::now();
+               std::chrono::duration<double> elapsed_seconds = current_time - last_time;
                dt = (F64)(elapsed_seconds.count());
 
                if(demo.mode == DEMO_MODE_PLAY){
@@ -567,7 +569,7 @@ int main(int argc, char** argv){
                               }
                          }
                     }else{
-                         demo.mode = DEMO_MODE_NONE;
+                         demo.paused = true;
                     }
                }
           }
