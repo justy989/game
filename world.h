@@ -21,11 +21,7 @@ struct World_t{
 
 bool load_map_number(S32 map_number, Coord_t* player_start, TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array,
                      ObjectArray_t<Interactive_t>* interactive_array);
-void reset_map(Player_t* player, Coord_t player_start, ObjectArray_t<Interactive_t>* interactive_array,
-               QuadTreeNode_t<Interactive_t>** interactive_quad_tree, ArrowArray_t* arrow_array);
-void setup_map(Player_t* player, Coord_t player_start, ObjectArray_t<Interactive_t>* interactive_array,
-               QuadTreeNode_t<Interactive_t>** interactive_quad_tree, ObjectArray_t<Block_t>* block_array,
-               QuadTreeNode_t<Block_t>** block_quad_tree, Undo_t* undo, TileMap_t* tilemap, ArrowArray_t* arrow_array);
+void setup_map(Coord_t player_start, World_t* world, Undo_t* undo);
 
 void activate(TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree, Coord_t coord);
 void toggle_electricity(TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree, Coord_t coord,

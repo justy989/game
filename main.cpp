@@ -280,9 +280,7 @@ int main(int argc, char** argv){
           world.blocks.elements[0].pos = coord_to_pos(Coord_t{-1, -1});
      }
 
-     reset_map(&world.player, player_start, &world.interactives, &world.interactive_qt, &world.arrows);
-     init(&undo, UNDO_MEMORY, world.tilemap.width, world.tilemap.height, world.blocks.count, world.interactives.count);
-     undo_snapshot(&undo, &world.player, &world.tilemap, &world.blocks, &world.interactives);
+     setup_map(player_start, &world, &undo);
      init(&editor);
 
      S64 frame_count = 0;
@@ -501,8 +499,7 @@ int main(int argc, char** argv){
                                    }
 
                                    if(load_map_number(map_number, &player_start, &world.tilemap, &world.blocks, &world.interactives)){
-                                        setup_map(&world.player, player_start, &world.interactives, &world.interactive_qt, &world.blocks,
-                                                  &world.block_qt, &undo, &world.tilemap, &world.arrows);
+                                        setup_map(player_start, &world, &undo);
 
                                         deep_copy(&world.tilemap, &demo_starting_tilemap);
                                         deep_copy(&world.blocks, &demo_starting_blocks);
@@ -609,8 +606,7 @@ int main(int argc, char** argv){
                          break;
                     case SDL_SCANCODE_L:
                          if(load_map_number(map_number, &player_start, &world.tilemap, &world.blocks, &world.interactives)){
-                              setup_map(&world.player, player_start, &world.interactives, &world.interactive_qt, &world.blocks,
-                                        &world.block_qt, &undo, &world.tilemap, &world.arrows);
+                              setup_map(player_start, &world, &undo);
 
                               if(demo.mode == DEMO_MODE_PLAY){
                                    deep_copy(&world.tilemap, &demo_starting_tilemap);
@@ -622,8 +618,7 @@ int main(int argc, char** argv){
                     case SDL_SCANCODE_LEFTBRACKET:
                          map_number--;
                          if(load_map_number(map_number, &player_start, &world.tilemap, &world.blocks, &world.interactives)){
-                              setup_map(&world.player, player_start, &world.interactives, &world.interactive_qt, &world.blocks,
-                                        &world.block_qt, &undo, &world.tilemap, &world.arrows);
+                              setup_map(player_start, &world, &undo);
 
                               // TODO: compress all dis with other places that duplicate this
                               if(demo.mode == DEMO_MODE_PLAY){
@@ -660,8 +655,7 @@ int main(int argc, char** argv){
                     case SDL_SCANCODE_RIGHTBRACKET:
                          map_number++;
                          if(load_map_number(map_number, &player_start, &world.tilemap, &world.blocks, &world.interactives)){
-                              setup_map(&world.player, player_start, &world.interactives, &world.interactive_qt, &world.blocks,
-                                        &world.block_qt, &undo, &world.tilemap, &world.arrows);
+                              setup_map(player_start, &world, &undo);
 
                               if(demo.mode == DEMO_MODE_PLAY){
                                    deep_copy(&world.tilemap, &demo_starting_tilemap);
@@ -949,8 +943,8 @@ int main(int argc, char** argv){
                                              deep_copy(&demo_starting_blocks, &world.blocks);
                                              deep_copy(&demo_starting_interactives, &world.interactives);
 
-                                             setup_map(&world.player, player_start, &world.interactives, &world.interactive_qt, &world.blocks,
-                                                       &world.block_qt, &undo, &world.tilemap, &world.arrows);
+                                             setup_map(player_start, &world, &undo);
+
                                              // reset some vars
                                              player_action = {};
                                              last_block_pushed = nullptr;
@@ -1132,8 +1126,7 @@ int main(int argc, char** argv){
                               deep_copy(&demo_starting_blocks, &world.blocks);
                               deep_copy(&demo_starting_interactives, &world.interactives);
 
-                              setup_map(&world.player, player_start, &world.interactives, &world.interactive_qt, &world.blocks,
-                                        &world.block_qt, &undo, &world.tilemap, &world.arrows);
+                              setup_map(player_start, &world, &undo);
 
                               // reset some vars
                               player_action = {};
@@ -1823,8 +1816,7 @@ int main(int argc, char** argv){
                          resetting = false;
 
                          if(load_map_number(map_number, &player_start, &world.tilemap, &world.blocks, &world.interactives)){
-                              setup_map(&world.player, player_start, &world.interactives, &world.interactive_qt, &world.blocks,
-                                        &world.block_qt, &undo, &world.tilemap, &world.arrows);
+                              setup_map(player_start, &world, &undo);
                          }
                     }
                }else{

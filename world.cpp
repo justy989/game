@@ -36,28 +36,23 @@ bool load_map_number(S32 map_number, Coord_t* player_start, TileMap_t* tilemap, 
      return load_map(filepath, player_start, tilemap, block_array, interactive_array);
 }
 
-void reset_map(Player_t* player, Coord_t player_start, ObjectArray_t<Interactive_t>* interactive_array,
-               QuadTreeNode_t<Interactive_t>** interactive_quad_tree, ArrowArray_t* arrow_array){
-     *player = {};
-     player->walk_frame_delta = 1;
-     player->pos = coord_to_pos_at_tile_center(player_start);
-     player->has_bow = true;
+void setup_map(Coord_t player_start, World_t* world, Undo_t* undo){
+     world->player = {};
+     world->player.walk_frame_delta = 1;
+     world->player.pos = coord_to_pos_at_tile_center(player_start);
+     world->player.has_bow = true;
 
-     // update interactive quad tree
-     quad_tree_free(*interactive_quad_tree);
-     *interactive_quad_tree = quad_tree_build(interactive_array);
-     init(arrow_array);
-}
+     init(&world->arrows);
 
-void setup_map(Player_t* player, Coord_t player_start, ObjectArray_t<Interactive_t>* interactive_array,
-               QuadTreeNode_t<Interactive_t>** interactive_quad_tree, ObjectArray_t<Block_t>* block_array,
-               QuadTreeNode_t<Block_t>** block_quad_tree, Undo_t* undo, TileMap_t* tilemap, ArrowArray_t* arrow_array){
-     reset_map(player, player_start, interactive_array, interactive_quad_tree, arrow_array);
+     quad_tree_free(world->interactive_qt);
+     world->interactive_qt = quad_tree_build(&world->interactives);
+
+     quad_tree_free(world->block_qt);
+     world->block_qt = quad_tree_build(&world->blocks);
+
      destroy(undo);
-     init(undo, UNDO_MEMORY, tilemap->width, tilemap->height, block_array->count, interactive_array->count);
-     undo_snapshot(undo, player, tilemap, block_array, interactive_array);
-     quad_tree_free(*block_quad_tree);
-     *block_quad_tree = quad_tree_build(block_array);
+     init(undo, UNDO_MEMORY, world->tilemap.width, world->tilemap.height, world->blocks.count, world->interactives.count);
+     undo_snapshot(undo, &world->player, &world->tilemap, &world->blocks, &world->interactives);
 }
 
 void activate(TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree, Coord_t coord){
