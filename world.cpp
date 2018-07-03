@@ -11,8 +11,7 @@
 #include <string.h>
 #include <math.h>
 
-bool load_map_number(S32 map_number, Coord_t* player_start, TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array,
-                     ObjectArray_t<Interactive_t>* interactive_array){
+bool load_map_number(S32 map_number, Coord_t* player_start, World_t* world){
      // search through directory to find file starting with 3 digit map number
      DIR* d = opendir("content");
      if(!d) return false;
@@ -33,7 +32,7 @@ bool load_map_number(S32 map_number, Coord_t* player_start, TileMap_t* tilemap, 
      if(!filepath[0]) return false;
 
      LOG("load map %s\n", filepath);
-     return load_map(filepath, player_start, tilemap, block_array, interactive_array);
+     return load_map(filepath, player_start, &world->tilemap, &world->blocks, &world->interactives);
 }
 
 void setup_map(Coord_t player_start, World_t* world, Undo_t* undo){
@@ -55,23 +54,8 @@ void setup_map(Coord_t player_start, World_t* world, Undo_t* undo){
      undo_snapshot(undo, &world->player, &world->tilemap, &world->blocks, &world->interactives);
 }
 
-void activate(TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree, Coord_t coord){
-     Interactive_t* interactive = quad_tree_interactive_find_at(interactive_quad_tree, coord);
-     if(!interactive) return;
-
-     if(interactive->type != INTERACTIVE_TYPE_LEVER &&
-        interactive->type != INTERACTIVE_TYPE_PRESSURE_PLATE &&
-        interactive->type != INTERACTIVE_TYPE_LIGHT_DETECTOR &&
-        interactive->type != INTERACTIVE_TYPE_ICE_DETECTOR) return;
-
-     toggle_electricity(tilemap, interactive_quad_tree, coord, DIRECTION_LEFT, false, false);
-     toggle_electricity(tilemap, interactive_quad_tree, coord, DIRECTION_RIGHT, false, false);
-     toggle_electricity(tilemap, interactive_quad_tree, coord, DIRECTION_UP, false, false);
-     toggle_electricity(tilemap, interactive_quad_tree, coord, DIRECTION_DOWN, false, false);
-}
-
-void toggle_electricity(TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree, Coord_t coord,
-                        Direction_t direction, bool from_wire, bool activated_by_door){
+static void toggle_electricity(TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree, Coord_t coord,
+                               Direction_t direction, bool from_wire, bool activated_by_door){
      Coord_t adjacent_coord = coord + direction;
      Tile_t* tile = tilemap_get_tile(tilemap, adjacent_coord);
      if(!tile) return;
@@ -289,6 +273,21 @@ void toggle_electricity(TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* inter
                toggle_electricity(tilemap, interactive_quad_tree, adjacent_coord, cluster_direction, true, false);
           }
      }
+}
+
+void activate(World_t* world, Coord_t coord){
+     Interactive_t* interactive = quad_tree_interactive_find_at(world->interactive_qt, coord);
+     if(!interactive) return;
+
+     if(interactive->type != INTERACTIVE_TYPE_LEVER &&
+        interactive->type != INTERACTIVE_TYPE_PRESSURE_PLATE &&
+        interactive->type != INTERACTIVE_TYPE_LIGHT_DETECTOR &&
+        interactive->type != INTERACTIVE_TYPE_ICE_DETECTOR) return;
+
+     toggle_electricity(&world->tilemap, world->interactive_qt, coord, DIRECTION_LEFT, false, false);
+     toggle_electricity(&world->tilemap, world->interactive_qt, coord, DIRECTION_RIGHT, false, false);
+     toggle_electricity(&world->tilemap, world->interactive_qt, coord, DIRECTION_UP, false, false);
+     toggle_electricity(&world->tilemap, world->interactive_qt, coord, DIRECTION_DOWN, false, false);
 }
 
 Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, Direction_t player_face, Coord_t* skip_coord,
@@ -588,9 +587,7 @@ S8 teleport_position_across_portal(Position_t* position, Vec_t* pos_delta, QuadT
      return -1;
 }
 
-void illuminate_line(Coord_t start, Coord_t end, U8 value, TileMap_t* tilemap,
-                     QuadTreeNode_t<Interactive_t>* interactive_quad_tree, QuadTreeNode_t<Block_t>* block_quad_tree,
-                     Coord_t from_portal){
+static void illuminate_line(Coord_t start, Coord_t end, U8 value, World_t* world, Coord_t from_portal){
      Coord_t coords[LIGHT_MAX_LINE_LEN];
      S8 coord_count = 0;
 
@@ -636,7 +633,7 @@ void illuminate_line(Coord_t start, Coord_t end, U8 value, TileMap_t* tilemap,
      }
 
      for(S8 i = 0; i < coord_count; ++i){
-          Tile_t* tile = tilemap_get_tile(tilemap, coords[i]);
+          Tile_t* tile = tilemap_get_tile(&world->tilemap, coords[i]);
           if(!tile) continue;
 
           S16 diff_x = abs(coords[i].x - start.x);
@@ -646,13 +643,13 @@ void illuminate_line(Coord_t start, Coord_t end, U8 value, TileMap_t* tilemap,
           U8 new_value = value - (distance * LIGHT_DECAY);
 
           if(coords[i] != from_portal){
-               Interactive_t* interactive = quad_tree_interactive_find_at(interactive_quad_tree, coords[i]);
+               Interactive_t* interactive = quad_tree_interactive_find_at(world->interactive_qt, coords[i]);
                if(is_active_portal(interactive)){
-                    PortalExit_t portal_exits = find_portal_exits(coords[i], tilemap, interactive_quad_tree);
+                    PortalExit_t portal_exits = find_portal_exits(coords[i], &world->tilemap, world->interactive_qt);
                     for(S8 d = 0; d < DIRECTION_COUNT; d++){
                          for(S8 p = 0; p < portal_exits.directions[d].count; p++){
                               if(portal_exits.directions[d].coords[p] == coords[i]) continue;
-                              illuminate(portal_exits.directions[d].coords[p], new_value, tilemap, interactive_quad_tree, block_quad_tree,
+                              illuminate(portal_exits.directions[d].coords[p], new_value, world,
                                          portal_exits.directions[d].coords[p]);
                          }
                     }
@@ -671,7 +668,7 @@ void illuminate_line(Coord_t start, Coord_t end, U8 value, TileMap_t* tilemap,
 
                S16 block_count = 0;
                Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
-               quad_tree_find_in(block_quad_tree, coord_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
+               quad_tree_find_in(world->block_qt, coord_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
 
                for(S16 b = 0; b < block_count; b++){
                     if(block_get_coord(blocks[b]) == coords[i]){
@@ -686,10 +683,8 @@ void illuminate_line(Coord_t start, Coord_t end, U8 value, TileMap_t* tilemap,
      }
 }
 
-void illuminate(Coord_t coord, U8 value, TileMap_t* tilemap,
-                QuadTreeNode_t<Interactive_t>* interactive_quad_tree, QuadTreeNode_t<Block_t>* block_quad_tree,
-                Coord_t from_portal){
-     if(coord.x < 0 || coord.y < 0 || coord.x >= tilemap->width || coord.y >= tilemap->height) return;
+void illuminate(Coord_t coord, U8 value, World_t* world, Coord_t from_portal){
+     if(coord.x < 0 || coord.y < 0 || coord.x >= world->tilemap.width || coord.y >= world->tilemap.height) return;
 
      S16 radius = ((value - BASE_LIGHT) / LIGHT_DECAY) + 1;
 
@@ -701,23 +696,22 @@ void illuminate(Coord_t coord, U8 value, TileMap_t* tilemap,
 
      for(S16 j = min.y + 1; j < max.y; ++j) {
           // bottom of box
-          illuminate_line(coord, Coord_t{min.x, j}, value, tilemap, interactive_quad_tree, block_quad_tree, from_portal);
+          illuminate_line(coord, Coord_t{min.x, j}, value, world, from_portal);
 
           // top of box
-          illuminate_line(coord, Coord_t{max.x, j}, value, tilemap, interactive_quad_tree, block_quad_tree, from_portal);
+          illuminate_line(coord, Coord_t{max.x, j}, value, world, from_portal);
      }
 
      for(S16 i = min.x + 1; i < max.x; ++i) {
           // left of box
-          illuminate_line(coord, Coord_t{i, min.y,}, value, tilemap, interactive_quad_tree, block_quad_tree, from_portal);
+          illuminate_line(coord, Coord_t{i, min.y,}, value, world, from_portal);
 
           // right of box
-          illuminate_line(coord, Coord_t{i, max.y,}, value, tilemap, interactive_quad_tree, block_quad_tree, from_portal);
+          illuminate_line(coord, Coord_t{i, max.y,}, value, world, from_portal);
      }
 }
 
-static void impact_ice(Coord_t center, S16 radius, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree,
-                       QuadTreeNode_t<Block_t>* block_quad_tree, bool teleported, bool spread_the_ice){
+static void impact_ice(Coord_t center, S16 radius, World_t* world, bool teleported, bool spread_the_ice){
      Coord_t delta {radius, radius};
      Coord_t min = center - delta;
      Coord_t max = center + delta;
@@ -725,12 +719,12 @@ static void impact_ice(Coord_t center, S16 radius, TileMap_t* tilemap, QuadTreeN
      for(S16 y = min.y; y <= max.y; ++y){
           for(S16 x = min.x; x <= max.x; ++x){
                Coord_t coord{x, y};
-               Tile_t* tile = tilemap_get_tile(tilemap, coord);
+               Tile_t* tile = tilemap_get_tile(&world->tilemap, coord);
                if(tile && !tile_is_solid(tile)){
                     Rect_t coord_rect = rect_surrounding_adjacent_coords(coord);
                     S16 block_count = 0;
                     Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
-                    quad_tree_find_in(block_quad_tree, coord_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
+                    quad_tree_find_in(world->block_qt, coord_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
 
                     Block_t* block = nullptr;
                     for(S16 i = 0; i < block_count; i++){
@@ -740,7 +734,7 @@ static void impact_ice(Coord_t center, S16 radius, TileMap_t* tilemap, QuadTreeN
                          }
                     }
 
-                    Interactive_t* interactive = quad_tree_find_at(interactive_quad_tree, coord.x, coord.y);
+                    Interactive_t* interactive = quad_tree_find_at(world->interactive_qt, coord.x, coord.y);
 
                     if(block){
                          if(spread_the_ice){
@@ -784,7 +778,7 @@ static void impact_ice(Coord_t center, S16 radius, TileMap_t* tilemap, QuadTreeN
                     }
 
                     if(is_active_portal(interactive) && !teleported){
-                         auto portal_exits = find_portal_exits(coord, tilemap, interactive_quad_tree);
+                         auto portal_exits = find_portal_exits(coord, &world->tilemap, world->interactive_qt);
                          for(S8 d = 0; d < DIRECTION_COUNT; d++){
                               for(S8 p = 0; p < portal_exits.directions[d].count; p++){
                                    if(portal_exits.directions[d].coords[p] == coord) continue;
@@ -794,7 +788,7 @@ static void impact_ice(Coord_t center, S16 radius, TileMap_t* tilemap, QuadTreeN
                                    Direction_t opposite = direction_opposite((Direction_t)(d));
 
                                    impact_ice(portal_exits.directions[d].coords[p] + opposite, radius - distance_from_center,
-                                              tilemap, interactive_quad_tree, block_quad_tree, true, spread_the_ice);
+                                              world, true, spread_the_ice);
                               }
                          }
                     }
@@ -803,21 +797,17 @@ static void impact_ice(Coord_t center, S16 radius, TileMap_t* tilemap, QuadTreeN
      }
 }
 
-void spread_ice(Coord_t center, S16 radius, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree,
-                QuadTreeNode_t<Block_t>* block_quad_tree, bool teleported){
-     impact_ice(center, radius, tilemap, interactive_quad_tree, block_quad_tree, teleported, true);
+void spread_ice(Coord_t center, S16 radius, World_t* world, bool teleported){
+     impact_ice(center, radius, world, teleported, true);
 }
 
-void melt_ice(Coord_t center, S16 radius, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree,
-              QuadTreeNode_t<Block_t>* block_quad_tree, bool teleported){
-     impact_ice(center, radius, tilemap, interactive_quad_tree, block_quad_tree, teleported, false);
+void melt_ice(Coord_t center, S16 radius, World_t* world, bool teleported){
+     impact_ice(center, radius, world, teleported, false);
 }
 
-void describe_coord(Coord_t coord, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree, QuadTreeNode_t<Block_t>* block_quad_tree){
-     (void)(block_quad_tree);
-
+void describe_coord(Coord_t coord, World_t* world){
      LOG("\ndescribe_coord(%d, %d)\n", coord.x, coord.y);
-     auto* tile = tilemap_get_tile(tilemap, coord);
+     auto* tile = tilemap_get_tile(&world->tilemap, coord);
      if(tile){
           LOG("Tile: id: %u, light: %u\n", tile->id, tile->light);
           if(tile->flags){
@@ -839,7 +829,7 @@ void describe_coord(Coord_t coord, TileMap_t* tilemap, QuadTreeNode_t<Interactiv
           }
      }
 
-     auto* interactive = quad_tree_find_at(interactive_quad_tree, coord.x, coord.y);
+     auto* interactive = quad_tree_find_at(world->interactive_qt, coord.x, coord.y);
      if(interactive){
           const char* type_string = "INTERACTIVE_TYPE_UKNOWN";
           const int info_string_len = 32;
@@ -909,7 +899,7 @@ void describe_coord(Coord_t coord, TileMap_t* tilemap, QuadTreeNode_t<Interactiv
 
      S16 block_count = 0;
      Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
-     quad_tree_find_in(block_quad_tree, coord_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
+     quad_tree_find_in(world->block_qt, coord_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
      for(S16 i = 0; i < block_count; i++){
           auto* block = blocks[i];
           LOG("block: %d, %d, dir: %s, element: %s\n", block->pos.pixel.x, block->pos.pixel.y,

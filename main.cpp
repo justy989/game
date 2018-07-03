@@ -204,7 +204,7 @@ int main(int argc, char** argv){
                return 1;
           }
      }else if(suite){
-          if(!load_map_number(map_number, &player_start, &world.tilemap, &world.blocks, &world.interactives)){
+          if(!load_map_number(map_number, &player_start, &world)){
                return 1;
           }
 
@@ -223,7 +223,7 @@ int main(int argc, char** argv){
           LOG("testing demo %s: with %ld actions across %ld frames\n", demo.filepath,
               demo.entries.count, demo.last_frame);
      }else if(map_number){
-          if(!load_map_number(map_number, &player_start, &world.tilemap, &world.blocks, &world.interactives)){
+          if(!load_map_number(map_number, &player_start, &world)){
                return 1;
           }
 
@@ -498,7 +498,7 @@ int main(int argc, char** argv){
                                         return 0;
                                    }
 
-                                   if(load_map_number(map_number, &player_start, &world.tilemap, &world.blocks, &world.interactives)){
+                                   if(load_map_number(map_number, &player_start, &world)){
                                         setup_map(player_start, &world, &undo);
 
                                         deep_copy(&world.tilemap, &demo_starting_tilemap);
@@ -605,7 +605,7 @@ int main(int argc, char** argv){
                          }
                          break;
                     case SDL_SCANCODE_L:
-                         if(load_map_number(map_number, &player_start, &world.tilemap, &world.blocks, &world.interactives)){
+                         if(load_map_number(map_number, &player_start, &world)){
                               setup_map(player_start, &world, &undo);
 
                               if(demo.mode == DEMO_MODE_PLAY){
@@ -617,7 +617,7 @@ int main(int argc, char** argv){
                          break;
                     case SDL_SCANCODE_LEFTBRACKET:
                          map_number--;
-                         if(load_map_number(map_number, &player_start, &world.tilemap, &world.blocks, &world.interactives)){
+                         if(load_map_number(map_number, &player_start, &world)){
                               setup_map(player_start, &world, &undo);
 
                               // TODO: compress all dis with other places that duplicate this
@@ -654,7 +654,7 @@ int main(int argc, char** argv){
                          break;
                     case SDL_SCANCODE_RIGHTBRACKET:
                          map_number++;
-                         if(load_map_number(map_number, &player_start, &world.tilemap, &world.blocks, &world.interactives)){
+                         if(load_map_number(map_number, &player_start, &world)){
                               setup_map(player_start, &world, &undo);
 
                               if(demo.mode == DEMO_MODE_PLAY){
@@ -882,7 +882,7 @@ int main(int argc, char** argv){
                     case SDL_SCANCODE_H:
                     {
                          Coord_t coord = mouse_select_world(mouse_screen, camera);
-                         describe_coord(coord, &world.tilemap, world.interactive_qt, world.block_qt);
+                         describe_coord(coord, &world);
                     } break;
                     }
                     break;
@@ -1190,7 +1190,7 @@ int main(int argc, char** argv){
                          }
 
                          if(should_be_down != interactive->pressure_plate.down){
-                              activate(&world.tilemap, world.interactive_qt, interactive->coord);
+                              activate(&world, interactive->coord);
                               interactive->pressure_plate.down = should_be_down;
                          }
                     }
@@ -1204,7 +1204,7 @@ int main(int argc, char** argv){
                     Coord_t pre_move_coord = pixel_to_coord(arrow->pos.pixel);
 
                     if(arrow->element == ELEMENT_FIRE){
-                         illuminate(pre_move_coord, 255 - LIGHT_DECAY, &world.tilemap, world.interactive_qt, world.block_qt);
+                         illuminate(pre_move_coord, 255 - LIGHT_DECAY, &world);
                     }
 
                     if(arrow->stuck_time > 0.0f){
@@ -1321,9 +1321,9 @@ int main(int argc, char** argv){
 
                          // catch or give elements
                          if(arrow->element == ELEMENT_FIRE){
-                              melt_ice(post_move_coord, 0, &world.tilemap, world.interactive_qt, world.block_qt, false);
+                              melt_ice(post_move_coord, 0, &world);
                          }else if(arrow->element == ELEMENT_ICE){
-                              spread_ice(post_move_coord, 0, &world.tilemap, world.interactive_qt, world.block_qt, false);
+                              spread_ice(post_move_coord, 0, &world);
                          }
 
                          Interactive_t* interactive = quad_tree_interactive_find_at(world.interactive_qt, post_move_coord);
@@ -1333,7 +1333,7 @@ int main(int argc, char** argv){
                                    break;
                               case INTERACTIVE_TYPE_LEVER:
                                    if(arrow->pos.z >= HEIGHT_INTERVAL){
-                                        activate(&world.tilemap, world.interactive_qt, post_move_coord);
+                                        activate(&world, post_move_coord);
                                    }else{
                                         arrow->stuck_time = dt;
                                    }
@@ -1404,7 +1404,7 @@ int main(int argc, char** argv){
 
                if(player_action.activate && !player_action.last_activate){
                     undo_commit(&undo, &world.player, &world.tilemap, &world.blocks, &world.interactives);
-                    activate(&world.tilemap, world.interactive_qt, pos_to_coord(world.player.pos) + world.player.face);
+                    activate(&world, pos_to_coord(world.player.pos) + world.player.face);
                }
 
                if(player_action.undo){
@@ -1677,10 +1677,10 @@ int main(int argc, char** argv){
                for(S16 i = 0; i < world.blocks.count; i++){
                     Block_t* block = world.blocks.elements + i;
                     if(block->element == ELEMENT_FIRE){
-                         illuminate(block_get_coord(block), 255, &world.tilemap, world.interactive_qt, world.block_qt);
+                         illuminate(block_get_coord(block), 255, &world);
                     }else if(block->element == ELEMENT_ICE){
                          auto block_coord = block_get_coord(block);
-                         spread_ice(block_coord, 1, &world.tilemap, world.interactive_qt, world.block_qt, false);
+                         spread_ice(block_coord, 1, &world);
                     }
                }
 
@@ -1688,7 +1688,7 @@ int main(int argc, char** argv){
                for(S16 i = 0; i < world.blocks.count; i++){
                     Block_t* block = world.blocks.elements + i;
                     if(block->element == ELEMENT_FIRE){
-                         melt_ice(block_get_coord(block), 1, &world.tilemap, world.interactive_qt, world.block_qt, false);
+                         melt_ice(block_get_coord(block), 1, &world);
                     }
                }
 
@@ -1712,20 +1712,20 @@ int main(int argc, char** argv){
                          }
 
                          if(interactive->detector.on && (tile->light < LIGHT_DETECTOR_THRESHOLD || block)){
-                              activate(&world.tilemap, world.interactive_qt, interactive->coord);
+                              activate(&world, interactive->coord);
                               interactive->detector.on = false;
                          }else if(!interactive->detector.on && tile->light >= LIGHT_DETECTOR_THRESHOLD && !block){
-                              activate(&world.tilemap, world.interactive_qt, interactive->coord);
+                              activate(&world, interactive->coord);
                               interactive->detector.on = true;
                          }
                     }else if(interactive->type == INTERACTIVE_TYPE_ICE_DETECTOR){
                          Tile_t* tile = tilemap_get_tile(&world.tilemap, interactive->coord);
                          if(tile){
                               if(interactive->detector.on && !tile_is_iced(tile)){
-                                   activate(&world.tilemap, world.interactive_qt, interactive->coord);
+                                   activate(&world, interactive->coord);
                                    interactive->detector.on = false;
                               }else if(!interactive->detector.on && tile_is_iced(tile)){
-                                   activate(&world.tilemap, world.interactive_qt, interactive->coord);
+                                   activate(&world, interactive->coord);
                                    interactive->detector.on = true;
                               }
                          }
@@ -1815,7 +1815,7 @@ int main(int argc, char** argv){
                     if(reset_timer >= RESET_TIME){
                          resetting = false;
 
-                         if(load_map_number(map_number, &player_start, &world.tilemap, &world.blocks, &world.interactives)){
+                         if(load_map_number(map_number, &player_start, &world)){
                               setup_map(player_start, &world, &undo);
                          }
                     }
