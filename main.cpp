@@ -1332,25 +1332,30 @@ int main(int argc, char** argv){
                camera += camera_movement * 0.05f;
 
                // block movement
+               // do a pass moving the block as far as possible, so that collision doesn't rely on order of blocks in the array
                for(S16 i = 0; i < world.blocks.count; i++){
                     Block_t* block = world.blocks.elements + i;
-
-                    //Coord_t block_prev_coord = pos_to_coord(block->pos);
-
                     Vec_t pos_delta = mass_move(&block->vel, block->accel, dt);
 
                     // TODO: blocks with velocity need to be checked against other blocks
 
-                    Position_t pre_move = block->pos;
+                    block->pre_move_pos = block->pos;
                     block->pos += pos_delta;
+               }
+
+               // do a collision pass on each block
+               for(S16 i = 0; i < world.blocks.count; i++){
+                    Block_t* block = world.blocks.elements + i;
 
                     bool stop_on_boundary_x = false;
                     bool stop_on_boundary_y = false;
                     bool held_up = false;
 
+                    Vec_t pos_delta = pos_to_vec(block->pos - block->pre_move_pos);
+
                     if(pos_delta.x != 0.0f || pos_delta.y != 0.0f){
-                         check_block_collision_with_other_blocks(block, world.block_qt, world.interactive_qt, &world.tilemap,
-                                                                 &world.player, last_block_pushed, last_block_pushed_direction);
+                         check_block_collision_with_other_blocks(block, &world, &world.player, last_block_pushed,
+                                                                 last_block_pushed_direction);
                     }
 
                     // get the current coord of the center of the block
@@ -1428,7 +1433,7 @@ int main(int argc, char** argv){
 
                     if(stop_on_boundary_x){
                          // stop on tile boundaries separately for each axis
-                         S16 boundary_x = range_passes_tile_boundary(pre_move.pixel.x, block->pos.pixel.x, block->push_start.x);
+                         S16 boundary_x = range_passes_tile_boundary(block->pre_move_pos.pixel.x, block->pos.pixel.x, block->push_start.x);
                          if(boundary_x){
                               block->pos.pixel.x = boundary_x;
                               block->pos.decimal.x = 0.0f;
@@ -1438,7 +1443,7 @@ int main(int argc, char** argv){
                     }
 
                     if(stop_on_boundary_y){
-                         S16 boundary_y = range_passes_tile_boundary(pre_move.pixel.y, block->pos.pixel.y, block->push_start.y);
+                         S16 boundary_y = range_passes_tile_boundary(block->pre_move_pos.pixel.y, block->pos.pixel.y, block->push_start.y);
                          if(boundary_y){
                               block->pos.pixel.y = boundary_y;
                               block->pos.decimal.y = 0.0f;
@@ -1478,7 +1483,7 @@ int main(int argc, char** argv){
                     }
 
                     coord = pixel_to_coord(block->pos.pixel + HALF_TILE_SIZE_PIXEL);
-                    Coord_t premove_coord = pixel_to_coord(pre_move.pixel + HALF_TILE_SIZE_PIXEL);
+                    Coord_t premove_coord = pixel_to_coord(block->pre_move_pos.pixel + HALF_TILE_SIZE_PIXEL);
 
                     Position_t block_center = block->pos;
                     block_center.pixel += HALF_TILE_SIZE_PIXEL;
@@ -1491,8 +1496,8 @@ int main(int argc, char** argv){
                          block->vel = vec_rotate_quadrants_clockwise(block->vel, rotations_between);
                          block->accel = vec_rotate_quadrants_clockwise(block->accel, rotations_between);
 
-                         check_block_collision_with_other_blocks(block, world.block_qt, world.interactive_qt, &world.tilemap,
-                                                                 &world.player, last_block_pushed, last_block_pushed_direction);
+                         check_block_collision_with_other_blocks(block, &world, &world.player, last_block_pushed,
+                                                                 last_block_pushed_direction);
 
                          // try teleporting if we collided with a block
                          premove_coord = pixel_to_coord(block_center.pixel + HALF_TILE_SIZE_PIXEL);

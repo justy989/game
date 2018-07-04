@@ -368,10 +368,6 @@ bool block_on_ice(Block_t* block, TileMap_t* tilemap, QuadTreeNode_t<Interactive
      return false;
 }
 
-void check_block_collision_with_other_blocks(Block_t* block_to_check, QuadTreeNode_t<Block_t>* block_quad_tree,
-                                             QuadTreeNode_t<Interactive_t>* interactive_quad_tree, TileMap_t* tilemap,
-                                             Player_t* player, Block_t* last_block_pushed, Direction_t last_block_pushed_direction){
-
 void check_block_collision_with_other_blocks(Block_t* block_to_check, World_t* world, Player_t* player,
                                              Block_t* last_block_pushed, Direction_t last_block_pushed_direction){
      for(BlockInsideResult_t block_inside_result = block_inside_another_block(block_to_check, world->block_qt, world->interactive_qt, &world->tilemap);

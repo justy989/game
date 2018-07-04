@@ -17,6 +17,8 @@ struct Block_t{
      Pixel_t push_start;
      F32 fall_time;
      S16 entangle_index;
+
+     Position_t pre_move_pos; // save where a block was at the start of the frame
 };
 
 S16 get_object_x(Block_t* block);

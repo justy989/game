@@ -5,6 +5,7 @@
 #include "portal_exit.h"
 #include "utils.h"
 #include "collision.h"
+#include "block_utils.h"
 
 // linux
 #include <dirent.h>
@@ -805,18 +806,19 @@ void melt_ice(Coord_t center, S16 radius, World_t* world, bool teleported){
 
 bool block_push(Block_t* block, Direction_t direction, World_t* world, bool pushed_by_ice){
      Direction_t collided_block_push_dir = DIRECTION_COUNT;
-     Block_t* collided_block = block_against_another_block(block, direction, world->block_qt, world->interactive_qt, tilemap,
-                                                           &collided_block_push_dir);
+     Block_t* collided_block = block_against_another_block(block, direction, world->block_qt, world->interactive_qt,
+                                                           &world->tilemap, &collided_block_push_dir);
      if(collided_block){
           if(collided_block == block){
                // pass, this happens in a corner portal!
           }else if(pushed_by_ice && block_on_ice(collided_block, &world->tilemap, world->interactive_qt)){
-               return block_push(collided_block, collided_block_push_dir, &world->tilemap, world->interactive_qt, world->block_qt, pushed_by_ice);
-          }else if(block->entangle_index == (collided_block - world->blocks.element)){
+               return block_push(collided_block, collided_block_push_dir, world, pushed_by_ice);
+          }else if(block->entangle_index == (collided_block - world->blocks.elements)){
                // if block is entangled with the block it collides with, check if the entangled block can move, this is kind of duplicate work
-               Block_t* collided_block = block_against_another_block(collided_block, direction, world->block_qt, world->interactive_qt, tilemap,
-                                                                     &collided_block_push_dir);
-               if(collided_block) return false;
+               Block_t* entangled_collided_block = block_against_another_block(collided_block, direction, world->block_qt,
+                                                                               world->interactive_qt, &world->tilemap,
+                                                                               &collided_block_push_dir);
+               if(entangled_collided_block) return false;
                if(block_against_solid_tile(collided_block, direction, &world->tilemap, world->interactive_qt)) return false;
                if(block_against_solid_interactive(collided_block, direction, &world->tilemap, world->interactive_qt)) return false;
           }else{
