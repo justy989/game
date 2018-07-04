@@ -1426,9 +1426,54 @@ int main(int argc, char** argv){
                          }
                     }
 
+                    Block_t* last_entangled_block_pushed = nullptr;
+                    if(last_block_pushed && last_block_pushed->entangle_index >= 0){
+                         last_entangled_block_pushed = world.blocks.elements + last_block_pushed->entangle_index;
+                    }
+
                     if(block != last_block_pushed && !block_on_ice(block, &world.tilemap, world.interactive_qt)){
-                         stop_on_boundary_x = true;
-                         stop_on_boundary_y = true;
+                         if(block == last_entangled_block_pushed){
+                              DirectionMask_t vel_mask = vec_direction_mask(block->vel);
+                              switch(last_block_pushed_direction){
+                              default:
+                                   break;
+                              case DIRECTION_LEFT:
+                                   if(vel_mask & DIRECTION_MASK_RIGHT){
+                                        stop_on_boundary_x = true;
+                                   }else if(vel_mask & DIRECTION_MASK_UP ||
+                                            vel_mask & DIRECTION_MASK_DOWN){
+                                        stop_on_boundary_y = true;
+                                   }
+                                   break;
+                              case DIRECTION_RIGHT:
+                                   if(vel_mask & DIRECTION_MASK_LEFT){
+                                        stop_on_boundary_x = true;
+                                   }else if(vel_mask & DIRECTION_MASK_UP ||
+                                            vel_mask & DIRECTION_MASK_DOWN){
+                                        stop_on_boundary_y = true;
+                                   }
+                                   break;
+                              case DIRECTION_UP:
+                                   if(vel_mask & DIRECTION_MASK_DOWN){
+                                        stop_on_boundary_y = true;
+                                   }else if(vel_mask & DIRECTION_MASK_LEFT ||
+                                            vel_mask & DIRECTION_MASK_RIGHT){
+                                        stop_on_boundary_x = true;
+                                   }
+                                   break;
+                              case DIRECTION_DOWN:
+                                   if(vel_mask & DIRECTION_MASK_UP){
+                                        stop_on_boundary_y = true;
+                                   }else if(vel_mask & DIRECTION_MASK_LEFT ||
+                                            vel_mask & DIRECTION_MASK_RIGHT){
+                                        stop_on_boundary_x = true;
+                                   }
+                                   break;
+                              }
+                         }else{
+                              stop_on_boundary_x = true;
+                              stop_on_boundary_y = true;
+                         }
                     }
 
                     if(stop_on_boundary_x){
