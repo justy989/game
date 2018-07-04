@@ -7,6 +7,7 @@
 #include "arrow.h"
 #include "quad_tree.h"
 #include "undo.h"
+#include "demo.h"
 
 struct World_t{
      Player_t player;
@@ -36,3 +37,4 @@ void spread_ice(Coord_t center, S16 radius, World_t* world, bool teleported = fa
 void melt_ice(Coord_t center, S16 radius, World_t* world, bool teleported = false);
 
 void describe_coord(Coord_t coord, World_t* world);
+bool test_map_end_state(World_t* world, Demo_t* demo);
