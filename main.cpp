@@ -61,7 +61,7 @@ void reset_player_state_vars(PlayerAction_t* player_action, Block_t** last_block
 }
 
 bool load_map_number_demo(Demo_t* demo, S16 map_number, S64* frame_count){
-     fclose(demo->file);
+     if(demo->file) fclose(demo->file);
      demo->file = load_demo_number(map_number, &demo->filepath);
      if(!demo->file){
           LOG("missing map %d corresponding demo.\n", map_number);
@@ -227,6 +227,8 @@ int main(int argc, char** argv){
 
      Coord_t player_start {2, 8};
 
+     S64 frame_count = 0;
+
      bool quit = false;
      bool seeked_with_mouse = false;
      bool resetting = false;
@@ -267,15 +269,9 @@ int main(int argc, char** argv){
           cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
 
           demo.mode = DEMO_MODE_PLAY;
-          demo.file = load_demo_number(map_number, &demo.filepath);
-          if(!demo.file){
-               LOG("missing map %d corresponding demo.\n", map_number);
+          if(!load_map_number_demo(&demo, map_number, &frame_count)){
                return 1;
           }
-          demo.entries = demo_entries_get(demo.file);
-          demo.last_frame = demo.entries.entries[demo.entries.count - 1].frame;
-          LOG("testing demo %s: with %ld actions across %ld frames\n", demo.filepath,
-              demo.entries.count, demo.last_frame);
      }else if(map_number){
           if(!load_map_number(map_number, &player_start, &world)){
                return 1;
@@ -335,7 +331,6 @@ int main(int argc, char** argv){
      setup_map(player_start, &world, &undo);
      init(&editor);
 
-     S64 frame_count = 0;
      F32 dt = 0.0f;
 
      auto last_time = std::chrono::system_clock::now();
@@ -354,6 +349,8 @@ int main(int argc, char** argv){
                }
           }
 
+          last_time = current_time;
+
           // TODO: consider 30fps as minimum for random noobs computers
           // if(demo.mode) dt = 0.0166666f; // the game always runs as if a 60th of a frame has occurred.
           dt = 0.0166666f; // the game always runs as if a 60th of a frame has occurred.
@@ -365,8 +362,6 @@ int main(int argc, char** argv){
                frame_count++;
                if(demo.seek_frame == frame_count) demo.seek_frame = -1;
           }
-
-          last_time = current_time;
 
           last_block_pushed = block_to_push;
           block_to_push = nullptr;
@@ -564,8 +559,6 @@ int main(int argc, char** argv){
                                         LOG("Done Testing %d maps.\n", maps_tested);
                                         return 0;
                                    }
-                              }else{
-                                   LOG("test passed\n");
                               }
                          }
                     }else{
