@@ -129,6 +129,17 @@ int main(int argc, char** argv){
                if(next >= argc) continue;
                map_number = atoi(argv[next]);
                first_map_number = map_number;
+          }else if(strcmp(argv[i], "-h") == 0){
+               printf("%s [options]\n", argv[0]);
+               printf("  -play   <demo filepath> replay a recorded demo file\n");
+               printf("  -record <demo filepath> record a demo file\n");
+               printf("  -load   <map filepath>  load a map\n");
+               printf("  -test                   validate the map state is correct after playing a demo\n");
+               printf("  -suite                  run map/demo combos in succession validating map state after each headless\n");
+               printf("  -show                   use in combination with -suite to run with a head\n");
+               printf("  -map    <number>        load a map by number\n");
+               printf("  -h this help.\n");
+               return 0;
           }
      }
 
