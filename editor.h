@@ -19,6 +19,7 @@ enum StampType_t{
 struct StampBlock_t{
      Element_t element;
      Direction_t face;
+     S16 entangle_index;
 };
 
 struct Stamp_t{

@@ -803,6 +803,51 @@ void melt_ice(Coord_t center, S16 radius, World_t* world, bool teleported){
      impact_ice(center, radius, world, teleported, false);
 }
 
+bool block_push(Block_t* block, Direction_t direction, World_t* world, bool pushed_by_ice){
+     Direction_t collided_block_push_dir = DIRECTION_COUNT;
+     Block_t* collided_block = block_against_another_block(block, direction, world->block_qt, world->interactive_qt, tilemap,
+                                                           &collided_block_push_dir);
+     if(collided_block){
+          if(collided_block == block){
+               // pass, this happens in a corner portal!
+          }else if(pushed_by_ice && block_on_ice(collided_block, &world->tilemap, world->interactive_qt)){
+               return block_push(collided_block, collided_block_push_dir, &world->tilemap, world->interactive_qt, world->block_qt, pushed_by_ice);
+          }else if(block->entangle_index == (collided_block - world->blocks.element)){
+               // if block is entangled with the block it collides with, check if the entangled block can move, this is kind of duplicate work
+               Block_t* collided_block = block_against_another_block(collided_block, direction, world->block_qt, world->interactive_qt, tilemap,
+                                                                     &collided_block_push_dir);
+               if(collided_block) return false;
+               if(block_against_solid_tile(collided_block, direction, &world->tilemap, world->interactive_qt)) return false;
+               if(block_against_solid_interactive(collided_block, direction, &world->tilemap, world->interactive_qt)) return false;
+          }else{
+               return false;
+          }
+     }
+
+     if(block_against_solid_tile(block, direction, &world->tilemap, world->interactive_qt)) return false;
+     if(block_against_solid_interactive(block, direction, &world->tilemap, world->interactive_qt)) return false;
+
+     switch(direction){
+     default:
+          break;
+     case DIRECTION_LEFT:
+          block->accel.x = -PLAYER_SPEED * 0.99f;
+          break;
+     case DIRECTION_RIGHT:
+          block->accel.x = PLAYER_SPEED * 0.99f;
+          break;
+     case DIRECTION_DOWN:
+          block->accel.y = -PLAYER_SPEED * 0.99f;
+          break;
+     case DIRECTION_UP:
+          block->accel.y = PLAYER_SPEED * 0.99f;
+          break;
+     }
+
+     block->push_start = block->pos.pixel;
+     return true;
+}
+
 void describe_coord(Coord_t coord, World_t* world){
      LOG("\ndescribe_coord(%d, %d)\n", coord.x, coord.y);
      auto* tile = tilemap_get_tile(&world->tilemap, coord);
@@ -900,8 +945,10 @@ void describe_coord(Coord_t coord, World_t* world){
      quad_tree_find_in(world->block_qt, coord_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
      for(S16 i = 0; i < block_count; i++){
           auto* block = blocks[i];
-          LOG("block: %d, %d, dir: %s, element: %s\n", block->pos.pixel.x, block->pos.pixel.y,
-              direction_to_string(block->face), element_to_string(block->element));
+          LOG("block %ld: pixel %d, %d, dir: %s, element: %s, entangle: %d\n",
+              block - world->blocks.elements, block->pos.pixel.x, block->pos.pixel.y,
+              direction_to_string(block->face), element_to_string(block->element),
+              block->entangle_index);
      }
 }
 
@@ -922,6 +969,9 @@ bool test_map_end_state(World_t* world, Demo_t* demo){
      Coord_t check_player_start;
      Pixel_t check_player_pixel;
 
+#define NAME_LEN 64
+     char name[NAME_LEN];
+
      if(!load_map_from_file(demo->file, &check_player_start, &check_tilemap, &check_block_array, &check_interactives, demo->filepath)){
           LOG("failed to load map state from end of file\n");
           return false;
@@ -936,8 +986,7 @@ bool test_map_end_state(World_t* world, Demo_t* demo){
           for(S16 j = 0; j < check_tilemap.height; j++){
                for(S16 i = 0; i < check_tilemap.width; i++){
                     if(check_tilemap.tiles[j][i].flags != world->tilemap.tiles[j][i].flags){
-                         char name[64];
-                         snprintf(name, 64, "tile %d, %d flags", i, j);
+                         snprintf(name, NAME_LEN, "tile %d, %d flags", i, j);
                          LOG_MISMATCH(name, "%d", check_tilemap.tiles[j][i].flags, world->tilemap.tiles[j][i].flags);
                     }
                }
@@ -960,27 +1009,28 @@ bool test_map_end_state(World_t* world, Demo_t* demo){
                Block_t* check_block = check_block_array.elements + i;
                Block_t* block = world->blocks.elements + i;
                if(check_block->pos.pixel.x != block->pos.pixel.x){
-                    char name[64];
-                    snprintf(name, 64, "block %d pos x", i);
+                    snprintf(name, NAME_LEN, "block %d pos x", i);
                     LOG_MISMATCH(name, "%d", check_block->pos.pixel.x, block->pos.pixel.x);
                }
 
                if(check_block->pos.pixel.y != block->pos.pixel.y){
-                    char name[64];
-                    snprintf(name, 64, "block %d pos y", i);
+                    snprintf(name, NAME_LEN, "block %d pos y", i);
                     LOG_MISMATCH(name, "%d", check_block->pos.pixel.y, block->pos.pixel.y);
                }
 
                if(check_block->pos.z != block->pos.z){
-                    char name[64];
-                    snprintf(name, 64, "block %d pos z", i);
+                    snprintf(name, NAME_LEN, "block %d pos z", i);
                     LOG_MISMATCH(name, "%d", check_block->pos.z, block->pos.z);
                }
 
                if(check_block->element != block->element){
-                    char name[64];
-                    snprintf(name, 64, "block %d element", i);
+                    snprintf(name, NAME_LEN, "block %d element", i);
                     LOG_MISMATCH(name, "%d", check_block->element, block->element);
+               }
+
+               if(check_block->entangle_index != block->entangle_index){
+                    snprintf(name, NAME_LEN, "block %d entangle_index", i);
+                    LOG_MISMATCH(name, "%d", check_block->entangle_index, block->entangle_index);
                }
           }
      }
@@ -1001,8 +1051,7 @@ bool test_map_end_state(World_t* world, Demo_t* demo){
                          break;
                     case INTERACTIVE_TYPE_PRESSURE_PLATE:
                          if(check_interactive->pressure_plate.down != interactive->pressure_plate.down){
-                              char name[64];
-                              snprintf(name, 64, "interactive at %d, %d pressure plate down",
+                              snprintf(name, NAME_LEN, "interactive at %d, %d pressure plate down",
                                        interactive->coord.x, interactive->coord.y);
                               LOG_MISMATCH(name, "%d", check_interactive->pressure_plate.down,
                                            interactive->pressure_plate.down);
@@ -1011,8 +1060,7 @@ bool test_map_end_state(World_t* world, Demo_t* demo){
                     case INTERACTIVE_TYPE_ICE_DETECTOR:
                     case INTERACTIVE_TYPE_LIGHT_DETECTOR:
                          if(check_interactive->detector.on != interactive->detector.on){
-                              char name[64];
-                              snprintf(name, 64, "interactive at %d, %d detector on",
+                              snprintf(name, NAME_LEN, "interactive at %d, %d detector on",
                                        interactive->coord.x, interactive->coord.y);
                               LOG_MISMATCH(name, "%d", check_interactive->detector.on,
                                            interactive->detector.on);
@@ -1020,15 +1068,13 @@ bool test_map_end_state(World_t* world, Demo_t* demo){
                          break;
                     case INTERACTIVE_TYPE_POPUP:
                          if(check_interactive->popup.iced != interactive->popup.iced){
-                              char name[64];
-                              snprintf(name, 64, "interactive at %d, %d popup iced",
+                              snprintf(name, NAME_LEN, "interactive at %d, %d popup iced",
                                        interactive->coord.x, interactive->coord.y);
                               LOG_MISMATCH(name, "%d", check_interactive->popup.iced,
                                            interactive->popup.iced);
                          }
                          if(check_interactive->popup.lift.up != interactive->popup.lift.up){
-                              char name[64];
-                              snprintf(name, 64, "interactive at %d, %d popup lift up",
+                              snprintf(name, NAME_LEN, "interactive at %d, %d popup lift up",
                                        interactive->coord.x, interactive->coord.y);
                               LOG_MISMATCH(name, "%d", check_interactive->popup.lift.up,
                                            interactive->popup.lift.up);
@@ -1036,8 +1082,7 @@ bool test_map_end_state(World_t* world, Demo_t* demo){
                          break;
                     case INTERACTIVE_TYPE_DOOR:
                          if(check_interactive->door.lift.up != interactive->door.lift.up){
-                              char name[64];
-                              snprintf(name, 64, "interactive at %d, %d door lift up",
+                              snprintf(name, NAME_LEN, "interactive at %d, %d door lift up",
                                        interactive->coord.x, interactive->coord.y);
                               LOG_MISMATCH(name, "%d", check_interactive->door.lift.up,
                                            interactive->door.lift.up);
@@ -1045,8 +1090,7 @@ bool test_map_end_state(World_t* world, Demo_t* demo){
                          break;
                     case INTERACTIVE_TYPE_PORTAL:
                          if(check_interactive->portal.on != interactive->portal.on){
-                              char name[64];
-                              snprintf(name, 64, "interactive at %d, %d portal on",
+                              snprintf(name, NAME_LEN, "interactive at %d, %d portal on",
                                        interactive->coord.x, interactive->coord.y);
                               LOG_MISMATCH(name, "%d", check_interactive->portal.on,
                                            interactive->portal.on);

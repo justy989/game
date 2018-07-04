@@ -8,45 +8,6 @@
 
 Pixel_t g_collided_with_pixel = {};
 
-bool block_push(Block_t* block, Direction_t direction, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree,
-                QuadTreeNode_t<Block_t>* block_quad_tree, bool pushed_by_ice){
-     Direction_t collided_block_push_dir = DIRECTION_COUNT;
-     Block_t* collided_block = block_against_another_block(block, direction, block_quad_tree, interactive_quad_tree, tilemap,
-                                                           &collided_block_push_dir);
-     if(collided_block){
-          if(collided_block == block){
-               // pass
-          }else if(pushed_by_ice && block_on_ice(collided_block, tilemap, interactive_quad_tree)){
-               return block_push(collided_block, collided_block_push_dir, tilemap, interactive_quad_tree, block_quad_tree, pushed_by_ice);
-          }else{
-               return false;
-          }
-     }
-
-     if(block_against_solid_tile(block, direction, tilemap, interactive_quad_tree)) return false;
-     if(block_against_solid_interactive(block, direction, tilemap, interactive_quad_tree)) return false;
-
-     switch(direction){
-     default:
-          break;
-     case DIRECTION_LEFT:
-          block->accel.x = -PLAYER_SPEED * 0.99f;
-          break;
-     case DIRECTION_RIGHT:
-          block->accel.x = PLAYER_SPEED * 0.99f;
-          break;
-     case DIRECTION_DOWN:
-          block->accel.y = -PLAYER_SPEED * 0.99f;
-          break;
-     case DIRECTION_UP:
-          block->accel.y = PLAYER_SPEED * 0.99f;
-          break;
-     }
-
-     block->push_start = block->pos.pixel;
-     return true;
-}
-
 bool block_adjacent_pixels_to_check(Block_t* block_to_check, Direction_t direction, Pixel_t* a, Pixel_t* b){
      switch(direction){
      default:
@@ -410,9 +371,12 @@ bool block_on_ice(Block_t* block, TileMap_t* tilemap, QuadTreeNode_t<Interactive
 void check_block_collision_with_other_blocks(Block_t* block_to_check, QuadTreeNode_t<Block_t>* block_quad_tree,
                                              QuadTreeNode_t<Interactive_t>* interactive_quad_tree, TileMap_t* tilemap,
                                              Player_t* player, Block_t* last_block_pushed, Direction_t last_block_pushed_direction){
-     for(BlockInsideResult_t block_inside_result = block_inside_another_block(block_to_check, block_quad_tree, interactive_quad_tree, tilemap);
+
+void check_block_collision_with_other_blocks(Block_t* block_to_check, World_t* world, Player_t* player,
+                                             Block_t* last_block_pushed, Direction_t last_block_pushed_direction){
+     for(BlockInsideResult_t block_inside_result = block_inside_another_block(block_to_check, world->block_qt, world->interactive_qt, &world->tilemap);
          block_inside_result.block && blocks_at_collidable_height(block_to_check, block_inside_result.block);
-         block_inside_result = block_inside_another_block(block_to_check, block_quad_tree, interactive_quad_tree, tilemap)){
+         block_inside_result = block_inside_another_block(block_to_check, world->block_qt, world->interactive_qt, &world->tilemap)){
 
 #if 0
           (void)(player);
@@ -434,8 +398,8 @@ void check_block_collision_with_other_blocks(Block_t* block_to_check, QuadTreeNo
           auto quadrant = relative_quadrant(block_center_pixel, block_inside_result.collision_pos.pixel);
 
           // check if they are on ice before we adjust the position on our block to check
-          bool a_on_ice = block_on_ice(block_to_check, tilemap, interactive_quad_tree);
-          bool b_on_ice = block_on_ice(block_inside_result.block, tilemap, interactive_quad_tree);
+          bool a_on_ice = block_on_ice(block_to_check, &world->tilemap, world->interactive_qt);
+          bool b_on_ice = block_on_ice(block_inside_result.block, &world->tilemap, world->interactive_qt);
 
           if(block_inside_result.block == block_to_check){
                block_to_check->pos = coord_to_pos(block_get_coord(block_to_check));
@@ -533,7 +497,7 @@ void check_block_collision_with_other_blocks(Block_t* block_to_check, QuadTreeNo
                     }
                }
 
-               if(push) block_push(block_inside_result.block, push_dir, tilemap, interactive_quad_tree, block_quad_tree, true);
+               if(push) block_push(block_inside_result.block, push_dir, world, true);
           }
 #endif
 

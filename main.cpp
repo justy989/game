@@ -92,6 +92,14 @@ bool load_map_number_map(S16 map_number, World_t* world, Undo_t* undo,
      return false;
 }
 
+Block_t block_from_stamp(Stamp_t* stamp){
+     Block_t block = {};
+     block.element = stamp->block.element;
+     block.face = stamp->block.face;
+     block.entangle_index = stamp->block.entangle_index;
+     return block;
+}
+
 int main(int argc, char** argv){
      const char* load_map_filepath = nullptr;
      bool test = false;
@@ -1608,10 +1616,10 @@ int main(int argc, char** argv){
                               world.player.push_time += dt;
                               if(world.player.push_time > BLOCK_PUSH_TIME){ // && !direction_in_mask(vec_direction_mask(block_to_push->vel), last_block_pushed_direction)){
                                    if(before_time <= BLOCK_PUSH_TIME) undo_commit(&undo, &world.player, &world.tilemap, &world.blocks, &world.interactives);
-                                   bool pushed = block_push(block_to_push, last_block_pushed_direction, &world.tilemap, world.interactive_qt, world.block_qt, false);
+                                   bool pushed = block_push(block_to_push, last_block_pushed_direction, &world, false);
                                    if(pushed && block_to_push->entangle_index >= 0){
                                         Block_t* entangled_block = world.blocks.elements + block_to_push->entangle_index;
-                                        block_push(entangled_block, last_block_pushed_direction, &world.tilemap, world.interactive_qt, world.block_qt, false);
+                                        block_push(entangled_block, last_block_pushed_direction, &world, false);
                                    }
                                    if(block_to_push->pos.z > 0) world.player.push_time = -0.5f; // TODO: wtf is this line?
                               }
@@ -1935,10 +1943,7 @@ int main(int argc, char** argv){
                               break;
                          case STAMP_TYPE_BLOCK:
                          {
-                              Block_t block = {};
-                              block.element = stamp->block.element;
-                              block.face = stamp->block.face;
-
+                              Block_t block = block_from_stamp(stamp);
                               draw_block(&block, vec);
                          } break;
                          case STAMP_TYPE_INTERACTIVE:
@@ -1978,9 +1983,7 @@ int main(int argc, char** argv){
                          break;
                     case STAMP_TYPE_BLOCK:
                     {
-                         Block_t block = {};
-                         block.element = stamp->block.element;
-                         block.face = stamp->block.face;
+                         Block_t block = block_from_stamp(stamp);
                          draw_block(&block, stamp_pos);
                     } break;
                     case STAMP_TYPE_INTERACTIVE:
@@ -2016,9 +2019,7 @@ int main(int argc, char** argv){
                                    break;
                               case STAMP_TYPE_BLOCK:
                               {
-                                   Block_t block = {};
-                                   block.element = stamp->block.element;
-                                   block.face = stamp->block.face;
+                                   Block_t block = block_from_stamp(stamp);
                                    draw_block(&block, stamp_vec);
                               } break;
                               case STAMP_TYPE_INTERACTIVE:
@@ -2064,9 +2065,7 @@ int main(int argc, char** argv){
                          break;
                     case STAMP_TYPE_BLOCK:
                     {
-                         Block_t block = {};
-                         block.element = stamp->block.element;
-                         block.face = stamp->block.face;
+                         Block_t block = block_from_stamp(stamp);
                          draw_block(&block, stamp_vec);
                     } break;
                     case STAMP_TYPE_INTERACTIVE:

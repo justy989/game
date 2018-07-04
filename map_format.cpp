@@ -306,7 +306,7 @@ bool load_map_from_file_v2(FILE* file, Coord_t* player_start, TileMap_t* tilemap
           block->pos.z = map_blocks[i].z;
           block->face = map_blocks[i].face;
           block->element = map_blocks[i].element;
-          block->entangle_index = -1;
+          block->entangle_index = map_blocks[i].entangle_index;
      }
 
      for(S16 i = 0; i < interactive_array->count; i++){
@@ -367,7 +367,7 @@ bool load_map_from_file_v2(FILE* file, Coord_t* player_start, TileMap_t* tilemap
 
 bool load_map_from_file(FILE* file, Coord_t* player_start, TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array,
                         ObjectArray_t<Interactive_t>* interactive_array, const char* filepath){
-     U8 map_version = MAP_VERSION;
+     U8 map_version = 0;
      fread(&map_version, sizeof(map_version), 1, file);
      switch(map_version){
      default:

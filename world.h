@@ -36,5 +36,7 @@ void illuminate(Coord_t coord, U8 value, World_t* world, Coord_t from_portal = C
 void spread_ice(Coord_t center, S16 radius, World_t* world, bool teleported = false);
 void melt_ice(Coord_t center, S16 radius, World_t* world, bool teleported = false);
 
+bool block_push(Block_t* block, Direction_t direction, World_t* world, bool pushed_by_ice);
+
 void describe_coord(Coord_t coord, World_t* world);
 bool test_map_end_state(World_t* world, Demo_t* demo);
