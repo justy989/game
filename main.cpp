@@ -2,6 +2,24 @@
 http://www.simonstalenhag.se/
 -Grant Sanderson 3blue1brown
 -Shane Hendrixson
+
+TODO:
+Entanglement:
+- entangle puzzle where there is a line of pressure plates against the wall with a line of popups on the other side that would
+  trap an entangled block if it got to close, stopping the player from using walls to get blocks closer
+- entangle puzzle with an extra non-entangled block where you don't want one of the entangled blocks to move, and you use
+  the non-entangled block to accomplish that
+- player entanglement
+- arrow entanglement
+- portal entangling
+
+Big Features:
+- Block splitting
+- Block ice collision with masses
+- 3D
+
+NOTES:
+- Only 2 blocks high can go through portals
 */
 
 #include <iostream>
@@ -52,14 +70,6 @@ void fetch_cache_for_demo_seek(World_t* world, TileMap_t* demo_starting_tilemap,
      deep_copy(demo_starting_interactives, &world->interactives);
 }
 
-void reset_player_state_vars(PlayerAction_t* player_action, Block_t** last_block_pushed,
-                             Direction_t* last_block_pushed_direction, Block_t** block_to_push){
-     *player_action = {};
-     *last_block_pushed = nullptr;
-     *last_block_pushed_direction = DIRECTION_LEFT;
-     *block_to_push = nullptr;
-}
-
 bool load_map_number_demo(Demo_t* demo, S16 map_number, S64* frame_count){
      if(demo->file) fclose(demo->file);
      demo->file = load_demo_number(map_number, &demo->filepath);
@@ -79,13 +89,16 @@ bool load_map_number_demo(Demo_t* demo, S16 map_number, S64* frame_count){
 }
 
 bool load_map_number_map(S16 map_number, World_t* world, Undo_t* undo,
-                         PlayerAction_t* player_action, Block_t** last_block_pushed,
+                         Coord_t* player_start, PlayerAction_t* player_action, Block_t** last_block_pushed,
                          Direction_t* last_block_pushed_direction, Block_t** block_to_push){
-     Coord_t player_start;
-     if(load_map_number(map_number, &player_start, world)){
-          setup_map(player_start, world, undo);
-          reset_player_state_vars(player_action, last_block_pushed,
-                                  last_block_pushed_direction, block_to_push);
+     if(load_map_number(map_number, player_start, world)){
+          setup_map(*player_start, world, undo);
+
+          *player_action = {};
+          *last_block_pushed = nullptr;
+          *last_block_pushed_direction = DIRECTION_LEFT;
+          *block_to_push = nullptr;
+
           return true;
      }
 
@@ -405,8 +418,8 @@ int main(int argc, char** argv){
                               map_number++;
                               S16 maps_tested = map_number - first_map_number;
 
-                              if(load_map_number_map(map_number, &world, &undo, &player_action, &last_block_pushed,
-                                                     &last_block_pushed_direction, &block_to_push)){
+                              if(load_map_number_map(map_number, &world, &undo, &player_start, &player_action,
+                                                     &last_block_pushed, &last_block_pushed_direction, &block_to_push)){
 
                                    cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
 
@@ -491,8 +504,8 @@ int main(int argc, char** argv){
                          }
                          break;
                     case SDL_SCANCODE_L:
-                         if(load_map_number_map(map_number, &world, &undo, &player_action, &last_block_pushed,
-                                                &last_block_pushed_direction, &block_to_push)){
+                         if(load_map_number_map(map_number, &world, &undo, &player_start, &player_action,
+                                                &last_block_pushed, &last_block_pushed_direction, &block_to_push)){
                               if(demo.mode == DEMO_MODE_PLAY){
                                    cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
                               }
@@ -500,8 +513,8 @@ int main(int argc, char** argv){
                          break;
                     case SDL_SCANCODE_LEFTBRACKET:
                          map_number--;
-                         if(load_map_number_map(map_number, &world, &undo, &player_action, &last_block_pushed,
-                                                &last_block_pushed_direction, &block_to_push)){
+                         if(load_map_number_map(map_number, &world, &undo, &player_start, &player_action,
+                                                &last_block_pushed, &last_block_pushed_direction, &block_to_push)){
                               if(demo.mode == DEMO_MODE_PLAY){
                                    cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
 
@@ -517,8 +530,8 @@ int main(int argc, char** argv){
                          break;
                     case SDL_SCANCODE_RIGHTBRACKET:
                          map_number++;
-                         if(load_map_number_map(map_number, &world, &undo, &player_action, &last_block_pushed,
-                                                &last_block_pushed_direction, &block_to_push)){
+                         if(load_map_number_map(map_number, &world, &undo, &player_start, &player_action,
+                                                &last_block_pushed, &last_block_pushed_direction, &block_to_push)){
                               if(demo.mode == DEMO_MODE_PLAY){
                                    cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
 
@@ -1706,8 +1719,8 @@ int main(int argc, char** argv){
                     if(reset_timer >= RESET_TIME){
                          resetting = false;
 
-                         load_map_number_map(map_number, &world, &undo, &player_action, &last_block_pushed,
-                                             &last_block_pushed_direction, &block_to_push);
+                         load_map_number_map(map_number, &world, &undo, &player_start, &player_action,
+                                             &last_block_pushed, &last_block_pushed_direction, &block_to_push);
                     }
                }else{
                     reset_timer -= dt;
