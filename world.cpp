@@ -420,10 +420,11 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
 
                Position_t block_center = collided_block->pos;
                block_center.pixel += HALF_TILE_SIZE_PIXEL;
-               S8 rotations_between = teleport_position_across_portal(&block_center, NULL, world, premove_coord,
+
+               auto teleport_result = teleport_position_across_portal(block_center, Vec_t{}, world, premove_coord,
                                                                       coord);
-               if(rotations_between >= 0){
-                    collided_block->pos = block_center;
+               if(teleport_result.count > 0){
+                    collided_block->pos = teleport_result.results[0].pos;
                     collided_block->pos.pixel -= HALF_TILE_SIZE_PIXEL;
                }
 
@@ -548,34 +549,30 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
      return pos_delta;
 }
 
-S8 teleport_position_across_portal(Position_t* position, Vec_t* pos_delta, World_t* world, Coord_t premove_coord,
-                                   Coord_t postmove_coord){
+TeleportPositionResult_t teleport_position_across_portal(Position_t position, Vec_t pos_delta, World_t* world, Coord_t premove_coord,
+                                                         Coord_t postmove_coord){
+     TeleportPositionResult_t result;
+
      if(postmove_coord != premove_coord){
           auto* interactive = quad_tree_interactive_find_at(world->interactive_qt, postmove_coord);
           if(is_active_portal(interactive)){
                if(interactive->portal.face == direction_opposite(direction_between(postmove_coord, premove_coord))){
-                    Position_t offset_from_center = *position - coord_to_pos_at_tile_center(postmove_coord);
+                    Position_t offset_from_center = position - coord_to_pos_at_tile_center(postmove_coord);
                     PortalExit_t portal_exit = find_portal_exits(postmove_coord, &world->tilemap, world->interactive_qt);
 
                     for(S8 d = 0; d < DIRECTION_COUNT; d++){
                          for(S8 p = 0; p < portal_exit.directions[d].count; p++){
                               if(portal_exit.directions[d].coords[p] != postmove_coord){
                                    Position_t final_offset = offset_from_center;
+
                                    Direction_t opposite = direction_opposite((Direction_t)(d));
                                    U8 rotations_between = direction_rotations_between(interactive->portal.face, opposite);
-
                                    final_offset = position_rotate_quadrants_counter_clockwise(final_offset, rotations_between);
-                                   // final_offset.pixel = pixel_rotate_quadrants_counter_clockwise(final_offset.pixel, rotations_between);
-                                   // final_offset.decimal = vec_rotate_quadrants_counter_clockwise(final_offset.decimal, rotations_between);
 
-                                   rotations_between = portal_rotations_between(interactive->portal.face, (Direction_t)(d));
-
-                                   if(pos_delta){
-                                        *pos_delta = vec_rotate_quadrants_clockwise(*pos_delta, rotations_between);
-                                   }
-
-                                   *position = coord_to_pos_at_tile_center(portal_exit.directions[d].coords[p] + opposite) + final_offset;
-                                   return rotations_between;
+                                   result.results[result.count].rotations = portal_rotations_between(interactive->portal.face, (Direction_t)(d));
+                                   result.results[result.count].delta = vec_rotate_quadrants_clockwise(pos_delta, result.results[result.count].rotations);
+                                   result.results[result.count].pos = coord_to_pos_at_tile_center(portal_exit.directions[d].coords[p] + opposite) + final_offset;
+                                   result.count++;
                               }
                          }
                     }
@@ -583,7 +580,7 @@ S8 teleport_position_across_portal(Position_t* position, Vec_t* pos_delta, World
           }
      }
 
-     return -1;
+     return result;
 }
 
 static void illuminate_line(Coord_t start, Coord_t end, U8 value, World_t* world, Coord_t from_portal){
