@@ -1216,10 +1216,13 @@ int main(int argc, char** argv){
                               }
                          }
 
-                         S8 rotations_between = teleport_position_across_portal(&arrow->pos, NULL, &world,
+                         auto teleport_result = teleport_position_across_portal(arrow->pos, Vec_t{}, &world,
                                                                                 pre_move_coord, post_move_coord);
-                         if(rotations_between >= 0){
-                              arrow->face = direction_rotate_clockwise(arrow->face, rotations_between);
+                         if(teleport_result.count > 0){
+                              arrow->pos = teleport_result.results[0].pos;
+                              arrow->face = direction_rotate_clockwise(arrow->face, teleport_result.results[0].rotations);
+
+                              // TODO: entangle
                          }
                     }
                }
@@ -1545,14 +1548,15 @@ int main(int argc, char** argv){
 
                     Position_t block_center = block->pos;
                     block_center.pixel += HALF_TILE_SIZE_PIXEL;
-                    S8 rotations_between = teleport_position_across_portal(&block_center, NULL, &world, premove_coord,
+
+                    auto teleport_result = teleport_position_across_portal(block_center, Vec_t{}, &world, premove_coord,
                                                                            coord);
-                    if(rotations_between >= 0){
-                         block->pos = block_center;
+                    if(teleport_result.count > 0){
+                         block->pos = teleport_result.results[0].pos;
                          block->pos.pixel -= HALF_TILE_SIZE_PIXEL;
 
-                         block->vel = vec_rotate_quadrants_clockwise(block->vel, rotations_between);
-                         block->accel = vec_rotate_quadrants_clockwise(block->accel, rotations_between);
+                         block->vel = vec_rotate_quadrants_clockwise(block->vel, teleport_result.results[0].rotations);
+                         block->accel = vec_rotate_quadrants_clockwise(block->accel, teleport_result.results[0].rotations);
 
                          check_block_collision_with_other_blocks(block, &world, &world.player, last_block_pushed,
                                                                  last_block_pushed_direction);
@@ -1561,17 +1565,16 @@ int main(int argc, char** argv){
                          premove_coord = pixel_to_coord(block_center.pixel + HALF_TILE_SIZE_PIXEL);
                          coord = pixel_to_coord(block->pos.pixel + HALF_TILE_SIZE_PIXEL);
 
-                         block_center = block->pos;
-                         block_center.pixel += HALF_TILE_SIZE_PIXEL;
+                         block_center = block_get_center(block);
 
-                         rotations_between = teleport_position_across_portal(&block_center, NULL, &world,
-                                                                             premove_coord, coord);
-                         if(rotations_between >= 0){
-                              block->pos = block_center;
+                         auto collided_teleport_result = teleport_position_across_portal(block_center, Vec_t{}, &world,
+                                                                                         premove_coord, coord);
+                         if(collided_teleport_result.count > 0){
+                              block->pos = collided_teleport_result.results[0].pos;
                               block->pos.pixel -= HALF_TILE_SIZE_PIXEL;
 
-                              block->vel = vec_rotate_quadrants_clockwise(block->vel, rotations_between);
-                              block->accel = vec_rotate_quadrants_clockwise(block->accel, rotations_between);
+                              block->vel = vec_rotate_quadrants_clockwise(block->vel, collided_teleport_result.results[0].rotations);
+                              block->accel = vec_rotate_quadrants_clockwise(block->accel, collided_teleport_result.results[0].rotations);
                          }
                     }
                }
@@ -1651,8 +1654,12 @@ int main(int argc, char** argv){
                     Coord_t player_coord = pos_to_coord(world.player.pos + pos_delta);
 
                     find_portal_adjacents_to_skip_collision_check(player_coord, world.interactive_qt, skip_coord);
-                    S8 rotations_between = teleport_position_across_portal(&world.player.pos, &pos_delta, &world,
+                    auto teleport_result = teleport_position_across_portal(world.player.pos, pos_delta, &world,
                                                                            player_previous_coord, player_coord);
+                    if(teleport_result.count > 0){
+                         world.player.pos = teleport_result.results[0].pos;
+                         pos_delta = teleport_result.results[0].delta;
+                    }
 
                     player_coord = pos_to_coord(world.player.pos + pos_delta);
 
@@ -1691,24 +1698,32 @@ int main(int argc, char** argv){
                          world.player.push_time = 0;
                     }
 
-                    if(rotations_between < 0){
-                         rotations_between = teleport_position_across_portal(&world.player.pos, &player_delta_pos, &world,
-                                                                             player_previous_coord, player_coord);
+                    if(teleport_result.count == 0){
+                         teleport_result = teleport_position_across_portal(world.player.pos, player_delta_pos, &world,
+                                                                           player_previous_coord, player_coord);
+                         if(teleport_result.count > 0){
+                              world.player.pos = teleport_result.results[0].pos;
+                              player_delta_pos = teleport_result.results[0].delta;
+                         }
                     }else{
-                         teleport_position_across_portal(&world.player.pos, &player_delta_pos, &world,
-                                                         player_previous_coord, player_coord);
+                         auto new_teleport_result = teleport_position_across_portal(world.player.pos, player_delta_pos, &world,
+                                                                                    player_previous_coord, player_coord);
+                         if(new_teleport_result.count > 0){
+                              world.player.pos = new_teleport_result.results[0].pos;
+                              player_delta_pos = new_teleport_result.results[0].delta;
+                         }
                     }
 
-                    if(rotations_between >= 0){
-                         world.player.face = direction_rotate_clockwise(world.player.face, rotations_between);
-                         world.player.vel = vec_rotate_quadrants_clockwise(world.player.vel, rotations_between);
-                         world.player.accel = vec_rotate_quadrants_clockwise(world.player.accel, rotations_between);
+                    if(teleport_result.count > 0){
+                         world.player.face = direction_rotate_clockwise(world.player.face, teleport_result.results[0].rotations);
+                         world.player.vel = vec_rotate_quadrants_clockwise(world.player.vel, teleport_result.results[0].rotations);
+                         world.player.accel = vec_rotate_quadrants_clockwise(world.player.accel, teleport_result.results[0].rotations);
 
                          // set rotations for each direction the player wants to move
-                         if(player_action.move_left) player_action.move_left_rotation = (player_action.move_left_rotation + rotations_between) % DIRECTION_COUNT;
-                         if(player_action.move_right) player_action.move_right_rotation = (player_action.move_right_rotation + rotations_between) % DIRECTION_COUNT;
-                         if(player_action.move_up) player_action.move_up_rotation = (player_action.move_up_rotation + rotations_between) % DIRECTION_COUNT;
-                         if(player_action.move_down) player_action.move_down_rotation = (player_action.move_down_rotation + rotations_between) % DIRECTION_COUNT;
+                         if(player_action.move_left) player_action.move_left_rotation = (player_action.move_left_rotation + teleport_result.results[0].rotations) % DIRECTION_COUNT;
+                         if(player_action.move_right) player_action.move_right_rotation = (player_action.move_right_rotation + teleport_result.results[0].rotations) % DIRECTION_COUNT;
+                         if(player_action.move_up) player_action.move_up_rotation = (player_action.move_up_rotation + teleport_result.results[0].rotations) % DIRECTION_COUNT;
+                         if(player_action.move_down) player_action.move_down_rotation = (player_action.move_down_rotation + teleport_result.results[0].rotations) % DIRECTION_COUNT;
                     }
 
                     world.player.pos += player_delta_pos;
