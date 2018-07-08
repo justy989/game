@@ -1,4 +1,6 @@
 #include "interactive.h"
+#include "conversion.h"
+#include "defines.h"
 
 void lift_update(Lift_t* lift, float tick_delay, float dt, S8 min_tick, S8 max_tick){
      lift->timer += dt;
@@ -84,4 +86,42 @@ bool interactive_equal(const Interactive_t* a, const Interactive_t* b){
 
 bool is_active_portal(const Interactive_t* interactive){
      return interactive && interactive->type == INTERACTIVE_TYPE_PORTAL && interactive->portal.on;
+}
+
+AxisLine_t get_portal_line(const Interactive_t* interactive){
+     AxisLine_t result = {};
+     if(interactive->type != INTERACTIVE_TYPE_PORTAL) return result;
+
+     auto top_left_pixel = coord_to_pixel(interactive->coord);
+
+     switch(interactive->portal.face){
+     default:
+          break;
+     case DIRECTION_LEFT:
+          result.vertical = true;
+          result.offset = top_left_pixel.x + BLOCK_SOLID_SIZE_IN_PIXELS;
+          result.min = top_left_pixel.y;
+          result.max = top_left_pixel.y + BLOCK_SOLID_SIZE_IN_PIXELS;
+          break;
+     case DIRECTION_RIGHT:
+          result.vertical = true;
+          result.offset = top_left_pixel.x;
+          result.min = top_left_pixel.y;
+          result.max = top_left_pixel.y + BLOCK_SOLID_SIZE_IN_PIXELS;
+          break;
+     case DIRECTION_UP:
+          result.vertical = false;
+          result.offset = top_left_pixel.y;
+          result.min = top_left_pixel.x;
+          result.max = top_left_pixel.x + BLOCK_SOLID_SIZE_IN_PIXELS;
+          break;
+     case DIRECTION_DOWN:
+          result.vertical = false;
+          result.offset = top_left_pixel.y + BLOCK_SOLID_SIZE_IN_PIXELS;
+          result.min = top_left_pixel.x;
+          result.max = top_left_pixel.x + BLOCK_SOLID_SIZE_IN_PIXELS;
+          break;
+     }
+
+     return result;
 }

@@ -738,7 +738,9 @@ int main(int argc, char** argv){
                          break;
                     case SDL_SCANCODE_H:
                     {
+                         Pixel_t pixel = mouse_select_world_pixel(mouse_screen, camera);
                          Coord_t coord = mouse_select_world(mouse_screen, camera);
+                         LOG("mouse pixel: %d, %d, Coord: %d, %d\n", pixel.x, pixel.y, coord.x, coord.y);
                          describe_coord(coord, &world);
                     } break;
                     }
@@ -1988,7 +1990,7 @@ int main(int argc, char** argv){
           draw_quad_wireframe(&collided_with_quad, 255.0f, 0.0f, 255.0f);
 #endif
 
-#if 1
+#if 0
           // light
           glBindTexture(GL_TEXTURE_2D, 0);
           glBegin(GL_QUADS);
@@ -2196,6 +2198,24 @@ int main(int argc, char** argv){
                glVertex2f(0, 1);
                glVertex2f(1, 1);
                glVertex2f(1, 0);
+               glEnd();
+          }
+
+          if(world.blocks.count > 1){
+               Block_t* block_one = world.blocks.elements + 1;
+
+               glBegin(GL_QUADS);
+
+               if(block_is_teleporting(block_one, world.interactive_qt)){
+                    glColor3f(0.0f, 1.0f, 0.0f);
+               }else{
+                    glColor3f(1.0f, 0.0f, 0.0f);
+               }
+
+               glVertex2f(0.02, 0.02);
+               glVertex2f(0.02, 0.04);
+               glVertex2f(0.04, 0.04);
+               glVertex2f(0.04, 0.02);
                glEnd();
           }
 

@@ -2,6 +2,7 @@
 
 #include "direction.h"
 #include "coord.h"
+#include "axis_line.h"
 
 struct Lift_t{
      U8 ticks; // start at 1
@@ -93,3 +94,4 @@ S16 get_object_y(const Interactive_t* interactive);
 bool interactive_equal(const Interactive_t* a, const Interactive_t* b);
 
 bool is_active_portal(const Interactive_t* interactive);
+AxisLine_t get_portal_line(const Interactive_t* interactive);

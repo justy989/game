@@ -534,3 +534,25 @@ void search_portal_destination_for_blocks(QuadTreeNode_t<Block_t>* block_quad_tr
           offsets[o] = src_fake_pixel - block_center_pixel(blocks[o]);
      }
 }
+
+bool block_is_teleporting(Block_t* block, QuadTreeNode_t<Interactive_t>* interactive_qt){
+     auto block_coord = block_get_coord(block);
+     auto block_rect = block_get_rect(block);
+     auto min = block_coord - Coord_t{1, 1};
+     auto max = block_coord + Coord_t{1, 1};
+
+     for(int y = min.y; y <= max.y; y++){
+          for(int x = min.x; x <= max.x; x++){
+               Interactive_t* interactive = quad_tree_find_at(interactive_qt, x, y);
+               if(!is_active_portal(interactive)) continue;
+
+               auto portal_line = get_portal_line(interactive);
+
+               if(axis_line_intersects_rect(portal_line, block_rect)){
+                    return true;
+               }
+          }
+     }
+
+     return false;
+}

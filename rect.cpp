@@ -54,3 +54,17 @@ bool rect_in_rect(Rect_t a, Rect_t b){
 
      return false;
 }
+
+bool axis_line_intersects_rect(AxisLine_t l, Rect_t r){
+     AxisLine_t top {false, r.top, r.left, r.right};
+     AxisLine_t bottom {false, r.bottom, r.left, r.right};
+     AxisLine_t left {true, r.left, r.bottom, r.top};
+     AxisLine_t right {true, r.right, r.bottom, r.top};
+
+     if(axis_lines_intersect(l, top)) return true;
+     if(axis_lines_intersect(l, bottom)) return true;
+     if(axis_lines_intersect(l, left)) return true;
+     if(axis_lines_intersect(l, right)) return true;
+
+     return false;
+}

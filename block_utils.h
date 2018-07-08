@@ -43,4 +43,6 @@ void search_portal_destination_for_blocks(QuadTreeNode_t<Block_t>* block_quad_tr
                                           Direction_t dst_portal_face, Coord_t src_portal_coord,
                                           Coord_t dst_portal_coord, Block_t** blocks, S16* block_count, Pixel_t* offsets);
 
+bool block_is_teleporting(Block_t* block, QuadTreeNode_t<Interactive_t>* interactive_qt);
+
 extern Pixel_t g_collided_with_pixel;
