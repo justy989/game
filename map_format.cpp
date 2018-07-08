@@ -182,6 +182,8 @@ bool load_map_from_file_v1(FILE* file, Coord_t* player_start, TileMap_t* tilemap
           block->face = map_blocks[i].face;
           block->element = map_blocks[i].element;
           block->entangle_index = -1;
+          block->cloning_direction = DIRECTION_COUNT;
+          block->clone_id = 0;
      }
 
      for(S16 i = 0; i < interactive_array->count; i++){
@@ -307,6 +309,8 @@ bool load_map_from_file_v2(FILE* file, Coord_t* player_start, TileMap_t* tilemap
           block->face = map_blocks[i].face;
           block->element = map_blocks[i].element;
           block->entangle_index = map_blocks[i].entangle_index;
+          block->cloning_direction = DIRECTION_COUNT;
+          block->clone_id = 0;
      }
 
      for(S16 i = 0; i < interactive_array->count; i++){

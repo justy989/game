@@ -19,6 +19,8 @@ struct Block_t{
      S16 entangle_index;
 
      Position_t pre_move_pos; // save where a block was at the start of the frame
+     Direction_t cloning_direction;
+     S8 clone_id;
 };
 
 S16 get_object_x(Block_t* block);

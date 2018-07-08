@@ -23,9 +23,11 @@ Block_t* block_against_another_block(Block_t* block_to_check, Direction_t direct
 Interactive_t* block_against_solid_interactive(Block_t* block_to_check, Direction_t direction,
                                                TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree);
 
-Block_t* block_inside_block_list(Block_t* block_to_check, Block_t** blocks, S16 block_count, Position_t* collided_with, Pixel_t* portal_offsets);
+Block_t* block_inside_block_list(Block_t* block_to_check, Block_t** blocks, S16 block_count, ObjectArray_t<Block_t>* blocks_array,
+                                 Position_t* collided_with, Pixel_t* portal_offsets);
 BlockInsideResult_t block_inside_another_block(Block_t* block_to_check, QuadTreeNode_t<Block_t>* block_quad_tree,
-                                                QuadTreeNode_t<Interactive_t>* interactive_quad_tree, TileMap_t* tilemap);
+                                               QuadTreeNode_t<Interactive_t>* interactive_quad_tree, TileMap_t* tilemap,
+                                               ObjectArray_t<Block_t>* block_array);
 Tile_t* block_against_solid_tile(Block_t* block_to_check, Direction_t direction, TileMap_t* tilemap,
                                  QuadTreeNode_t<Interactive_t>* interactive_quad_tree);
 
@@ -43,6 +45,6 @@ void search_portal_destination_for_blocks(QuadTreeNode_t<Block_t>* block_quad_tr
                                           Direction_t dst_portal_face, Coord_t src_portal_coord,
                                           Coord_t dst_portal_coord, Block_t** blocks, S16* block_count, Pixel_t* offsets);
 
-bool block_is_teleporting(Block_t* block, QuadTreeNode_t<Interactive_t>* interactive_qt);
+Interactive_t* block_is_teleporting(Block_t* block, QuadTreeNode_t<Interactive_t>* interactive_qt);
 
 extern Pixel_t g_collided_with_pixel;

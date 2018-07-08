@@ -149,3 +149,12 @@ const char* direction_to_string(Direction_t dir){
 
      return "DIRECTION_UNKNOWN";
 }
+
+Direction_t direction_from_single_mask(DirectionMask_t mask){
+     if(mask & DIRECTION_MASK_UP) return DIRECTION_UP;
+     if(mask & DIRECTION_MASK_DOWN) return DIRECTION_DOWN;
+     if(mask & DIRECTION_MASK_LEFT) return DIRECTION_LEFT;
+     if(mask & DIRECTION_MASK_RIGHT) return DIRECTION_RIGHT;
+
+     return DIRECTION_COUNT;
+}

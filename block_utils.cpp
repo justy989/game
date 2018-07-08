@@ -198,14 +198,22 @@ Interactive_t* block_against_solid_interactive(Block_t* block_to_check, Directio
      return nullptr;
 }
 
-Block_t* block_inside_block_list(Block_t* block_to_check, Block_t** blocks, S16 block_count, Position_t* collided_with, Pixel_t* portal_offsets){
+Block_t* block_inside_block_list(Block_t* block_to_check, Block_t** blocks, S16 block_count, ObjectArray_t<Block_t>* blocks_array, Position_t* collided_with, Pixel_t* portal_offsets){
      Rect_t rect = {block_to_check->pos.pixel.x, block_to_check->pos.pixel.y,
                     (S16)(block_to_check->pos.pixel.x + BLOCK_SOLID_SIZE_IN_PIXELS),
                     (S16)(block_to_check->pos.pixel.y + BLOCK_SOLID_SIZE_IN_PIXELS)};
 
+     Block_t* entangled_block = nullptr;
+     if(block_to_check->entangle_index >= 0){
+          entangled_block = blocks_array->elements + block_to_check->entangle_index;
+     }
+
      for(S16 i = 0; i < block_count; i++){
-          if(blocks[i] == block_to_check && portal_offsets[i].x == 0 && portal_offsets[i].y == 0) continue;
           Block_t* block = blocks[i];
+
+          // don't collide with blocks that are cloning
+          if(block == entangled_block && block_to_check->cloning_direction < DIRECTION_COUNT) continue;
+          if(block == block_to_check && portal_offsets[i].x == 0 && portal_offsets[i].y == 0) continue;
 
           Pixel_t pixel_to_check = block->pos.pixel + portal_offsets[i];
 
@@ -224,7 +232,8 @@ Block_t* block_inside_block_list(Block_t* block_to_check, Block_t** blocks, S16 
 }
 
 BlockInsideResult_t block_inside_another_block(Block_t* block_to_check, QuadTreeNode_t<Block_t>* block_quad_tree,
-                                                QuadTreeNode_t<Interactive_t>* interactive_quad_tree, TileMap_t* tilemap){
+                                               QuadTreeNode_t<Interactive_t>* interactive_quad_tree, TileMap_t* tilemap,
+                                               ObjectArray_t<Block_t>* block_array){
      BlockInsideResult_t result = {};
 
      // TODO: need more complicated function to detect this
@@ -236,7 +245,7 @@ BlockInsideResult_t block_inside_another_block(Block_t* block_to_check, QuadTree
      Pixel_t portal_offsets[BLOCK_QUAD_TREE_MAX_QUERY];
      memset(portal_offsets, 0, sizeof(portal_offsets));
 
-     Block_t* collided_block = block_inside_block_list(block_to_check, blocks, block_count, &result.collision_pos, portal_offsets);
+     Block_t* collided_block = block_inside_block_list(block_to_check, blocks, block_count, block_array, &result.collision_pos, portal_offsets);
      if(collided_block){
           result.block = collided_block;
           return result;
@@ -262,7 +271,7 @@ BlockInsideResult_t block_inside_another_block(Block_t* block_to_check, QuadTree
                               search_portal_destination_for_blocks(block_quad_tree, interactive->portal.face, (Direction_t)(d), src_coord,
                                                                    dst_coord, blocks, &block_count, portal_offsets);
 
-                              collided_block = block_inside_block_list(block_to_check, blocks, block_count, &result.collision_pos, portal_offsets);
+                              collided_block = block_inside_block_list(block_to_check, blocks, block_count, block_array, &result.collision_pos, portal_offsets);
                               if(collided_block){
                                    result.block = collided_block;
                                    result.portal_rotations = portal_rotations_between(interactive->portal.face, (Direction_t)(d));
@@ -370,9 +379,9 @@ bool block_on_ice(Block_t* block, TileMap_t* tilemap, QuadTreeNode_t<Interactive
 
 void check_block_collision_with_other_blocks(Block_t* block_to_check, World_t* world, Player_t* player,
                                              Block_t* last_block_pushed, Direction_t last_block_pushed_direction){
-     for(BlockInsideResult_t block_inside_result = block_inside_another_block(block_to_check, world->block_qt, world->interactive_qt, &world->tilemap);
+     for(BlockInsideResult_t block_inside_result = block_inside_another_block(block_to_check, world->block_qt, world->interactive_qt, &world->tilemap, &world->blocks);
          block_inside_result.block && blocks_at_collidable_height(block_to_check, block_inside_result.block);
-         block_inside_result = block_inside_another_block(block_to_check, world->block_qt, world->interactive_qt, &world->tilemap)){
+         block_inside_result = block_inside_another_block(block_to_check, world->block_qt, world->interactive_qt, &world->tilemap, &world->blocks)){
 
 #if 0
           (void)(player);
@@ -535,7 +544,7 @@ void search_portal_destination_for_blocks(QuadTreeNode_t<Block_t>* block_quad_tr
      }
 }
 
-bool block_is_teleporting(Block_t* block, QuadTreeNode_t<Interactive_t>* interactive_qt){
+Interactive_t* block_is_teleporting(Block_t* block, QuadTreeNode_t<Interactive_t>* interactive_qt){
      auto block_coord = block_get_coord(block);
      auto block_rect = block_get_rect(block);
      auto min = block_coord - Coord_t{1, 1};
@@ -549,10 +558,10 @@ bool block_is_teleporting(Block_t* block, QuadTreeNode_t<Interactive_t>* interac
                auto portal_line = get_portal_line(interactive);
 
                if(axis_line_intersects_rect(portal_line, block_rect)){
-                    return true;
+                    return interactive;
                }
           }
      }
 
-     return false;
+     return nullptr;
 }

@@ -110,6 +110,8 @@ Block_t block_from_stamp(Stamp_t* stamp){
      block.element = stamp->block.element;
      block.face = stamp->block.face;
      block.entangle_index = stamp->block.entangle_index;
+     block.cloning_direction = DIRECTION_COUNT;
+     block.clone_id = 0;
      return block;
 }
 
@@ -1553,12 +1555,12 @@ int main(int argc, char** argv){
 
                     auto teleport_result = teleport_position_across_portal(block_center, Vec_t{}, &world, premove_coord,
                                                                            coord);
-                    if(teleport_result.count > 0){
-                         block->pos = teleport_result.results[0].pos;
+                    if(teleport_result.count > block->clone_id){
+                         block->pos = teleport_result.results[block->clone_id].pos;
                          block->pos.pixel -= HALF_TILE_SIZE_PIXEL;
 
-                         block->vel = vec_rotate_quadrants_clockwise(block->vel, teleport_result.results[0].rotations);
-                         block->accel = vec_rotate_quadrants_clockwise(block->accel, teleport_result.results[0].rotations);
+                         block->vel = vec_rotate_quadrants_clockwise(block->vel, teleport_result.results[block->clone_id].rotations);
+                         block->accel = vec_rotate_quadrants_clockwise(block->accel, teleport_result.results[block->clone_id].rotations);
 
                          block->pre_move_pos = block->pos;
 
@@ -1573,39 +1575,59 @@ int main(int argc, char** argv){
 
                          auto collided_teleport_result = teleport_position_across_portal(block_center, Vec_t{}, &world,
                                                                                          premove_coord, coord);
-                         if(collided_teleport_result.count > 0){
+                         if(collided_teleport_result.count > block->clone_id){
                               block->pos = collided_teleport_result.results[0].pos;
                               block->pos.pixel -= HALF_TILE_SIZE_PIXEL;
 
-                              block->vel = vec_rotate_quadrants_clockwise(block->vel, collided_teleport_result.results[0].rotations);
-                              block->accel = vec_rotate_quadrants_clockwise(block->accel, collided_teleport_result.results[0].rotations);
+                              block->vel = vec_rotate_quadrants_clockwise(block->vel, collided_teleport_result.results[block->clone_id].rotations);
+                              block->accel = vec_rotate_quadrants_clockwise(block->accel, collided_teleport_result.results[block->clone_id].rotations);
                          }
+                    }
 
-                         if(teleport_result.count > 1){
-                              S16 new_block_index = world.blocks.count;
-                              S16 old_block_index = block - world.blocks.elements;
+                    auto* portal = block_is_teleporting(block, world.interactive_qt);
+                    if(portal && block->cloning_direction == DIRECTION_COUNT){
+                         // at the first instant of the block teleporting, check if we should create an entangled_block
 
-                              if(resize(&world.blocks, world.blocks.count + 1)){
-                                   // a resize will kill our block ptr, so we gotta update it
-                                   block = world.blocks.elements + old_block_index;
-                                   Block_t* entangled_block = world.blocks.elements + new_block_index;
+                         PortalExit_t portal_exits = find_portal_exits(portal->coord, &world.tilemap, world.interactive_qt);
+                         S8 clone_id = 0;
+                         for(int d = 0; d < DIRECTION_COUNT; d++){
+                              for(int p = 0; p < portal_exits.directions[d].count; p++){
+                                   if(portal_exits.directions[d].coords[p] == portal->coord) continue;
 
-                                   entangled_block->pos = teleport_result.results[1].pos;
-                                   entangled_block->pos.pixel -= HALF_TILE_SIZE_PIXEL;
+                                   if(clone_id == 0){
+                                        block->clone_id = clone_id;
+                                   }else{
+                                        S16 new_block_index = world.blocks.count;
+                                        S16 old_block_index = block - world.blocks.elements;
 
-                                   entangled_block->vel = vec_rotate_quadrants_clockwise(block->vel, collided_teleport_result.results[1].rotations);
-                                   entangled_block->accel = vec_rotate_quadrants_clockwise(block->accel, collided_teleport_result.results[1].rotations);
-                                   // TODO: face entangled block based on portal rotation
-                                   entangled_block->element = block->element;
-                                   entangled_block->push_start = block->push_start;
-                                   entangled_block->fall_time = block->fall_time;
-                                   entangled_block->pre_move_pos = entangled_block->pos;
+                                        if(resize(&world.blocks, world.blocks.count + 1)){
+                                             // update quad tree now that we have resized the world
+                                             quad_tree_free(world.block_qt);
+                                             world.block_qt = quad_tree_build(&world.blocks);
 
-                                   // the magic
-                                   entangled_block->entangle_index = old_block_index;
-                                   block->entangle_index = new_block_index;
+                                             // a resize will kill our block ptr, so we gotta update it
+                                             block = world.blocks.elements + old_block_index;
+                                             block->cloning_direction = direction_from_single_mask(vec_direction_mask(block->vel));
+
+                                             Block_t* entangled_block = world.blocks.elements + new_block_index;
+
+                                             *entangled_block = *block;
+                                             entangled_block->clone_id = clone_id;
+
+                                             // the magic
+                                             entangled_block->entangle_index = old_block_index;
+                                             block->entangle_index = new_block_index;
+                                        }
+                                   }
+
+                                   clone_id++;
                               }
                          }
+                    }else if(!portal && block->cloning_direction < DIRECTION_COUNT){
+                         // TODO: remove the clone, if we are backing out of the portal, and patch the entangle
+                         //       indices of our replacement if necessary
+                         // Block_t* entangled = world.blocks.elements + block->entangle_index;
+                         // block->cloning_direction = DIRECTION_COUNT;
                     }
                }
 
