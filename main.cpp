@@ -1558,6 +1558,8 @@ int main(int argc, char** argv){
                          block->vel = vec_rotate_quadrants_clockwise(block->vel, teleport_result.results[0].rotations);
                          block->accel = vec_rotate_quadrants_clockwise(block->accel, teleport_result.results[0].rotations);
 
+                         block->pre_move_pos = block->pos;
+
                          check_block_collision_with_other_blocks(block, &world, &world.player, last_block_pushed,
                                                                  last_block_pushed_direction);
 
@@ -1575,6 +1577,32 @@ int main(int argc, char** argv){
 
                               block->vel = vec_rotate_quadrants_clockwise(block->vel, collided_teleport_result.results[0].rotations);
                               block->accel = vec_rotate_quadrants_clockwise(block->accel, collided_teleport_result.results[0].rotations);
+                         }
+
+                         if(teleport_result.count > 1){
+                              S16 new_block_index = world.blocks.count;
+                              S16 old_block_index = block - world.blocks.elements;
+
+                              if(resize(&world.blocks, world.blocks.count + 1)){
+                                   // a resize will kill our block ptr, so we gotta update it
+                                   block = world.blocks.elements + old_block_index;
+                                   Block_t* entangled_block = world.blocks.elements + new_block_index;
+
+                                   entangled_block->pos = teleport_result.results[1].pos;
+                                   entangled_block->pos.pixel -= HALF_TILE_SIZE_PIXEL;
+
+                                   entangled_block->vel = vec_rotate_quadrants_clockwise(block->vel, collided_teleport_result.results[1].rotations);
+                                   entangled_block->accel = vec_rotate_quadrants_clockwise(block->accel, collided_teleport_result.results[1].rotations);
+                                   // TODO: face entangled block based on portal rotation
+                                   entangled_block->element = block->element;
+                                   entangled_block->push_start = block->push_start;
+                                   entangled_block->fall_time = block->fall_time;
+                                   entangled_block->pre_move_pos = entangled_block->pos;
+
+                                   // the magic
+                                   entangled_block->entangle_index = old_block_index;
+                                   block->entangle_index = new_block_index;
+                              }
                          }
                     }
                }
