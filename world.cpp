@@ -283,7 +283,8 @@ void activate(World_t* world, Coord_t coord){
      if(interactive->type != INTERACTIVE_TYPE_LEVER &&
         interactive->type != INTERACTIVE_TYPE_PRESSURE_PLATE &&
         interactive->type != INTERACTIVE_TYPE_LIGHT_DETECTOR &&
-        interactive->type != INTERACTIVE_TYPE_ICE_DETECTOR) return;
+        interactive->type != INTERACTIVE_TYPE_ICE_DETECTOR &&
+        interactive->type != INTERACTIVE_TYPE_PORTAL) return;
 
      toggle_electricity(&world->tilemap, world->interactive_qt, coord, DIRECTION_LEFT, false, false);
      toggle_electricity(&world->tilemap, world->interactive_qt, coord, DIRECTION_RIGHT, false, false);
@@ -944,10 +945,10 @@ void describe_coord(Coord_t coord, World_t* world){
      quad_tree_find_in(world->block_qt, coord_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
      for(S16 i = 0; i < block_count; i++){
           auto* block = blocks[i];
-          LOG("block %ld: pixel %d, %d, dir: %s, element: %s, entangle: %d\n",
+          LOG("block %ld: pixel %d, %d, dir: %s, element: %s, entangle: %d, clone id: %d\n\n",
               block - world->blocks.elements, block->pos.pixel.x, block->pos.pixel.y,
               direction_to_string(block->face), element_to_string(block->element),
-              block->entangle_index);
+              block->entangle_index, block->clone_id);
      }
 }
 

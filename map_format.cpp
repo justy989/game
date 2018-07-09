@@ -182,7 +182,7 @@ bool load_map_from_file_v1(FILE* file, Coord_t* player_start, TileMap_t* tilemap
           block->face = map_blocks[i].face;
           block->element = map_blocks[i].element;
           block->entangle_index = -1;
-          block->cloning_direction = DIRECTION_COUNT;
+          block->clone_start = Coord_t{};
           block->clone_id = 0;
      }
 
@@ -309,7 +309,7 @@ bool load_map_from_file_v2(FILE* file, Coord_t* player_start, TileMap_t* tilemap
           block->face = map_blocks[i].face;
           block->element = map_blocks[i].element;
           block->entangle_index = map_blocks[i].entangle_index;
-          block->cloning_direction = DIRECTION_COUNT;
+          block->clone_start = Coord_t{};
           block->clone_id = 0;
      }
 

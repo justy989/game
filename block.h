@@ -19,8 +19,8 @@ struct Block_t{
      S16 entangle_index;
 
      Position_t pre_move_pos; // save where a block was at the start of the frame
-     Direction_t cloning_direction;
-     S8 clone_id;
+     Coord_t clone_start; // the portal where the clone started
+     S8 clone_id; // helps when we are entangled in determining which portal we come out of
 };
 
 S16 get_object_x(Block_t* block);

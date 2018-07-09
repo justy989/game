@@ -46,6 +46,13 @@ DirectionMask_t vec_direction_mask(Vec_t vec){
      return mask;
 }
 
+Direction_t vec_direction(Vec_t vec){
+     if(vec.x) assert(vec.y == 0);
+     if(vec.y) assert(vec.x == 0);
+
+     return direction_from_single_mask(vec_direction_mask(vec));
+}
+
 U8 portal_rotations_between(Direction_t a, Direction_t b){
      if(a == b) return 2;
      if(a == direction_opposite(b)) return 0;

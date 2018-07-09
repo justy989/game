@@ -212,7 +212,7 @@ Block_t* block_inside_block_list(Block_t* block_to_check, Block_t** blocks, S16 
           Block_t* block = blocks[i];
 
           // don't collide with blocks that are cloning
-          if(block == entangled_block && block_to_check->cloning_direction < DIRECTION_COUNT) continue;
+          if(block == entangled_block && block_to_check->clone_start.x > 0) continue;
           if(block == block_to_check && portal_offsets[i].x == 0 && portal_offsets[i].y == 0) continue;
 
           Pixel_t pixel_to_check = block->pos.pixel + portal_offsets[i];

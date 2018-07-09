@@ -110,7 +110,7 @@ Block_t block_from_stamp(Stamp_t* stamp){
      block.element = stamp->block.element;
      block.face = stamp->block.face;
      block.entangle_index = stamp->block.entangle_index;
-     block.cloning_direction = DIRECTION_COUNT;
+     block.clone_start = Coord_t{};
      block.clone_id = 0;
      return block;
 }
@@ -1576,7 +1576,7 @@ int main(int argc, char** argv){
                          auto collided_teleport_result = teleport_position_across_portal(block_center, Vec_t{}, &world,
                                                                                          premove_coord, coord);
                          if(collided_teleport_result.count > block->clone_id){
-                              block->pos = collided_teleport_result.results[0].pos;
+                              block->pos = collided_teleport_result.results[block->clone_id].pos;
                               block->pos.pixel -= HALF_TILE_SIZE_PIXEL;
 
                               block->vel = vec_rotate_quadrants_clockwise(block->vel, collided_teleport_result.results[block->clone_id].rotations);
@@ -1585,7 +1585,7 @@ int main(int argc, char** argv){
                     }
 
                     auto* portal = block_is_teleporting(block, world.interactive_qt);
-                    if(portal && block->cloning_direction == DIRECTION_COUNT){
+                    if(portal && block->clone_start.x == 0){
                          // at the first instant of the block teleporting, check if we should create an entangled_block
 
                          PortalExit_t portal_exits = find_portal_exits(portal->coord, &world.tilemap, world.interactive_qt);
@@ -1607,7 +1607,7 @@ int main(int argc, char** argv){
 
                                              // a resize will kill our block ptr, so we gotta update it
                                              block = world.blocks.elements + old_block_index;
-                                             block->cloning_direction = direction_from_single_mask(vec_direction_mask(block->vel));
+                                             block->clone_start = portal->coord;
 
                                              Block_t* entangled_block = world.blocks.elements + new_block_index;
 
@@ -1623,11 +1623,49 @@ int main(int argc, char** argv){
                                    clone_id++;
                               }
                          }
-                    }else if(!portal && block->cloning_direction < DIRECTION_COUNT){
-                         // TODO: remove the clone, if we are backing out of the portal, and patch the entangle
-                         //       indices of our replacement if necessary
-                         // Block_t* entangled = world.blocks.elements + block->entangle_index;
-                         // block->cloning_direction = DIRECTION_COUNT;
+                    }else if(!portal && block->clone_start.x > 0){
+                         auto block_move_dir = vec_direction(pos_delta);
+                         auto block_from_coord = block_get_coord(block) - block_move_dir;
+                         if(block_from_coord == block->clone_start){
+                              // in this instance, despawn the clone
+                              // NOTE: I think this relies on new entangle blocks being
+                              S16 block_index = block - world.blocks.elements;
+                              remove(&world.blocks, block->entangle_index);
+
+                              // update ptr since we could have resized
+                              block = world.blocks.elements + block_index;
+
+                              // if our entangled block was not the last element, then it was replaced by another
+                              if(block->entangle_index < world.blocks.count){
+                                   Block_t* replaced_block = world.blocks.elements + block->entangle_index;
+                                   if(replaced_block->entangle_index >= 0){
+                                        // update the block's entangler that moved into our entangled blocks spot
+                                        Block_t* replaced_block_entangler = world.blocks.elements + replaced_block->entangle_index;
+                                        replaced_block_entangler->entangle_index = replaced_block - world.blocks.elements;
+                                   }
+                              }
+
+                              block->entangle_index = -1;
+                         }else{
+                              assert(block->entangle_index >= 0);
+
+                              // great news everyone, the clone was a success
+                              Block_t* entangled_block = world.blocks.elements + block->entangle_index;
+
+                              block->clone_id = 0;
+                              entangled_block->clone_id = 0;
+
+                              entangled_block->clone_start = Coord_t{};
+
+                              // turn off the circuit
+                              activate(&world, block->clone_start);
+                              auto* src_portal = quad_tree_find_at(world.interactive_qt, block->clone_start.x, block->clone_start.y);
+                              if(is_active_portal(src_portal)){
+                                   src_portal->portal.on = false;
+                              }
+                         }
+
+                         block->clone_start = Coord_t{};
                     }
                }
 
