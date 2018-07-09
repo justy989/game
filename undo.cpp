@@ -193,21 +193,21 @@ void undo_commit(Undo_t* undo, Player_t* player, TileMap_t* tilemap, ObjectArray
                     diff_count++;
                }
           }
-     }else{
-          // blocks
-          for(S16 i = 0; i < min_block_count; i++){
-               UndoBlock_t* undo_block = undo->block_array.elements + i;
-               Block_t* block = block_array->elements + i;
+     }
 
-               if(undo_block->pixel != block->pos.pixel ||
-                  undo_block->z != block->pos.z ||
-                  undo_block->element != block->element ||
-                  undo_block->entangle_index != block->entangle_index){
-                    auto* undo_block_entry = (UndoBlock_t*)(undo->history.current);
-                    *undo_block_entry = *undo_block;
-                    undo_history_add(&undo->history, UNDO_DIFF_TYPE_BLOCK, i);
-                    diff_count++;
-               }
+     // blocks
+     for(S16 i = 0; i < min_block_count; i++){
+          UndoBlock_t* undo_block = undo->block_array.elements + i;
+          Block_t* block = block_array->elements + i;
+
+          if(undo_block->pixel != block->pos.pixel ||
+             undo_block->z != block->pos.z ||
+             undo_block->element != block->element ||
+             undo_block->entangle_index != block->entangle_index){
+               auto* undo_block_entry = (UndoBlock_t*)(undo->history.current);
+               *undo_block_entry = *undo_block;
+               undo_history_add(&undo->history, UNDO_DIFF_TYPE_BLOCK, i);
+               diff_count++;
           }
      }
 

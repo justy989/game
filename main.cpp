@@ -1447,7 +1447,7 @@ int main(int argc, char** argv){
                     }
 
                     Block_t* last_entangled_block_pushed = nullptr;
-                    if(last_block_pushed && last_block_pushed->entangle_index >= 0){
+                    if(last_block_pushed && last_block_pushed->entangle_index >= 0 && last_block_pushed->entangle_index < world.blocks.count){
                          last_entangled_block_pushed = world.blocks.elements + last_block_pushed->entangle_index;
                     }
 
@@ -1589,6 +1589,10 @@ int main(int argc, char** argv){
                          // at the first instant of the block teleporting, check if we should create an entangled_block
 
                          PortalExit_t portal_exits = find_portal_exits(portal->coord, &world.tilemap, world.interactive_qt);
+                         if(portal_exit_coord_count(&portal_exits) > 1){
+                              undo_commit(&undo, &world.player, &world.tilemap, &world.blocks, &world.interactives);
+                         }
+
                          S8 clone_id = 0;
                          for(int d = 0; d < DIRECTION_COUNT; d++){
                               for(int p = 0; p < portal_exits.directions[d].count; p++){
@@ -1623,7 +1627,8 @@ int main(int argc, char** argv){
                                    clone_id++;
                               }
                          }
-                    }else if(!portal && block->clone_start.x > 0){
+                    }else if(!portal && block->clone_start.x > 0 &&
+                             block->entangle_index < world.blocks.count){
                          auto block_move_dir = vec_direction(pos_delta);
                          auto block_from_coord = block_get_coord(block) - block_move_dir;
                          if(block_from_coord == block->clone_start){
@@ -1777,7 +1782,7 @@ int main(int argc, char** argv){
                               if(world.player.push_time > BLOCK_PUSH_TIME){ // && !direction_in_mask(vec_direction_mask(block_to_push->vel), last_block_pushed_direction)){
                                    if(before_time <= BLOCK_PUSH_TIME) undo_commit(&undo, &world.player, &world.tilemap, &world.blocks, &world.interactives);
                                    bool pushed = block_push(block_to_push, last_block_pushed_direction, &world, false);
-                                   if(pushed && block_to_push->entangle_index >= 0){
+                                   if(pushed && block_to_push->entangle_index >= 0 && block_to_push->entangle_index < world.blocks.count){
                                         Block_t* entangled_block = world.blocks.elements + block_to_push->entangle_index;
                                         block_push(entangled_block, last_block_pushed_direction, &world, false);
                                    }
