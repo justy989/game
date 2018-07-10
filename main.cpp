@@ -1585,14 +1585,12 @@ int main(int argc, char** argv){
                     }
 
                     auto* portal = block_is_teleporting(block, world.interactive_qt);
+
+                    // is the block teleporting and it hasn't been cloning ?
                     if(portal && block->clone_start.x == 0){
                          // at the first instant of the block teleporting, check if we should create an entangled_block
 
                          PortalExit_t portal_exits = find_portal_exits(portal->coord, &world.tilemap, world.interactive_qt);
-                         if(portal_exit_coord_count(&portal_exits) > 1){
-                              undo_commit(&undo, &world.player, &world.tilemap, &world.blocks, &world.interactives);
-                         }
-
                          S8 clone_id = 0;
                          for(int d = 0; d < DIRECTION_COUNT; d++){
                               for(int p = 0; p < portal_exits.directions[d].count; p++){
@@ -1627,6 +1625,8 @@ int main(int argc, char** argv){
                                    clone_id++;
                               }
                          }
+
+                    // if we didn't find a portal but we have been cloning, we are done cloning! We either need to kill the clone or complete it
                     }else if(!portal && block->clone_start.x > 0 &&
                              block->entangle_index < world.blocks.count){
                          auto block_move_dir = vec_direction(pos_delta);

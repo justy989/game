@@ -19,5 +19,3 @@ void portal_exit_add(PortalExit_t* portal_exit, Direction_t direction, Coord_t c
 void find_portal_exits_impl(Coord_t coord, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree,
                             PortalExit_t* portal_exit, Direction_t from);
 PortalExit_t find_portal_exits(Coord_t coord, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree);
-
-S8 portal_exit_coord_count(const PortalExit_t* p);
