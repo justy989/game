@@ -639,6 +639,19 @@ int main(int argc, char** argv){
                               }
                          }
                          break;
+                    case SDL_SCANCODE_2:
+                         if(editor.mode == EDITOR_MODE_CATEGORY_SELECT){
+                              auto pixel = mouse_select_world_pixel(mouse_screen, camera);
+
+                              // TODO: make this a function where you can pass in entangler_index
+                              S16 new_index = world.players.count;
+                              if(resize(&world.players, world.players.count + 1)){
+                                   Player_t* new_player = world.players.elements + new_index;
+                                   *new_player = world.players.elements[0];
+                                   new_player->pos = pixel_to_pos(pixel);
+                              }
+                         }
+                         break;
                     // TODO: #ifdef DEBUG
                     case SDL_SCANCODE_GRAVE:
                          if(editor.mode == EDITOR_MODE_OFF){
@@ -1783,6 +1796,7 @@ int main(int argc, char** argv){
                                    if(before_time <= BLOCK_PUSH_TIME) undo_commit(&undo, world.players.elements, &world.tilemap, &world.blocks, &world.interactives);
                                    bool pushed = block_push(block_to_push, last_block_pushed_direction, &world, false);
                                    if(pushed && block_to_push->entangle_index >= 0 && block_to_push->entangle_index < world.blocks.count){
+                                        // TODO: take into account block_to_push->face to rotate face
                                         Block_t* entangled_block = world.blocks.elements + block_to_push->entangle_index;
                                         block_push(entangled_block, last_block_pushed_direction, &world, false);
                                    }
@@ -1883,6 +1897,8 @@ int main(int argc, char** argv){
                }
           }
 
+          bool* draw_players = (bool*)malloc(world.players.count);
+
           for(S16 y = max.y; y >= min.y; y--){
                for(S16 x = min.x; x <= max.x; x++){
                     Vec_t tile_pos {(F32)(x - min.x) * TILE_SIZE + camera_offset.x,
@@ -1908,15 +1924,14 @@ int main(int argc, char** argv){
                                    Interactive_t* portal_interactive = quad_tree_find_at(world.interactive_qt, portal_coord.x, portal_coord.y);
 
                                    U8 portal_rotations = portal_rotations_between((Direction_t)(d), interactive->portal.face);
-                                   Player_t* player = nullptr;
                                    Pixel_t portal_center_pixel = coord_to_pixel_at_center(portal_coord);
-                                   if(pixel_distance_between(portal_center_pixel, world.players.elements->pos.pixel) <= 20){
-                                        player = world.players.elements;
+                                   for(S16 p = 0; p < world.players.count; p++){
+                                        draw_players[p] = (pixel_distance_between(portal_center_pixel, world.players.elements[p].pos.pixel) <= 20);
                                    }
 
-                                   draw_solids(tile_pos, portal_interactive, blocks, block_count, player, screen_camera,
-                                               theme_texture, player_texture, portal_coord, coord, portal_rotations,
-                                               &world.tilemap, world.interactive_qt);
+                                   draw_solids(tile_pos, portal_interactive, blocks, block_count, &world.players, draw_players,
+                                               screen_camera, theme_texture, player_texture, portal_coord, coord,
+                                               portal_rotations, &world.tilemap, world.interactive_qt);
                               }
                          }
 
@@ -1937,8 +1952,9 @@ int main(int argc, char** argv){
           }
 
           for(S16 y = max.y; y >= min.y; y--){
-               Player_t* player = nullptr;
-               if(pos_to_coord(world.players.elements->pos).y == y) player = world.players.elements;
+               for(S16 p = 0; p < world.players.count; p++){
+                    draw_players[p] = (pos_to_coord(world.players.elements[p].pos).y == y);
+               }
 
                for(S16 x = min.x; x <= max.x; x++){
                     Coord_t coord {x, y};
@@ -1952,8 +1968,8 @@ int main(int argc, char** argv){
 
                     Interactive_t* interactive = quad_tree_find_at(world.interactive_qt, x, y);
 
-                    draw_solids(tile_pos, interactive, blocks, block_count, player, screen_camera, theme_texture, player_texture,
-                                coord, Coord_t{-1, -1}, 0, &world.tilemap, world.interactive_qt);
+                    draw_solids(tile_pos, interactive, blocks, block_count, &world.players, draw_players, screen_camera,
+                                theme_texture, player_texture, coord, Coord_t{-1, -1}, 0, &world.tilemap, world.interactive_qt);
 
                }
 
@@ -2001,6 +2017,8 @@ int main(int argc, char** argv){
                     glColor3f(1.0f, 1.0f, 1.0f);
                }
           }
+
+          free(draw_players);
 
           glEnd();
 

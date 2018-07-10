@@ -369,7 +369,8 @@ void draw_flats(Vec_t pos, Tile_t* tile, Interactive_t* interactive, GLuint them
      if(tile_is_iced(tile)) draw_ice(pos, theme_texture);
 }
 
-void draw_solids(Vec_t pos, Interactive_t* interactive, Block_t** blocks, S16 block_count, Player_t* player,
+void draw_solids(Vec_t pos, Interactive_t* interactive, Block_t** blocks, S16 block_count,
+                 ObjectArray_t<Player_t>* players, bool* draw_players,
                  Position_t screen_camera, GLuint theme_texture, GLuint player_texture,
                  Coord_t source_coord, Coord_t destination_coord, U8 portal_rotations,
                  TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree){
@@ -410,7 +411,10 @@ void draw_solids(Vec_t pos, Interactive_t* interactive, Block_t** blocks, S16 bl
           draw_block(block, pos_to_vec(block_camera_offset));
      }
 
-     if(player){
+     for(S16 i = 0; i < players->count; i++){
+          if(!draw_players[i]) continue;
+          Player_t* player = players->elements + i;
+
           Vec_t pos_vec = pos_to_vec(player->pos);
           if(destination_coord.x >= 0){
                Position_t destination_pos = coord_to_pos_at_tile_center(destination_coord);

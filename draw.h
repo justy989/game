@@ -43,7 +43,8 @@ void draw_interactive(Interactive_t* interactive, Vec_t pos_vec, Coord_t coord,
                       TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree);
 void draw_flats(Vec_t pos, Tile_t* tile, Interactive_t* interactive, GLuint theme_texture,
                 U8 portal_rotations);
-void draw_solids(Vec_t pos, Interactive_t* interactive, Block_t** blocks, S16 block_count, Player_t* player,
+void draw_solids(Vec_t pos, Interactive_t* interactive, Block_t** blocks, S16 block_count,
+                 ObjectArray_t<Player_t>* players, bool* draw_players,
                  Position_t screen_camera, GLuint theme_texture, GLuint player_texture,
                  Coord_t source_coord, Coord_t destination_coord, U8 portal_rotations,
                  TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree);
