@@ -105,6 +105,12 @@ bool load_map_number_map(S16 map_number, World_t* world, Undo_t* undo,
      return false;
 }
 
+void players_action_perform(PlayerAction_t* player_action, ObjectArray_t<Player_t>* players, PlayerActionType_t action_type, Demo_t* demo, S64 frame_count){
+     for(S16 i = 0; i < players->count; i++){
+          player_action_perform(player_action, players->elements + i, action_type, demo->mode, demo->file, frame_count);
+     }
+}
+
 Block_t block_from_stamp(Stamp_t* stamp){
      Block_t block = {};
      block.element = stamp->block.element;
@@ -404,8 +410,7 @@ int main(int argc, char** argv){
                     end_of_demo = (frame_count == demo.entries.entries[demo.entry_index].frame);
                }else{
                     while(frame_count == demo.entries.entries[demo.entry_index].frame){
-                         player_action_perform(&player_action, &world.player, demo.entries.entries[demo.entry_index].player_action_type, demo.mode,
-                                               demo.file, frame_count);
+                         players_action_perform(&player_action, &world.players, demo.entries.entries[demo.entry_index].player_action_type, &demo, frame_count);
                          demo.entry_index++;
                     }
                }
@@ -458,8 +463,7 @@ int main(int argc, char** argv){
                               editor.selection_start.x--;
                               editor.selection_end.x--;
                          }else if(!resetting){
-                              player_action_perform(&player_action, &world.player, PLAYER_ACTION_TYPE_MOVE_LEFT_START, demo.mode,
-                                                    demo.file, frame_count);
+                              players_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_LEFT_START, &demo, frame_count);
                          }
                          break;
                     case SDL_SCANCODE_RIGHT:
@@ -467,8 +471,7 @@ int main(int argc, char** argv){
                               editor.selection_start.x++;
                               editor.selection_end.x++;
                          }else if(!resetting){
-                              player_action_perform(&player_action, &world.player, PLAYER_ACTION_TYPE_MOVE_RIGHT_START, demo.mode,
-                                                    demo.file, frame_count);
+                              players_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_RIGHT_START, &demo, frame_count);
                          }
                          break;
                     case SDL_SCANCODE_UP:
@@ -476,8 +479,7 @@ int main(int argc, char** argv){
                               editor.selection_start.y++;
                               editor.selection_end.y++;
                          }else if(!resetting){
-                              player_action_perform(&player_action, &world.player, PLAYER_ACTION_TYPE_MOVE_UP_START, demo.mode,
-                                                    demo.file, frame_count);
+                              players_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_UP_START, &demo, frame_count);
                          }
                          break;
                     case SDL_SCANCODE_DOWN:
@@ -485,14 +487,12 @@ int main(int argc, char** argv){
                               editor.selection_start.y--;
                               editor.selection_end.y--;
                          }else if(!resetting){
-                              player_action_perform(&player_action, &world.player, PLAYER_ACTION_TYPE_MOVE_DOWN_START, demo.mode,
-                                                    demo.file, frame_count);
+                              players_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_DOWN_START, &demo, frame_count);
                          }
                          break;
                     case SDL_SCANCODE_E:
                          if(!resetting){
-                              player_action_perform(&player_action, &world.player, PLAYER_ACTION_TYPE_ACTIVATE_START, demo.mode,
-                                                    demo.file, frame_count);
+                              players_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_ACTIVATE_START, &demo, frame_count);
                          }
                          break;
                     case SDL_SCANCODE_SPACE:
@@ -500,8 +500,7 @@ int main(int argc, char** argv){
                               demo.paused = !demo.paused;
                          }else{
                               if(!resetting){
-                                   player_action_perform(&player_action, &world.player, PLAYER_ACTION_TYPE_SHOOT_START, demo.mode,
-                                                         demo.file, frame_count);
+                                   players_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_SHOOT_START, &demo, frame_count);
                               }
                          }
                          break;
@@ -569,8 +568,7 @@ int main(int argc, char** argv){
                     } break;
                     case SDL_SCANCODE_U:
                          if(!resetting){
-                              player_action_perform(&player_action, &world.player, PLAYER_ACTION_TYPE_UNDO, demo.mode,
-                                                    demo.file, frame_count);
+                              players_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_UNDO, &demo, frame_count);
                          }
                          break;
                     case SDL_SCANCODE_N:
@@ -612,7 +610,7 @@ int main(int argc, char** argv){
                                    S32 block_index = blocks[0] - world.blocks.elements;
                                    if(block_index >= 0 && block_index < world.blocks.count){
                                         if(editor.block_entangle_index_save >= 0 && editor.block_entangle_index_save != block_index){
-                                             undo_commit(&undo, &world.player, &world.tilemap, &world.blocks, &world.interactives);
+                                             undo_commit(&undo, world.players.elements, &world.tilemap, &world.blocks, &world.interactives);
 
                                              // the magic happens here
                                              Block_t* other = world.blocks.elements + editor.block_entangle_index_save;
@@ -661,7 +659,7 @@ int main(int argc, char** argv){
                          break;
                     case SDL_SCANCODE_RETURN:
                          if(editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
-                              undo_commit(&undo, &world.player, &world.tilemap, &world.blocks, &world.interactives);
+                              undo_commit(&undo, world.players.elements, &world.tilemap, &world.blocks, &world.interactives);
 
                               // clear coords below stamp
                               Rect_t selection_bounds = editor_selection_bounds(&editor);
@@ -722,9 +720,10 @@ int main(int argc, char** argv){
                     case SDL_SCANCODE_B:
 #if 0
                     {
-                         undo_commit(&undo, &world.player, &world.tilemap, &world.blocks, &world.interactives);
-                         Coord_t min = pos_to_coord(world.player.pos) - Coord_t{1, 1};
-                         Coord_t max = pos_to_coord(world.player.pos) + Coord_t{1, 1};
+                         undo_commit(&undo, world.players.elements, &world.tilemap, &world.blocks, &world.interactives);
+                         Coord_t player_coord = pos_to_coord(world.players.elements->pos)
+                         Coord_t min = player_coord - Coord_t{1, 1};
+                         Coord_t max = player_coord + Coord_t{1, 1};
                          for(S16 y = min.y; y <= max.y; y++){
                               for(S16 x = min.x; x <= max.x; x++){
                                    Coord_t coord {x, y};
@@ -734,10 +733,14 @@ int main(int argc, char** argv){
                     } break;
 #endif
                     case SDL_SCANCODE_5:
-                         world.player.pos.pixel = mouse_select_world_pixel(mouse_screen, camera) + HALF_TILE_SIZE_PIXEL;
-                         world.player.pos.decimal.x = 0;
-                         world.player.pos.decimal.y = 0;
+                    {
+                         reset_players(&world.players);
+                         Player_t* player = world.players.elements;
+                         player->pos.pixel = mouse_select_world_pixel(mouse_screen, camera) + HALF_TILE_SIZE_PIXEL;
+                         player->pos.decimal.x = 0;
+                         player->pos.decimal.y = 0;
                          break;
+                    }
                     case SDL_SCANCODE_H:
                     {
                          Pixel_t pixel = mouse_select_world_pixel(mouse_screen, camera);
@@ -755,28 +758,22 @@ int main(int argc, char** argv){
                          quit = true;
                          break;
                     case SDL_SCANCODE_LEFT:
-                         player_action_perform(&player_action, &world.player, PLAYER_ACTION_TYPE_MOVE_LEFT_STOP, demo.mode,
-                                               demo.file, frame_count);
+                         players_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_LEFT_STOP, &demo, frame_count);
                          break;
                     case SDL_SCANCODE_RIGHT:
-                         player_action_perform(&player_action, &world.player, PLAYER_ACTION_TYPE_MOVE_RIGHT_STOP, demo.mode,
-                                               demo.file, frame_count);
+                         players_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_RIGHT_STOP, &demo, frame_count);
                          break;
                     case SDL_SCANCODE_UP:
-                         player_action_perform(&player_action, &world.player, PLAYER_ACTION_TYPE_MOVE_UP_STOP, demo.mode,
-                                               demo.file, frame_count);
+                         players_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_UP_STOP, &demo, frame_count);
                          break;
                     case SDL_SCANCODE_DOWN:
-                         player_action_perform(&player_action, &world.player, PLAYER_ACTION_TYPE_MOVE_DOWN_STOP, demo.mode,
-                                               demo.file, frame_count);
+                         players_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_DOWN_STOP, &demo, frame_count);
                          break;
                     case SDL_SCANCODE_E:
-                         player_action_perform(&player_action, &world.player, PLAYER_ACTION_TYPE_ACTIVATE_STOP, demo.mode,
-                                               demo.file, frame_count);
+                         players_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_ACTIVATE_STOP, &demo, frame_count);
                          break;
                     case SDL_SCANCODE_SPACE:
-                         player_action_perform(&player_action, &world.player, PLAYER_ACTION_TYPE_SHOOT_STOP, demo.mode,
-                                               demo.file, frame_count);
+                         players_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_SHOOT_STOP, &demo, frame_count);
                          break;
                     case SDL_SCANCODE_LCTRL:
                          ctrl_down = false;
@@ -841,7 +838,7 @@ int main(int argc, char** argv){
                               if(editor.mode != EDITOR_MODE_STAMP_HIDE && select_index < editor.category_array.elements[editor.category].count && select_index >= 0){
                                    editor.stamp = select_index;
                               }else{
-                                   undo_commit(&undo, &world.player, &world.tilemap, &world.blocks, &world.interactives);
+                                   undo_commit(&undo, world.players.elements, &world.tilemap, &world.blocks, &world.interactives);
                                    Coord_t select_coord = mouse_select_world(mouse_screen, camera);
                                    auto* stamp_array = editor.category_array.elements[editor.category].elements + editor.stamp;
                                    for(S16 s = 0; s < stamp_array->count; s++){
@@ -861,14 +858,14 @@ int main(int argc, char** argv){
                          default:
                               break;
                          case EDITOR_MODE_CATEGORY_SELECT:
-                              undo_commit(&undo, &world.player, &world.tilemap, &world.blocks, &world.interactives);
+                              undo_commit(&undo, world.players.elements, &world.tilemap, &world.blocks, &world.interactives);
                               coord_clear(mouse_select_world(mouse_screen, camera), &world.tilemap, &world.interactives,
                                           world.interactive_qt, &world.blocks);
                               break;
                          case EDITOR_MODE_STAMP_SELECT:
                          case EDITOR_MODE_STAMP_HIDE:
                          {
-                              undo_commit(&undo, &world.player, &world.tilemap, &world.blocks, &world.interactives);
+                              undo_commit(&undo, world.players.elements, &world.tilemap, &world.blocks, &world.interactives);
                               Coord_t start = mouse_select_world(mouse_screen, camera);
                               Coord_t end = start + stamp_array_dimensions(editor.category_array.elements[editor.category].elements + editor.stamp);
                               for(S16 j = start.y; j < end.y; j++){
@@ -880,7 +877,7 @@ int main(int argc, char** argv){
                          } break;
                          case EDITOR_MODE_SELECTION_MANIPULATION:
                          {
-                              undo_commit(&undo, &world.player, &world.tilemap, &world.blocks, &world.interactives);
+                              undo_commit(&undo, world.players.elements, &world.tilemap, &world.blocks, &world.interactives);
                               Rect_t selection_bounds = editor_selection_bounds(&editor);
                               for(S16 j = selection_bounds.bottom; j <= selection_bounds.top; j++){
                                    for(S16 i = selection_bounds.left; i <= selection_bounds.right; i++){
@@ -1018,7 +1015,7 @@ int main(int argc, char** argv){
                          lift_update(&interactive->door.lift, POPUP_TICK_DELAY, dt, 0, DOOR_MAX_HEIGHT);
                     }else if(interactive->type == INTERACTIVE_TYPE_PRESSURE_PLATE){
                          bool should_be_down = false;
-                         Coord_t player_coord = pos_to_coord(world.player.pos);
+                         Coord_t player_coord = pos_to_coord(world.players.elements->pos);
                          if(interactive->coord == player_coord){
                               should_be_down = true;
                          }else{
@@ -1234,42 +1231,44 @@ int main(int argc, char** argv){
                // update player
                user_movement = vec_zero();
 
+               Player_t* player = world.players.elements;
+
                if(player_action.move_left){
                     Direction_t direction = DIRECTION_LEFT;
                     direction = direction_rotate_clockwise(direction, player_action.move_left_rotation);
                     user_movement += direction_to_vec(direction);
-                    if(player_action.reface) world.player.face = direction;
+                    if(player_action.reface) player->face = direction;
                }
 
                if(player_action.move_right){
                     Direction_t direction = DIRECTION_RIGHT;
                     direction = direction_rotate_clockwise(direction, player_action.move_right_rotation);
                     user_movement += direction_to_vec(direction);
-                    if(player_action.reface) world.player.face = direction;
+                    if(player_action.reface) player->face = direction;
                }
 
                if(player_action.move_up){
                     Direction_t direction = DIRECTION_UP;
                     direction = direction_rotate_clockwise(direction, player_action.move_up_rotation);
                     user_movement += direction_to_vec(direction);
-                    if(player_action.reface) world.player.face = direction;
+                    if(player_action.reface) player->face = direction;
                }
 
                if(player_action.move_down){
                     Direction_t direction = DIRECTION_DOWN;
                     direction = direction_rotate_clockwise(direction, player_action.move_down_rotation);
                     user_movement += direction_to_vec(direction);
-                    if(player_action.reface) world.player.face = direction;
+                    if(player_action.reface) player->face = direction;
                }
 
                if(player_action.activate && !player_action.last_activate){
-                    undo_commit(&undo, &world.player, &world.tilemap, &world.blocks, &world.interactives);
-                    activate(&world, pos_to_coord(world.player.pos) + world.player.face);
+                    undo_commit(&undo, world.players.elements, &world.tilemap, &world.blocks, &world.interactives);
+                    activate(&world, pos_to_coord(player->pos) + player->face);
                }
 
                if(player_action.undo){
-                    undo_commit(&undo, &world.player, &world.tilemap, &world.blocks, &world.interactives);
-                    undo_revert(&undo, &world.player, &world.tilemap, &world.blocks, &world.interactives);
+                    undo_commit(&undo, world.players.elements, &world.tilemap, &world.blocks, &world.interactives);
+                    undo_revert(&undo, world.players.elements, &world.tilemap, &world.blocks, &world.interactives);
                     quad_tree_free(world.interactive_qt);
                     world.interactive_qt = quad_tree_build(&world.interactives);
                     quad_tree_free(world.block_qt);
@@ -1277,13 +1276,13 @@ int main(int argc, char** argv){
                     player_action.undo = false;
                }
 
-               if(world.player.has_bow && player_action.shoot && world.player.bow_draw_time < PLAYER_BOW_DRAW_DELAY){
-                    world.player.bow_draw_time += dt;
+               if(player->has_bow && player_action.shoot && player->bow_draw_time < PLAYER_BOW_DRAW_DELAY){
+                    player->bow_draw_time += dt;
                }else if(!player_action.shoot){
-                    if(world.player.bow_draw_time >= PLAYER_BOW_DRAW_DELAY){
-                         undo_commit(&undo, &world.player, &world.tilemap, &world.blocks, &world.interactives);
-                         Position_t arrow_pos = world.player.pos;
-                         switch(world.player.face){
+                    if(player->bow_draw_time >= PLAYER_BOW_DRAW_DELAY){
+                         undo_commit(&undo, world.players.elements, &world.tilemap, &world.blocks, &world.interactives);
+                         Position_t arrow_pos = player->pos;
+                         switch(player->face){
                          default:
                               break;
                          case DIRECTION_LEFT:
@@ -1302,34 +1301,34 @@ int main(int argc, char** argv){
                               break;
                          }
                          arrow_pos.z += ARROW_SHOOT_HEIGHT;
-                         arrow_spawn(&world.arrows, arrow_pos, world.player.face);
+                         arrow_spawn(&world.arrows, arrow_pos, player->face);
                     }
-                    world.player.bow_draw_time = 0.0f;
+                    player->bow_draw_time = 0.0f;
                }
 
                if(!player_action.move_left && !player_action.move_right && !player_action.move_up && !player_action.move_down){
-                    world.player.walk_frame = 1;
+                    player->walk_frame = 1;
                }else{
-                    world.player.walk_frame_time += dt;
+                    player->walk_frame_time += dt;
 
-                    if(world.player.walk_frame_time > PLAYER_WALK_DELAY){
-                         if(vec_magnitude(world.player.vel) > PLAYER_IDLE_SPEED){
-                              world.player.walk_frame_time = 0.0f;
+                    if(player->walk_frame_time > PLAYER_WALK_DELAY){
+                         if(vec_magnitude(player->vel) > PLAYER_IDLE_SPEED){
+                              player->walk_frame_time = 0.0f;
 
-                              world.player.walk_frame += world.player.walk_frame_delta;
-                              if(world.player.walk_frame > 2 || world.player.walk_frame < 0){
-                                   world.player.walk_frame = 1;
-                                   world.player.walk_frame_delta = -world.player.walk_frame_delta;
+                              player->walk_frame += player->walk_frame_delta;
+                              if(player->walk_frame > 2 || player->walk_frame < 0){
+                                   player->walk_frame = 1;
+                                   player->walk_frame_delta = -player->walk_frame_delta;
                               }
                          }else{
-                              world.player.walk_frame = 1;
-                              world.player.walk_frame_time = 0.0f;
+                              player->walk_frame = 1;
+                              player->walk_frame_time = 0.0f;
                          }
                     }
                }
 
      #if 0
-               Vec_t pos_vec = pos_to_vec(world.player.pos);
+               Vec_t pos_vec = pos_to_vec(player->pos);
 
                // TODO: do we want this in the future?
                // figure out what room we should focus on
@@ -1374,7 +1373,7 @@ int main(int argc, char** argv){
                     Vec_t pos_delta = pos_to_vec(block->pos - block->pre_move_pos);
 
                     if(pos_delta.x != 0.0f || pos_delta.y != 0.0f){
-                         check_block_collision_with_other_blocks(block, &world, &world.player, last_block_pushed,
+                         check_block_collision_with_other_blocks(block, &world, player, last_block_pushed,
                                                                  last_block_pushed_direction);
                     }
 
@@ -1564,7 +1563,7 @@ int main(int argc, char** argv){
 
                          block->pre_move_pos = block->pos;
 
-                         check_block_collision_with_other_blocks(block, &world, &world.player, last_block_pushed,
+                         check_block_collision_with_other_blocks(block, &world, player, last_block_pushed,
                                                                  last_block_pushed_direction);
 
                          // try teleporting if we collided with a block
@@ -1736,83 +1735,84 @@ int main(int argc, char** argv){
                // player movement
                {
                     user_movement = vec_normalize(user_movement);
-                    world.player.accel = user_movement * PLAYER_SPEED;
 
-                    Vec_t pos_delta = mass_move(&world.player.vel, world.player.accel, dt);
+                    player->accel = user_movement * PLAYER_SPEED;
 
-                    if(fabs(vec_magnitude(world.player.vel)) > PLAYER_SPEED){
-                         world.player.vel = vec_normalize(world.player.vel) * PLAYER_SPEED;
+                    Vec_t pos_delta = mass_move(&player->vel, player->accel, dt);
+
+                    if(fabs(vec_magnitude(player->vel)) > PLAYER_SPEED){
+                         player->vel = vec_normalize(player->vel) * PLAYER_SPEED;
                     }
 
                     Coord_t skip_coord[DIRECTION_COUNT];
-                    Coord_t player_previous_coord = pos_to_coord(world.player.pos);
-                    Coord_t player_coord = pos_to_coord(world.player.pos + pos_delta);
+                    Coord_t player_previous_coord = pos_to_coord(player->pos);
+                    Coord_t player_coord = pos_to_coord(player->pos + pos_delta);
 
                     find_portal_adjacents_to_skip_collision_check(player_coord, world.interactive_qt, skip_coord);
-                    auto teleport_result = teleport_position_across_portal(world.player.pos, pos_delta, &world,
+                    auto teleport_result = teleport_position_across_portal(player->pos, pos_delta, &world,
                                                                            player_previous_coord, player_coord);
                     if(teleport_result.count > 0){
-                         world.player.pos = teleport_result.results[0].pos;
+                         player->pos = teleport_result.results[0].pos;
                          pos_delta = teleport_result.results[0].delta;
                     }
 
-                    player_coord = pos_to_coord(world.player.pos + pos_delta);
+                    player_coord = pos_to_coord(player->pos + pos_delta);
 
                     bool collide_with_interactive = false;
-                    Vec_t player_delta_pos = move_player_position_through_world(world.player.pos, pos_delta,
-                                                                                world.player.face, skip_coord,
-                                                                                &world.player, &world, &block_to_push,
+                    Vec_t player_delta_pos = move_player_position_through_world(player->pos, pos_delta,
+                                                                                player->face, skip_coord,
+                                                                                player, &world, &block_to_push,
                                                                                 &last_block_pushed_direction,
                                                                                 &collide_with_interactive, &resetting);
 
-                    player_coord = pos_to_coord(world.player.pos + player_delta_pos);
+                    player_coord = pos_to_coord(player->pos + player_delta_pos);
 
                     if(block_to_push){
                          DirectionMask_t block_move_dir_mask = vec_direction_mask(block_to_push->vel);
-                         if(direction_in_mask(direction_mask_opposite(block_move_dir_mask), world.player.face))
+                         if(direction_in_mask(direction_mask_opposite(block_move_dir_mask), player->face))
                          {
                               // if the player is pushing against a block moving towards them, the block wins
-                              world.player.push_time = 0;
+                              player->push_time = 0;
                               block_to_push = nullptr;
                          }else{
-                              F32 before_time = world.player.push_time;
+                              F32 before_time = player->push_time;
 
                               // TODO: get back to this once we improve our demo tools
-                              world.player.push_time += dt;
-                              if(world.player.push_time > BLOCK_PUSH_TIME){ // && !direction_in_mask(vec_direction_mask(block_to_push->vel), last_block_pushed_direction)){
-                                   if(before_time <= BLOCK_PUSH_TIME) undo_commit(&undo, &world.player, &world.tilemap, &world.blocks, &world.interactives);
+                              player->push_time += dt;
+                              if(player->push_time > BLOCK_PUSH_TIME){ // && !direction_in_mask(vec_direction_mask(block_to_push->vel), last_block_pushed_direction)){
+                                   if(before_time <= BLOCK_PUSH_TIME) undo_commit(&undo, world.players.elements, &world.tilemap, &world.blocks, &world.interactives);
                                    bool pushed = block_push(block_to_push, last_block_pushed_direction, &world, false);
                                    if(pushed && block_to_push->entangle_index >= 0 && block_to_push->entangle_index < world.blocks.count){
                                         Block_t* entangled_block = world.blocks.elements + block_to_push->entangle_index;
                                         block_push(entangled_block, last_block_pushed_direction, &world, false);
                                    }
-                                   if(block_to_push->pos.z > 0) world.player.push_time = -0.5f; // TODO: wtf is this line?
+                                   if(block_to_push->pos.z > 0) player->push_time = -0.5f; // TODO: wtf is this line?
                               }
                          }
                     }else{
-                         world.player.push_time = 0;
+                         player->push_time = 0;
                     }
 
                     if(teleport_result.count == 0){
-                         teleport_result = teleport_position_across_portal(world.player.pos, player_delta_pos, &world,
+                         teleport_result = teleport_position_across_portal(player->pos, player_delta_pos, &world,
                                                                            player_previous_coord, player_coord);
                          if(teleport_result.count > 0){
-                              world.player.pos = teleport_result.results[0].pos;
+                              player->pos = teleport_result.results[0].pos;
                               player_delta_pos = teleport_result.results[0].delta;
                          }
                     }else{
-                         auto new_teleport_result = teleport_position_across_portal(world.player.pos, player_delta_pos, &world,
+                         auto new_teleport_result = teleport_position_across_portal(player->pos, player_delta_pos, &world,
                                                                                     player_previous_coord, player_coord);
                          if(new_teleport_result.count > 0){
-                              world.player.pos = new_teleport_result.results[0].pos;
+                              player->pos = new_teleport_result.results[0].pos;
                               player_delta_pos = new_teleport_result.results[0].delta;
                          }
                     }
 
                     if(teleport_result.count > 0){
-                         world.player.face = direction_rotate_clockwise(world.player.face, teleport_result.results[0].rotations);
-                         world.player.vel = vec_rotate_quadrants_clockwise(world.player.vel, teleport_result.results[0].rotations);
-                         world.player.accel = vec_rotate_quadrants_clockwise(world.player.accel, teleport_result.results[0].rotations);
+                         player->face = direction_rotate_clockwise(player->face, teleport_result.results[0].rotations);
+                         player->vel = vec_rotate_quadrants_clockwise(player->vel, teleport_result.results[0].rotations);
+                         player->accel = vec_rotate_quadrants_clockwise(player->accel, teleport_result.results[0].rotations);
 
                          // set rotations for each direction the player wants to move
                          if(player_action.move_left) player_action.move_left_rotation = (player_action.move_left_rotation + teleport_result.results[0].rotations) % DIRECTION_COUNT;
@@ -1821,7 +1821,7 @@ int main(int argc, char** argv){
                          if(player_action.move_down) player_action.move_down_rotation = (player_action.move_down_rotation + teleport_result.results[0].rotations) % DIRECTION_COUNT;
                     }
 
-                    world.player.pos += player_delta_pos;
+                    player->pos += player_delta_pos;
                }
 
                if(resetting){
@@ -1908,12 +1908,13 @@ int main(int argc, char** argv){
                                    Interactive_t* portal_interactive = quad_tree_find_at(world.interactive_qt, portal_coord.x, portal_coord.y);
 
                                    U8 portal_rotations = portal_rotations_between((Direction_t)(d), interactive->portal.face);
-                                   Player_t* player_ptr = nullptr;
+                                   Player_t* player = nullptr;
                                    Pixel_t portal_center_pixel = coord_to_pixel_at_center(portal_coord);
-                                   if(pixel_distance_between(portal_center_pixel, world.player.pos.pixel) <= 20){
-                                        player_ptr = &world.player;
+                                   if(pixel_distance_between(portal_center_pixel, world.players.elements->pos.pixel) <= 20){
+                                        player = world.players.elements;
                                    }
-                                   draw_solids(tile_pos, portal_interactive, blocks, block_count, player_ptr, screen_camera,
+
+                                   draw_solids(tile_pos, portal_interactive, blocks, block_count, player, screen_camera,
                                                theme_texture, player_texture, portal_coord, coord, portal_rotations,
                                                &world.tilemap, world.interactive_qt);
                               }
@@ -1936,8 +1937,8 @@ int main(int argc, char** argv){
           }
 
           for(S16 y = max.y; y >= min.y; y--){
-               Player_t* player_ptr = nullptr;
-               if(pos_to_coord(world.player.pos).y == y) player_ptr = &world.player;
+               Player_t* player = nullptr;
+               if(pos_to_coord(world.players.elements->pos).y == y) player = world.players.elements;
 
                for(S16 x = min.x; x <= max.x; x++){
                     Coord_t coord {x, y};
@@ -1951,7 +1952,7 @@ int main(int argc, char** argv){
 
                     Interactive_t* interactive = quad_tree_find_at(world.interactive_qt, x, y);
 
-                    draw_solids(tile_pos, interactive, blocks, block_count, player_ptr, screen_camera, theme_texture, player_texture,
+                    draw_solids(tile_pos, interactive, blocks, block_count, player, screen_camera, theme_texture, player_texture,
                                 coord, Coord_t{-1, -1}, 0, &world.tilemap, world.interactive_qt);
 
                }
@@ -2004,7 +2005,7 @@ int main(int argc, char** argv){
           glEnd();
 
           // player circle
-          Position_t player_camera_offset = world.player.pos - screen_camera;
+          Position_t player_camera_offset = world.players.elements->pos - screen_camera;
           Vec_t pos_vec = pos_to_vec(player_camera_offset);
 
           glBindTexture(GL_TEXTURE_2D, 0);
@@ -2298,11 +2299,10 @@ int main(int argc, char** argv){
      default:
           break;
      case DEMO_MODE_RECORD:
-          player_action_perform(&player_action, &world.player, PLAYER_ACTION_TYPE_END_DEMO, demo.mode,
-                                demo.file, frame_count);
+          players_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_END_DEMO, &demo, frame_count);
           // save map and player position
           save_map_to_file(demo.file, player_start, &world.tilemap, &world.blocks, &world.interactives);
-          fwrite(&world.player.pos.pixel, sizeof(world.player.pos.pixel), 1, demo.file);
+          fwrite(&world.players.elements->pos.pixel, sizeof(world.players.elements->pos.pixel), 1, demo.file);
           fclose(demo.file);
           break;
      case DEMO_MODE_PLAY:

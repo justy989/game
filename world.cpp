@@ -37,10 +37,13 @@ bool load_map_number(S32 map_number, Coord_t* player_start, World_t* world){
 }
 
 void setup_map(Coord_t player_start, World_t* world, Undo_t* undo){
-     world->player = {};
-     world->player.walk_frame_delta = 1;
-     world->player.pos = coord_to_pos_at_tile_center(player_start);
-     world->player.has_bow = true;
+     destroy(&world->players);
+     init(&world->players, 1);
+     Player_t* player = world->players.elements;
+     *player = {};
+     player->walk_frame_delta = 1;
+     player->pos = coord_to_pos_at_tile_center(player_start);
+     player->has_bow = true;
 
      init(&world->arrows);
 
@@ -52,7 +55,7 @@ void setup_map(Coord_t player_start, World_t* world, Undo_t* undo){
 
      destroy(undo);
      init(undo, UNDO_MEMORY, world->tilemap.width, world->tilemap.height, world->blocks.count, world->interactives.count);
-     undo_snapshot(undo, &world->player, &world->tilemap, &world->blocks, &world->interactives);
+     undo_snapshot(undo, world->players.elements, &world->tilemap, &world->blocks, &world->interactives);
 }
 
 static void toggle_electricity(TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree, Coord_t coord,
@@ -848,6 +851,13 @@ bool block_push(Block_t* block, Direction_t direction, World_t* world, bool push
      return true;
 }
 
+bool reset_players(ObjectArray_t<Player_t>* players){
+     destroy(players);
+     bool success = init(players, 1);
+     if(success) *players->elements = Player_t{};
+     return success;
+}
+
 void describe_coord(Coord_t coord, World_t* world){
      LOG("\ndescribe_coord(%d, %d)\n", coord.x, coord.y);
      auto* tile = tilemap_get_tile(&world->tilemap, coord);
@@ -993,12 +1003,16 @@ bool test_map_end_state(World_t* world, Demo_t* demo){
           }
      }
 
-     if(check_player_pixel.x != world->player.pos.pixel.x){
-          LOG_MISMATCH("player pixel x", "%d", check_player_pixel.x, world->player.pos.pixel.x);
-     }
+     for(S16 i = 0; i < world->players.count; i++){
+          Player_t* player = world->players.elements + i;
 
-     if(check_player_pixel.y != world->player.pos.pixel.y){
-          LOG_MISMATCH("player pixel y", "%d", check_player_pixel.y, world->player.pos.pixel.y);
+          if(check_player_pixel.x != player->pos.pixel.x){
+               LOG_MISMATCH("player pixel x", "%d", check_player_pixel.x, player->pos.pixel.x);
+          }
+
+          if(check_player_pixel.y != player->pos.pixel.y){
+               LOG_MISMATCH("player pixel y", "%d", check_player_pixel.y, player->pos.pixel.y);
+          }
      }
 
      if(check_block_array.count != world->blocks.count){
