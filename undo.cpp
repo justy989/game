@@ -64,6 +64,7 @@ bool init(Undo_t* undo, U32 history_size, S16 map_width, S16 map_height, S16 blo
      undo->width = map_width;
      undo->height = map_height;
 
+     if(!init(&undo->players, 1)) return false;
      if(!init(&undo->blocks, block_count)) return false;
      if(!init(&undo->interactives, interactive_count)) return false;
      if(!init(&undo->history, history_size)) return false;
@@ -79,6 +80,7 @@ void destroy(Undo_t* undo){
      undo->tile_flags = nullptr;
      undo->width = 0;
      undo->height = 0;
+     destroy(&undo->players);
      destroy(&undo->blocks);
      destroy(&undo->interactives);
      destroy(&undo->history);
@@ -138,9 +140,51 @@ void undo_commit(Undo_t* undo, ObjectArray_t<Player_t>* players, TileMap_t* tile
 
      U32 diff_count = 0;
 
+     // TODO: compress this, interactives, and blocks doin the same damn thing
+     // check for differences between player count in previous state and new state
+     S16 min_player_count = players->count;
+     if(players->count > undo->players.count){
+          min_player_count = undo->players.count;
+          // remove a new players
+          for(S16 i = undo->players.count; i < players->count; i++){
+               undo_history_add(&undo->history, UNDO_DIFF_TYPE_PLAYER_REMOVE, i);
+               diff_count++;
+          }
+     }else if(players->count < undo->players.count){
+          // insert a new players
+          S16 diff = undo->players.count - players->count;
+          for(S16 d = 0; d < diff; d++){
+               S16 last_index = (undo->players.count - 1) - d;
+               UndoPlayer_t* last_player = undo->players.elements + last_index;
+               bool found = false;
+
+               for(S16 i = 0; i < players->count; i++){
+                    Player_t* player = players->elements + i;
+
+                    if(last_player->pixel == player->pos.pixel &&
+                       last_player->z == player->pos.z){
+                         found = true;
+                         auto* undo_player_entry = (UndoPlayer_t*)(undo->history.current);
+                         *undo_player_entry = undo->players.elements[i];
+                         undo_history_add(&undo->history, UNDO_DIFF_TYPE_PLAYER_INSERT, i);
+                         diff_count++;
+                         break;
+                    }
+               }
+
+               // it must have been that last element
+               if(!found){
+                    auto* undo_player_entry = (UndoPlayer_t*)(undo->history.current);
+                    *undo_player_entry = *last_player;
+                    undo_history_add(&undo->history, UNDO_DIFF_TYPE_PLAYER_INSERT, last_index);
+                    diff_count++;
+               }
+          }
+     }
+
      // TODO: player count has resized
 
-     for(S16 i = 0; i < players->count; i++){
+     for(S16 i = 0; i < min_player_count; i++){
           UndoPlayer_t* undo_player = undo->players.elements + i;
           Player_t* player = players->elements + i;
           if(player->pos.pixel != undo_player->pixel ||
@@ -263,19 +307,19 @@ void undo_commit(Undo_t* undo, ObjectArray_t<Player_t>* players, TileMap_t* tile
                     diff_count++;
                }
           }
-     }else{
-          // interactives
-          for(S16 i = 0; i < min_interactive_count; i++){
-               Interactive_t* undo_interactive = undo->interactives.elements + i;
-               Interactive_t* interactive = interactives->elements + i;
-               assert(undo_interactive->type == interactive->type);
+     }
 
-               if(!interactive_equal(undo_interactive, interactive)){
-                    auto* undo_interactive_entry = (Interactive_t*)(undo->history.current);
-                    *undo_interactive_entry = *undo_interactive;
-                    undo_history_add(&undo->history, UNDO_DIFF_TYPE_INTERACTIVE, i);
-                    diff_count++;
-               }
+     // interactives
+     for(S16 i = 0; i < min_interactive_count; i++){
+          Interactive_t* undo_interactive = undo->interactives.elements + i;
+          Interactive_t* interactive = interactives->elements + i;
+          assert(undo_interactive->type == interactive->type);
+
+          if(!interactive_equal(undo_interactive, interactive)){
+               auto* undo_interactive_entry = (Interactive_t*)(undo->history.current);
+               *undo_interactive_entry = *undo_interactive;
+               undo_history_add(&undo->history, UNDO_DIFF_TYPE_INTERACTIVE, i);
+               diff_count++;
           }
      }
 
@@ -383,6 +427,19 @@ void undo_revert(Undo_t* undo, ObjectArray_t<Player_t>* players, TileMap_t* tile
           case UNDO_DIFF_TYPE_INTERACTIVE_REMOVE:
           {
                remove(interactives, diff_header->index);
+          } break;
+          case UNDO_DIFF_TYPE_PLAYER_INSERT:
+          {
+               ptr -= sizeof(Player_t);
+               auto* player_entry = (Player_t*)(ptr);
+               S16 last_index = players->count;
+               resize(players, players->count + 1);
+               players->elements[last_index] = players->elements[diff_header->index];
+               players->elements[diff_header->index] = *player_entry;
+          } break;
+          case UNDO_DIFF_TYPE_PLAYER_REMOVE:
+          {
+               remove(players, diff_header->index);
           } break;
           }
      }
