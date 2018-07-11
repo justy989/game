@@ -55,7 +55,7 @@ void setup_map(Coord_t player_start, World_t* world, Undo_t* undo){
 
      destroy(undo);
      init(undo, UNDO_MEMORY, world->tilemap.width, world->tilemap.height, world->blocks.count, world->interactives.count);
-     undo_snapshot(undo, world->players.elements, &world->tilemap, &world->blocks, &world->interactives);
+     undo_snapshot(undo, &world->players, &world->tilemap, &world->blocks, &world->interactives);
 }
 
 static void toggle_electricity(TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree, Coord_t coord,

@@ -614,7 +614,7 @@ int main(int argc, char** argv){
                                    S32 block_index = blocks[0] - world.blocks.elements;
                                    if(block_index >= 0 && block_index < world.blocks.count){
                                         if(editor.block_entangle_index_save >= 0 && editor.block_entangle_index_save != block_index){
-                                             undo_commit(&undo, world.players.elements, &world.tilemap, &world.blocks, &world.interactives);
+                                             undo_commit(&undo, &world.players, &world.tilemap, &world.blocks, &world.interactives);
 
                                              // the magic happens here
                                              Block_t* other = world.blocks.elements + editor.block_entangle_index_save;
@@ -676,7 +676,7 @@ int main(int argc, char** argv){
                          break;
                     case SDL_SCANCODE_RETURN:
                          if(editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
-                              undo_commit(&undo, world.players.elements, &world.tilemap, &world.blocks, &world.interactives);
+                              undo_commit(&undo, &world.players, &world.tilemap, &world.blocks, &world.interactives);
 
                               // clear coords below stamp
                               Rect_t selection_bounds = editor_selection_bounds(&editor);
@@ -737,7 +737,7 @@ int main(int argc, char** argv){
                     case SDL_SCANCODE_B:
 #if 0
                     {
-                         undo_commit(&undo, world.players.elements, &world.tilemap, &world.blocks, &world.interactives);
+                         undo_commit(&undo, &world.players, &world.tilemap, &world.blocks, &world.interactives);
                          Coord_t player_coord = pos_to_coord(world.players.elements->pos)
                          Coord_t min = player_coord - Coord_t{1, 1};
                          Coord_t max = player_coord + Coord_t{1, 1};
@@ -861,7 +861,7 @@ int main(int argc, char** argv){
                               if(editor.mode != EDITOR_MODE_STAMP_HIDE && select_index < editor.category_array.elements[editor.category].count && select_index >= 0){
                                    editor.stamp = select_index;
                               }else{
-                                   undo_commit(&undo, world.players.elements, &world.tilemap, &world.blocks, &world.interactives);
+                                   undo_commit(&undo, &world.players, &world.tilemap, &world.blocks, &world.interactives);
                                    Coord_t select_coord = mouse_select_world(mouse_screen, camera);
                                    auto* stamp_array = editor.category_array.elements[editor.category].elements + editor.stamp;
                                    for(S16 s = 0; s < stamp_array->count; s++){
@@ -881,14 +881,14 @@ int main(int argc, char** argv){
                          default:
                               break;
                          case EDITOR_MODE_CATEGORY_SELECT:
-                              undo_commit(&undo, world.players.elements, &world.tilemap, &world.blocks, &world.interactives);
+                              undo_commit(&undo, &world.players, &world.tilemap, &world.blocks, &world.interactives);
                               coord_clear(mouse_select_world(mouse_screen, camera), &world.tilemap, &world.interactives,
                                           world.interactive_qt, &world.blocks);
                               break;
                          case EDITOR_MODE_STAMP_SELECT:
                          case EDITOR_MODE_STAMP_HIDE:
                          {
-                              undo_commit(&undo, world.players.elements, &world.tilemap, &world.blocks, &world.interactives);
+                              undo_commit(&undo, &world.players, &world.tilemap, &world.blocks, &world.interactives);
                               Coord_t start = mouse_select_world(mouse_screen, camera);
                               Coord_t end = start + stamp_array_dimensions(editor.category_array.elements[editor.category].elements + editor.stamp);
                               for(S16 j = start.y; j < end.y; j++){
@@ -900,7 +900,7 @@ int main(int argc, char** argv){
                          } break;
                          case EDITOR_MODE_SELECTION_MANIPULATION:
                          {
-                              undo_commit(&undo, world.players.elements, &world.tilemap, &world.blocks, &world.interactives);
+                              undo_commit(&undo, &world.players, &world.tilemap, &world.blocks, &world.interactives);
                               Rect_t selection_bounds = editor_selection_bounds(&editor);
                               for(S16 j = selection_bounds.bottom; j <= selection_bounds.top; j++){
                                    for(S16 i = selection_bounds.left; i <= selection_bounds.right; i++){
@@ -1286,13 +1286,13 @@ int main(int argc, char** argv){
                     }
 
                     if(player_action.activate && !player_action.last_activate){
-                         undo_commit(&undo, world.players.elements, &world.tilemap, &world.blocks, &world.interactives);
+                         undo_commit(&undo, &world.players, &world.tilemap, &world.blocks, &world.interactives);
                          activate(&world, pos_to_coord(player->pos) + player->face);
                     }
 
                     if(player_action.undo){
-                         undo_commit(&undo, world.players.elements, &world.tilemap, &world.blocks, &world.interactives);
-                         undo_revert(&undo, world.players.elements, &world.tilemap, &world.blocks, &world.interactives);
+                         undo_commit(&undo, &world.players, &world.tilemap, &world.blocks, &world.interactives);
+                         undo_revert(&undo, &world.players, &world.tilemap, &world.blocks, &world.interactives);
                          quad_tree_free(world.interactive_qt);
                          world.interactive_qt = quad_tree_build(&world.interactives);
                          quad_tree_free(world.block_qt);
@@ -1304,7 +1304,7 @@ int main(int argc, char** argv){
                          player->bow_draw_time += dt;
                     }else if(!player_action.shoot){
                          if(player->bow_draw_time >= PLAYER_BOW_DRAW_DELAY){
-                              undo_commit(&undo, world.players.elements, &world.tilemap, &world.blocks, &world.interactives);
+                              undo_commit(&undo, &world.players, &world.tilemap, &world.blocks, &world.interactives);
                               Position_t arrow_pos = player->pos;
                               switch(player->face){
                               default:
@@ -1807,7 +1807,7 @@ int main(int argc, char** argv){
                               // TODO: get back to this once we improve our demo tools
                               player->push_time += dt;
                               if(player->push_time > BLOCK_PUSH_TIME){ // && !direction_in_mask(vec_direction_mask(block_to_push->vel), last_block_pushed_direction)){
-                                   if(before_time <= BLOCK_PUSH_TIME) undo_commit(&undo, world.players.elements, &world.tilemap, &world.blocks, &world.interactives);
+                                   if(before_time <= BLOCK_PUSH_TIME) undo_commit(&undo, &world.players, &world.tilemap, &world.blocks, &world.interactives);
                                    bool pushed = block_push(block_to_push, last_block_pushed_direction, &world, false);
                                    if(pushed && block_to_push->entangle_index >= 0 && block_to_push->entangle_index < world.blocks.count){
                                         // TODO: take into account block_to_push->face to rotate face

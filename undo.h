@@ -19,6 +19,7 @@ struct UndoPlayer_t{
      Pixel_t pixel;
      S8 z;
      Direction_t face;
+     S16 index;
 };
 
 enum UndoDiffType_t : U8{
@@ -47,9 +48,9 @@ struct Undo_t{
      S16 width;
      S16 height;
      U16** tile_flags;
-     ObjectArray_t<UndoBlock_t> block_array;
-     ObjectArray_t<Interactive_t> interactive_array;
-     UndoPlayer_t player;
+     ObjectArray_t<UndoBlock_t> blocks;
+     ObjectArray_t<Interactive_t> interactives;
+     ObjectArray_t<UndoPlayer_t> players;
 
      UndoHistory_t history;
 };
@@ -59,9 +60,9 @@ void destroy(UndoHistory_t* undo_history);
 void undo_history_add(UndoHistory_t* undo_history, UndoDiffType_t type, S32 index);
 bool init(Undo_t* undo, U32 history_size, S16 map_width, S16 map_height, S16 block_count, S16 interactive_count);
 void destroy(Undo_t* undo);
-void undo_snapshot(Undo_t* undo, Player_t* player, TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array,
-                   ObjectArray_t<Interactive_t>* interactive_array);
-void undo_commit(Undo_t* undo, Player_t* player, TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array,
-                 ObjectArray_t<Interactive_t>* interactive_array);
-void undo_revert(Undo_t* undo, Player_t* player, TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array,
-                 ObjectArray_t<Interactive_t>* interactive_array);
+void undo_snapshot(Undo_t* undo, ObjectArray_t<Player_t>* players, TileMap_t* tilemap, ObjectArray_t<Block_t>* blocks,
+                   ObjectArray_t<Interactive_t>* interactives);
+void undo_commit(Undo_t* undo, ObjectArray_t<Player_t>* players, TileMap_t* tilemap, ObjectArray_t<Block_t>* blocks,
+                 ObjectArray_t<Interactive_t>* interactives);
+void undo_revert(Undo_t* undo, ObjectArray_t<Player_t>* players, TileMap_t* tilemap, ObjectArray_t<Block_t>* blocks,
+                 ObjectArray_t<Interactive_t>* interactives);
