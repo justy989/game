@@ -2,9 +2,11 @@
 
 #include "position.h"
 #include "vec.h"
+#include "coord.h"
 #include "direction.h"
 
-#define PLAYER_RADIUS (3.5f / 272.0f)
+#define PLAYER_RADIUS_IN_SUB_PIXELS 3.5f
+#define PLAYER_RADIUS (PLAYER_RADIUS_IN_SUB_PIXELS / 272.0f)
 #define PLAYER_SPEED 5.5f
 #define PLAYER_WALK_DELAY 0.15f
 #define PLAYER_IDLE_SPEED 0.0025f
@@ -21,4 +23,7 @@ struct Player_t{
      F32 walk_frame_time = 0.0;
      bool has_bow = false;
      F32 bow_draw_time = 0.0;
+
+     Coord_t clone_start;
+     S8 clone_id = 0;
 };

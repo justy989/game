@@ -1778,9 +1778,9 @@ int main(int argc, char** argv){
                     find_portal_adjacents_to_skip_collision_check(player_coord, world.interactive_qt, skip_coord);
                     auto teleport_result = teleport_position_across_portal(player->pos, pos_delta, &world,
                                                                            player_previous_coord, player_coord);
-                    if(teleport_result.count > 0){
-                         player->pos = teleport_result.results[0].pos;
-                         pos_delta = teleport_result.results[0].delta;
+                    if(teleport_result.count > player->clone_id){
+                         player->pos = teleport_result.results[player->clone_id].pos;
+                         pos_delta = teleport_result.results[player->clone_id].delta;
                     }
 
                     player_coord = pos_to_coord(player->pos + pos_delta);
@@ -1824,29 +1824,37 @@ int main(int argc, char** argv){
                     if(teleport_result.count == 0){
                          teleport_result = teleport_position_across_portal(player->pos, player_delta_pos, &world,
                                                                            player_previous_coord, player_coord);
-                         if(teleport_result.count > 0){
-                              player->pos = teleport_result.results[0].pos;
-                              player_delta_pos = teleport_result.results[0].delta;
+                         if(teleport_result.count > player->clone_id){
+                              player->pos = teleport_result.results[player->clone_id].pos;
+                              player_delta_pos = teleport_result.results[player->clone_id].delta;
                          }
                     }else{
                          auto new_teleport_result = teleport_position_across_portal(player->pos, player_delta_pos, &world,
                                                                                     player_previous_coord, player_coord);
-                         if(new_teleport_result.count > 0){
-                              player->pos = new_teleport_result.results[0].pos;
-                              player_delta_pos = new_teleport_result.results[0].delta;
+                         if(new_teleport_result.count > player->clone_id){
+                              player->pos = new_teleport_result.results[player->clone_id].pos;
+                              player_delta_pos = new_teleport_result.results[player->clone_id].delta;
                          }
                     }
 
-                    if(teleport_result.count > 0){
-                         player->face = direction_rotate_clockwise(player->face, teleport_result.results[0].rotations);
-                         player->vel = vec_rotate_quadrants_clockwise(player->vel, teleport_result.results[0].rotations);
-                         player->accel = vec_rotate_quadrants_clockwise(player->accel, teleport_result.results[0].rotations);
+                    if(teleport_result.count > player->clone_id){
+                         player->face = direction_rotate_clockwise(player->face, teleport_result.results[player->clone_id].rotations);
+                         player->vel = vec_rotate_quadrants_clockwise(player->vel, teleport_result.results[player->clone_id].rotations);
+                         player->accel = vec_rotate_quadrants_clockwise(player->accel, teleport_result.results[player->clone_id].rotations);
 
                          // set rotations for each direction the player wants to move
-                         if(player_action.move_left) player_action.move_left_rotation = (player_action.move_left_rotation + teleport_result.results[0].rotations) % DIRECTION_COUNT;
-                         if(player_action.move_right) player_action.move_right_rotation = (player_action.move_right_rotation + teleport_result.results[0].rotations) % DIRECTION_COUNT;
-                         if(player_action.move_up) player_action.move_up_rotation = (player_action.move_up_rotation + teleport_result.results[0].rotations) % DIRECTION_COUNT;
-                         if(player_action.move_down) player_action.move_down_rotation = (player_action.move_down_rotation + teleport_result.results[0].rotations) % DIRECTION_COUNT;
+                         if(player_action.move_left) player_action.move_left_rotation = (player_action.move_left_rotation + teleport_result.results[player->clone_id].rotations) % DIRECTION_COUNT;
+                         if(player_action.move_right) player_action.move_right_rotation = (player_action.move_right_rotation + teleport_result.results[player->clone_id].rotations) % DIRECTION_COUNT;
+                         if(player_action.move_up) player_action.move_up_rotation = (player_action.move_up_rotation + teleport_result.results[player->clone_id].rotations) % DIRECTION_COUNT;
+                         if(player_action.move_down) player_action.move_down_rotation = (player_action.move_down_rotation + teleport_result.results[player->clone_id].rotations) % DIRECTION_COUNT;
+                    }
+
+                    auto* portal = player_is_teleporting(player, world.interactive_qt);
+
+                    if(portal && player->clone_start.x == 0){
+
+                    }else if(!portal && player->clone_start.x > 0){
+
                     }
 
                     player->pos += player_delta_pos;
@@ -2296,24 +2304,6 @@ int main(int argc, char** argv){
                glVertex2f(0, 1);
                glVertex2f(1, 1);
                glVertex2f(1, 0);
-               glEnd();
-          }
-
-          if(world.blocks.count > 1){
-               Block_t* block_one = world.blocks.elements + 1;
-
-               glBegin(GL_QUADS);
-
-               if(block_is_teleporting(block_one, world.interactive_qt)){
-                    glColor3f(0.0f, 1.0f, 0.0f);
-               }else{
-                    glColor3f(1.0f, 0.0f, 0.0f);
-               }
-
-               glVertex2f(0.02, 0.02);
-               glVertex2f(0.02, 0.04);
-               glVertex2f(0.04, 0.04);
-               glVertex2f(0.04, 0.02);
                glEnd();
           }
 

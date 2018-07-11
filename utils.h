@@ -8,6 +8,7 @@
 #include "tile.h"
 #include "interactive.h"
 #include "quad.h"
+#include "player.h"
 
 Direction_t direction_between(Coord_t a, Coord_t b);
 bool directions_meet_expectations(Direction_t a, Direction_t b, Direction_t first_expectation, Direction_t second_expectation);
@@ -36,6 +37,8 @@ Interactive_t* quad_tree_interactive_solid_at(QuadTreeNode_t<Interactive_t>* roo
 void find_portal_adjacents_to_skip_collision_check(Coord_t coord, QuadTreeNode_t<Interactive_t>* interactive_quad_tree,
                                                    Coord_t* skip_coord);
 bool portal_has_destination(Coord_t coord, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree);
+
+Interactive_t* player_is_teleporting(const Player_t* player, QuadTreeNode_t<Interactive_t>* interactive_qt);
 
 S16 range_passes_tile_boundary(S16 a, S16 b, S16 ignore);
 

@@ -226,6 +226,26 @@ bool portal_has_destination(Coord_t coord, TileMap_t* tilemap, QuadTreeNode_t<In
      return result;
 }
 
+Interactive_t* player_is_teleporting(const Player_t* player, QuadTreeNode_t<Interactive_t>* interactive_qt){
+     auto player_coord = pos_to_coord(player->pos);
+     auto min = player_coord - Coord_t{1, 1};
+     auto max = player_coord + Coord_t{1, 1};
+
+     for(int y = min.y; y <= max.y; y++){
+          for(int x = min.x; x <= max.x; x++){
+               Interactive_t* interactive = quad_tree_find_at(interactive_qt, x, y);
+               if(!is_active_portal(interactive)) continue;
+
+               auto portal_line = get_portal_line(interactive);
+
+               if(axis_line_intersects_circle(portal_line, player->pos.pixel, PLAYER_RADIUS_IN_SUB_PIXELS)){
+                    return interactive;
+               }
+          }
+     }
+     return nullptr;
+}
+
 S16 range_passes_tile_boundary(S16 a, S16 b, S16 ignore){
      if(a == b) return 0;
      if(a > b){
