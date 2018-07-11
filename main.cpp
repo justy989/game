@@ -105,11 +105,6 @@ bool load_map_number_map(S16 map_number, World_t* world, Undo_t* undo,
      return false;
 }
 
-void players_action_perform(PlayerAction_t* player_action, ObjectArray_t<Player_t>* players, PlayerActionType_t action_type, Demo_t* demo, S64 frame_count){
-     for(S16 i = 0; i < players->count; i++){
-          player_action_perform(player_action, players->elements + i, action_type, demo->mode, demo->file, frame_count);
-     }
-}
 
 Block_t block_from_stamp(Stamp_t* stamp){
      Block_t block = {};
@@ -410,7 +405,9 @@ int main(int argc, char** argv){
                     end_of_demo = (frame_count == demo.entries.entries[demo.entry_index].frame);
                }else{
                     while(frame_count == demo.entries.entries[demo.entry_index].frame){
-                         players_action_perform(&player_action, &world.players, demo.entries.entries[demo.entry_index].player_action_type, &demo, frame_count);
+                         player_action_perform(&player_action, &world.players,
+                                               demo.entries.entries[demo.entry_index].player_action_type, demo.mode,
+                                               demo.file, frame_count);
                          demo.entry_index++;
                     }
                }
@@ -463,7 +460,8 @@ int main(int argc, char** argv){
                               editor.selection_start.x--;
                               editor.selection_end.x--;
                          }else if(!resetting){
-                              players_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_LEFT_START, &demo, frame_count);
+                              player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_LEFT_START,
+                                                    demo.mode, demo.file, frame_count);
                          }
                          break;
                     case SDL_SCANCODE_RIGHT:
@@ -471,7 +469,8 @@ int main(int argc, char** argv){
                               editor.selection_start.x++;
                               editor.selection_end.x++;
                          }else if(!resetting){
-                              players_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_RIGHT_START, &demo, frame_count);
+                              player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_RIGHT_START,
+                                                    demo.mode, demo.file, frame_count);
                          }
                          break;
                     case SDL_SCANCODE_UP:
@@ -479,7 +478,8 @@ int main(int argc, char** argv){
                               editor.selection_start.y++;
                               editor.selection_end.y++;
                          }else if(!resetting){
-                              players_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_UP_START, &demo, frame_count);
+                              player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_UP_START,
+                                                    demo.mode, demo.file, frame_count);
                          }
                          break;
                     case SDL_SCANCODE_DOWN:
@@ -487,12 +487,14 @@ int main(int argc, char** argv){
                               editor.selection_start.y--;
                               editor.selection_end.y--;
                          }else if(!resetting){
-                              players_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_DOWN_START, &demo, frame_count);
+                              player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_DOWN_START,
+                                                    demo.mode, demo.file, frame_count);
                          }
                          break;
                     case SDL_SCANCODE_E:
                          if(!resetting){
-                              players_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_ACTIVATE_START, &demo, frame_count);
+                              player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_ACTIVATE_START,
+                                                    demo.mode, demo.file, frame_count);
                          }
                          break;
                     case SDL_SCANCODE_SPACE:
@@ -500,7 +502,8 @@ int main(int argc, char** argv){
                               demo.paused = !demo.paused;
                          }else{
                               if(!resetting){
-                                   players_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_SHOOT_START, &demo, frame_count);
+                                   player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_SHOOT_START,
+                                                         demo.mode, demo.file, frame_count);
                               }
                          }
                          break;
@@ -568,7 +571,8 @@ int main(int argc, char** argv){
                     } break;
                     case SDL_SCANCODE_U:
                          if(!resetting){
-                              players_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_UNDO, &demo, frame_count);
+                              player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_UNDO,
+                                                    demo.mode, demo.file, frame_count);
                          }
                          break;
                     case SDL_SCANCODE_N:
@@ -771,22 +775,28 @@ int main(int argc, char** argv){
                          quit = true;
                          break;
                     case SDL_SCANCODE_LEFT:
-                         players_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_LEFT_STOP, &demo, frame_count);
+                         player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_LEFT_STOP,
+                                               demo.mode, demo.file, frame_count);
                          break;
                     case SDL_SCANCODE_RIGHT:
-                         players_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_RIGHT_STOP, &demo, frame_count);
+                         player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_RIGHT_STOP,
+                                               demo.mode, demo.file, frame_count);
                          break;
                     case SDL_SCANCODE_UP:
-                         players_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_UP_STOP, &demo, frame_count);
+                         player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_UP_STOP,
+                                               demo.mode, demo.file, frame_count);
                          break;
                     case SDL_SCANCODE_DOWN:
-                         players_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_DOWN_STOP, &demo, frame_count);
+                         player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_DOWN_STOP,
+                                               demo.mode, demo.file, frame_count);
                          break;
                     case SDL_SCANCODE_E:
-                         players_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_ACTIVATE_STOP, &demo, frame_count);
+                         player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_ACTIVATE_STOP,
+                                               demo.mode, demo.file, frame_count);
                          break;
                     case SDL_SCANCODE_SPACE:
-                         players_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_SHOOT_STOP, &demo, frame_count);
+                         player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_SHOOT_STOP,
+                                               demo.mode, demo.file, frame_count);
                          break;
                     case SDL_SCANCODE_LCTRL:
                          ctrl_down = false;
@@ -1244,98 +1254,100 @@ int main(int argc, char** argv){
                // update player
                user_movement = vec_zero();
 
-               Player_t* player = world.players.elements;
+               for(S16 i = 0; i < world.players.count; i++){
+                    Player_t* player = world.players.elements + i;
 
-               if(player_action.move_left){
-                    Direction_t direction = DIRECTION_LEFT;
-                    direction = direction_rotate_clockwise(direction, player_action.move_left_rotation);
-                    user_movement += direction_to_vec(direction);
-                    if(player_action.reface) player->face = direction;
-               }
-
-               if(player_action.move_right){
-                    Direction_t direction = DIRECTION_RIGHT;
-                    direction = direction_rotate_clockwise(direction, player_action.move_right_rotation);
-                    user_movement += direction_to_vec(direction);
-                    if(player_action.reface) player->face = direction;
-               }
-
-               if(player_action.move_up){
-                    Direction_t direction = DIRECTION_UP;
-                    direction = direction_rotate_clockwise(direction, player_action.move_up_rotation);
-                    user_movement += direction_to_vec(direction);
-                    if(player_action.reface) player->face = direction;
-               }
-
-               if(player_action.move_down){
-                    Direction_t direction = DIRECTION_DOWN;
-                    direction = direction_rotate_clockwise(direction, player_action.move_down_rotation);
-                    user_movement += direction_to_vec(direction);
-                    if(player_action.reface) player->face = direction;
-               }
-
-               if(player_action.activate && !player_action.last_activate){
-                    undo_commit(&undo, world.players.elements, &world.tilemap, &world.blocks, &world.interactives);
-                    activate(&world, pos_to_coord(player->pos) + player->face);
-               }
-
-               if(player_action.undo){
-                    undo_commit(&undo, world.players.elements, &world.tilemap, &world.blocks, &world.interactives);
-                    undo_revert(&undo, world.players.elements, &world.tilemap, &world.blocks, &world.interactives);
-                    quad_tree_free(world.interactive_qt);
-                    world.interactive_qt = quad_tree_build(&world.interactives);
-                    quad_tree_free(world.block_qt);
-                    world.block_qt = quad_tree_build(&world.blocks);
-                    player_action.undo = false;
-               }
-
-               if(player->has_bow && player_action.shoot && player->bow_draw_time < PLAYER_BOW_DRAW_DELAY){
-                    player->bow_draw_time += dt;
-               }else if(!player_action.shoot){
-                    if(player->bow_draw_time >= PLAYER_BOW_DRAW_DELAY){
-                         undo_commit(&undo, world.players.elements, &world.tilemap, &world.blocks, &world.interactives);
-                         Position_t arrow_pos = player->pos;
-                         switch(player->face){
-                         default:
-                              break;
-                         case DIRECTION_LEFT:
-                              arrow_pos.pixel.y -= 2;
-                              arrow_pos.pixel.x -= 8;
-                              break;
-                         case DIRECTION_RIGHT:
-                              arrow_pos.pixel.y -= 2;
-                              arrow_pos.pixel.x += 8;
-                              break;
-                         case DIRECTION_UP:
-                              arrow_pos.pixel.y += 7;
-                              break;
-                         case DIRECTION_DOWN:
-                              arrow_pos.pixel.y -= 11;
-                              break;
-                         }
-                         arrow_pos.z += ARROW_SHOOT_HEIGHT;
-                         arrow_spawn(&world.arrows, arrow_pos, player->face);
+                    if(player_action.move_left){
+                         Direction_t direction = DIRECTION_LEFT;
+                         direction = direction_rotate_clockwise(direction, player_action.move_left_rotation);
+                         user_movement += direction_to_vec(direction);
+                         if(player_action.reface) player->face = direction;
                     }
-                    player->bow_draw_time = 0.0f;
-               }
 
-               if(!player_action.move_left && !player_action.move_right && !player_action.move_up && !player_action.move_down){
-                    player->walk_frame = 1;
-               }else{
-                    player->walk_frame_time += dt;
+                    if(player_action.move_right){
+                         Direction_t direction = DIRECTION_RIGHT;
+                         direction = direction_rotate_clockwise(direction, player_action.move_right_rotation);
+                         user_movement += direction_to_vec(direction);
+                         if(player_action.reface) player->face = direction;
+                    }
 
-                    if(player->walk_frame_time > PLAYER_WALK_DELAY){
-                         if(vec_magnitude(player->vel) > PLAYER_IDLE_SPEED){
-                              player->walk_frame_time = 0.0f;
+                    if(player_action.move_up){
+                         Direction_t direction = DIRECTION_UP;
+                         direction = direction_rotate_clockwise(direction, player_action.move_up_rotation);
+                         user_movement += direction_to_vec(direction);
+                         if(player_action.reface) player->face = direction;
+                    }
 
-                              player->walk_frame += player->walk_frame_delta;
-                              if(player->walk_frame > 2 || player->walk_frame < 0){
-                                   player->walk_frame = 1;
-                                   player->walk_frame_delta = -player->walk_frame_delta;
+                    if(player_action.move_down){
+                         Direction_t direction = DIRECTION_DOWN;
+                         direction = direction_rotate_clockwise(direction, player_action.move_down_rotation);
+                         user_movement += direction_to_vec(direction);
+                         if(player_action.reface) player->face = direction;
+                    }
+
+                    if(player_action.activate && !player_action.last_activate){
+                         undo_commit(&undo, world.players.elements, &world.tilemap, &world.blocks, &world.interactives);
+                         activate(&world, pos_to_coord(player->pos) + player->face);
+                    }
+
+                    if(player_action.undo){
+                         undo_commit(&undo, world.players.elements, &world.tilemap, &world.blocks, &world.interactives);
+                         undo_revert(&undo, world.players.elements, &world.tilemap, &world.blocks, &world.interactives);
+                         quad_tree_free(world.interactive_qt);
+                         world.interactive_qt = quad_tree_build(&world.interactives);
+                         quad_tree_free(world.block_qt);
+                         world.block_qt = quad_tree_build(&world.blocks);
+                         player_action.undo = false;
+                    }
+
+                    if(player->has_bow && player_action.shoot && player->bow_draw_time < PLAYER_BOW_DRAW_DELAY){
+                         player->bow_draw_time += dt;
+                    }else if(!player_action.shoot){
+                         if(player->bow_draw_time >= PLAYER_BOW_DRAW_DELAY){
+                              undo_commit(&undo, world.players.elements, &world.tilemap, &world.blocks, &world.interactives);
+                              Position_t arrow_pos = player->pos;
+                              switch(player->face){
+                              default:
+                                   break;
+                              case DIRECTION_LEFT:
+                                   arrow_pos.pixel.y -= 2;
+                                   arrow_pos.pixel.x -= 8;
+                                   break;
+                              case DIRECTION_RIGHT:
+                                   arrow_pos.pixel.y -= 2;
+                                   arrow_pos.pixel.x += 8;
+                                   break;
+                              case DIRECTION_UP:
+                                   arrow_pos.pixel.y += 7;
+                                   break;
+                              case DIRECTION_DOWN:
+                                   arrow_pos.pixel.y -= 11;
+                                   break;
                               }
-                         }else{
-                              player->walk_frame = 1;
-                              player->walk_frame_time = 0.0f;
+                              arrow_pos.z += ARROW_SHOOT_HEIGHT;
+                              arrow_spawn(&world.arrows, arrow_pos, player->face);
+                         }
+                         player->bow_draw_time = 0.0f;
+                    }
+
+                    if(!player_action.move_left && !player_action.move_right && !player_action.move_up && !player_action.move_down){
+                         player->walk_frame = 1;
+                    }else{
+                         player->walk_frame_time += dt;
+
+                         if(player->walk_frame_time > PLAYER_WALK_DELAY){
+                              if(vec_magnitude(player->vel) > PLAYER_IDLE_SPEED){
+                                   player->walk_frame_time = 0.0f;
+
+                                   player->walk_frame += player->walk_frame_delta;
+                                   if(player->walk_frame > 2 || player->walk_frame < 0){
+                                        player->walk_frame = 1;
+                                        player->walk_frame_delta = -player->walk_frame_delta;
+                                   }
+                              }else{
+                                   player->walk_frame = 1;
+                                   player->walk_frame_time = 0.0f;
+                              }
                          }
                     }
                }
@@ -1386,7 +1398,7 @@ int main(int argc, char** argv){
                     Vec_t pos_delta = pos_to_vec(block->pos - block->pre_move_pos);
 
                     if(pos_delta.x != 0.0f || pos_delta.y != 0.0f){
-                         check_block_collision_with_other_blocks(block, &world, player, last_block_pushed,
+                         check_block_collision_with_other_blocks(block, &world, world.players.elements, last_block_pushed,
                                                                  last_block_pushed_direction);
                     }
 
@@ -1576,7 +1588,7 @@ int main(int argc, char** argv){
 
                          block->pre_move_pos = block->pos;
 
-                         check_block_collision_with_other_blocks(block, &world, player, last_block_pushed,
+                         check_block_collision_with_other_blocks(block, &world, world.players.elements, last_block_pushed,
                                                                  last_block_pushed_direction);
 
                          // try teleporting if we collided with a block
@@ -1745,9 +1757,11 @@ int main(int argc, char** argv){
                     }
                }
 
+               user_movement = vec_normalize(user_movement);
+
                // player movement
-               {
-                    user_movement = vec_normalize(user_movement);
+               for(S16 i = 0; i < world.players.count; i++){
+                    Player_t* player = world.players.elements + i;
 
                     player->accel = user_movement * PLAYER_SPEED;
 
@@ -2317,7 +2331,7 @@ int main(int argc, char** argv){
      default:
           break;
      case DEMO_MODE_RECORD:
-          players_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_END_DEMO, &demo, frame_count);
+          player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_END_DEMO, demo.mode, demo.file, frame_count);
           // save map and player position
           save_map_to_file(demo.file, player_start, &world.tilemap, &world.blocks, &world.interactives);
           fwrite(&world.players.elements->pos.pixel, sizeof(world.players.elements->pos.pixel), 1, demo.file);

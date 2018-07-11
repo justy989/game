@@ -1,6 +1,7 @@
 #pragma once
 
 #include "player.h"
+#include "object_array.h"
 
 #include <stdio.h>
 
@@ -68,5 +69,5 @@ struct Demo_t{
 };
 
 DemoEntries_t demo_entries_get(FILE* file);
-void player_action_perform(PlayerAction_t* player_action, Player_t* player, PlayerActionType_t player_action_type,
+void player_action_perform(PlayerAction_t* player_action, ObjectArray_t<Player_t>* players, PlayerActionType_t player_action_type,
                            DemoMode_t demo_mode, FILE* demo_file, S64 frame_count);
