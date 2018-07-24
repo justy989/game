@@ -16,7 +16,7 @@ struct Block_t{
      Element_t element;
      Pixel_t push_start;
      F32 fall_time;
-     S16 entangle_index;
+     S16 entangle_index; // -1 means not entangled, 0 - N = entangled with that block
 
      Position_t pre_move_pos; // save where a block was at the start of the frame
      Coord_t clone_start; // the portal where the clone started

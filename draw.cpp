@@ -455,6 +455,12 @@ void draw_solids(Vec_t pos, Interactive_t* interactive, Block_t** blocks, S16 bl
           glBindTexture(GL_TEXTURE_2D, theme_texture);
           glBegin(GL_QUADS);
           glColor3f(1.0f, 1.0f, 1.0f);
+
+          if(i >= 1){
+              pos_vec -= Vec_t{HALF_TILE_SIZE, HALF_TILE_SIZE};
+              tex_vec = theme_frame(0, 22);
+              draw_theme_frame(pos_vec, tex_vec);
+          }
      }
 }
 

@@ -18,6 +18,8 @@ struct World_t{
 
      QuadTreeNode_t<Interactive_t>* interactive_qt = nullptr;
      QuadTreeNode_t<Block_t>* block_qt = nullptr;
+
+     S32 clone_instance = 0;
 };
 
 #define MAX_TELEPORT_POSITION_RESULTS 4

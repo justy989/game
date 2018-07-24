@@ -90,3 +90,11 @@ PortalExit_t find_portal_exits(Coord_t coord, TileMap_t* tilemap, QuadTreeNode_t
      }
      return portal_exit;
 }
+
+S8 portal_exit_count(const PortalExit_t* portal_exit){
+    S8 count = 0;
+    for(S8 d = 0; d < DIRECTION_COUNT; d++){
+        count += portal_exit->directions[d].count;
+    }
+    return count;
+}

@@ -10,6 +10,7 @@ Entanglement:
 - entangle puzzle with an extra non-entangled block where you don't want one of the entangled blocks to move, and you use
   the non-entangled block to accomplish that
 - player entanglement
+- player on player collision
 - arrow entanglement
 - portal entangling
 
@@ -1653,6 +1654,7 @@ int main(int argc, char** argv){
                     // if we didn't find a portal but we have been cloning, we are done cloning! We either need to kill the clone or complete it
                     }else if(!portal && block->clone_start.x > 0 &&
                              block->entangle_index < world.blocks.count){
+                         // TODO: do we need to update the block quad tree here?
                          auto block_move_dir = vec_direction(pos_delta);
                          auto block_from_coord = block_get_coord(block) - block_move_dir;
                          if(block_from_coord == block->clone_start){
@@ -1683,7 +1685,6 @@ int main(int argc, char** argv){
 
                               block->clone_id = 0;
                               entangled_block->clone_id = 0;
-
                               entangled_block->clone_start = Coord_t{};
 
                               // turn off the circuit
@@ -1852,9 +1853,73 @@ int main(int argc, char** argv){
                     auto* portal = player_is_teleporting(player, world.interactive_qt);
 
                     if(portal && player->clone_start.x == 0){
+                         // at the first instant of the block teleporting, check if we should create an entangled_block
 
+                         PortalExit_t portal_exits = find_portal_exits(portal->coord, &world.tilemap, world.interactive_qt);
+                         S8 count = portal_exit_count(&portal_exits);
+                         if(count >= 3){
+                              world.clone_instance++;
+
+                              S8 clone_id = 0;
+                              for(int d = 0; d < DIRECTION_COUNT; d++){
+                                   for(int p = 0; p < portal_exits.directions[d].count; p++){
+                                        if(portal_exits.directions[d].coords[p] == portal->coord) continue;
+
+                                        if(clone_id == 0){
+                                             player->clone_id = clone_id;
+                                             player->clone_instance = world.clone_instance;
+                                        }else{
+                                             S16 new_player_index = world.players.count;
+                                             S16 old_player_index = player - world.players.elements;
+
+                                             if(resize(&world.players, world.players.count + 1)){
+                                                  // a resize will kill our block ptr, so we gotta update it
+                                                  player = world.players.elements + old_player_index;
+                                                  player->clone_start = portal->coord;
+
+                                                  Player_t* new_player = world.players.elements + new_player_index;
+
+                                                  *new_player = *player;
+                                                  new_player->clone_id = clone_id;
+                                                  new_player->clone_instance = world.clone_instance;
+                                             }
+                                        }
+
+                                        clone_id++;
+                                   }
+                              }
+                         }
                     }else if(!portal && player->clone_start.x > 0){
+                         auto player_move_dir = vec_direction(pos_delta);
+                         auto player_from_coord = pos_to_coord(player->pos) - player_move_dir;
+                         if(player_from_coord == player->clone_start){
+                              // in this instance, despawn the clone
+                              S16 player_index = player - world.players.elements;
 
+                              // loop across all players after this one
+                              for(S16 p = i + 1; p < world.players.count; p++){
+                                   Player_t* other_player = world.players.elements + p;
+                                   if(other_player->clone_instance == player->clone_instance){
+                                        remove(&world.players, p);
+
+                                        // update ptr since we could have resized
+                                        player = world.players.elements + player_index;
+                                   }
+                              }
+                         }else{
+                              for(S16 p = i + 1; p < world.players.count; p++){
+                                   Player_t* other_player = world.players.elements + p;
+                                   if(other_player->clone_instance == player->clone_instance){
+                                       other_player->clone_id = 0;
+                                       other_player->clone_start = Coord_t{};
+                                       other_player->clone_instance = 0;
+                                   }
+                              }
+                         }
+
+                         player->clone_id = 0;
+                         player->clone_instance = 0;
+                         player->clone_start = Coord_t{};
                     }
 
                     player->pos += player_delta_pos;
@@ -2044,46 +2109,49 @@ int main(int argc, char** argv){
 
           glEnd();
 
-          // player circle
-          Position_t player_camera_offset = world.players.elements->pos - screen_camera;
-          Vec_t pos_vec = pos_to_vec(player_camera_offset);
-
           glBindTexture(GL_TEXTURE_2D, 0);
           glBegin(GL_LINES);
-          if(block_to_push){
-               glColor3f(1.0f, 0.0f, 0.0f);
-          }else{
-               glColor3f(1.0f, 1.0f, 1.0f);
-          }
-          Vec_t prev_vec {pos_vec.x + PLAYER_RADIUS, pos_vec.y};
-          S32 segments = 32;
-          F32 delta = 3.14159f * 2.0f / (F32)(segments);
-          F32 angle = 0.0f  + delta;
-          for(S32 i = 0; i <= segments; i++){
-               F32 dx = cos(angle) * PLAYER_RADIUS;
-               F32 dy = sin(angle) * PLAYER_RADIUS;
 
-               glVertex2f(prev_vec.x, prev_vec.y);
-               glVertex2f(pos_vec.x + dx, pos_vec.y + dy);
-               prev_vec.x = pos_vec.x + dx;
-               prev_vec.y = pos_vec.y + dy;
-               angle += delta;
-          }
+          for(S16 p = 0; p < world.players.count; p++){
+               // player circle
+               Position_t player_camera_offset = world.players.elements[p].pos - screen_camera;
+               Vec_t pos_vec = pos_to_vec(player_camera_offset);
 
-          pos_vec = pos_to_vec(Position_t{} - screen_camera);
-          prev_vec = {pos_vec.x + PLAYER_RADIUS, pos_vec.y};
-          segments = 32;
-          delta = 3.14159f * 2.0f / (F32)(segments);
-          angle = 0.0f  + delta;
-          for(S32 i = 0; i <= segments; i++){
-               F32 dx = cos(angle) * PLAYER_RADIUS;
-               F32 dy = sin(angle) * PLAYER_RADIUS;
+               if(block_to_push){
+                    glColor3f(1.0f, 0.0f, 0.0f);
+               }else{
+                    glColor3f(1.0f, 1.0f, 1.0f);
+               }
+               Vec_t prev_vec {pos_vec.x + PLAYER_RADIUS, pos_vec.y};
+               S32 segments = 32;
+               F32 delta = 3.14159f * 2.0f / (F32)(segments);
+               F32 angle = 0.0f  + delta;
+               for(S32 i = 0; i <= segments; i++){
+                    F32 dx = cos(angle) * PLAYER_RADIUS;
+                    F32 dy = sin(angle) * PLAYER_RADIUS;
 
-               glVertex2f(prev_vec.x, prev_vec.y);
-               glVertex2f(pos_vec.x + dx, pos_vec.y + dy);
-               prev_vec.x = pos_vec.x + dx;
-               prev_vec.y = pos_vec.y + dy;
-               angle += delta;
+                    glVertex2f(prev_vec.x, prev_vec.y);
+                    glVertex2f(pos_vec.x + dx, pos_vec.y + dy);
+                    prev_vec.x = pos_vec.x + dx;
+                    prev_vec.y = pos_vec.y + dy;
+                    angle += delta;
+               }
+
+               pos_vec = pos_to_vec(Position_t{} - screen_camera);
+               prev_vec = {pos_vec.x + PLAYER_RADIUS, pos_vec.y};
+               segments = 32;
+               delta = 3.14159f * 2.0f / (F32)(segments);
+               angle = 0.0f  + delta;
+               for(S32 i = 0; i <= segments; i++){
+                    F32 dx = cos(angle) * PLAYER_RADIUS;
+                    F32 dy = sin(angle) * PLAYER_RADIUS;
+
+                    glVertex2f(prev_vec.x, prev_vec.y);
+                    glVertex2f(pos_vec.x + dx, pos_vec.y + dy);
+                    prev_vec.x = pos_vec.x + dx;
+                    prev_vec.y = pos_vec.y + dy;
+                    angle += delta;
+               }
           }
 
           glEnd();
@@ -2304,6 +2372,24 @@ int main(int argc, char** argv){
                glVertex2f(0, 1);
                glVertex2f(1, 1);
                glVertex2f(1, 0);
+               glEnd();
+          }
+
+          if(world.players.count >= 1){
+               Player_t* player = world.players.elements + 0;
+
+               glBegin(GL_QUADS);
+
+               if(player_is_teleporting(player, world.interactive_qt)){
+                    glColor3f(0.0f, 1.0f, 0.0f);
+               }else{
+                    glColor3f(1.0f, 0.0f, 0.0f);
+               }
+
+               glVertex2f(0.02, 0.02);
+               glVertex2f(0.02, 0.04);
+               glVertex2f(0.04, 0.04);
+               glVertex2f(0.04, 0.02);
                glEnd();
           }
 
