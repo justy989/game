@@ -557,30 +557,28 @@ TeleportPositionResult_t teleport_position_across_portal(Position_t position, Ve
                                                          Coord_t postmove_coord){
      TeleportPositionResult_t result {};
 
-     if(postmove_coord != premove_coord){
-          auto* interactive = quad_tree_interactive_find_at(world->interactive_qt, postmove_coord);
-          if(is_active_portal(interactive)){
-               if(interactive->portal.face == direction_opposite(direction_between(postmove_coord, premove_coord))){
-                    Position_t offset_from_center = position - coord_to_pos_at_tile_center(postmove_coord);
-                    PortalExit_t portal_exit = find_portal_exits(postmove_coord, &world->tilemap, world->interactive_qt);
+     if(postmove_coord == premove_coord) return result;
+     auto* interactive = quad_tree_interactive_find_at(world->interactive_qt, postmove_coord);
+     if(!is_active_portal(interactive)) return result;
+     if(interactive->portal.face != direction_opposite(direction_between(postmove_coord, premove_coord))) return result;
 
-                    for(S8 d = 0; d < DIRECTION_COUNT; d++){
-                         for(S8 p = 0; p < portal_exit.directions[d].count; p++){
-                              if(portal_exit.directions[d].coords[p] != postmove_coord){
-                                   Position_t final_offset = offset_from_center;
+     Position_t offset_from_center = position - coord_to_pos_at_tile_center(postmove_coord);
+     PortalExit_t portal_exit = find_portal_exits(postmove_coord, &world->tilemap, world->interactive_qt);
 
-                                   Direction_t opposite = direction_opposite((Direction_t)(d));
-                                   U8 rotations_between = direction_rotations_between(interactive->portal.face, opposite);
-                                   final_offset = position_rotate_quadrants_counter_clockwise(final_offset, rotations_between);
+     for(S8 d = 0; d < DIRECTION_COUNT; d++){
+          for(S8 p = 0; p < portal_exit.directions[d].count; p++){
+               if(portal_exit.directions[d].coords[p] == postmove_coord) continue;
 
-                                   result.results[result.count].rotations = portal_rotations_between(interactive->portal.face, (Direction_t)(d));
-                                   result.results[result.count].delta = vec_rotate_quadrants_clockwise(pos_delta, result.results[result.count].rotations);
-                                   result.results[result.count].pos = coord_to_pos_at_tile_center(portal_exit.directions[d].coords[p] + opposite) + final_offset;
-                                   result.count++;
-                              }
-                         }
-                    }
-               }
+               Position_t final_offset = offset_from_center;
+
+               Direction_t opposite = direction_opposite((Direction_t)(d));
+               U8 rotations_between = direction_rotations_between(interactive->portal.face, opposite);
+               final_offset = position_rotate_quadrants_counter_clockwise(final_offset, rotations_between);
+
+               result.results[result.count].rotations = portal_rotations_between(interactive->portal.face, (Direction_t)(d));
+               result.results[result.count].delta = vec_rotate_quadrants_clockwise(pos_delta, result.results[result.count].rotations);
+               result.results[result.count].pos = coord_to_pos_at_tile_center(portal_exit.directions[d].coords[p] + opposite) + final_offset;
+               result.count++;
           }
      }
 

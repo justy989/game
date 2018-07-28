@@ -19,7 +19,6 @@ struct UndoPlayer_t{
      Pixel_t pixel;
      S8 z;
      Direction_t face;
-     S16 index;
 };
 
 enum UndoDiffType_t : U8{

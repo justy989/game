@@ -72,12 +72,12 @@ void player_action_perform(PlayerAction_t* player_action, ObjectArray_t<Player_t
      case PLAYER_ACTION_TYPE_MOVE_LEFT_STOP:
           for(S16 i = 0; i < players->count; i++){
                Player_t* player = players->elements + i;
-               if(player->face == direction_rotate_clockwise(DIRECTION_LEFT, player_action->move_left_rotation)){
-                    player_action->reface = true;
+               if(player->face == direction_rotate_clockwise(DIRECTION_LEFT, player->move_left_rotation)){
+                    player->reface = true;
+                    player->move_left_rotation = 0;
                }
           }
           player_action->move_left = false;
-          player_action->move_left_rotation = 0;
           break;
      case PLAYER_ACTION_TYPE_MOVE_UP_START:
           if(player_action->move_up) return;
@@ -90,12 +90,12 @@ void player_action_perform(PlayerAction_t* player_action, ObjectArray_t<Player_t
      case PLAYER_ACTION_TYPE_MOVE_UP_STOP:
           for(S16 i = 0; i < players->count; i++){
                Player_t* player = players->elements + i;
-               if(player->face == direction_rotate_clockwise(DIRECTION_UP, player_action->move_up_rotation)){
-                    player_action->reface = true;
+               if(player->face == direction_rotate_clockwise(DIRECTION_UP, player->move_up_rotation)){
+                    player->reface = true;
+                    player->move_up_rotation = 0;
                }
           }
           player_action->move_up = false;
-          player_action->move_up_rotation = 0;
           break;
      case PLAYER_ACTION_TYPE_MOVE_RIGHT_START:
           if(player_action->move_right) return;
@@ -108,12 +108,12 @@ void player_action_perform(PlayerAction_t* player_action, ObjectArray_t<Player_t
      case PLAYER_ACTION_TYPE_MOVE_RIGHT_STOP:
           for(S16 i = 0; i < players->count; i++){
                Player_t* player = players->elements + i;
-               if(player->face == direction_rotate_clockwise(DIRECTION_RIGHT, player_action->move_right_rotation)){
-                    player_action->reface = true;
+               if(player->face == direction_rotate_clockwise(DIRECTION_RIGHT, player->move_right_rotation)){
+                    player->reface = true;
+                    player->move_right_rotation = 0;
                }
           }
           player_action->move_right = false;
-          player_action->move_right_rotation = 0;
           break;
      case PLAYER_ACTION_TYPE_MOVE_DOWN_START:
           if(player_action->move_down) return;
@@ -126,12 +126,12 @@ void player_action_perform(PlayerAction_t* player_action, ObjectArray_t<Player_t
      case PLAYER_ACTION_TYPE_MOVE_DOWN_STOP:
           for(S16 i = 0; i < players->count; i++){
                Player_t* player = players->elements + i;
-               if(player->face == direction_rotate_clockwise(DIRECTION_DOWN, player_action->move_down_rotation)){
-                    player_action->reface = true;
+               if(player->face == direction_rotate_clockwise(DIRECTION_DOWN, player->move_down_rotation)){
+                    player->reface = true;
+                    player->move_down_rotation = 0;
                }
           }
           player_action->move_down = false;
-          player_action->move_down_rotation = 0;
           break;
      case PLAYER_ACTION_TYPE_ACTIVATE_START:
           if(player_action->activate) return;

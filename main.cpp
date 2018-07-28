@@ -106,7 +106,6 @@ bool load_map_number_map(S16 map_number, World_t* world, Undo_t* undo,
      return false;
 }
 
-
 Block_t block_from_stamp(Stamp_t* stamp){
      Block_t block = {};
      block.element = stamp->block.element;
@@ -398,7 +397,9 @@ int main(int argc, char** argv){
           block_to_push = nullptr;
 
           player_action.last_activate = player_action.activate;
-          player_action.reface = false;
+          for(S16 i = 0; i < world.players.count; i++) {
+               world.players.elements[i].reface = false;
+          }
 
           if(demo.mode == DEMO_MODE_PLAY){
                bool end_of_demo = false;
@@ -1259,30 +1260,30 @@ int main(int argc, char** argv){
 
                     if(player_action.move_left){
                          Direction_t direction = DIRECTION_LEFT;
-                         direction = direction_rotate_clockwise(direction, player_action.move_left_rotation);
+                         direction = direction_rotate_clockwise(direction, player->move_left_rotation);
                          user_movement += direction_to_vec(direction);
-                         if(player_action.reface) player->face = direction;
+                         if(player->reface) player->face = direction;
                     }
 
                     if(player_action.move_right){
                          Direction_t direction = DIRECTION_RIGHT;
-                         direction = direction_rotate_clockwise(direction, player_action.move_right_rotation);
+                         direction = direction_rotate_clockwise(direction, player->move_right_rotation);
                          user_movement += direction_to_vec(direction);
-                         if(player_action.reface) player->face = direction;
+                         if(player->reface) player->face = direction;
                     }
 
                     if(player_action.move_up){
                          Direction_t direction = DIRECTION_UP;
-                         direction = direction_rotate_clockwise(direction, player_action.move_up_rotation);
+                         direction = direction_rotate_clockwise(direction, player->move_up_rotation);
                          user_movement += direction_to_vec(direction);
-                         if(player_action.reface) player->face = direction;
+                         if(player->reface) player->face = direction;
                     }
 
                     if(player_action.move_down){
                          Direction_t direction = DIRECTION_DOWN;
-                         direction = direction_rotate_clockwise(direction, player_action.move_down_rotation);
+                         direction = direction_rotate_clockwise(direction, player->move_down_rotation);
                          user_movement += direction_to_vec(direction);
-                         if(player_action.reface) player->face = direction;
+                         if(player->reface) player->face = direction;
                     }
 
                     if(player_action.activate && !player_action.last_activate){
@@ -1783,8 +1784,6 @@ int main(int argc, char** argv){
                          pos_delta = teleport_result.results[player->clone_id].delta;
                     }
 
-                    player_coord = pos_to_coord(player->pos + pos_delta);
-
                     bool collide_with_interactive = false;
                     Vec_t player_delta_pos = move_player_position_through_world(player->pos, pos_delta,
                                                                                 player->face, skip_coord,
@@ -1843,10 +1842,10 @@ int main(int argc, char** argv){
                          player->accel = vec_rotate_quadrants_clockwise(player->accel, teleport_result.results[player->clone_id].rotations);
 
                          // set rotations for each direction the player wants to move
-                         if(player_action.move_left) player_action.move_left_rotation = (player_action.move_left_rotation + teleport_result.results[player->clone_id].rotations) % DIRECTION_COUNT;
-                         if(player_action.move_right) player_action.move_right_rotation = (player_action.move_right_rotation + teleport_result.results[player->clone_id].rotations) % DIRECTION_COUNT;
-                         if(player_action.move_up) player_action.move_up_rotation = (player_action.move_up_rotation + teleport_result.results[player->clone_id].rotations) % DIRECTION_COUNT;
-                         if(player_action.move_down) player_action.move_down_rotation = (player_action.move_down_rotation + teleport_result.results[player->clone_id].rotations) % DIRECTION_COUNT;
+                         if(player_action.move_left) player->move_left_rotation = (player->move_left_rotation + teleport_result.results[player->clone_id].rotations) % DIRECTION_COUNT;
+                         if(player_action.move_right) player->move_right_rotation = (player->move_right_rotation + teleport_result.results[player->clone_id].rotations) % DIRECTION_COUNT;
+                         if(player_action.move_up) player->move_up_rotation = (player->move_up_rotation + teleport_result.results[player->clone_id].rotations) % DIRECTION_COUNT;
+                         if(player_action.move_down) player->move_down_rotation = (player->move_down_rotation + teleport_result.results[player->clone_id].rotations) % DIRECTION_COUNT;
                     }
 
                     auto* portal = player_is_teleporting(player, world.interactive_qt);
@@ -1872,7 +1871,7 @@ int main(int argc, char** argv){
                                              S16 old_player_index = (S16)(player - world.players.elements);
 
                                              if(resize(&world.players, world.players.count + (S16)(1))){
-                                                  // a resize will kill our block ptr, so we gotta update it
+                                                  // a resize will kill our player ptr, so we gotta update it
                                                   player = world.players.elements + old_player_index;
                                                   player->clone_start = portal->coord;
 
@@ -1904,7 +1903,8 @@ int main(int argc, char** argv){
                               S16 player_index = (S16)(player - world.players.elements);
 
                               // loop across all players after this one
-                              for(S16 p = (S16)(i + 1); p < world.players.count; p++){
+                              for(S16 p = 0; p < world.players.count; p++){
+                                   if(p == i) continue;
                                    Player_t* other_player = world.players.elements + p;
                                    if(other_player->clone_instance == player->clone_instance){
                                         remove(&world.players, p);
@@ -1914,12 +1914,13 @@ int main(int argc, char** argv){
                               // update ptr since we could have resized
                               player = world.players.elements + player_index;
                          }else{
-                              for(S16 p = (S16)(i + 1); p < world.players.count; p++){
+                              for(S16 p = 0; p < world.players.count; p++){
+                                   if(p == i) continue;
                                    Player_t* other_player = world.players.elements + p;
                                    if(other_player->clone_instance == player->clone_instance){
-                                       other_player->clone_id = 0;
-                                       other_player->clone_instance = 0;
-                                       other_player->clone_start = Coord_t{};
+                                        other_player->clone_id = 0;
+                                        other_player->clone_instance = 0;
+                                        other_player->clone_start = Coord_t{};
                                    }
                               }
 

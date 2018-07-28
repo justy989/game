@@ -17,7 +17,7 @@ void destroy(UndoHistory_t* undo_history){
      memset(undo_history, 0, sizeof(*undo_history));
 }
 
-#define ASSERT_BELOW_HISTORY_SIZE(history) assert((char*)(history->current) - (char*)(history->start) < history->size)
+#define ASSERT_BELOW_HISTORY_SIZE(history) assert(((char*)(history->current) - (char*)(history->start)) < history->size)
 
 void undo_history_add(UndoHistory_t* undo_history, UndoDiffType_t type, S32 index){
      switch(type){
@@ -25,6 +25,7 @@ void undo_history_add(UndoHistory_t* undo_history, UndoDiffType_t type, S32 inde
           assert(!"unsupported diff type");
           return;
      case UNDO_DIFF_TYPE_PLAYER:
+     case UNDO_DIFF_TYPE_PLAYER_INSERT:
           undo_history->current = (char*)(undo_history->current) + sizeof(UndoPlayer_t);
           break;
      case UNDO_DIFF_TYPE_TILE_FLAGS:
@@ -38,6 +39,7 @@ void undo_history_add(UndoHistory_t* undo_history, UndoDiffType_t type, S32 inde
      case UNDO_DIFF_TYPE_INTERACTIVE_INSERT:
           undo_history->current = (char*)(undo_history->current) + sizeof(Interactive_t);
           break;
+     case UNDO_DIFF_TYPE_PLAYER_REMOVE:
      case UNDO_DIFF_TYPE_BLOCK_REMOVE:
      case UNDO_DIFF_TYPE_INTERACTIVE_REMOVE:
           // NOTE: no need to add any more data
@@ -182,8 +184,6 @@ void undo_commit(Undo_t* undo, ObjectArray_t<Player_t>* players, TileMap_t* tile
           }
      }
 
-     // TODO: player count has resized
-
      for(S16 i = 0; i < min_player_count; i++){
           UndoPlayer_t* undo_player = undo->players.elements + i;
           Player_t* player = players->elements + i;
@@ -192,7 +192,7 @@ void undo_commit(Undo_t* undo, ObjectArray_t<Player_t>* players, TileMap_t* tile
              player->face != undo_player->face){
                auto* diff_undo_player = (UndoPlayer_t*)(undo->history.current);
                *diff_undo_player = *undo_player;
-               undo_history_add(&undo->history, UNDO_DIFF_TYPE_PLAYER, 0);
+               undo_history_add(&undo->history, UNDO_DIFF_TYPE_PLAYER, i);
                diff_count++;
           }
      }
@@ -355,7 +355,7 @@ void undo_revert(Undo_t* undo, ObjectArray_t<Player_t>* players, TileMap_t* tile
           {
                ptr -= sizeof(UndoPlayer_t);
                auto* player_entry = (UndoPlayer_t*)(ptr);
-               Player_t* player = players->elements + player_entry->index;
+               Player_t* player = players->elements + diff_header->index;
                *player = {};
                // TODO fix these numbers as they are important
                player->walk_frame_delta = 1;

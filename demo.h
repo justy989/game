@@ -30,12 +30,7 @@ struct PlayerAction_t{
      bool activate;
      bool last_activate;
      bool shoot;
-     bool reface;
      bool undo;
-     U8 move_left_rotation;
-     U8 move_right_rotation;
-     U8 move_up_rotation;
-     U8 move_down_rotation;
 };
 
 enum DemoMode_t{

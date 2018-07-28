@@ -27,4 +27,10 @@ struct Player_t{
      Coord_t clone_start;
      S8 clone_id = 0;
      S32 clone_instance = 0;
+
+     bool reface;
+     U8 move_left_rotation;
+     U8 move_right_rotation;
+     U8 move_up_rotation;
+     U8 move_down_rotation;
 };
