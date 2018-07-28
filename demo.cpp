@@ -62,76 +62,76 @@ void player_action_perform(PlayerAction_t* player_action, ObjectArray_t<Player_t
      default:
           break;
      case PLAYER_ACTION_TYPE_MOVE_LEFT_START:
-          if(player_action->move_left) return;
-          player_action->move_left = true;
+          if(player_action->move[DIRECTION_LEFT]) return;
+          player_action->move[DIRECTION_LEFT] = true;
           for(S16 i = 0; i < players->count; i++){
                Player_t* player = players->elements + i;
-               player->face = DIRECTION_LEFT;
+               player->face = direction_rotate_clockwise(DIRECTION_LEFT, player->rotation);
           }
           break;
      case PLAYER_ACTION_TYPE_MOVE_LEFT_STOP:
           for(S16 i = 0; i < players->count; i++){
                Player_t* player = players->elements + i;
-               if(player->face == direction_rotate_clockwise(DIRECTION_LEFT, player->move_left_rotation)){
+               if(player->face == direction_rotate_clockwise(DIRECTION_LEFT, player->move_rotation[DIRECTION_LEFT])){
                     player->reface = true;
-                    player->move_left_rotation = 0;
+                    player->move_rotation[DIRECTION_LEFT] = 0;
                }
           }
-          player_action->move_left = false;
+          player_action->move[DIRECTION_LEFT] = false;
           break;
      case PLAYER_ACTION_TYPE_MOVE_UP_START:
-          if(player_action->move_up) return;
-          player_action->move_up = true;
+          if(player_action->move[DIRECTION_UP]) return;
+          player_action->move[DIRECTION_UP] = true;
           for(S16 i = 0; i < players->count; i++){
                Player_t* player = players->elements + i;
-               player->face = DIRECTION_UP;
+               player->face = direction_rotate_clockwise(DIRECTION_UP, player->rotation);
           }
           break;
      case PLAYER_ACTION_TYPE_MOVE_UP_STOP:
           for(S16 i = 0; i < players->count; i++){
                Player_t* player = players->elements + i;
-               if(player->face == direction_rotate_clockwise(DIRECTION_UP, player->move_up_rotation)){
+               if(player->face == direction_rotate_clockwise(DIRECTION_UP, player->move_rotation[DIRECTION_UP])){
                     player->reface = true;
-                    player->move_up_rotation = 0;
+                    player->move_rotation[DIRECTION_UP] = 0;
                }
           }
-          player_action->move_up = false;
+          player_action->move[DIRECTION_UP] = false;
           break;
      case PLAYER_ACTION_TYPE_MOVE_RIGHT_START:
-          if(player_action->move_right) return;
-          player_action->move_right = true;
+          if(player_action->move[DIRECTION_RIGHT]) return;
+          player_action->move[DIRECTION_RIGHT] = true;
           for(S16 i = 0; i < players->count; i++){
                Player_t* player = players->elements + i;
-               player->face = DIRECTION_RIGHT;
+               player->face = direction_rotate_clockwise(DIRECTION_RIGHT, player->rotation);
           }
           break;
      case PLAYER_ACTION_TYPE_MOVE_RIGHT_STOP:
           for(S16 i = 0; i < players->count; i++){
                Player_t* player = players->elements + i;
-               if(player->face == direction_rotate_clockwise(DIRECTION_RIGHT, player->move_right_rotation)){
+               if(player->face == direction_rotate_clockwise(DIRECTION_RIGHT, player->move_rotation[DIRECTION_RIGHT])){
                     player->reface = true;
-                    player->move_right_rotation = 0;
+                    player->move_rotation[DIRECTION_RIGHT] = 0;
                }
           }
-          player_action->move_right = false;
+          player_action->move[DIRECTION_RIGHT] = false;
           break;
      case PLAYER_ACTION_TYPE_MOVE_DOWN_START:
-          if(player_action->move_down) return;
-          player_action->move_down = true;
+          if(player_action->move[DIRECTION_DOWN]) return;
+          player_action->move[DIRECTION_DOWN] = true;
           for(S16 i = 0; i < players->count; i++){
                Player_t* player = players->elements + i;
-               player->face = DIRECTION_DOWN;
+               player->face = direction_rotate_clockwise(DIRECTION_DOWN, player->rotation);
           }
           break;
      case PLAYER_ACTION_TYPE_MOVE_DOWN_STOP:
           for(S16 i = 0; i < players->count; i++){
                Player_t* player = players->elements + i;
-               if(player->face == direction_rotate_clockwise(DIRECTION_DOWN, player->move_down_rotation)){
+               if(player->face == direction_rotate_clockwise(DIRECTION_DOWN, player->move_rotation[DIRECTION_DOWN])){
                     player->reface = true;
-                    player->move_down_rotation = 0;
+                    player->move_rotation[DIRECTION_DOWN] = 0;
                }
           }
-          player_action->move_down = false;
+          player_action->move[DIRECTION_DOWN] = false;
           break;
      case PLAYER_ACTION_TYPE_ACTIVATE_START:
           if(player_action->activate) return;

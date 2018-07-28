@@ -63,11 +63,7 @@ Direction_t direction_rotate_clockwise(Direction_t dir){
 }
 
 Direction_t direction_rotate_clockwise(Direction_t dir, U8 times){
-     for(U8 i = 0; i < times; ++i){
-          dir = direction_rotate_clockwise(dir);
-     }
-
-     return dir;
+     return (Direction_t)((U8)(dir + times) % DIRECTION_COUNT);
 }
 
 DirectionMask_t direction_mask_rotate_clockwise(DirectionMask_t mask){

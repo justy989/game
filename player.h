@@ -14,8 +14,8 @@
 
 struct Player_t{
      Position_t pos;
-     Vec_t accel;
      Vec_t vel;
+     Vec_t accel;
      Direction_t face = DIRECTION_LEFT;
      F32 push_time = 0.0f;
      S8 walk_frame = 0;
@@ -28,9 +28,8 @@ struct Player_t{
      S8 clone_id = 0;
      S32 clone_instance = 0;
 
-     bool reface;
-     U8 move_left_rotation;
-     U8 move_right_rotation;
-     U8 move_up_rotation;
-     U8 move_down_rotation;
+     U8 rotation = 0;
+
+     bool reface = false;
+     U8 move_rotation[DIRECTION_COUNT];
 };

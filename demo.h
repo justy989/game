@@ -23,10 +23,7 @@ enum PlayerActionType_t{
 };
 
 struct PlayerAction_t{
-     bool move_left;
-     bool move_right;
-     bool move_up;
-     bool move_down;
+     bool move[DIRECTION_COUNT];
      bool activate;
      bool last_activate;
      bool shoot;

@@ -121,6 +121,7 @@ Vec_t rotate_vec_between_dirs_clockwise(Direction_t a, Direction_t b, Vec_t vec)
 Vec_t direction_to_vec(Direction_t d){
      switch(d){
      default:
+          assert(!"wat");
           break;
      case DIRECTION_LEFT:
           return Vec_t{-1, 0};

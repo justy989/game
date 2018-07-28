@@ -266,7 +266,6 @@ int main(int argc, char** argv){
 
      PlayerAction_t player_action {};
      Position_t camera = coord_to_pos(Coord_t{8, 8});
-     Vec_t user_movement = {};
 
      Block_t* last_block_pushed = nullptr;
      Direction_t last_block_pushed_direction = DIRECTION_LEFT;
@@ -1253,37 +1252,27 @@ int main(int argc, char** argv){
                }
 
                // update player
-               user_movement = vec_zero();
-
                for(S16 i = 0; i < world.players.count; i++){
                     Player_t* player = world.players.elements + i;
 
-                    if(player_action.move_left){
-                         Direction_t direction = DIRECTION_LEFT;
-                         direction = direction_rotate_clockwise(direction, player->move_left_rotation);
-                         user_movement += direction_to_vec(direction);
-                         if(player->reface) player->face = direction;
+                    bool rotated_move_actions[4];
+                    for(int d = 0; d < 4; d++) rotated_move_actions[d] = false;
+                    for(int d = 0; d < 4; d++){
+                         if(player_action.move[d]){
+                              Direction_t rot_dir = direction_rotate_clockwise((Direction_t)(d), player->rotation);
+                              rotated_move_actions[rot_dir] = true;
+                         }
                     }
 
-                    if(player_action.move_right){
-                         Direction_t direction = DIRECTION_RIGHT;
-                         direction = direction_rotate_clockwise(direction, player->move_right_rotation);
-                         user_movement += direction_to_vec(direction);
-                         if(player->reface) player->face = direction;
-                    }
+                    player->accel = vec_zero();
 
-                    if(player_action.move_up){
-                         Direction_t direction = DIRECTION_UP;
-                         direction = direction_rotate_clockwise(direction, player->move_up_rotation);
-                         user_movement += direction_to_vec(direction);
-                         if(player->reface) player->face = direction;
-                    }
-
-                    if(player_action.move_down){
-                         Direction_t direction = DIRECTION_DOWN;
-                         direction = direction_rotate_clockwise(direction, player->move_down_rotation);
-                         user_movement += direction_to_vec(direction);
-                         if(player->reface) player->face = direction;
+                    for(int d = 0; d < DIRECTION_COUNT; d++){
+                         if(rotated_move_actions[d]){
+                              Direction_t direction = (Direction_t)(d);
+                              direction = direction_rotate_clockwise(direction, player->move_rotation[d]);
+                              player->accel += direction_to_vec(direction);
+                              if(player->reface) player->face = direction;
+                         }
                     }
 
                     if(player_action.activate && !player_action.last_activate){
@@ -1331,7 +1320,8 @@ int main(int argc, char** argv){
                          player->bow_draw_time = 0.0f;
                     }
 
-                    if(!player_action.move_left && !player_action.move_right && !player_action.move_up && !player_action.move_down){
+                    if(!player_action.move[DIRECTION_LEFT] && !player_action.move[DIRECTION_RIGHT] &&
+                       !player_action.move[DIRECTION_UP] && !player_action.move[DIRECTION_DOWN]){
                          player->walk_frame = 1;
                     }else{
                          player->walk_frame_time += dt;
@@ -1758,13 +1748,12 @@ int main(int argc, char** argv){
                     }
                }
 
-               user_movement = vec_normalize(user_movement);
-
                // player movement
                for(S16 i = 0; i < world.players.count; i++){
                     Player_t* player = world.players.elements + i;
 
-                    player->accel = user_movement * PLAYER_SPEED;
+                    player->accel = vec_normalize(player->accel);
+                    player->accel = player->accel * PLAYER_SPEED;
 
                     Vec_t pos_delta = mass_move(&player->vel, player->accel, dt);
 
@@ -1841,11 +1830,12 @@ int main(int argc, char** argv){
                          player->vel = vec_rotate_quadrants_clockwise(player->vel, teleport_result.results[player->clone_id].rotations);
                          player->accel = vec_rotate_quadrants_clockwise(player->accel, teleport_result.results[player->clone_id].rotations);
 
+                         player->rotation = (player->rotation + teleport_result.results[player->clone_id].rotations) % DIRECTION_COUNT;
+
                          // set rotations for each direction the player wants to move
-                         if(player_action.move_left) player->move_left_rotation = (player->move_left_rotation + teleport_result.results[player->clone_id].rotations) % DIRECTION_COUNT;
-                         if(player_action.move_right) player->move_right_rotation = (player->move_right_rotation + teleport_result.results[player->clone_id].rotations) % DIRECTION_COUNT;
-                         if(player_action.move_up) player->move_up_rotation = (player->move_up_rotation + teleport_result.results[player->clone_id].rotations) % DIRECTION_COUNT;
-                         if(player_action.move_down) player->move_down_rotation = (player->move_down_rotation + teleport_result.results[player->clone_id].rotations) % DIRECTION_COUNT;
+                         for(S8 d = 0; d < DIRECTION_COUNT; d++){
+                              if(player_action.move[d]) player->move_rotation[d] = (player->move_rotation[d] + teleport_result.results[player->clone_id].rotations) % DIRECTION_COUNT;
+                         }
                     }
 
                     auto* portal = player_is_teleporting(player, world.interactive_qt);
@@ -1927,9 +1917,7 @@ int main(int argc, char** argv){
                               // turn off the circuit
                               activate(&world, player->clone_start);
                               auto* src_portal = quad_tree_find_at(world.interactive_qt, player->clone_start.x, player->clone_start.y);
-                              if(is_active_portal(src_portal)){
-                                   src_portal->portal.on = false;
-                              }
+                              if(is_active_portal(src_portal)) src_portal->portal.on = false;
                          }
 
                          player->clone_id = 0;
