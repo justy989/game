@@ -2,10 +2,10 @@
 #include "utils.h"
 
 void portal_exit_add(PortalExit_t* portal_exit, Direction_t direction, Coord_t coord){
-     S8* count = &portal_exit->directions[direction].count;
-     if(*count < MAX_PORTAL_EXITS){
-          portal_exit->directions[direction].coords[*count] = coord;
-          (*count)++;
+     PortalExitCoords_t* portal_exit_direction = portal_exit->directions + direction;
+     if(portal_exit_direction->count < MAX_PORTAL_EXITS){
+          portal_exit_direction->coords[portal_exit_direction->count] = coord;
+          portal_exit_direction->count++;
      }
 }
 
@@ -73,7 +73,6 @@ PortalExit_t find_portal_exits(Coord_t coord, TileMap_t* tilemap, QuadTreeNode_t
      PortalExit_t portal_exit = {};
      Interactive_t* interactive = quad_tree_interactive_find_at(interactive_quad_tree, coord);
      if(is_active_portal(interactive)){
-          portal_exit_add(&portal_exit, interactive->portal.face, coord);
           for(S8 d = 0; d < DIRECTION_COUNT; d++){
                Coord_t adjacent_coord = coord + (Direction_t)(d);
                Tile_t* tile = tilemap_get_tile(tilemap, adjacent_coord);

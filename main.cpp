@@ -1857,7 +1857,7 @@ int main(int argc, char** argv){
 
                          PortalExit_t portal_exits = find_portal_exits(portal->coord, &world.tilemap, world.interactive_qt);
                          S8 count = portal_exit_count(&portal_exits);
-                         if(count >= 3){
+                         if(count >= 3){ // src portal, dst portal, clone portal
                               world.clone_instance++;
 
                               S8 clone_id = 0;
@@ -1878,10 +1878,8 @@ int main(int argc, char** argv){
                                                   player->clone_start = portal->coord;
 
                                                   Player_t* new_player = world.players.elements + new_player_index;
-
                                                   *new_player = *player;
                                                   new_player->clone_id = clone_id;
-                                                  new_player->clone_instance = world.clone_instance;
                                              }
                                         }
 
@@ -1890,9 +1888,19 @@ int main(int argc, char** argv){
                               }
                          }
                     }else if(!portal && player->clone_start.x > 0){
-                         auto player_move_dir = vec_direction(pos_delta);
-                         auto player_from_coord = pos_to_coord(player->pos) - player_move_dir;
-                         if(player_from_coord == player->clone_start){
+                         auto player_move_dir_mask = vec_direction_mask(pos_delta);
+                         bool from_clone_start = false;
+                         for(S8 d = 0; d < DIRECTION_COUNT; d++){
+                              Direction_t dir = (Direction_t)(d);
+                              if(!direction_in_mask(player_move_dir_mask, dir)) continue;
+                              auto player_from_coord = pos_to_coord(player->pos) - dir;
+                              if(player_from_coord == player->clone_start){
+                                   from_clone_start = true;
+                                   break;
+                              }
+                         }
+
+                         if(from_clone_start){
                               // in this instance, despawn the clone
                               S16 player_index = player - world.players.elements;
 
@@ -1901,19 +1909,26 @@ int main(int argc, char** argv){
                                    Player_t* other_player = world.players.elements + p;
                                    if(other_player->clone_instance == player->clone_instance){
                                         remove(&world.players, p);
-
-                                        // update ptr since we could have resized
-                                        player = world.players.elements + player_index;
                                    }
                               }
+
+                              // update ptr since we could have resized
+                              player = world.players.elements + player_index;
                          }else{
                               for(S16 p = i + 1; p < world.players.count; p++){
                                    Player_t* other_player = world.players.elements + p;
                                    if(other_player->clone_instance == player->clone_instance){
                                        other_player->clone_id = 0;
-                                       other_player->clone_start = Coord_t{};
                                        other_player->clone_instance = 0;
+                                       other_player->clone_start = Coord_t{};
                                    }
+                              }
+
+                              // turn off the circuit
+                              activate(&world, player->clone_start);
+                              auto* src_portal = quad_tree_find_at(world.interactive_qt, player->clone_start.x, player->clone_start.y);
+                              if(is_active_portal(src_portal)){
+                                   src_portal->portal.on = false;
                               }
                          }
 
