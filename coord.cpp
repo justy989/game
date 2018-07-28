@@ -53,9 +53,3 @@ void coord_move_x(Coord_t* c, S16 dx){c->x += dx;};
 void coord_move_y(Coord_t* c, S16 dy){c->y += dy;}
 
 bool coord_after(Coord_t a, Coord_t b){return b.y < a.y || (b.y == a.y && b.x < a.x);}
-
-float coord_distance_between(Coord_t a, Coord_t b){
-     S16 d_x = b.x - a.x;
-     S16 d_y = b.y - a.y;
-     return sqrt(d_x * d_x + d_y * d_y);
-}

@@ -9,7 +9,6 @@ struct Position_t{
      Vec_t decimal;
 };
 
-Position_t pixel_pos(S16 x, S16 y);
 Position_t pixel_pos(Pixel_t pixel);
 void canonicalize(Position_t* position);
 Position_t operator+(Position_t p, Vec_t v);

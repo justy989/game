@@ -5,19 +5,19 @@ bool save_map_to_file(FILE* file, Coord_t player_start, const TileMap_t* tilemap
                       ObjectArray_t<Interactive_t>* interactive_array){
      // alloc and convert map elements to map format
      S32 map_tile_count = (S32)(tilemap->width) * (S32)(tilemap->height);
-     MapTileV1_t* map_tiles = (MapTileV1_t*)(calloc(map_tile_count, sizeof(*map_tiles)));
+     MapTileV1_t* map_tiles = (MapTileV1_t*)(calloc((size_t)(map_tile_count), sizeof(*map_tiles)));
      if(!map_tiles){
           LOG("%s(): failed to allocate %d tiles\n", __FUNCTION__, map_tile_count);
           return false;
      }
 
-     MapBlockV2_t* map_blocks = (MapBlockV2_t*)(calloc(block_array->count, sizeof(*map_blocks)));
+     MapBlockV2_t* map_blocks = (MapBlockV2_t*)(calloc((size_t)(block_array->count), sizeof(*map_blocks)));
      if(!map_blocks){
           LOG("%s(): failed to allocate %d blocks\n", __FUNCTION__, block_array->count);
           return false;
      }
 
-     MapInteractiveV1_t* map_interactives = (MapInteractiveV1_t*)(calloc(interactive_array->count, sizeof(*map_interactives)));
+     MapInteractiveV1_t* map_interactives = (MapInteractiveV1_t*)(calloc((size_t)(interactive_array->count), sizeof(*map_interactives)));
      if(!map_interactives){
           LOG("%s(): failed to allocate %d interactives\n", __FUNCTION__, interactive_array->count);
           return false;
@@ -90,9 +90,9 @@ bool save_map_to_file(FILE* file, Coord_t player_start, const TileMap_t* tilemap
      fwrite(&tilemap->height, sizeof(tilemap->height), 1, file);
      fwrite(&block_array->count, sizeof(block_array->count), 1, file);
      fwrite(&interactive_array->count, sizeof(interactive_array->count), 1, file);
-     fwrite(map_tiles, sizeof(*map_tiles), map_tile_count, file);
-     fwrite(map_blocks, sizeof(*map_blocks), block_array->count, file);
-     fwrite(map_interactives, sizeof(*map_interactives), interactive_array->count, file);
+     fwrite(map_tiles, sizeof(*map_tiles), (size_t)(map_tile_count), file);
+     fwrite(map_blocks, sizeof(*map_blocks), (size_t)(block_array->count), file);
+     fwrite(map_interactives, sizeof(*map_interactives), (size_t)(interactive_array->count), file);
 
      free(map_tiles);
      free(map_blocks);
@@ -131,28 +131,28 @@ bool load_map_from_file_v1(FILE* file, Coord_t* player_start, TileMap_t* tilemap
 
      // alloc and convert map elements to map format
      S32 map_tile_count = (S32)(map_width) * (S32)(map_height);
-     MapTileV1_t* map_tiles = (MapTileV1_t*)(calloc(map_tile_count, sizeof(*map_tiles)));
+     MapTileV1_t* map_tiles = (MapTileV1_t*)(calloc((size_t)(map_tile_count), sizeof(*map_tiles)));
      if(!map_tiles){
           LOG("%s(): failed to allocate %d tiles\n", __FUNCTION__, map_tile_count);
           return false;
      }
 
-     MapBlockV1_t* map_blocks = (MapBlockV1_t*)(calloc(block_count, sizeof(*map_blocks)));
+     MapBlockV1_t* map_blocks = (MapBlockV1_t*)(calloc((size_t)(block_count), sizeof(*map_blocks)));
      if(!map_blocks){
           LOG("%s(): failed to allocate %d blocks\n", __FUNCTION__, block_count);
           return false;
      }
 
-     MapInteractiveV1_t* map_interactives = (MapInteractiveV1_t*)(calloc(interactive_count, sizeof(*map_interactives)));
+     MapInteractiveV1_t* map_interactives = (MapInteractiveV1_t*)(calloc((size_t)(interactive_count), sizeof(*map_interactives)));
      if(!map_interactives){
           LOG("%s(): failed to allocate %d interactives\n", __FUNCTION__, interactive_count);
           return false;
      }
 
      // read data from file
-     fread(map_tiles, sizeof(*map_tiles), map_tile_count, file);
-     fread(map_blocks, sizeof(*map_blocks), block_count, file);
-     fread(map_interactives, sizeof(*map_interactives), interactive_count, file);
+     fread(map_tiles, sizeof(*map_tiles), (size_t)(map_tile_count), file);
+     fread(map_blocks, sizeof(*map_blocks), (size_t)(block_count), file);
+     fread(map_interactives, sizeof(*map_interactives), (size_t)(interactive_count), file);
 
      destroy(tilemap);
      init(tilemap, map_width, map_height);
@@ -258,28 +258,28 @@ bool load_map_from_file_v2(FILE* file, Coord_t* player_start, TileMap_t* tilemap
 
      // alloc and convert map elements to map format
      S32 map_tile_count = (S32)(map_width) * (S32)(map_height);
-     MapTileV1_t* map_tiles = (MapTileV1_t*)(calloc(map_tile_count, sizeof(*map_tiles)));
+     MapTileV1_t* map_tiles = (MapTileV1_t*)(calloc((size_t)(map_tile_count), sizeof(*map_tiles)));
      if(!map_tiles){
           LOG("%s(): failed to allocate %d tiles\n", __FUNCTION__, map_tile_count);
           return false;
      }
 
-     MapBlockV2_t* map_blocks = (MapBlockV2_t*)(calloc(block_count, sizeof(*map_blocks)));
+     MapBlockV2_t* map_blocks = (MapBlockV2_t*)(calloc((size_t)(block_count), sizeof(*map_blocks)));
      if(!map_blocks){
           LOG("%s(): failed to allocate %d blocks\n", __FUNCTION__, block_count);
           return false;
      }
 
-     MapInteractiveV1_t* map_interactives = (MapInteractiveV1_t*)(calloc(interactive_count, sizeof(*map_interactives)));
+     MapInteractiveV1_t* map_interactives = (MapInteractiveV1_t*)(calloc((size_t)(interactive_count), sizeof(*map_interactives)));
      if(!map_interactives){
           LOG("%s(): failed to allocate %d interactives\n", __FUNCTION__, interactive_count);
           return false;
      }
 
      // read data from file
-     fread(map_tiles, sizeof(*map_tiles), map_tile_count, file);
-     fread(map_blocks, sizeof(*map_blocks), block_count, file);
-     fread(map_interactives, sizeof(*map_interactives), interactive_count, file);
+     fread(map_tiles, sizeof(*map_tiles), (size_t)(map_tile_count), file);
+     fread(map_blocks, sizeof(*map_blocks), (size_t)(block_count), file);
+     fread(map_interactives, sizeof(*map_interactives), (size_t)(interactive_count), file);
 
      destroy(tilemap);
      init(tilemap, map_width, map_height);

@@ -66,13 +66,10 @@ struct Editor_t{
 
      S32 category;
      S32 stamp;
-     S32 block_entangle_index_save;
+     S16 block_entangle_index_save;
 
      Coord_t selection_start;
      Coord_t selection_end;
-
-     Coord_t clipboard_start_offset;
-     Coord_t clipboard_end_offset;
 
      ObjectArray_t<Stamp_t> selection;
      ObjectArray_t<Stamp_t> clipboard;

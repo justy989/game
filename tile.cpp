@@ -5,11 +5,11 @@
 #include <cstring>
 
 bool init(TileMap_t* tilemap, S16 width, S16 height){
-     tilemap->tiles = (Tile_t**)calloc(height, sizeof(*tilemap->tiles));
+     tilemap->tiles = (Tile_t**)calloc((size_t)(height), sizeof(*tilemap->tiles));
      if(!tilemap->tiles) return false;
 
      for(S16 i = 0; i < height; i++){
-          tilemap->tiles[i] = (Tile_t*)calloc(width, sizeof(*tilemap->tiles[i]));
+          tilemap->tiles[i] = (Tile_t*)calloc((size_t)(width), sizeof(*tilemap->tiles[i]));
           if(!tilemap->tiles[i]) return false;
      }
 
@@ -43,12 +43,12 @@ bool tile_is_solid(Tile_t* tile){
 }
 
 bool tile_is_iced(Tile_t* tile){
-     return tile->flags & TILE_FLAG_ICED;
+     return (bool)(tile->flags & TILE_FLAG_ICED);
 }
 
 Tile_t* tilemap_get_tile(TileMap_t* tilemap, Coord_t coord){
-     if(coord.x < 0 || coord.x >= tilemap->width) return NULL;
-     if(coord.y < 0 || coord.y >= tilemap->height) return NULL;
+     if(coord.x < 0 || coord.x >= tilemap->width) return nullptr;
+     if(coord.y < 0 || coord.y >= tilemap->height) return nullptr;
 
      return tilemap->tiles[coord.y] + coord.x;
 }
@@ -66,8 +66,8 @@ bool tilemap_is_iced(TileMap_t* tilemap, Coord_t coord){
 }
 
 Direction_t tile_flags_cluster_direction(U16 flags){
-     bool first_bit = flags & (1 << 14);
-     bool second_bit = flags & (1 << 15);
+     bool first_bit = (bool)(flags & (1 << 14));
+     bool second_bit = (bool)(flags & (1 << 15));
      if(first_bit){
           if(second_bit){
                return DIRECTION_UP;
@@ -77,11 +77,10 @@ Direction_t tile_flags_cluster_direction(U16 flags){
      }else{
           if(second_bit){
                return DIRECTION_DOWN;
-          }else{
-               return DIRECTION_LEFT;
           }
      }
-     return DIRECTION_COUNT;
+
+     return DIRECTION_LEFT;
 }
 
 void tile_flags_set_cluster_direction(U16* flags, Direction_t dir){

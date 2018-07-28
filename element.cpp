@@ -62,11 +62,6 @@ Element_t transition_element(Element_t a, Element_t b){
      return e;
 }
 
-Element_t next_element(Element_t e){
-     int i = (int)(e) + 1;
-     return (Element_t)( i % ELEMENT_COUNT );
-}
-
 const char* element_to_string(Element_t e){
      switch(e){
      default:

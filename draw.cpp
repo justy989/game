@@ -7,17 +7,17 @@
 #include <float.h>
 
 Vec_t theme_frame(S16 x, S16 y){
-     y = (THEME_FRAMES_TALL - 1) - y;
+     y = (THEME_FRAMES_TALL - (S16)(1)) - y;
      return Vec_t{(F32)(x) * THEME_FRAME_WIDTH, (F32)(y) * THEME_FRAME_HEIGHT};
 }
 
-Vec_t arrow_frame(S8 x, S8 y) {
-     y = (ARROW_FRAMES_TALL - 1) - y;
+Vec_t arrow_frame(S16 x, S16 y) {
+     y = (ARROW_FRAMES_TALL - (S16)(1)) - y;
      return Vec_t{(F32)(x) * ARROW_FRAME_WIDTH, (F32)(y) * ARROW_FRAME_HEIGHT};
 }
 
-Vec_t player_frame(S8 x, S8 y){
-     y = (PLAYER_FRAMES_TALL - 1) - y;
+Vec_t player_frame(S16 x, S16 y){
+     y = (PLAYER_FRAMES_TALL - (S16)(1)) - y;
      return Vec_t{(F32)(x) * PLAYER_FRAME_WIDTH, (F32)(y) * PLAYER_FRAME_HEIGHT};
 }
 
@@ -72,9 +72,8 @@ void draw_double_theme_frame(Vec_t pos, Vec_t tex){
 }
 
 void draw_tile_id(U8 id, Vec_t pos){
-     U8 id_x = id % 16;
-     U8 id_y = id / 16;
-
+     U8 id_x = id % (U8)(16);
+     U8 id_y = id / (U8)(16);
      draw_theme_frame(pos, theme_frame(id_x, id_y));
 }
 
@@ -99,7 +98,7 @@ void draw_tile_flags(U16 flags, Vec_t tile_pos){
      }
 
      if(flags & (TILE_FLAG_WIRE_CLUSTER_LEFT | TILE_FLAG_WIRE_CLUSTER_MID | TILE_FLAG_WIRE_CLUSTER_RIGHT)){
-          S16 frame_y = 17 + tile_flags_cluster_direction(flags);
+          S16 frame_y = (S16)(17) + tile_flags_cluster_direction(flags);
           S16 frame_x = 0;
 
           if(flags & TILE_FLAG_WIRE_CLUSTER_LEFT){
@@ -167,7 +166,7 @@ void draw_interactive(Interactive_t* interactive, Vec_t pos_vec, Coord_t coord,
           break;
      case INTERACTIVE_TYPE_PRESSURE_PLATE:
      {
-          int frame_x = 7;
+          S16 frame_x = 7;
           if(interactive->pressure_plate.down) frame_x++;
           tex_vec = theme_frame(frame_x, 8);
           draw_theme_frame(pos_vec, tex_vec);
@@ -180,11 +179,11 @@ void draw_interactive(Interactive_t* interactive, Vec_t pos_vec, Coord_t coord,
           draw_theme_frame(pos_vec, theme_frame(0, 9));
           break;
      case INTERACTIVE_TYPE_POPUP:
-          tex_vec = theme_frame(interactive->popup.lift.ticks - 1, 8);
+          tex_vec = theme_frame(interactive->popup.lift.ticks - (S16)(1), 8);
           draw_double_theme_frame(pos_vec, tex_vec);
           break;
      case INTERACTIVE_TYPE_DOOR:
-          tex_vec = theme_frame(interactive->door.lift.ticks + 8, 11 + interactive->door.face);
+          tex_vec = theme_frame(interactive->door.lift.ticks + (S16)(8), (S16)(11) + interactive->door.face);
           draw_theme_frame(pos_vec, tex_vec);
           break;
      case INTERACTIVE_TYPE_LIGHT_DETECTOR:
@@ -251,12 +250,12 @@ void draw_interactive(Interactive_t* interactive, Vec_t pos_vec, Coord_t coord,
                draw_theme_frame(pos_vec, theme_frame(frame_x, frame_y));
           }
 
-          draw_theme_frame(pos_vec, theme_frame(interactive->portal.face, 26 + interactive->portal.on));
+          draw_theme_frame(pos_vec, theme_frame(interactive->portal.face, (S16)(26 + interactive->portal.on)));
           break;
      }
      case INTERACTIVE_TYPE_WIRE_CROSS:
      {
-          int y_frame = 17 + interactive->wire_cross.on;
+          S16 y_frame = (S16)(17) + interactive->wire_cross.on;
           if(interactive->wire_cross.mask & DIRECTION_MASK_LEFT) draw_theme_frame(pos_vec, theme_frame(6, y_frame));
           if(interactive->wire_cross.mask & DIRECTION_MASK_UP) draw_theme_frame(pos_vec, theme_frame(7, y_frame));
           if(interactive->wire_cross.mask & DIRECTION_MASK_RIGHT) draw_theme_frame(pos_vec, theme_frame(8, y_frame));
@@ -264,7 +263,6 @@ void draw_interactive(Interactive_t* interactive, Vec_t pos_vec, Coord_t coord,
           break;
      }
      }
-
 }
 
 void draw_quad_wireframe(const Quad_t* quad, F32 red, F32 green, F32 blue){

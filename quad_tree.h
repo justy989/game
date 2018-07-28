@@ -40,27 +40,27 @@ bool quad_tree_subdivide(QuadTreeNode_t<T>* node){
      node->top_right = (QuadTreeNode_t<T>*)(calloc(1, sizeof(*node)));
      if(!node->top_right) return false;
 
-     int half_width = (node->bounds.right - node->bounds.left) / 2;
-     int half_height = (node->bounds.top - node->bounds.bottom) / 2;
+     S16 half_width = (node->bounds.right - node->bounds.left) / (S16)(2);
+     S16 half_height = (node->bounds.top - node->bounds.bottom) / (S16)(2);
 
      node->bottom_left->bounds.left = node->bounds.left;
      node->bottom_left->bounds.right = node->bounds.left + half_width;
      node->bottom_left->bounds.bottom = node->bounds.bottom;
      node->bottom_left->bounds.top = node->bounds.bottom + half_height;
 
-     node->bottom_right->bounds.left = node->bottom_left->bounds.right + 1;
+     node->bottom_right->bounds.left = node->bottom_left->bounds.right + (S16)(1);
      node->bottom_right->bounds.right = node->bounds.right;
      node->bottom_right->bounds.bottom = node->bounds.bottom;
      node->bottom_right->bounds.top = node->bounds.bottom + half_height;
 
      node->top_left->bounds.left = node->bounds.left;
      node->top_left->bounds.right = node->bounds.left + half_width;
-     node->top_left->bounds.bottom = node->bottom_left->bounds.top + 1;
+     node->top_left->bounds.bottom = node->bottom_left->bounds.top + (S16)(1);
      node->top_left->bounds.top = node->bounds.top;
 
      node->top_right->bounds.left = node->bottom_right->bounds.left;
      node->top_right->bounds.right = node->bottom_right->bounds.right;
-     node->top_right->bounds.bottom = node->bottom_left->bounds.top + 1;
+     node->top_right->bounds.bottom = node->bottom_left->bounds.top + (S16)(1);
      node->top_right->bounds.top = node->bounds.top;
 
      for(S8 i = 0; i < node->entry_count; i++){

@@ -306,8 +306,8 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
      Coord_t min = player_coord - Coord_t{1, 1};
      Coord_t max = player_coord + Coord_t{1, 1};
      // S8 player_top = player.pos.z + 2 * HEIGHT_INTERVAL;
-     min = coord_clamp_zero_to_dim(min, world->tilemap.width - 1, world->tilemap.height - 1);
-     max = coord_clamp_zero_to_dim(max, world->tilemap.width - 1, world->tilemap.height - 1);
+     min = coord_clamp_zero_to_dim(min, world->tilemap.width - (S16)(1), world->tilemap.height - (S16)(1));
+     max = coord_clamp_zero_to_dim(max, world->tilemap.width - (S16)(1), world->tilemap.height - (S16)(1));
 
      // TODO: convert to use quad tree
      Vec_t collided_block_delta {};
@@ -363,7 +363,7 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
 
           if(collide_with_block){
                Vec_t pos_delta_diff = pos_delta - pos_delta_save;
-               collided_block_delta = vec_rotate_quadrants_clockwise(pos_delta_diff, 4 - portal_rotations);
+               collided_block_delta = vec_rotate_quadrants_clockwise(pos_delta_diff, (U8)(4) - portal_rotations);
                auto collided_block_dir = relative_quadrant(position.pixel, block_pos.pixel + HALF_TILE_SIZE_PIXEL);
                auto collided_block = world->blocks.elements + i;
                Position_t pre_move = collided_block->pos;
@@ -493,7 +493,7 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
      for(S8 d = 0; d < DIRECTION_COUNT; d++){
           if(!collided_blocks[d]) continue;
 
-          Direction_t dir = static_cast<Direction_t>(d);
+          auto dir = (Direction_t)(d);
 
 #ifdef BLOCKS_SQUISH_PLAYER
           Direction_t opposite = direction_opposite(dir);
@@ -555,7 +555,7 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
 
 TeleportPositionResult_t teleport_position_across_portal(Position_t position, Vec_t pos_delta, World_t* world, Coord_t premove_coord,
                                                          Coord_t postmove_coord){
-     TeleportPositionResult_t result;
+     TeleportPositionResult_t result {};
 
      if(postmove_coord != premove_coord){
           auto* interactive = quad_tree_interactive_find_at(world->interactive_qt, postmove_coord);
@@ -605,8 +605,8 @@ static void illuminate_line(Coord_t start, Coord_t end, U8 value, World_t* world
                F64 dy = (F64)(end.y) - (F64)(start.y);
                F64 derror = fabs(dy / dx);
 
-               S16 step_x = (start.x < end.x) ? 1 : -1;
-               S16 step_y = (end.y - start.y >= 0) ? 1 : -1;
+               S16 step_x = (start.x < end.x) ? (S16)(1) : (S16)(-1);
+               S16 step_y = (end.y - start.y >= 0) ? (S16)(1) : (S16)(-1);
                S16 end_step_x = end.x + step_x;
                S16 sy = start.y;
 
@@ -636,21 +636,20 @@ static void illuminate_line(Coord_t start, Coord_t end, U8 value, World_t* world
           Tile_t* tile = tilemap_get_tile(&world->tilemap, coords[i]);
           if(!tile) continue;
 
-          S16 diff_x = abs(coords[i].x - start.x);
-          S16 diff_y = abs(coords[i].y - start.y);
+          S16 diff_x = (S16)(abs(coords[i].x - start.x));
+          S16 diff_y = (S16)(abs(coords[i].y - start.y));
           U8 distance = static_cast<U8>(sqrt(static_cast<F32>(diff_x * diff_x + diff_y * diff_y)));
 
-          U8 new_value = value - (distance * LIGHT_DECAY);
+          U8 new_value = value - (distance * (U8)(LIGHT_DECAY));
 
           if(coords[i] != from_portal){
                Interactive_t* interactive = quad_tree_interactive_find_at(world->interactive_qt, coords[i]);
                if(is_active_portal(interactive)){
                     PortalExit_t portal_exits = find_portal_exits(coords[i], &world->tilemap, world->interactive_qt);
-                    for(S8 d = 0; d < DIRECTION_COUNT; d++){
-                         for(S8 p = 0; p < portal_exits.directions[d].count; p++){
-                              if(portal_exits.directions[d].coords[p] == coords[i]) continue;
-                              illuminate(portal_exits.directions[d].coords[p], new_value, world,
-                                         portal_exits.directions[d].coords[p]);
+                    for (auto &direction : portal_exits.directions) {
+                         for(S8 p = 0; p < direction.count; p++){
+                              if(direction.coords[p] == coords[i]) continue;
+                              illuminate(direction.coords[p], new_value, world, direction.coords[p]);
                          }
                     }
                }

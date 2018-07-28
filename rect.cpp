@@ -5,18 +5,8 @@ bool xy_in_rect(const Rect_t& rect, S16 x, S16 y){
              y >= rect.bottom && y <= rect.top);
 }
 
-Rect_t pixel_range(Pixel_t bottom_left, Pixel_t top_right){
-     Rect_t r {bottom_left.x, bottom_left.y, top_right.x, top_right.y};
-     return r;
-}
-
 bool pixel_in_rect(Pixel_t p, Rect_t r){
      return xy_in_rect(r, p.x, p.y);
-}
-
-Rect_t coord_range(Coord_t bottom_left, Coord_t top_right){
-     Rect_t r {bottom_left.x, bottom_left.y, top_right.x, top_right.y};
-     return r;
 }
 
 bool coord_in_rect(Coord_t c, Rect_t r){

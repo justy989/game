@@ -47,8 +47,8 @@ DirectionMask_t vec_direction_mask(Vec_t vec){
 }
 
 Direction_t vec_direction(Vec_t vec){
-     if(vec.x) assert(vec.y == 0);
-     if(vec.y) assert(vec.x == 0);
+     if(vec.x != 0) assert(vec.y == 0);
+     if(vec.y != 0) assert(vec.x == 0);
 
      return direction_from_single_mask(vec_direction_mask(vec));
 }
@@ -135,23 +135,6 @@ Vec_t direction_to_vec(Direction_t d){
      return Vec_t{0, 0};
 }
 
-Pixel_t direction_to_pixel(Direction_t d){
-     switch(d){
-     default:
-          break;
-     case DIRECTION_LEFT:
-          return Pixel_t{-TILE_SIZE_IN_PIXELS, 0};
-     case DIRECTION_RIGHT:
-          return Pixel_t{TILE_SIZE_IN_PIXELS, 0};
-     case DIRECTION_UP:
-          return Pixel_t{0, TILE_SIZE_IN_PIXELS};
-     case DIRECTION_DOWN:
-          return Pixel_t{0, -TILE_SIZE_IN_PIXELS};
-     }
-
-     return Pixel_t{0, 0};
-}
-
 Rect_t rect_surrounding_coord(Coord_t coord){
      Pixel_t pixel = coord_to_pixel(coord);
      return Rect_t{pixel.x,
@@ -164,17 +147,15 @@ Rect_t rect_surrounding_adjacent_coords(Coord_t coord){
      Pixel_t pixel = coord_to_pixel(coord);
      return Rect_t {(S16)(pixel.x - TILE_SIZE_IN_PIXELS),
                     (S16)(pixel.y - TILE_SIZE_IN_PIXELS),
-                    (S16)(pixel.x + (2 * TILE_SIZE_IN_PIXELS)),
-                    (S16)(pixel.y + (2 * TILE_SIZE_IN_PIXELS))};
+                    (S16)(pixel.x + DOUBLE_TILE_SIZE_IN_PIXELS),
+                    (S16)(pixel.y + DOUBLE_TILE_SIZE_IN_PIXELS)};
 }
 
 Rect_t rect_to_check_surrounding_blocks(Pixel_t center){
-     Rect_t rect = {};
-     rect.left = center.x - (2 * TILE_SIZE_IN_PIXELS);
-     rect.right = center.x + (2 * TILE_SIZE_IN_PIXELS);
-     rect.bottom = center.y - (2 * TILE_SIZE_IN_PIXELS);
-     rect.top = center.y + (2 * TILE_SIZE_IN_PIXELS);
-     return rect;
+    return Rect_t{(S16)(center.x - DOUBLE_TILE_SIZE_IN_PIXELS),
+                   (S16)(center.y - DOUBLE_TILE_SIZE_IN_PIXELS),
+                   (S16)(center.x + DOUBLE_TILE_SIZE_IN_PIXELS),
+                   (S16)(center.y + DOUBLE_TILE_SIZE_IN_PIXELS)};
 }
 
 Interactive_t* quad_tree_interactive_find_at(QuadTreeNode_t<Interactive_t>* root, Coord_t coord){
@@ -276,11 +257,6 @@ Coord_t mouse_select_coord(Vec_t mouse_screen){
 
 Coord_t mouse_select_world(Vec_t mouse_screen, Position_t camera){
      return mouse_select_coord(mouse_screen) + (pos_to_coord(camera) - Coord_t{ROOM_TILE_SIZE / 2, ROOM_TILE_SIZE / 2});
-}
-
-S32 mouse_select_index(Vec_t mouse_screen){
-     Coord_t coord = mouse_select_coord(mouse_screen);
-     return coord.y * ROOM_TILE_SIZE + coord.x;
 }
 
 Vec_t coord_to_screen_position(Coord_t coord){

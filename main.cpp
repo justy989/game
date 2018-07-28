@@ -125,7 +125,7 @@ int main(int argc, char** argv){
      S16 map_number = 0;
      S16 first_map_number = 0;
 
-     Demo_t demo;
+     Demo_t demo {};
 
      for(int i = 1; i < argc; i++){
           if(strcmp(argv[i], "-play") == 0){
@@ -152,7 +152,7 @@ int main(int argc, char** argv){
           }else if(strcmp(argv[i], "-map") == 0){
                int next = i + 1;
                if(next >= argc) continue;
-               map_number = atoi(argv[next]);
+               map_number = (S16)(atoi(argv[next]));
                first_map_number = map_number;
           }else if(strcmp(argv[i], "-h") == 0){
                printf("%s [options]\n", argv[0]);
@@ -182,7 +182,7 @@ int main(int argc, char** argv){
      int window_width = 1080;
      int window_height = 1080;
      SDL_Window* window = nullptr;
-     SDL_GLContext opengl_context = 0;
+     SDL_GLContext opengl_context = nullptr;
      GLuint theme_texture = 0;
      GLuint player_texture = 0;
      GLuint arrow_texture = 0;
@@ -251,10 +251,10 @@ int main(int argc, char** argv){
           break;
      }
 
-     World_t world;
+     World_t world {};
 
-     Editor_t editor;
-     Undo_t undo = {};
+     Editor_t editor {};
+     Undo_t undo {};
 
      Coord_t player_start {2, 8};
 
@@ -278,9 +278,9 @@ int main(int argc, char** argv){
      bool ctrl_down = false;
 
      // cached to seek in demo faster
-     TileMap_t demo_starting_tilemap = {};
-     ObjectArray_t<Block_t> demo_starting_blocks = {};
-     ObjectArray_t<Interactive_t> demo_starting_interactives = {};
+     TileMap_t demo_starting_tilemap {};
+     ObjectArray_t<Block_t> demo_starting_blocks {};
+     ObjectArray_t<Interactive_t> demo_starting_interactives {};
 
      Quad_t pct_bar_outline_quad = {0, 2.0f * PIXEL_SIZE, 1.0f, 0.02f};
 
@@ -371,7 +371,7 @@ int main(int argc, char** argv){
           if((!suite || show_suite) && demo.seek_frame < 0){
                current_time = std::chrono::system_clock::now();
                std::chrono::duration<double> elapsed_seconds = current_time - last_time;
-               dt = (F64)(elapsed_seconds.count());
+               dt = (F32)(elapsed_seconds.count());
 
                if(demo.mode == DEMO_MODE_PLAY){
                     if(dt < (0.0166666f / demo.dt_scalar)) continue;
@@ -612,7 +612,7 @@ int main(int argc, char** argv){
                               if(block_count > 1){
                                    LOG("error: too man blocks in coord, unsure which one to entangle!\\n");
                               }else if(block_count == 1){
-                                   S32 block_index = blocks[0] - world.blocks.elements;
+                                   S16 block_index = (S16)(blocks[0] - world.blocks.elements);
                                    if(block_index >= 0 && block_index < world.blocks.count){
                                         if(editor.block_entangle_index_save >= 0 && editor.block_entangle_index_save != block_index){
                                              undo_commit(&undo, &world.players, &world.tilemap, &world.blocks, &world.interactives);
@@ -650,7 +650,7 @@ int main(int argc, char** argv){
 
                               // TODO: make this a function where you can pass in entangler_index
                               S16 new_index = world.players.count;
-                              if(resize(&world.players, world.players.count + 1)){
+                              if(resize(&world.players, world.players.count + (S16)(1))){
                                    Player_t* new_player = world.players.elements + new_index;
                                    *new_player = world.players.elements[0];
                                    new_player->pos = pixel_to_pos(pixel);
@@ -701,7 +701,7 @@ int main(int argc, char** argv){
                          if(editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
                               sort_selection(&editor);
 
-                              S16 height_offset = (editor.selection_end.y - editor.selection_start.y) - 1;
+                              S16 height_offset = (S16)((editor.selection_end.y - editor.selection_start.y) - 1);
 
                               // perform rotation on each offset
                               for(S16 i = 0; i < editor.selection.count; i++){
@@ -932,7 +932,8 @@ int main(int argc, char** argv){
 
                               destroy(&editor.selection);
 
-                              S16 stamp_count = (((editor.selection_end.x - editor.selection_start.x) + 1) * ((editor.selection_end.y - editor.selection_start.y) + 1)) * 2;
+                              S16 stamp_count = (S16)((((editor.selection_end.x - editor.selection_start.x) + 1) *
+                                                       ((editor.selection_end.y - editor.selection_start.y) + 1)) * 2);
                               init(&editor.selection, stamp_count);
                               S16 stamp_index = 0;
                               for(S16 j = editor.selection_start.y; j <= editor.selection_end.y; j++){
@@ -956,7 +957,7 @@ int main(int argc, char** argv){
                                         // interactive
                                         auto* interactive = quad_tree_interactive_find_at(world.interactive_qt, coord);
                                         if(interactive){
-                                             resize(&editor.selection, editor.selection.count + 1);
+                                             resize(&editor.selection, editor.selection.count + (S16)(1));
                                              auto* stamp = editor.selection.elements + (editor.selection.count - 1);
                                              stamp->type = STAMP_TYPE_INTERACTIVE;
                                              stamp->interactive = *interactive;
@@ -966,7 +967,7 @@ int main(int argc, char** argv){
                                         for(S16 b = 0; b < world.blocks.count; b++){
                                              auto* block = world.blocks.elements + b;
                                              if(pos_to_coord(block->pos) == coord){
-                                                  resize(&editor.selection, editor.selection.count + 1);
+                                                  resize(&editor.selection, editor.selection.count + (S16)(1));
                                                   auto* stamp = editor.selection.elements + (editor.selection.count - 1);
                                                   stamp->type = STAMP_TYPE_BLOCK;
                                                   stamp->block.face = block->face;
@@ -1047,10 +1048,10 @@ int main(int argc, char** argv){
                               if(tile){
                                    if(!tile_is_iced(tile)){
                                         Pixel_t center = coord_to_pixel(interactive->coord) + HALF_TILE_SIZE_PIXEL;
-                                        Rect_t rect = {(S16)(center.x - (2 * TILE_SIZE_IN_PIXELS)),
-                                                       (S16)(center.y - (2 * TILE_SIZE_IN_PIXELS)),
-                                                       (S16)(center.x + (2 * TILE_SIZE_IN_PIXELS)),
-                                                       (S16)(center.y + (2 * TILE_SIZE_IN_PIXELS))};
+                                        Rect_t rect = {(S16)(center.x - DOUBLE_TILE_SIZE_IN_PIXELS),
+                                                       (S16)(center.y - DOUBLE_TILE_SIZE_IN_PIXELS),
+                                                       (S16)(center.x + DOUBLE_TILE_SIZE_IN_PIXELS),
+                                                       (S16)(center.y + DOUBLE_TILE_SIZE_IN_PIXELS)};
 
                                         S16 block_count = 0;
                                         Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
@@ -1148,9 +1149,9 @@ int main(int argc, char** argv){
                     for(S16 b = 0; b < block_count; b++){
                          // blocks on the coordinate and on the ground block light
                          Rect_t block_rect = block_get_rect(blocks[b]);
-                         S16 block_index = blocks[b] - world.blocks.elements;
-                         S16 block_bottom = blocks[b]->pos.z;
-                         S16 block_top = block_bottom + HEIGHT_INTERVAL;
+                         S16 block_index = (S16)(blocks[b] - world.blocks.elements);
+                         S8 block_bottom = blocks[b]->pos.z;
+                         S8 block_top = block_bottom + HEIGHT_INTERVAL;
                          if(pixel_in_rect(arrow->pos.pixel, block_rect) && arrow->element_from_block != block_index){
                               if(arrow->pos.z >= block_bottom && arrow->pos.z <= block_top){
                                    arrow->stuck_time = dt;
@@ -1184,10 +1185,8 @@ int main(int argc, char** argv){
 
                     if(pre_move_coord != post_move_coord){
                          bool skip = false;
-                         for(S8 d = 0; d < DIRECTION_COUNT; d++){
-                              if(post_move_coord == skip_coord[d]){
-                                   skip = true;
-                              }
+                         for (auto d : skip_coord) {
+                              if(post_move_coord == d) skip = true;
                          }
 
                          if(!skip){
@@ -1412,8 +1411,8 @@ int main(int argc, char** argv){
 
                     // check for adjacent walls
                     if(block->vel.x > 0.0f){
-                         Pixel_t pixel_a;
-                         Pixel_t pixel_b;
+                         Pixel_t pixel_a {};
+                         Pixel_t pixel_b {};
                          block_adjacent_pixels_to_check(block, DIRECTION_RIGHT, &pixel_a, &pixel_b);
                          Coord_t coord_a = pixel_to_coord(pixel_a);
                          Coord_t coord_b = pixel_to_coord(pixel_b);
@@ -1426,8 +1425,8 @@ int main(int argc, char** argv){
                                                    quad_tree_interactive_solid_at(world.interactive_qt, &world.tilemap, coord_b);
                          }
                     }else if(block->vel.x < 0.0f){
-                         Pixel_t pixel_a;
-                         Pixel_t pixel_b;
+                         Pixel_t pixel_a {};
+                         Pixel_t pixel_b {};
                          block_adjacent_pixels_to_check(block, DIRECTION_LEFT, &pixel_a, &pixel_b);
                          Coord_t coord_a = pixel_to_coord(pixel_a);
                          Coord_t coord_b = pixel_to_coord(pixel_b);
@@ -1442,8 +1441,8 @@ int main(int argc, char** argv){
                     }
 
                     if(block->vel.y > 0.0f){
-                         Pixel_t pixel_a;
-                         Pixel_t pixel_b;
+                         Pixel_t pixel_a {};
+                         Pixel_t pixel_b {};
                          block_adjacent_pixels_to_check(block, DIRECTION_UP, &pixel_a, &pixel_b);
                          Coord_t coord_a = pixel_to_coord(pixel_a);
                          Coord_t coord_b = pixel_to_coord(pixel_b);
@@ -1456,8 +1455,8 @@ int main(int argc, char** argv){
                                                    quad_tree_interactive_solid_at(world.interactive_qt, &world.tilemap, coord_b);
                          }
                     }else if(block->vel.y < 0.0f){
-                         Pixel_t pixel_a;
-                         Pixel_t pixel_b;
+                         Pixel_t pixel_a {};
+                         Pixel_t pixel_b {};
                          block_adjacent_pixels_to_check(block, DIRECTION_DOWN, &pixel_a, &pixel_b);
                          Coord_t coord_a = pixel_to_coord(pixel_a);
                          Coord_t coord_b = pixel_to_coord(pixel_b);
@@ -1486,7 +1485,7 @@ int main(int argc, char** argv){
                                    if(vel_mask & DIRECTION_MASK_RIGHT){
                                         stop_on_boundary_x = true;
                                    }else if(vel_mask & DIRECTION_MASK_UP ||
-                                            vel_mask & DIRECTION_MASK_DOWN){
+                                             vel_mask & DIRECTION_MASK_DOWN){
                                         stop_on_boundary_y = true;
                                    }
                                    break;
@@ -1494,7 +1493,7 @@ int main(int argc, char** argv){
                                    if(vel_mask & DIRECTION_MASK_LEFT){
                                         stop_on_boundary_x = true;
                                    }else if(vel_mask & DIRECTION_MASK_UP ||
-                                            vel_mask & DIRECTION_MASK_DOWN){
+                                             vel_mask & DIRECTION_MASK_DOWN){
                                         stop_on_boundary_y = true;
                                    }
                                    break;
@@ -1502,7 +1501,7 @@ int main(int argc, char** argv){
                                    if(vel_mask & DIRECTION_MASK_DOWN){
                                         stop_on_boundary_y = true;
                                    }else if(vel_mask & DIRECTION_MASK_LEFT ||
-                                            vel_mask & DIRECTION_MASK_RIGHT){
+                                             vel_mask & DIRECTION_MASK_RIGHT){
                                         stop_on_boundary_x = true;
                                    }
                                    break;
@@ -1510,7 +1509,7 @@ int main(int argc, char** argv){
                                    if(vel_mask & DIRECTION_MASK_UP){
                                         stop_on_boundary_y = true;
                                    }else if(vel_mask & DIRECTION_MASK_LEFT ||
-                                            vel_mask & DIRECTION_MASK_RIGHT){
+                                             vel_mask & DIRECTION_MASK_RIGHT){
                                         stop_on_boundary_x = true;
                                    }
                                    break;
@@ -1617,17 +1616,17 @@ int main(int argc, char** argv){
 
                          PortalExit_t portal_exits = find_portal_exits(portal->coord, &world.tilemap, world.interactive_qt);
                          S8 clone_id = 0;
-                         for(int d = 0; d < DIRECTION_COUNT; d++){
-                              for(int p = 0; p < portal_exits.directions[d].count; p++){
-                                   if(portal_exits.directions[d].coords[p] == portal->coord) continue;
+                         for (auto &direction : portal_exits.directions) {
+                              for(int p = 0; p < direction.count; p++){
+                                   if(direction.coords[p] == portal->coord) continue;
 
                                    if(clone_id == 0){
                                         block->clone_id = clone_id;
                                    }else{
                                         S16 new_block_index = world.blocks.count;
-                                        S16 old_block_index = block - world.blocks.elements;
+                                        S16 old_block_index = (S16)(block - world.blocks.elements);
 
-                                        if(resize(&world.blocks, world.blocks.count + 1)){
+                                        if(resize(&world.blocks, world.blocks.count + (S16)(1))){
                                              // update quad tree now that we have resized the world
                                              quad_tree_free(world.block_qt);
                                              world.block_qt = quad_tree_build(&world.blocks);
@@ -1660,7 +1659,7 @@ int main(int argc, char** argv){
                          if(block_from_coord == block->clone_start){
                               // in this instance, despawn the clone
                               // NOTE: I think this relies on new entangle blocks being
-                              S16 block_index = block - world.blocks.elements;
+                              S16 block_index = (S16)(block - world.blocks.elements);
                               remove(&world.blocks, block->entangle_index);
 
                               // update ptr since we could have resized
@@ -1672,7 +1671,7 @@ int main(int argc, char** argv){
                                    if(replaced_block->entangle_index >= 0){
                                         // update the block's entangler that moved into our entangled blocks spot
                                         Block_t* replaced_block_entangler = world.blocks.elements + replaced_block->entangle_index;
-                                        replaced_block_entangler->entangle_index = replaced_block - world.blocks.elements;
+                                        replaced_block_entangler->entangle_index = (S16)(replaced_block - world.blocks.elements);
                                    }
                               }
 
@@ -1861,18 +1860,18 @@ int main(int argc, char** argv){
                               world.clone_instance++;
 
                               S8 clone_id = 0;
-                              for(int d = 0; d < DIRECTION_COUNT; d++){
-                                   for(int p = 0; p < portal_exits.directions[d].count; p++){
-                                        if(portal_exits.directions[d].coords[p] == portal->coord) continue;
+                              for (auto &direction : portal_exits.directions) {
+                                   for(int p = 0; p < direction.count; p++){
+                                        if(direction.coords[p] == portal->coord) continue;
 
                                         if(clone_id == 0){
                                              player->clone_id = clone_id;
                                              player->clone_instance = world.clone_instance;
                                         }else{
                                              S16 new_player_index = world.players.count;
-                                             S16 old_player_index = player - world.players.elements;
+                                             S16 old_player_index = (S16)(player - world.players.elements);
 
-                                             if(resize(&world.players, world.players.count + 1)){
+                                             if(resize(&world.players, world.players.count + (S16)(1))){
                                                   // a resize will kill our block ptr, so we gotta update it
                                                   player = world.players.elements + old_player_index;
                                                   player->clone_start = portal->coord;
@@ -1891,7 +1890,7 @@ int main(int argc, char** argv){
                          auto player_move_dir_mask = vec_direction_mask(pos_delta);
                          bool from_clone_start = false;
                          for(S8 d = 0; d < DIRECTION_COUNT; d++){
-                              Direction_t dir = (Direction_t)(d);
+                              auto dir = (Direction_t)(d);
                               if(!direction_in_mask(player_move_dir_mask, dir)) continue;
                               auto player_from_coord = pos_to_coord(player->pos) - dir;
                               if(player_from_coord == player->clone_start){
@@ -1902,10 +1901,10 @@ int main(int argc, char** argv){
 
                          if(from_clone_start){
                               // in this instance, despawn the clone
-                              S16 player_index = player - world.players.elements;
+                              S16 player_index = (S16)(player - world.players.elements);
 
                               // loop across all players after this one
-                              for(S16 p = i + 1; p < world.players.count; p++){
+                              for(S16 p = (S16)(i + 1); p < world.players.count; p++){
                                    Player_t* other_player = world.players.elements + p;
                                    if(other_player->clone_instance == player->clone_instance){
                                         remove(&world.players, p);
@@ -1915,7 +1914,7 @@ int main(int argc, char** argv){
                               // update ptr since we could have resized
                               player = world.players.elements + player_index;
                          }else{
-                              for(S16 p = i + 1; p < world.players.count; p++){
+                              for(S16 p = (S16)(i + 1); p < world.players.count; p++){
                                    Player_t* other_player = world.players.elements + p;
                                    if(other_player->clone_instance == player->clone_instance){
                                        other_player->clone_id = 0;
@@ -1962,8 +1961,8 @@ int main(int argc, char** argv){
 
           Coord_t min = pos_to_coord(screen_camera);
           Coord_t max = min + Coord_t{ROOM_TILE_SIZE, ROOM_TILE_SIZE};
-          min = coord_clamp_zero_to_dim(min, world.tilemap.width - 1, world.tilemap.height - 1);
-          max = coord_clamp_zero_to_dim(max, world.tilemap.width - 1, world.tilemap.height - 1);
+          min = coord_clamp_zero_to_dim(min, world.tilemap.width - (S16)(1), world.tilemap.height - (S16)(1));
+          max = coord_clamp_zero_to_dim(max, world.tilemap.width - (S16)(1), world.tilemap.height - (S16)(1));
           Position_t tile_bottom_left = coord_to_pos(min);
           Vec_t camera_offset = pos_to_vec(tile_bottom_left - screen_camera);
 
@@ -1999,7 +1998,7 @@ int main(int argc, char** argv){
                }
           }
 
-          bool* draw_players = (bool*)malloc(world.players.count);
+          bool* draw_players = (bool*)malloc((size_t)(world.players.count));
 
           for(S16 y = max.y; y >= min.y; y--){
                for(S16 x = min.x; x <= max.x; x++){
@@ -2107,7 +2106,7 @@ int main(int argc, char** argv){
                     arrow_vec.y += (arrow->pos.z * PIXEL_SIZE);
 
                     S8 y_frame = 0;
-                    if(arrow->element) y_frame = 2 + ((arrow->element - 1) * 4);
+                    if(arrow->element) y_frame = (S8)(2 + ((arrow->element - 1) * 4));
 
                     tex_vec = arrow_frame(arrow->face, y_frame);
                     draw_screen_texture(arrow_vec, tex_vec, dim, tex_dim);

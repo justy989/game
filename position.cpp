@@ -3,16 +3,8 @@
 
 #include <cmath>
 
-Position_t pixel_pos(S16 x, S16 y){
-     Position_t p;
-     p.pixel = {x, y};
-     p.decimal = {0.0f, 0.0f};
-     p.z = 0;
-     return p;
-}
-
 Position_t pixel_pos(Pixel_t pixel){
-     Position_t p;
+     Position_t p {};
      p.pixel = pixel;
      p.decimal = {0.0f, 0.0f};
      p.z = 0;
@@ -68,7 +60,7 @@ void operator-=(Position_t& p, Vec_t v){
 }
 
 Position_t operator+(Position_t a, Position_t b){
-     Position_t p;
+     Position_t p {};
 
      p.pixel = a.pixel + b.pixel;
      p.decimal = a.decimal + b.decimal;
@@ -79,7 +71,7 @@ Position_t operator+(Position_t a, Position_t b){
 }
 
 Position_t operator-(Position_t a, Position_t b){
-     Position_t p;
+     Position_t p {};
 
      p.pixel = a.pixel - b.pixel;
      p.decimal = a.decimal - b.decimal;

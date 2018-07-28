@@ -11,5 +11,4 @@ enum Element_t : U8{
 };
 
 Element_t transition_element(Element_t a, Element_t b);
-Element_t next_element(Element_t e);
 const char* element_to_string(Element_t e);

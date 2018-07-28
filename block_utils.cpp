@@ -290,8 +290,8 @@ BlockInsideResult_t block_inside_another_block(Block_t* block_to_check, QuadTree
 
 Tile_t* block_against_solid_tile(Block_t* block_to_check, Direction_t direction, TileMap_t* tilemap,
                                  QuadTreeNode_t<Interactive_t>* interactive_quad_tree){
-     Pixel_t pixel_a;
-     Pixel_t pixel_b;
+     Pixel_t pixel_a {};
+     Pixel_t pixel_b {};
 
      if(!block_adjacent_pixels_to_check(block_to_check, direction, &pixel_a, &pixel_b)){
           return nullptr;
@@ -303,8 +303,8 @@ Tile_t* block_against_solid_tile(Block_t* block_to_check, Direction_t direction,
      Coord_t tile_coord = pixel_to_coord(pixel_a);
 
      bool skip = false;
-     for(S8 d = 0; d < DIRECTION_COUNT; d++){
-          if(skip_coord[d] == tile_coord){
+     for (auto d : skip_coord) {
+          if(d == tile_coord){
                skip = true;
                break;
           }
@@ -318,8 +318,8 @@ Tile_t* block_against_solid_tile(Block_t* block_to_check, Direction_t direction,
      tile_coord = pixel_to_coord(pixel_b);
 
      skip = false;
-     for(S8 d = 0; d < DIRECTION_COUNT; d++){
-          if(skip_coord[d] == tile_coord){
+     for (auto d : skip_coord) {
+          if(d == tile_coord){
                skip = true;
                break;
           }
@@ -550,8 +550,8 @@ Interactive_t* block_is_teleporting(Block_t* block, QuadTreeNode_t<Interactive_t
      auto min = block_coord - Coord_t{1, 1};
      auto max = block_coord + Coord_t{1, 1};
 
-     for(int y = min.y; y <= max.y; y++){
-          for(int x = min.x; x <= max.x; x++){
+     for(auto y = min.y; y <= max.y; y++){
+          for(auto x = min.x; x <= max.x; x++){
                Interactive_t* interactive = quad_tree_find_at(interactive_qt, x, y);
                if(!is_active_portal(interactive)) continue;
 

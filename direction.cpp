@@ -28,24 +28,8 @@ DirectionMask_t direction_mask_add(DirectionMask_t a, DirectionMask_t b){
      return (DirectionMask_t)(a | b); // C++ makes this annoying
 }
 
-DirectionMask_t direction_mask_add(DirectionMask_t a, int b){
-     return (DirectionMask_t)(a | b); // C++ makes this annoying
-}
-
 DirectionMask_t direction_mask_add(DirectionMask_t mask, Direction_t dir){
      return (DirectionMask_t)(mask | direction_to_direction_mask(dir)); // C++ makes this annoying
-}
-
-DirectionMask_t direction_mask_remove(DirectionMask_t a, DirectionMask_t b){
-     return (DirectionMask_t)(a & ~b); // C++ makes this annoying
-}
-
-DirectionMask_t direction_mask_remove(DirectionMask_t a, int b){
-     return (DirectionMask_t)(a & ~b); // C++ makes this annoying
-}
-
-DirectionMask_t direction_mask_remove(DirectionMask_t mask, Direction_t dir){
-     return (DirectionMask_t)(mask & ~direction_to_direction_mask(dir)); // C++ makes this annoying
 }
 
 DirectionMask_t direction_mask_opposite(DirectionMask_t mask){
@@ -64,20 +48,16 @@ Direction_t direction_opposite(Direction_t dir){
      return (Direction_t)(((int)(dir) + 2) % DIRECTION_COUNT);
 }
 
-bool direction_is_horizontal(Direction_t dir){
-     return dir == DIRECTION_LEFT || dir == DIRECTION_RIGHT;
-}
-
 U8 direction_rotations_between(Direction_t a, Direction_t b){
      if(a < b){
-          return ((int)(a) + DIRECTION_COUNT) - (int)(b);
+          return (U8)((a + DIRECTION_COUNT) - b);
      }
 
-     return (int)(a) - (int)(b);
+     return (U8)(a - b);
 }
 
 Direction_t direction_rotate_clockwise(Direction_t dir){
-     U8 rot = (U8)(dir) + 1;
+     U8 rot = (U8)(dir + 1);
      rot %= DIRECTION_COUNT;
      return (Direction_t)(rot);
 }

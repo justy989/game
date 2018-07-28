@@ -24,7 +24,7 @@ static bool bitmap_interpret_bytes(Bitmap_t* bitmap){
      bitmap->pixels = (BitmapPixel_t*)(bitmap->raw.bytes + bitmap->header->bitmap_offset);
 
      // swap blue and green
-     U64 pixel_count = bitmap->info->width * bitmap->info->height;
+     U64 pixel_count = (U64)(bitmap->info->width) * (U64)(bitmap->info->height);
      for(U64 i = 0; i < pixel_count; ++i){
           U8 t = bitmap->pixels[i].blue;
           bitmap->pixels[i].blue = bitmap->pixels[i].red;
@@ -74,7 +74,7 @@ Bitmap_t bitmap_load_from_file(const char* filepath){
 }
 
 AlphaBitmap_t bitmap_to_alpha_bitmap(const Bitmap_t* bitmap, BitmapPixel_t color_key){
-     AlphaBitmap_t alpha_bitmap;
+     AlphaBitmap_t alpha_bitmap {};
 
      if(!bitmap->pixels) return alpha_bitmap;
 

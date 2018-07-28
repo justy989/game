@@ -6,7 +6,7 @@ bool Log_t::create(const char* filepath)
 {
      if(log) destroy();
      log = fopen(filepath, "w");
-     return log != NULL;
+     return log != nullptr;
 }
 
 void Log_t::destroy()

@@ -16,7 +16,6 @@ DirectionMask_t vec_direction_mask(Vec_t vec);
 Direction_t vec_direction(Vec_t vec); // returns the first direction it finds, only use this with one component vectors
 U8 portal_rotations_between(Direction_t a, Direction_t b);
 Vec_t direction_to_vec(Direction_t d);
-Pixel_t direction_to_pixel(Direction_t d);
 
 Vec_t vec_rotate_quadrants_clockwise(Vec_t vec, S8 rotations_between);
 Pixel_t pixel_rotate_quadrants_clockwise(Pixel_t pixel, S8 rotations_between);
@@ -46,7 +45,6 @@ Pixel_t mouse_select_pixel(Vec_t mouse_screen);
 Pixel_t mouse_select_world_pixel(Vec_t mouse_screen, Position_t camera);
 Coord_t mouse_select_coord(Vec_t mouse_screen);
 Coord_t mouse_select_world(Vec_t mouse_screen, Position_t camera);
-S32 mouse_select_index(Vec_t mouse_screen);
 Vec_t coord_to_screen_position(Coord_t coord);
 
 bool vec_in_quad(const Quad_t* q, Vec_t v);

@@ -27,7 +27,7 @@ struct World_t{
 struct TeleportPosition_t{
      Position_t pos;
      Vec_t delta;
-     S8 rotations = 0;
+     U8 rotations = 0;
 };
 
 struct TeleportPositionResult_t{

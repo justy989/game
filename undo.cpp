@@ -55,10 +55,10 @@ void undo_history_add(UndoHistory_t* undo_history, UndoDiffType_t type, S32 inde
 }
 
 bool init(Undo_t* undo, U32 history_size, S16 map_width, S16 map_height, S16 block_count, S16 interactive_count){
-     undo->tile_flags = (U16**)calloc(map_height, sizeof(*undo->tile_flags));
+     undo->tile_flags = (U16**)calloc((size_t)(map_height), sizeof(*undo->tile_flags));
      if(!undo->tile_flags) return false;
      for(S16 i = 0; i < map_height; i++){
-          undo->tile_flags[i] = (U16*)calloc(map_width, sizeof(*undo->tile_flags[i]));
+          undo->tile_flags[i] = (U16*)calloc((size_t)(map_width), sizeof(*undo->tile_flags[i]));
           if(!undo->tile_flags[i]) return false;
      }
      undo->width = map_width;
@@ -154,7 +154,7 @@ void undo_commit(Undo_t* undo, ObjectArray_t<Player_t>* players, TileMap_t* tile
           // insert a new players
           S16 diff = undo->players.count - players->count;
           for(S16 d = 0; d < diff; d++){
-               S16 last_index = (undo->players.count - 1) - d;
+               S16 last_index = (undo->players.count - (S16)(1)) - d;
                UndoPlayer_t* last_player = undo->players.elements + last_index;
                bool found = false;
 
@@ -222,7 +222,7 @@ void undo_commit(Undo_t* undo, ObjectArray_t<Player_t>* players, TileMap_t* tile
           // insert a new blocks
           S16 diff = undo->blocks.count - blocks->count;
           for(S16 d = 0; d < diff; d++){
-               S16 last_index = (undo->blocks.count - 1) - d;
+               S16 last_index = (undo->blocks.count - (S16)(1)) - d;
                UndoBlock_t* last_block = undo->blocks.elements + last_index;
                bool found = false;
 
@@ -282,7 +282,7 @@ void undo_commit(Undo_t* undo, ObjectArray_t<Player_t>* players, TileMap_t* tile
           // insert a new interactives
           S16 diff = undo->interactives.count - interactives->count;
           for(S16 d = 0; d < diff; d++){
-               S16 last_index = (undo->interactives.count - 1) - d;
+               S16 last_index = (undo->interactives.count - (S16)(1)) - d;
                Interactive_t* last_interactive = undo->interactives.elements + last_index;
                bool found = false;
 
@@ -390,7 +390,7 @@ void undo_revert(Undo_t* undo, ObjectArray_t<Player_t>* players, TileMap_t* tile
                ptr -= sizeof(UndoBlock_t);
                auto* block_entry = (UndoBlock_t*)(ptr);
                S16 last_index = blocks->count;
-               resize(blocks, blocks->count + 1);
+               resize(blocks, blocks->count + (S16)(1));
 
                // move the block at that index back to the end of the list
                blocks->elements[last_index] = blocks->elements[diff_header->index];
@@ -407,39 +407,39 @@ void undo_revert(Undo_t* undo, ObjectArray_t<Player_t>* players, TileMap_t* tile
           } break;
           case UNDO_DIFF_TYPE_BLOCK_REMOVE:
           {
-               remove(blocks, diff_header->index);
+               remove(blocks, (S16)(diff_header->index));
           } break;
           case UNDO_DIFF_TYPE_INTERACTIVE:
           {
                ptr -= sizeof(Interactive_t);
                auto* interactive_entry = (Interactive_t*)(ptr);
-               interactives->elements[diff_header->index] = *interactive_entry;
+               interactives->elements[(S16)(diff_header->index)] = *interactive_entry;
           } break;
           case UNDO_DIFF_TYPE_INTERACTIVE_INSERT:
           {
                ptr -= sizeof(Interactive_t);
                auto* interactive_entry = (Interactive_t*)(ptr);
                S16 last_index = interactives->count;
-               resize(interactives, interactives->count + 1);
+               resize(interactives, interactives->count + (S16)(1));
                interactives->elements[last_index] = interactives->elements[diff_header->index];
                interactives->elements[diff_header->index] = *interactive_entry;
           } break;
           case UNDO_DIFF_TYPE_INTERACTIVE_REMOVE:
           {
-               remove(interactives, diff_header->index);
+               remove(interactives, (S16)(diff_header->index));
           } break;
           case UNDO_DIFF_TYPE_PLAYER_INSERT:
           {
                ptr -= sizeof(Player_t);
                auto* player_entry = (Player_t*)(ptr);
                S16 last_index = players->count;
-               resize(players, players->count + 1);
+               resize(players, players->count + (S16)(1));
                players->elements[last_index] = players->elements[diff_header->index];
                players->elements[diff_header->index] = *player_entry;
           } break;
           case UNDO_DIFF_TYPE_PLAYER_REMOVE:
           {
-               remove(players, diff_header->index);
+               remove(players, (S16)(diff_header->index));
           } break;
           }
      }

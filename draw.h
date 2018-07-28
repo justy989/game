@@ -11,24 +11,24 @@
 
 #include <SDL2/SDL_opengl.h>
 
-#define THEME_FRAMES_WIDE 16
-#define THEME_FRAMES_TALL 32
+#define THEME_FRAMES_WIDE (S16)(16)
+#define THEME_FRAMES_TALL (S16)(32)
 #define THEME_FRAME_WIDTH 0.0625f
 #define THEME_FRAME_HEIGHT 0.03125f
 
 #define ARROW_FRAME_WIDTH 0.25f
 #define ARROW_FRAME_HEIGHT 0.0625f
-#define ARROW_FRAMES_TALL 16
-#define ARROW_FRAMES_WIDE 4
+#define ARROW_FRAMES_TALL (S16)(16)
+#define ARROW_FRAMES_WIDE (S16)(4)
 
 #define PLAYER_FRAME_WIDTH 0.25f
 #define PLAYER_FRAME_HEIGHT 0.03125f
-#define PLAYER_FRAMES_WIDE 4
-#define PLAYER_FRAMES_TALL 32
+#define PLAYER_FRAMES_WIDE (S16)(4)
+#define PLAYER_FRAMES_TALL (S16)(32)
 
 Vec_t theme_frame(S16 x, S16 y);
-Vec_t arrow_frame(S8 x, S8 y);
-Vec_t player_frame(S8 x, S8 y);
+Vec_t arrow_frame(S16 x, S16 y);
+Vec_t player_frame(S16 x, S16 y);
 
 GLuint create_texture_from_bitmap(AlphaBitmap_t* bitmap);
 GLuint transparent_texture_from_file(const char* filepath);

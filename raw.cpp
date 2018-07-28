@@ -7,8 +7,7 @@
 
 Raw_t raw_load_file(const char* filename)
 {
-     Raw_t raw;
-     memset(&raw, 0, sizeof(raw));
+     Raw_t raw {};
 
      FILE* file = fopen(filename, "rb");
      if(!file){
@@ -17,7 +16,7 @@ Raw_t raw_load_file(const char* filename)
      }
 
      fseek(file, 0, SEEK_END);
-     raw.byte_count = ftell(file); // returns a long, is that enough to get 64 bytes?
+     raw.byte_count = (U64)(ftell(file)); // returns a long, is that enough to get 64 bytes?
      fseek(file, 0, SEEK_SET);
 
      raw.bytes = (U8*)(malloc((size_t)(raw.byte_count)));

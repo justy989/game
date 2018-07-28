@@ -34,7 +34,7 @@ bool axis_lines_intersect(AxisLine_t a, AxisLine_t b){
 }
 
 bool axis_line_intersects_circle(AxisLine_t a, Pixel_t p, F32 radius){
-     Pixel_t a_p;
+     Pixel_t a_p {};
 
      if(a.vertical){
           a_p.x = a.offset;

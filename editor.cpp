@@ -58,15 +58,15 @@ bool init(Editor_t* editor){
           tile_id_array++;
           init(tile_id_array, 4);
           tile_id_array->elements[0].type = STAMP_TYPE_TILE_ID;
-          tile_id_array->elements[0].tile_id = 36 + (i * 2);
+          tile_id_array->elements[0].tile_id = (U8)(36 + (i * 2));
           tile_id_array->elements[1].type = STAMP_TYPE_TILE_ID;
-          tile_id_array->elements[1].tile_id = 37 + (i * 2);
+          tile_id_array->elements[1].tile_id = (U8)(37 + (i * 2));
           tile_id_array->elements[1].offset = Coord_t{1, 0};
           tile_id_array->elements[2].type = STAMP_TYPE_TILE_ID;
-          tile_id_array->elements[2].tile_id = 20 + (i * 2);
+          tile_id_array->elements[2].tile_id = (U8)(20 + (i * 2));
           tile_id_array->elements[2].offset = Coord_t{0, 1};
           tile_id_array->elements[3].type = STAMP_TYPE_TILE_ID;
-          tile_id_array->elements[3].tile_id = 21 + (i * 2);
+          tile_id_array->elements[3].tile_id = (U8)(21 + (i * 2));
           tile_id_array->elements[3].offset = Coord_t{1, 1};
      }
 
@@ -74,15 +74,15 @@ bool init(Editor_t* editor){
           tile_id_array++;
           init(tile_id_array, 4);
           tile_id_array->elements[0].type = STAMP_TYPE_TILE_ID;
-          tile_id_array->elements[0].tile_id = 50 + i * 4;
+          tile_id_array->elements[0].tile_id = (U8)(50 + i * 4);
           tile_id_array->elements[1].type = STAMP_TYPE_TILE_ID;
-          tile_id_array->elements[1].tile_id = 51 + i * 4;
+          tile_id_array->elements[1].tile_id = (U8)(51 + i * 4);
           tile_id_array->elements[1].offset = Coord_t{1, 0};
           tile_id_array->elements[2].type = STAMP_TYPE_TILE_ID;
-          tile_id_array->elements[2].tile_id = 48 + i * 4;
+          tile_id_array->elements[2].tile_id = (U8)(48 + i * 4);
           tile_id_array->elements[2].offset = Coord_t{0, 1};
           tile_id_array->elements[3].type = STAMP_TYPE_TILE_ID;
-          tile_id_array->elements[3].tile_id = 49 + i * 4;
+          tile_id_array->elements[3].tile_id = (U8)(49 + i * 4);
           tile_id_array->elements[3].offset = Coord_t{1, 1};
      }
 
@@ -151,7 +151,7 @@ bool init(Editor_t* editor){
      tile_flags_category->elements[index_offset].elements[0].tile_flags = TILE_FLAG_WIRE_RIGHT | TILE_FLAG_WIRE_DOWN;
 
      for(S8 i = 0; i < DIRECTION_COUNT; i++){
-          index_offset = 15 + (i * 4);
+          index_offset = (S16)(15 + (i * 4));
           init(tile_flags_category->elements + index_offset, 1);
           tile_flags_category->elements[index_offset].elements[0].type = STAMP_TYPE_TILE_FLAGS;
           tile_flags_category->elements[index_offset].elements[0].tile_flags = TILE_FLAG_WIRE_CLUSTER_LEFT | TILE_FLAG_WIRE_CLUSTER_MID;
@@ -379,7 +379,7 @@ void apply_stamp(Stamp_t* stamp, Coord_t coord, TileMap_t* tilemap, ObjectArray_
      case STAMP_TYPE_BLOCK:
      {
           int index = block_array->count;
-          resize(block_array, block_array->count + 1);
+          resize(block_array, block_array->count + (S16)(1));
           // TODO: Check if block is in the way with the quad tree
 
           Block_t* block = block_array->elements + index;
@@ -397,7 +397,7 @@ void apply_stamp(Stamp_t* stamp, Coord_t coord, TileMap_t* tilemap, ObjectArray_
           if(interactive) return;
 
           int index = interactive_array->count;
-          resize(interactive_array, interactive_array->count + 1);
+          resize(interactive_array, interactive_array->count + (S16)(1));
           interactive_array->elements[index] = stamp->interactive;
           interactive_array->elements[index].coord = coord;
           quad_tree_free(*interactive_quad_tree);
@@ -417,7 +417,7 @@ void coord_clear(Coord_t coord, TileMap_t* tilemap, ObjectArray_t<Interactive_t>
 
      auto* interactive = quad_tree_interactive_find_at(interactive_quad_tree, coord);
      if(interactive){
-          S16 index = interactive - interactive_array->elements;
+          S16 index = (S16)(interactive - interactive_array->elements);
           if(index >= 0){
                remove(interactive_array, index);
                quad_tree_free(interactive_quad_tree);

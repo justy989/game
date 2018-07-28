@@ -3,14 +3,14 @@
 #include <math.h>
 
 Pixel_t operator+(Pixel_t a, Pixel_t b){
-     Pixel_t p;
+     Pixel_t p {};
      p.x = a.x + b.x;
      p.y = a.y + b.y;
      return p;
 }
 
 Pixel_t operator-(Pixel_t a, Pixel_t b){
-     Pixel_t p;
+     Pixel_t p {};
      p.x = a.x - b.x;
      p.y = a.y - b.y;
      return p;

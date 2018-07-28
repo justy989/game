@@ -26,8 +26,8 @@ Coord_t block_get_coord(Block_t* block){
 }
 
 bool blocks_at_collidable_height(Block_t* a, Block_t* b){
-     S8 a_top = a->pos.z + HEIGHT_INTERVAL - 1;
-     S8 b_top = b->pos.z + HEIGHT_INTERVAL - 1;
+     S8 a_top = a->pos.z + HEIGHT_INTERVAL - (S8)(1);
+     S8 b_top = b->pos.z + HEIGHT_INTERVAL - (S8)(1);
 
      if(a_top >= b->pos.z && a_top <= b_top){
           return true;
@@ -46,16 +46,6 @@ Rect_t block_get_rect(Block_t* b){
                           (S16)(b->pos.pixel.x + BLOCK_SOLID_SIZE_IN_PIXELS),
                           (S16)(b->pos.pixel.y + BLOCK_SOLID_SIZE_IN_PIXELS)};
      return block_rect;
-}
-
-bool block_y_tile_aligned(Block_t* block){
-     return (block->pos.decimal.y == 0.0f &&
-             (block->pos.pixel.y % TILE_SIZE_IN_PIXELS) == 0);
-}
-
-bool block_x_tile_aligned(Block_t* block){
-     return (block->pos.decimal.x == 0.0f &&
-             (block->pos.pixel.x % TILE_SIZE_IN_PIXELS) == 0);
 }
 
 Pixel_t block_bottom_right_pixel(Pixel_t block_pixel){
