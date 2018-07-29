@@ -82,11 +82,12 @@ bool load_map_number_demo(Demo_t* demo, S16 map_number, S64* frame_count){
 
      free(demo->entries.entries);
      demo->entry_index = 0;
+     fread(&demo->version, sizeof(demo->version), 1, demo->file);
      demo->entries = demo_entries_get(demo->file);
      *frame_count = 0;
      demo->last_frame = demo->entries.entries[demo->entries.count - 1].frame;
-     LOG("testing demo %s: with %ld actions across %ld frames\n", demo->filepath,
-         demo->entries.count, demo->last_frame);
+     LOG("testing demo %s: version %d with %ld actions across %ld frames\n", demo->filepath,
+         demo->version, demo->entries.count, demo->last_frame);
      return true;
 }
 
@@ -229,7 +230,8 @@ int main(int argc, char** argv){
                LOG("failed to open demo file: %s\n", demo.filepath);
                return 1;
           }
-          // TODO: write header
+          demo.version = 2;
+          fwrite(&demo.version, sizeof(demo.version), 1, demo.file);
           break;
      case DEMO_MODE_PLAY:
           demo.file = fopen(demo.filepath, "r");
@@ -237,11 +239,11 @@ int main(int argc, char** argv){
                LOG("failed to open demo file: %s\n", demo.filepath);
                return 1;
           }
-          // TODO: read header
+          fread(&demo.version, sizeof(demo.version), 1, demo.file);
           demo.entries = demo_entries_get(demo.file);
           demo.last_frame = demo.entries.entries[demo.entries.count - 1].frame;
-          LOG("playing demo %s: with %ld actions across %ld frames\n", demo.filepath,
-              demo.entries.count, demo.last_frame);
+          LOG("playing demo %s: version %d with %ld actions across %ld frames\n", demo.filepath,
+              demo.version, demo.entries.count, demo.last_frame);
           break;
      }
 
@@ -1368,7 +1370,7 @@ int main(int argc, char** argv){
                     Vec_t pos_delta = pos_to_vec(block->pos - block->pre_move_pos);
 
                     if(pos_delta.x != 0.0f || pos_delta.y != 0.0f){
-                         check_block_collision_with_other_blocks(block, &world, world.players.elements);
+                         check_block_collision_with_other_blocks(block, &world);
                     }
 
                     // get the current coord of the center of the block
@@ -1439,13 +1441,20 @@ int main(int argc, char** argv){
                          }
                     }
 
+                    // TODO: I think we may want to keep track of more of these and resolve multiple directions as well?
                     // used to make sure the pushing is smooth on the entangled block as well
                     Block_t* entangled_block_pushed = nullptr;
+                    Direction_t entangled_block_pushed_dir = DIRECTION_COUNT;
                     Block_t* block_pushed = nullptr;
-                    if(world.players.elements->pushing_block >= 0){
-                         block_pushed = world.blocks.elements + world.players.elements->pushing_block;
-                         if(block_pushed && block_pushed->entangle_index >= 0 && block_pushed->entangle_index < world.blocks.count){
-                              entangled_block_pushed = world.blocks.elements + block_pushed->entangle_index;
+
+                    for(S16 p = 0; p < world.players.count; p++){
+                         Player_t* player = world.players.elements + p;
+                         if(player->pushing_block >= 0){
+                              block_pushed = world.blocks.elements + player->pushing_block;
+                              if(block_pushed && block_pushed->entangle_index >= 0 && block_pushed->entangle_index < world.blocks.count){
+                                   entangled_block_pushed = world.blocks.elements + block_pushed->entangle_index;
+                                   entangled_block_pushed_dir = player->pushing_block_dir;
+                              }
                          }
                     }
 
@@ -1454,7 +1463,7 @@ int main(int argc, char** argv){
                          if(block == entangled_block_pushed){
                               // TODO: take into account block rotation
                               DirectionMask_t vel_mask = vec_direction_mask(block->vel);
-                              switch(world.players.elements->face){
+                              switch(entangled_block_pushed_dir){
                               default:
                                    break;
                               case DIRECTION_LEFT:
@@ -1560,7 +1569,7 @@ int main(int argc, char** argv){
 
                          block->pre_move_pos = block->pos;
 
-                         check_block_collision_with_other_blocks(block, &world, world.players.elements);
+                         check_block_collision_with_other_blocks(block, &world);
 
                          // try teleporting if we collided with a block
                          premove_coord = pixel_to_coord(block_center.pixel + HALF_TILE_SIZE_PIXEL);
@@ -2410,7 +2419,21 @@ int main(int argc, char** argv){
           player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_END_DEMO, demo.mode, demo.file, frame_count);
           // save map and player position
           save_map_to_file(demo.file, player_start, &world.tilemap, &world.blocks, &world.interactives);
-          fwrite(&world.players.elements->pos.pixel, sizeof(world.players.elements->pos.pixel), 1, demo.file);
+          switch(demo.version){
+          default:
+               break;
+          case 1:
+               fwrite(&world.players.elements->pos.pixel, sizeof(world.players.elements->pos.pixel), 1, demo.file);
+               break;
+          case 2:
+          {
+               fwrite(&world.players.count, sizeof(world.players.count), 1, demo.file);
+               for(S16 p = 0; p < world.players.count; p++){
+                    Player_t* player = world.players.elements + p;
+                    fwrite(&player->pos.pixel, sizeof(player->pos.pixel), 1, demo.file);
+               }
+          } break;
+          }
           fclose(demo.file);
           break;
      case DEMO_MODE_PLAY:

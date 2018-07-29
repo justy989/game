@@ -377,27 +377,11 @@ bool block_on_ice(Block_t* block, TileMap_t* tilemap, QuadTreeNode_t<Interactive
      return false;
 }
 
-void check_block_collision_with_other_blocks(Block_t* block_to_check, World_t* world, Player_t* player){
+void check_block_collision_with_other_blocks(Block_t* block_to_check, World_t* world){
      for(BlockInsideResult_t block_inside_result = block_inside_another_block(block_to_check, world->block_qt, world->interactive_qt, &world->tilemap, &world->blocks);
          block_inside_result.block && blocks_at_collidable_height(block_to_check, block_inside_result.block);
          block_inside_result = block_inside_another_block(block_to_check, world->block_qt, world->interactive_qt, &world->tilemap, &world->blocks)){
 
-#if 0
-          (void)(player);
-          (void)(last_block_pushed);
-          (void)(last_block_pushed_direction);
-
-          // TODO: remove, this is just for debuging exactly when collisions occur
-          block_to_check->vel.x = 0.0f;
-          block_to_check->accel.x = 0.0f;
-          block_to_check->vel.y = 0.0f;
-          block_to_check->accel.y = 0.0f;
-
-          block_inside_result.block->vel.x = 0.0f;
-          block_inside_result.block->accel.x = 0.0f;
-          block_inside_result.block->vel.y = 0.0f;
-          block_inside_result.block->accel.y = 0.0f;
-#else
           auto block_center_pixel = block_to_check->pos.pixel + HALF_TILE_SIZE_PIXEL;
           auto quadrant = relative_quadrant(block_center_pixel, block_inside_result.collision_pos.pixel);
 
@@ -438,8 +422,11 @@ void check_block_collision_with_other_blocks(Block_t* block_to_check, World_t* w
                }
           }
 
-          if(player->pushing_block == (S16)(block_to_check - world->blocks.elements) && quadrant == player->face){
-               player->push_time = 0.0f;
+          for(S16 i = 0; i < world->players.count; i++){
+               Player_t* player = world->players.elements + i;
+               if(player->pushing_block == (S16)(block_to_check - world->blocks.elements) && quadrant == player->face){
+                    player->push_time = 0.0f;
+               }
           }
 
           if(a_on_ice && b_on_ice){
@@ -502,7 +489,6 @@ void check_block_collision_with_other_blocks(Block_t* block_to_check, World_t* w
 
                if(push) block_push(block_inside_result.block, push_dir, world, true);
           }
-#endif
 
           // TODO: there is no way this is the right way to do this
           if(block_inside_result.block == block_to_check) break;

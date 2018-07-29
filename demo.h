@@ -52,6 +52,7 @@ struct Demo_t{
      const char* filepath = nullptr;
      FILE* file = nullptr;
 
+     S32 version = 1;
      S64 last_frame = 0;
      S64 entry_index = 0;
      S64 seek_frame = -1;

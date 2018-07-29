@@ -973,7 +973,6 @@ bool test_map_end_state(World_t* world, Demo_t* demo){
      ObjectArray_t<Block_t> check_block_array = {};
      ObjectArray_t<Interactive_t> check_interactives = {};
      Coord_t check_player_start;
-     Pixel_t check_player_pixel;
 
 #define NAME_LEN 64
      char name[NAME_LEN];
@@ -983,7 +982,6 @@ bool test_map_end_state(World_t* world, Demo_t* demo){
           return false;
      }
 
-     fread(&check_player_pixel, sizeof(check_player_pixel), 1, demo->file);
      if(check_tilemap.width != world->tilemap.width){
           LOG_MISMATCH("tilemap width", "%d", check_tilemap.width, world->tilemap.width);
      }else if(check_tilemap.height != world->tilemap.height){
@@ -999,17 +997,39 @@ bool test_map_end_state(World_t* world, Demo_t* demo){
           }
      }
 
+     S16 check_player_pixel_count = 0;
+     Pixel_t* check_player_pixels = nullptr;
+
+     switch(demo->version){
+     default:
+          break;
+     case 1:
+          check_player_pixel_count = 1;
+          check_player_pixels = (Pixel_t*)(malloc(sizeof(*check_player_pixels)));
+          break;
+     case 2:
+          fread(&check_player_pixel_count, sizeof(check_player_pixel_count), 1, demo->file);
+          check_player_pixels = (Pixel_t*)(malloc(sizeof(*check_player_pixels) * check_player_pixel_count));
+          break;
+     }
+
+     for(S16 i = 0; i < check_player_pixel_count; i++){
+          fread(check_player_pixels + i, sizeof(check_player_pixels[i]), 1, demo->file);
+     }
+
      for(S16 i = 0; i < world->players.count; i++){
           Player_t* player = world->players.elements + i;
 
-          if(check_player_pixel.x != player->pos.pixel.x){
-               LOG_MISMATCH("player pixel x", "%d", check_player_pixel.x, player->pos.pixel.x);
+          if(check_player_pixels[i].x != player->pos.pixel.x){
+               LOG_MISMATCH("player pixel x", "%d", check_player_pixels[i].x, player->pos.pixel.x);
           }
 
-          if(check_player_pixel.y != player->pos.pixel.y){
-               LOG_MISMATCH("player pixel y", "%d", check_player_pixel.y, player->pos.pixel.y);
+          if(check_player_pixels[i].y != player->pos.pixel.y){
+               LOG_MISMATCH("player pixel y", "%d", check_player_pixels[i].y, player->pos.pixel.y);
           }
      }
+
+     free(check_player_pixels);
 
      if(check_block_array.count != world->blocks.count){
           LOG_MISMATCH("block count", "%d", check_block_array.count, world->blocks.count);
