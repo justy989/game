@@ -1,0 +1,7 @@
+#!/bin/bash
+SOURCES=($(ls content | grep .bd))
+for source in "${SOURCES[@]}"
+do
+     ./prepend_version ../old_game_content_5/$source content/$source
+done
+
