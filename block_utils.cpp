@@ -377,8 +377,7 @@ bool block_on_ice(Block_t* block, TileMap_t* tilemap, QuadTreeNode_t<Interactive
      return false;
 }
 
-void check_block_collision_with_other_blocks(Block_t* block_to_check, World_t* world, Player_t* player,
-                                             Block_t* last_block_pushed, Direction_t last_block_pushed_direction){
+void check_block_collision_with_other_blocks(Block_t* block_to_check, World_t* world, Player_t* player){
      for(BlockInsideResult_t block_inside_result = block_inside_another_block(block_to_check, world->block_qt, world->interactive_qt, &world->tilemap, &world->blocks);
          block_inside_result.block && blocks_at_collidable_height(block_to_check, block_inside_result.block);
          block_inside_result = block_inside_another_block(block_to_check, world->block_qt, world->interactive_qt, &world->tilemap, &world->blocks)){
@@ -439,7 +438,7 @@ void check_block_collision_with_other_blocks(Block_t* block_to_check, World_t* w
                }
           }
 
-          if(block_to_check == last_block_pushed && quadrant == last_block_pushed_direction){
+          if(player->pushing_block == (S16)(block_to_check - world->blocks.elements) && quadrant == player->face){
                player->push_time = 0.0f;
           }
 
@@ -464,7 +463,6 @@ void check_block_collision_with_other_blocks(Block_t* block_to_check, World_t* w
 
                     resolve_block_colliding_with_itself(src_portal_dir, dst_portal_dir, move_mask, block_to_check,
                                                         DIRECTION_RIGHT, DIRECTION_DOWN, &push_dir);
-
                }else{
                     push_dir = direction_rotate_clockwise(quadrant, block_inside_result.portal_rotations);
 

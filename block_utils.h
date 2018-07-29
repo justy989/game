@@ -35,8 +35,7 @@ Block_t* block_held_up_by_another_block(Block_t* block_to_check, QuadTreeNode_t<
 
 bool block_on_ice(Block_t* block, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree);
 
-void check_block_collision_with_other_blocks(Block_t* block_to_check, World_t* world, Player_t* player,
-                                             Block_t* last_block_pushed, Direction_t last_block_pushed_direction);
+void check_block_collision_with_other_blocks(Block_t* block_to_check, World_t* world, Player_t* player);
 
 void resolve_block_colliding_with_itself(Direction_t src_portal_dir, Direction_t dst_portal_dir, DirectionMask_t move_mask,
                                          Block_t* block, Direction_t check_horizontal, Direction_t check_vertical, Direction_t* push_dir);

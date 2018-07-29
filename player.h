@@ -32,4 +32,7 @@ struct Player_t{
 
      bool reface = false;
      U8 move_rotation[DIRECTION_COUNT];
+
+     S16 pushing_block = -1;
+     Direction_t pushing_block_dir = DIRECTION_COUNT; // we would use face but the pushing can be through rotated portal
 };

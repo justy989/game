@@ -296,8 +296,7 @@ void activate(World_t* world, Coord_t coord){
 }
 
 Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, Direction_t player_face, Coord_t* skip_coord,
-                                         Player_t* player, World_t* world, Block_t** block_to_push, Direction_t* last_block_pushed_direction,
-                                         bool* collided_with_interactive, bool* resetting){
+                                         Player_t* player, World_t* world, bool* collided_with_interactive, bool* resetting){
      // figure out tiles that are close by
      Position_t final_player_pos = position + pos_delta;
      Coord_t player_coord = pos_to_coord(final_player_pos);
@@ -434,13 +433,13 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
 
                auto rotated_player_face = direction_rotate_clockwise(player_face, portal_rotations);
                if(collided_block_dir == rotated_player_face && (player->accel.x != 0.0f || player->accel.y != 0.0f)){
-                    if(*block_to_push == nullptr){ // also check that the player is actually pushing against the block
-                         *block_to_push = world->blocks.elements + i;
-                         *last_block_pushed_direction = player_face;
+                    if(player->pushing_block < 0){ // also check that the player is actually pushing against the block
+                         player->pushing_block = i;
+                         player->pushing_block_dir = player_face;
                     }else{
                          // stop the player from pushing 2 blocks at once
-                         *block_to_push = nullptr;
-                         *last_block_pushed_direction = DIRECTION_COUNT;
+                         player->pushing_block = -1;
+                         player->pushing_block_dir = DIRECTION_COUNT;
                     }
                }
 

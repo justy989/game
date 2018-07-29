@@ -9,6 +9,7 @@ Entanglement:
   trap an entangled block if it got to close, stopping the player from using walls to get blocks closer
 - entangle puzzle with an extra non-entangled block where you don't want one of the entangled blocks to move, and you use
   the non-entangled block to accomplish that
+- block rotation on entanglement
 - player entanglement
 - player on player collision
 - arrow entanglement
@@ -90,16 +91,10 @@ bool load_map_number_demo(Demo_t* demo, S16 map_number, S64* frame_count){
 }
 
 bool load_map_number_map(S16 map_number, World_t* world, Undo_t* undo,
-                         Coord_t* player_start, PlayerAction_t* player_action, Block_t** last_block_pushed,
-                         Direction_t* last_block_pushed_direction, Block_t** block_to_push){
+                         Coord_t* player_start, PlayerAction_t* player_action){
      if(load_map_number(map_number, player_start, world)){
           setup_map(*player_start, world, undo);
-
           *player_action = {};
-          *last_block_pushed = nullptr;
-          *last_block_pushed_direction = DIRECTION_LEFT;
-          *block_to_push = nullptr;
-
           return true;
      }
 
@@ -267,10 +262,6 @@ int main(int argc, char** argv){
      PlayerAction_t player_action {};
      Position_t camera = coord_to_pos(Coord_t{8, 8});
 
-     Block_t* last_block_pushed = nullptr;
-     Direction_t last_block_pushed_direction = DIRECTION_LEFT;
-     Block_t* block_to_push = nullptr;
-
      Vec_t mouse_screen = {}; // 0.0f to 1.0f
      Position_t mouse_world = {};
      bool ctrl_down = false;
@@ -392,9 +383,6 @@ int main(int argc, char** argv){
                if(demo.seek_frame == frame_count) demo.seek_frame = -1;
           }
 
-          last_block_pushed = block_to_push;
-          block_to_push = nullptr;
-
           player_action.last_activate = player_action.activate;
           for(S16 i = 0; i < world.players.count; i++) {
                world.players.elements[i].reface = false;
@@ -423,8 +411,7 @@ int main(int argc, char** argv){
                               map_number++;
                               S16 maps_tested = map_number - first_map_number;
 
-                              if(load_map_number_map(map_number, &world, &undo, &player_start, &player_action,
-                                                     &last_block_pushed, &last_block_pushed_direction, &block_to_push)){
+                              if(load_map_number_map(map_number, &world, &undo, &player_start, &player_action)){
 
                                    cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
 
@@ -509,8 +496,7 @@ int main(int argc, char** argv){
                          }
                          break;
                     case SDL_SCANCODE_L:
-                         if(load_map_number_map(map_number, &world, &undo, &player_start, &player_action,
-                                                &last_block_pushed, &last_block_pushed_direction, &block_to_push)){
+                         if(load_map_number_map(map_number, &world, &undo, &player_start, &player_action)){
                               if(demo.mode == DEMO_MODE_PLAY){
                                    cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
                               }
@@ -518,8 +504,7 @@ int main(int argc, char** argv){
                          break;
                     case SDL_SCANCODE_LEFTBRACKET:
                          map_number--;
-                         if(load_map_number_map(map_number, &world, &undo, &player_start, &player_action,
-                                                &last_block_pushed, &last_block_pushed_direction, &block_to_push)){
+                         if(load_map_number_map(map_number, &world, &undo, &player_start, &player_action)){
                               if(demo.mode == DEMO_MODE_PLAY){
                                    cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
 
@@ -535,8 +520,7 @@ int main(int argc, char** argv){
                          break;
                     case SDL_SCANCODE_RIGHTBRACKET:
                          map_number++;
-                         if(load_map_number_map(map_number, &world, &undo, &player_start, &player_action,
-                                                &last_block_pushed, &last_block_pushed_direction, &block_to_push)){
+                         if(load_map_number_map(map_number, &world, &undo, &player_start, &player_action)){
                               if(demo.mode == DEMO_MODE_PLAY){
                                    cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
 
@@ -827,9 +811,6 @@ int main(int argc, char** argv){
 
                                              // reset some vars
                                              player_action = {};
-                                             last_block_pushed = nullptr;
-                                             last_block_pushed_direction = DIRECTION_LEFT;
-                                             block_to_push = nullptr;
 
                                              demo.entry_index = 0;
                                              frame_count = 0;
@@ -1009,9 +990,6 @@ int main(int argc, char** argv){
 
                               // reset some vars
                               player_action = {};
-                              last_block_pushed = nullptr;
-                              last_block_pushed_direction = DIRECTION_LEFT;
-                              block_to_push = nullptr;
 
                               demo.entry_index = 0;
                               frame_count = 0;
@@ -1379,7 +1357,8 @@ int main(int argc, char** argv){
                }
 
                // do a collision pass on each block
-               for(S16 i = 0; i < world.blocks.count; i++){
+               S16 update_blocks_count = world.blocks.count;
+               for(S16 i = 0; i < update_blocks_count; i++){
                     Block_t* block = world.blocks.elements + i;
 
                     bool stop_on_boundary_x = false;
@@ -1389,8 +1368,7 @@ int main(int argc, char** argv){
                     Vec_t pos_delta = pos_to_vec(block->pos - block->pre_move_pos);
 
                     if(pos_delta.x != 0.0f || pos_delta.y != 0.0f){
-                         check_block_collision_with_other_blocks(block, &world, world.players.elements, last_block_pushed,
-                                                                 last_block_pushed_direction);
+                         check_block_collision_with_other_blocks(block, &world, world.players.elements);
                     }
 
                     // get the current coord of the center of the block
@@ -1461,46 +1439,49 @@ int main(int argc, char** argv){
                          }
                     }
 
-                    Block_t* last_entangled_block_pushed = nullptr;
-                    if(last_block_pushed && last_block_pushed->entangle_index >= 0 && last_block_pushed->entangle_index < world.blocks.count){
-                         last_entangled_block_pushed = world.blocks.elements + last_block_pushed->entangle_index;
+                    // used to make sure the pushing is smooth on the entangled block as well
+                    Block_t* entangled_block_pushed = nullptr;
+                    Block_t* block_pushed = nullptr;
+                    if(world.players.elements->pushing_block >= 0){
+                         block_pushed = world.blocks.elements + world.players.elements->pushing_block;
+                         if(block_pushed && block_pushed->entangle_index >= 0 && block_pushed->entangle_index < world.blocks.count){
+                              entangled_block_pushed = world.blocks.elements + block_pushed->entangle_index;
+                         }
                     }
 
-                    if(block != last_block_pushed && !block_on_ice(block, &world.tilemap, world.interactive_qt)){
-                         if(block == last_entangled_block_pushed){
+                    // this instance of last_block_pushed is to keep the pushing smooth and not have it stop at the tile boundaries
+                    if(block != block_pushed && !block_on_ice(block, &world.tilemap, world.interactive_qt)){
+                         if(block == entangled_block_pushed){
+                              // TODO: take into account block rotation
                               DirectionMask_t vel_mask = vec_direction_mask(block->vel);
-                              switch(last_block_pushed_direction){
+                              switch(world.players.elements->face){
                               default:
                                    break;
                               case DIRECTION_LEFT:
                                    if(vel_mask & DIRECTION_MASK_RIGHT){
                                         stop_on_boundary_x = true;
-                                   }else if(vel_mask & DIRECTION_MASK_UP ||
-                                             vel_mask & DIRECTION_MASK_DOWN){
+                                   }else if(vel_mask & DIRECTION_MASK_UP || vel_mask & DIRECTION_MASK_DOWN){
                                         stop_on_boundary_y = true;
                                    }
                                    break;
                               case DIRECTION_RIGHT:
                                    if(vel_mask & DIRECTION_MASK_LEFT){
                                         stop_on_boundary_x = true;
-                                   }else if(vel_mask & DIRECTION_MASK_UP ||
-                                             vel_mask & DIRECTION_MASK_DOWN){
+                                   }else if(vel_mask & DIRECTION_MASK_UP || vel_mask & DIRECTION_MASK_DOWN){
                                         stop_on_boundary_y = true;
                                    }
                                    break;
                               case DIRECTION_UP:
                                    if(vel_mask & DIRECTION_MASK_DOWN){
                                         stop_on_boundary_y = true;
-                                   }else if(vel_mask & DIRECTION_MASK_LEFT ||
-                                             vel_mask & DIRECTION_MASK_RIGHT){
+                                   }else if(vel_mask & DIRECTION_MASK_LEFT || vel_mask & DIRECTION_MASK_RIGHT){
                                         stop_on_boundary_x = true;
                                    }
                                    break;
                               case DIRECTION_DOWN:
                                    if(vel_mask & DIRECTION_MASK_UP){
                                         stop_on_boundary_y = true;
-                                   }else if(vel_mask & DIRECTION_MASK_LEFT ||
-                                             vel_mask & DIRECTION_MASK_RIGHT){
+                                   }else if(vel_mask & DIRECTION_MASK_LEFT || vel_mask & DIRECTION_MASK_RIGHT){
                                         stop_on_boundary_x = true;
                                    }
                                    break;
@@ -1579,8 +1560,7 @@ int main(int argc, char** argv){
 
                          block->pre_move_pos = block->pos;
 
-                         check_block_collision_with_other_blocks(block, &world, world.players.elements, last_block_pushed,
-                                                                 last_block_pushed_direction);
+                         check_block_collision_with_other_blocks(block, &world, world.players.elements);
 
                          // try teleporting if we collided with a block
                          premove_coord = pixel_to_coord(block_center.pixel + HALF_TILE_SIZE_PIXEL);
@@ -1653,8 +1633,12 @@ int main(int argc, char** argv){
                               S16 block_index = (S16)(block - world.blocks.elements);
                               remove(&world.blocks, block->entangle_index);
 
+                              // TODO: This could lead to a subtle bug where our block index is no longer correct
+                              // TODO: because this was the last index in the list which got swapped to our index
                               // update ptr since we could have resized
                               block = world.blocks.elements + block_index;
+
+                              update_blocks_count--;
 
                               // if our entangled block was not the last element, then it was replaced by another
                               if(block->entangle_index < world.blocks.count){
@@ -1790,35 +1774,40 @@ int main(int argc, char** argv){
                          pos_delta = teleport_result.results[teleport_clone_id].delta;
                     }
 
+                    player->pushing_block = -1;
                     bool collide_with_interactive = false;
                     Vec_t player_delta_pos = move_player_position_through_world(player->pos, pos_delta,
                                                                                 player->face, skip_coord,
-                                                                                player, &world, &block_to_push,
-                                                                                &last_block_pushed_direction,
+                                                                                player, &world,
                                                                                 &collide_with_interactive, &resetting);
 
                     player_coord = pos_to_coord(player->pos + player_delta_pos);
 
-                    if(block_to_push){
+                    if(player->pushing_block >= 0){
+                         Block_t* block_to_push = world.blocks.elements + player->pushing_block;
                          DirectionMask_t block_move_dir_mask = vec_direction_mask(block_to_push->vel);
-                         if(direction_in_mask(direction_mask_opposite(block_move_dir_mask), player->face))
+                         if(direction_in_mask(direction_mask_opposite(block_move_dir_mask), player->pushing_block_dir))
                          {
                               // if the player is pushing against a block moving towards them, the block wins
                               player->push_time = 0;
-                              block_to_push = nullptr;
+                              player->pushing_block = -1;
                          }else{
-                              F32 before_time = player->push_time;
+                              F32 save_push_time = player->push_time;
 
                               // TODO: get back to this once we improve our demo tools
                               player->push_time += dt;
-                              if(player->push_time > BLOCK_PUSH_TIME){ // && !direction_in_mask(vec_direction_mask(block_to_push->vel), last_block_pushed_direction)){
-                                   if(before_time <= BLOCK_PUSH_TIME) undo_commit(&undo, &world.players, &world.tilemap, &world.blocks, &world.interactives);
-                                   bool pushed = block_push(block_to_push, last_block_pushed_direction, &world, false);
+                              if(player->push_time > BLOCK_PUSH_TIME){
+
+                                   // if this is the frame that causes the block to be pushed, make a commit
+                                   if(save_push_time <= BLOCK_PUSH_TIME) undo_commit(&undo, &world.players, &world.tilemap, &world.blocks, &world.interactives);
+
+                                   bool pushed = block_push(block_to_push, player->pushing_block_dir, &world, false);
                                    if(pushed && block_to_push->entangle_index >= 0 && block_to_push->entangle_index < world.blocks.count){
                                         // TODO: take into account block_to_push->face to rotate face
                                         Block_t* entangled_block = world.blocks.elements + block_to_push->entangle_index;
-                                        block_push(entangled_block, last_block_pushed_direction, &world, false);
+                                        block_push(entangled_block, player->pushing_block_dir, &world, false);
                                    }
+
                                    if(block_to_push->pos.z > 0) player->push_time = -0.5f; // TODO: wtf is this line?
                               }
                          }
@@ -1942,8 +1931,7 @@ int main(int argc, char** argv){
                     if(reset_timer >= RESET_TIME){
                          resetting = false;
 
-                         load_map_number_map(map_number, &world, &undo, &player_start, &player_action,
-                                             &last_block_pushed, &last_block_pushed_direction, &block_to_push);
+                         load_map_number_map(map_number, &world, &undo, &player_start, &player_action);
                     }
                }else{
                     reset_timer -= dt;
@@ -2129,7 +2117,7 @@ int main(int argc, char** argv){
                Position_t player_camera_offset = world.players.elements[p].pos - screen_camera;
                Vec_t pos_vec = pos_to_vec(player_camera_offset);
 
-               if(block_to_push){
+               if(world.players.elements[p].pushing_block >= 0){
                     glColor3f(1.0f, 0.0f, 0.0f);
                }else{
                     glColor3f(1.0f, 1.0f, 1.0f);
