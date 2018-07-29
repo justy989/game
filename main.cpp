@@ -10,6 +10,7 @@ Entanglement:
 - entangle puzzle with an extra non-entangled block where you don't want one of the entangled blocks to move, and you use
   the non-entangled block to accomplish that
 - arrow entanglement
+- arrow kills player
 
 Big Features:
 - Block splitting
@@ -1016,10 +1017,15 @@ int main(int argc, char** argv){
                          lift_update(&interactive->door.lift, POPUP_TICK_DELAY, dt, 0, DOOR_MAX_HEIGHT);
                     }else if(interactive->type == INTERACTIVE_TYPE_PRESSURE_PLATE){
                          bool should_be_down = false;
-                         Coord_t player_coord = pos_to_coord(world.players.elements->pos);
-                         if(interactive->coord == player_coord){
-                              should_be_down = true;
-                         }else{
+                         for(S16 p = 0; p < world.players.count; p++){
+                              Coord_t player_coord = pos_to_coord(world.players.elements[p].pos);
+                              if(interactive->coord == player_coord){
+                                   should_be_down = true;
+                                   break;
+                              }
+                         }
+
+                         if(!should_be_down){
                               Tile_t* tile = tilemap_get_tile(&world.tilemap, interactive->coord);
                               if(tile){
                                    if(!tile_is_iced(tile)){
@@ -1937,6 +1943,16 @@ int main(int argc, char** argv){
                          player->clone_id = 0;
                          player->clone_instance = 0;
                          player->clone_start = Coord_t{};
+                    }
+
+                    Interactive_t* interactive = quad_tree_find_at(world.interactive_qt, player_coord.x, player_coord.y);
+                    if(interactive && interactive->type == INTERACTIVE_TYPE_CLONE_KILLER){
+                         if(i == 0){
+                              resize(&world.players, 1);
+                              update_player_count = 1;
+                         }else{
+                              resetting = true;
+                         }
                     }
                }
 

@@ -262,6 +262,9 @@ void draw_interactive(Interactive_t* interactive, Vec_t pos_vec, Coord_t coord,
           if(interactive->wire_cross.mask & DIRECTION_MASK_DOWN) draw_theme_frame(pos_vec, theme_frame(9, y_frame));
           break;
      }
+     case INTERACTIVE_TYPE_CLONE_KILLER:
+          draw_theme_frame(pos_vec, theme_frame(4, 27));
+          break;
      }
 }
 

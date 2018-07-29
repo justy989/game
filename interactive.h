@@ -28,6 +28,7 @@ enum InteractiveType_t{
      INTERACTIVE_TYPE_STAIRS,
      INTERACTIVE_TYPE_PROMPT,
      INTERACTIVE_TYPE_WIRE_CROSS,
+     INTERACTIVE_TYPE_CLONE_KILLER,
 };
 
 struct PressurePlate_t{

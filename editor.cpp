@@ -317,6 +317,12 @@ bool init(Editor_t* editor){
           }
      }
 
+     auto* interactive_clone_killer_category = editor->category_array.elements + EDITOR_CATEGORY_INTERACTIVE_CLONE_KILLER;
+     init(interactive_clone_killer_category, 1);
+     init(interactive_clone_killer_category->elements, 1);
+     interactive_clone_killer_category->elements[0].elements[0].type = STAMP_TYPE_INTERACTIVE;
+     interactive_clone_killer_category->elements[0].elements[0].interactive.type = INTERACTIVE_TYPE_CLONE_KILLER;
+
      return true;
 }
 
