@@ -1831,7 +1831,7 @@ int main(int argc, char** argv){
                          player->vel = vec_rotate_quadrants_clockwise(player->vel, teleport_result.results[player->clone_id].rotations);
                          player->accel = vec_rotate_quadrants_clockwise(player->accel, teleport_result.results[player->clone_id].rotations);
 
-                         player->rotation = (player->rotation + teleport_result.results[player->clone_id].rotations) % DIRECTION_COUNT;
+                         if(i != 0) player->rotation = (player->rotation + teleport_result.results[player->clone_id].rotations) % DIRECTION_COUNT;
 
                          // set rotations for each direction the player wants to move
                          for(S8 d = 0; d < DIRECTION_COUNT; d++){
@@ -1889,7 +1889,7 @@ int main(int argc, char** argv){
                                    Player_t* other_player = world.players.elements + p;
                                    if(other_player->clone_instance == player->clone_instance){
                                         // TODO: I think I may have a really subtle bug here where we actually move
-                                        //       the i'th player around because it was the last in the array
+                                        // TODO: the i'th player around because it was the last in the array
                                         remove(&world.players, p);
 
                                         // update ptr since we could have resized
