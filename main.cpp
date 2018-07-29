@@ -9,11 +9,7 @@ Entanglement:
   trap an entangled block if it got to close, stopping the player from using walls to get blocks closer
 - entangle puzzle with an extra non-entangled block where you don't want one of the entangled blocks to move, and you use
   the non-entangled block to accomplish that
-- block rotation on entanglement
-- player entanglement
-- player on player collision
 - arrow entanglement
-- portal entangling
 
 Big Features:
 - Block splitting

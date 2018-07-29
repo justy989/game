@@ -21,20 +21,20 @@ Vec_t collide_circle_with_line(Vec_t circle_center, F32 circle_radius, Vec_t a, 
      return vec_zero();
 }
 
-void position_collide_with_rect(Position_t pos, Position_t rect_pos, Vec_t* pos_delta, bool* collide_with_block){
+void position_collide_with_rect(Position_t pos, Position_t rect_pos, F32 rect_dimension_size, Vec_t* pos_delta, bool* collides){
      Position_t relative = rect_pos - pos;
      Vec_t bottom_left = pos_to_vec(relative);
-     if(vec_magnitude(bottom_left) > (2 * TILE_SIZE)) return;
+     if(vec_magnitude(bottom_left) > (2 * rect_dimension_size)) return;
 
-     Vec_t top_left {bottom_left.x, bottom_left.y + TILE_SIZE};
-     Vec_t top_right {bottom_left.x + TILE_SIZE, bottom_left.y + TILE_SIZE};
-     Vec_t bottom_right {bottom_left.x + TILE_SIZE, bottom_left.y};
+     Vec_t top_left {bottom_left.x, bottom_left.y + rect_dimension_size};
+     Vec_t top_right {bottom_left.x + rect_dimension_size, bottom_left.y + rect_dimension_size};
+     Vec_t bottom_right {bottom_left.x + rect_dimension_size, bottom_left.y};
 
      // TODO: pass in radius
-     *pos_delta += collide_circle_with_line(*pos_delta, PLAYER_RADIUS, bottom_left, top_left, collide_with_block);
-     *pos_delta += collide_circle_with_line(*pos_delta, PLAYER_RADIUS, top_left, top_right, collide_with_block);
-     *pos_delta += collide_circle_with_line(*pos_delta, PLAYER_RADIUS, bottom_left, bottom_right, collide_with_block);
-     *pos_delta += collide_circle_with_line(*pos_delta, PLAYER_RADIUS, bottom_right, top_right, collide_with_block);
+     *pos_delta += collide_circle_with_line(*pos_delta, PLAYER_RADIUS, bottom_left, top_left, collides);
+     *pos_delta += collide_circle_with_line(*pos_delta, PLAYER_RADIUS, top_left, top_right, collides);
+     *pos_delta += collide_circle_with_line(*pos_delta, PLAYER_RADIUS, bottom_left, bottom_right, collides);
+     *pos_delta += collide_circle_with_line(*pos_delta, PLAYER_RADIUS, bottom_right, top_right, collides);
 }
 
 void position_slide_against_rect(Position_t pos, Coord_t coord, F32 player_radius, Vec_t* pos_delta, bool* collide_with_coord){

@@ -320,7 +320,7 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
 
           bool collide_with_block = false;
           Position_t block_pos = world->blocks.elements[i].pos;
-          position_collide_with_rect(position, block_pos, &pos_delta, &collide_with_block);
+          position_collide_with_rect(position, block_pos, TILE_SIZE, &pos_delta, &collide_with_block);
           Coord_t block_coord = block_get_coord(world->blocks.elements + i);
           U8 portal_rotations = 0;
 
@@ -344,7 +344,7 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
 
                                    Position_t portal_pos = coord_to_pos_at_tile_center(portal_exits.directions[d].coords[p]) + final_coord_offset -
                                                            pixel_to_pos(HALF_TILE_SIZE_PIXEL);
-                                   position_collide_with_rect(position, portal_pos, &pos_delta, &collide_with_block);
+                                   position_collide_with_rect(position, portal_pos, TILE_SIZE, &pos_delta, &collide_with_block);
 
                                    if(collide_with_block){
                                         block_pos = portal_pos;
@@ -484,6 +484,17 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
                     }
                }
           }
+     }
+
+     for(S16 i = 0; i < world->players.count; i++){
+          Player_t* other_player = world->players.elements + i;
+          if(other_player == player) continue;
+          if(other_player->clone_instance > 0 && other_player->clone_instance == player->clone_instance) continue; // don't collide while cloning
+          F64 distance = pixel_distance_between(player->pos.pixel, other_player->pos.pixel);
+          if(distance > PLAYER_RADIUS_IN_SUB_PIXELS * 3.0f) continue;
+          bool collided = false;
+          Position_t other_player_bottom_left = other_player->pos - Vec_t{PLAYER_RADIUS, PLAYER_RADIUS};
+          position_collide_with_rect(position, other_player_bottom_left, 2.0f * PLAYER_RADIUS, &pos_delta, &collided);
      }
 
      // TODO do we care about other directions for colliding with interactives and tiles like we do for blocks?
