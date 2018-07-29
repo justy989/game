@@ -32,4 +32,3 @@ void coord_move_x(Coord_t* c, S16 dx);
 void coord_move_y(Coord_t* c, S16 dy);
 
 bool coord_after(Coord_t a, Coord_t b);
-

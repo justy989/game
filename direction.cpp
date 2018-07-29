@@ -56,12 +56,6 @@ U8 direction_rotations_between(Direction_t a, Direction_t b){
      return (U8)(a - b);
 }
 
-Direction_t direction_rotate_clockwise(Direction_t dir){
-     U8 rot = (U8)(dir + 1);
-     rot %= DIRECTION_COUNT;
-     return (Direction_t)(rot);
-}
-
 Direction_t direction_rotate_clockwise(Direction_t dir, U8 times){
      return (Direction_t)((U8)(dir + times) % DIRECTION_COUNT);
 }
@@ -76,40 +70,6 @@ DirectionMask_t direction_mask_rotate_clockwise(DirectionMask_t mask){
      if(mask & DIRECTION_MASK_DOWN) rot |= DIRECTION_MASK_LEFT;
 
      return (DirectionMask_t)(rot);
-}
-
-DirectionMask_t direction_mask_rotate_clockwise(DirectionMask_t mask, U8 rotations){
-     for(U8 i = 0; i < rotations; i++){
-          mask = direction_mask_rotate_clockwise(mask);
-     }
-
-     return mask;
-}
-
-DirectionMask_t direction_mask_flip_horizontal(DirectionMask_t mask){
-     S8 flip = DIRECTION_MASK_NONE;
-
-     if(mask & DIRECTION_MASK_LEFT) flip |= DIRECTION_MASK_RIGHT;
-     if(mask & DIRECTION_MASK_RIGHT) flip |= DIRECTION_MASK_LEFT;
-
-     // keep the vertical components the same
-     if(mask & DIRECTION_MASK_UP) flip |= DIRECTION_MASK_UP;
-     if(mask & DIRECTION_MASK_DOWN) flip |= DIRECTION_MASK_DOWN;
-
-     return (DirectionMask_t)(flip);
-}
-
-DirectionMask_t direction_mask_flip_vertical(DirectionMask_t mask){
-     S8 flip = DIRECTION_MASK_NONE;
-
-     if(mask & DIRECTION_MASK_UP) flip |= DIRECTION_MASK_DOWN;
-     if(mask & DIRECTION_MASK_DOWN) flip |= DIRECTION_MASK_UP;
-
-     // keep the horizontal components the same
-     if(mask & DIRECTION_MASK_LEFT) flip |= DIRECTION_MASK_LEFT;
-     if(mask & DIRECTION_MASK_RIGHT) flip |= DIRECTION_MASK_RIGHT;
-
-     return (DirectionMask_t)(flip);
 }
 
 const char* direction_to_string(Direction_t dir){

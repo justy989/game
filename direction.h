@@ -43,7 +43,6 @@ DirectionMask_t direction_mask_add(DirectionMask_t mask, Direction_t dir);
 DirectionMask_t direction_mask_opposite(DirectionMask_t mask);
 Direction_t direction_opposite(Direction_t dir);
 U8 direction_rotations_between(Direction_t a, Direction_t b);
-Direction_t direction_rotate_clockwise(Direction_t dir);
 Direction_t direction_rotate_clockwise(Direction_t dir, U8 times);
 DirectionMask_t direction_mask_rotate_clockwise(DirectionMask_t mask);
 Direction_t direction_from_single_mask(DirectionMask_t mask);
