@@ -134,7 +134,7 @@ void draw_tile_flags(U16 flags, Vec_t tile_pos){
 }
 
 void draw_block(Block_t* block, Vec_t pos_vec){
-     Vec_t tex_vec = theme_frame(0, 6);
+     Vec_t tex_vec = theme_frame(block->rotation, 29);
      draw_double_theme_frame(pos_vec, tex_vec);
 
      if(block->element == ELEMENT_ONLY_ICED || block->element == ELEMENT_ICE ){

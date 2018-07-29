@@ -388,7 +388,7 @@ void apply_stamp(Stamp_t* stamp, Coord_t coord, TileMap_t* tilemap, ObjectArray_
           block->vel = vec_zero();
           block->accel = vec_zero();
           block->element = stamp->block.element;
-          block->face = stamp->block.face;
+          // block->rotation = stamp->block.rotation;
           block->entangle_index = stamp->block.entangle_index;
      } break;
      case STAMP_TYPE_INTERACTIVE:

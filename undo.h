@@ -13,6 +13,7 @@ struct UndoBlock_t{
      Vec_t accel;
      Vec_t vel;
      S16 entangle_index;
+     S8 rotation;
 };
 
 struct UndoPlayer_t{

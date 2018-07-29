@@ -951,9 +951,9 @@ void describe_coord(Coord_t coord, World_t* world){
      quad_tree_find_in(world->block_qt, coord_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
      for(S16 i = 0; i < block_count; i++){
           auto* block = blocks[i];
-          LOG("block %ld: pixel %d, %d, dir: %s, element: %s, entangle: %d, clone id: %d\n\n",
+          LOG("block %ld: pixel %d, %d, rot: %d, element: %s, entangle: %d, clone id: %d\n\n",
               block - world->blocks.elements, block->pos.pixel.x, block->pos.pixel.y,
-              direction_to_string(block->face), element_to_string(block->element),
+              block->rotation, element_to_string(block->element),
               block->entangle_index, block->clone_id);
      }
 }

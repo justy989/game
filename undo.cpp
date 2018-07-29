@@ -121,6 +121,7 @@ void undo_snapshot(Undo_t* undo, ObjectArray_t<Player_t>* players, TileMap_t* ti
           undo_block->accel = block->accel;
           undo_block->vel = block->vel;
           undo_block->entangle_index = block->entangle_index;
+          undo_block->rotation = block->rotation;
      }
 
      if(undo->interactives.count != interactives->count){
@@ -384,6 +385,7 @@ void undo_revert(Undo_t* undo, ObjectArray_t<Player_t>* players, TileMap_t* tile
                block->accel = block_entry->accel;
                block->vel = block_entry->vel;
                block->entangle_index = block_entry->entangle_index;
+               block->rotation = block_entry->rotation;
           } break;
           case UNDO_DIFF_TYPE_BLOCK_INSERT:
           {
@@ -404,6 +406,7 @@ void undo_revert(Undo_t* undo, ObjectArray_t<Player_t>* players, TileMap_t* tile
                block->accel = block_entry->accel;
                block->vel = block_entry->vel;
                block->entangle_index = block_entry->entangle_index;
+               block->rotation = block_entry->rotation;
           } break;
           case UNDO_DIFF_TYPE_BLOCK_REMOVE:
           {

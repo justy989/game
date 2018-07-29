@@ -37,7 +37,7 @@ bool save_map_to_file(FILE* file, Coord_t player_start, const TileMap_t* tilemap
           Block_t* block = block_array->elements + i;
           map_blocks[i].pixel = block->pos.pixel;
           map_blocks[i].z = block->pos.z;
-          map_blocks[i].face = block->face;
+          map_blocks[i].rotation = block->rotation;
           map_blocks[i].element = block->element;
           map_blocks[i].entangle_index = block->entangle_index;
      }
@@ -179,11 +179,12 @@ bool load_map_from_file_v1(FILE* file, Coord_t* player_start, TileMap_t* tilemap
           Block_t* block = block_array->elements + i;
           block->pos.pixel = map_blocks[i].pixel;
           block->pos.z = map_blocks[i].z;
-          block->face = map_blocks[i].face;
+          block->rotation = map_blocks[i].rotation;
           block->element = map_blocks[i].element;
           block->entangle_index = -1;
           block->clone_start = Coord_t{};
           block->clone_id = 0;
+          block->rotation = 0;
      }
 
      for(S16 i = 0; i < interactive_array->count; i++){
@@ -306,11 +307,12 @@ bool load_map_from_file_v2(FILE* file, Coord_t* player_start, TileMap_t* tilemap
           Block_t* block = block_array->elements + i;
           block->pos.pixel = map_blocks[i].pixel;
           block->pos.z = map_blocks[i].z;
-          block->face = map_blocks[i].face;
+          block->rotation = map_blocks[i].rotation;
           block->element = map_blocks[i].element;
           block->entangle_index = map_blocks[i].entangle_index;
           block->clone_start = Coord_t{};
           block->clone_id = 0;
+          block->rotation = 0;
      }
 
      for(S16 i = 0; i < interactive_array->count; i++){

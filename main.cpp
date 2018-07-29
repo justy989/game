@@ -105,7 +105,7 @@ bool load_map_number_map(S16 map_number, World_t* world, Undo_t* undo,
 Block_t block_from_stamp(Stamp_t* stamp){
      Block_t block = {};
      block.element = stamp->block.element;
-     block.face = stamp->block.face;
+     // block.rotation = stamp->block.rotation;
      block.entangle_index = stamp->block.entangle_index;
      block.clone_start = Coord_t{};
      block.clone_id = 0;
@@ -953,7 +953,7 @@ int main(int argc, char** argv){
                                                   resize(&editor.selection, editor.selection.count + (S16)(1));
                                                   auto* stamp = editor.selection.elements + (editor.selection.count - 1);
                                                   stamp->type = STAMP_TYPE_BLOCK;
-                                                  stamp->block.face = block->face;
+                                                  // stamp->block.rotation = block->rotation;
                                                   stamp->block.element = block->element;
                                                   stamp->offset = offset;
                                              }
@@ -1566,6 +1566,7 @@ int main(int argc, char** argv){
 
                          block->vel = vec_rotate_quadrants_clockwise(block->vel, teleport_result.results[block->clone_id].rotations);
                          block->accel = vec_rotate_quadrants_clockwise(block->accel, teleport_result.results[block->clone_id].rotations);
+                         block->rotation = teleport_result.results[block->clone_id].rotations;
 
                          block->pre_move_pos = block->pos;
 
@@ -1585,6 +1586,7 @@ int main(int argc, char** argv){
 
                               block->vel = vec_rotate_quadrants_clockwise(block->vel, collided_teleport_result.results[block->clone_id].rotations);
                               block->accel = vec_rotate_quadrants_clockwise(block->accel, collided_teleport_result.results[block->clone_id].rotations);
+                              block->rotation = collided_teleport_result.results[block->clone_id].rotations;
                          }
                     }
 
@@ -1814,7 +1816,14 @@ int main(int argc, char** argv){
                                    if(pushed && block_to_push->entangle_index >= 0 && block_to_push->entangle_index < world.blocks.count){
                                         // TODO: take into account block_to_push->face to rotate face
                                         Block_t* entangled_block = world.blocks.elements + block_to_push->entangle_index;
-                                        block_push(entangled_block, player->pushing_block_dir, &world, false);
+                                        U8 push_rotation = 0;
+                                        if(block_to_push->rotation){
+                                             push_rotation = block_to_push->rotation;
+                                        }else if(entangled_block->rotation){
+                                             push_rotation = entangled_block->rotation;
+                                        }
+                                        Direction_t rotated_dir = direction_rotate_clockwise(player->pushing_block_dir, push_rotation);
+                                        block_push(entangled_block, rotated_dir, &world, false);
                                    }
 
                                    if(block_to_push->pos.z > 0) player->push_time = -0.5f; // TODO: wtf is this line?

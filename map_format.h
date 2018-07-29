@@ -18,14 +18,14 @@ struct MapTileV1_t{
 
 struct MapBlockV1_t{
      Pixel_t pixel;
-     Direction_t face;
+     U8 rotation;
      Element_t element;
      S8 z;
 };
 
 struct MapBlockV2_t{
      Pixel_t pixel;
-     Direction_t face;
+     U8 rotation;
      Element_t element;
      S8 z;
      S16 entangle_index;
