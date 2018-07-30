@@ -1,4 +1,4 @@
 #!/bin/bash
 set -x
-rm -f game bryte.log
+rm -f game bryte.log test_results.txt
 

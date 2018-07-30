@@ -1,0 +1,14 @@
+#!/bin/bash
+MAP_START=1
+if [ "$#" -eq 1 ]; then
+    MAP_START=$1
+fi
+echo "./game -suite -map ${MAP_START} > test_results.txt"
+if ./game -suite -map $MAP_START > test_results.txt; then
+    echo -e "\e[32mTESTS PASSED\e[39m\n"
+else
+    echo -e "\e[31mTESTS FAILED\e[39m\n"
+    fgrep -B 1 mismatched test_results.txt
+    echo ""
+    fgrep "game -suite" test_results.txt
+fi

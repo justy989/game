@@ -404,6 +404,7 @@ int main(int argc, char** argv){
                     if(test){
                          if(!test_map_end_state(&world, &demo)){
                               LOG("test failed\n");
+                              LOG("\n./game -suite -map %d -show\n\n", map_number);
                               demo.mode = DEMO_MODE_NONE;
                               if(suite && !show_suite) return 1;
                          }else if(suite){
