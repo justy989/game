@@ -314,7 +314,6 @@ void undo_commit(Undo_t* undo, ObjectArray_t<Player_t>* players, TileMap_t* tile
      for(S16 i = 0; i < min_interactive_count; i++){
           Interactive_t* undo_interactive = undo->interactives.elements + i;
           Interactive_t* interactive = interactives->elements + i;
-          assert(undo_interactive->type == interactive->type);
 
           if(!interactive_equal(undo_interactive, interactive)){
                auto* undo_interactive_entry = (Interactive_t*)(undo->history.current);

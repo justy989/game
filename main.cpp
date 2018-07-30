@@ -1040,8 +1040,14 @@ int main(int argc, char** argv){
                                         quad_tree_find_in(world.block_qt, rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
 
                                         for(S16 b = 0; b < block_count; b++){
-                                             Coord_t block_coord = block_get_coord(blocks[b]);
-                                             if(interactive->coord == block_coord){
+                                             Coord_t bottom_left = pixel_to_coord(blocks[b]->pos.pixel);
+                                             Coord_t bottom_right = pixel_to_coord(blocks[b]->pos.pixel + Pixel_t{BLOCK_SOLID_SIZE_IN_PIXELS, 0});
+                                             Coord_t top_left = pixel_to_coord(blocks[b]->pos.pixel + Pixel_t{0, BLOCK_SOLID_SIZE_IN_PIXELS});
+                                             Coord_t top_right = pixel_to_coord(blocks[b]->pos.pixel + Pixel_t{BLOCK_SOLID_SIZE_IN_PIXELS, BLOCK_SOLID_SIZE_IN_PIXELS});
+                                             if(interactive->coord == bottom_left ||
+                                                interactive->coord == bottom_right ||
+                                                interactive->coord == top_left ||
+                                                interactive->coord == top_right){
                                                   should_be_down = true;
                                                   break;
                                              }
