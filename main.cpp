@@ -17,6 +17,9 @@ Big Features:
 - Block ice collision with masses
 - 3D
 
+Bug:
+- if you push a block while a door is opening/closing, then the undo stuck bug happens
+
 NOTES:
 - Only 2 blocks high can go through portals
 */
@@ -47,6 +50,53 @@ NOTES:
 #include "world.h"
 
 // #define BLOCKS_SQUISH_PLAYER
+
+#define TEXT_CHAR_WIDTH (5.0f * PIXEL_SIZE)
+#define TEXT_CHAR_HEIGHT (8.0f * PIXEL_SIZE)
+#define TEXT_CHAR_SPACING (1.0f * PIXEL_SIZE)
+#define TEXT_CHAR_TEX_WIDTH 0.01953125f
+#define TEXT_CHAR_TEX_HEIGHT 1.0f
+
+void draw_text(const char* message, Vec_t pos)
+{
+     char c;
+     Vec_t dimensions {TEXT_CHAR_WIDTH, TEXT_CHAR_HEIGHT};
+     Vec_t tex {};
+     Vec_t tex_dimensions {TEXT_CHAR_TEX_WIDTH, TEXT_CHAR_TEX_HEIGHT};
+
+     while((c = *message)){
+          if(isalpha(c)){
+               tex.x = (F32)((c - 'A')) * TEXT_CHAR_TEX_WIDTH;
+          }else if(isdigit(c)){
+               tex.x = (F32)((c - '0') + ('Z' - 'A') + 1) * TEXT_CHAR_TEX_WIDTH;
+          }else if(c == ':'){
+               tex.x = 36.0f * TEXT_CHAR_TEX_WIDTH;
+          }else if(c == '.'){
+               tex.x = 37.0f * TEXT_CHAR_TEX_WIDTH;
+          }else if(c == ','){
+               tex.x = 38.0f * TEXT_CHAR_TEX_WIDTH;
+          }else if(c == '+'){
+               tex.x = 39.0f * TEXT_CHAR_TEX_WIDTH;
+          }else if(c == '?'){
+               tex.x = 40.0f * TEXT_CHAR_TEX_WIDTH;
+          }else if(c == '!'){
+               tex.x = 41.0f * TEXT_CHAR_TEX_WIDTH;
+          }else if(c == '\''){
+               tex.x = 42.0f * TEXT_CHAR_TEX_WIDTH;
+          }else if(c == '*'){
+               tex.x = 43.0f * TEXT_CHAR_TEX_WIDTH;
+          }else if(c == '/'){
+               tex.x = 44.0f * TEXT_CHAR_TEX_WIDTH;
+          }else{
+               tex.x = 1.0f - TEXT_CHAR_TEX_WIDTH;
+          }
+
+          draw_screen_texture(pos, tex, dimensions, tex_dimensions);
+
+          pos.x += TEXT_CHAR_WIDTH + TEXT_CHAR_SPACING;
+          message++;
+     }
+}
 
 FILE* load_demo_number(S32 map_number, const char** demo_filepath){
      char filepath[64] = {};
@@ -88,8 +138,8 @@ bool load_map_number_demo(Demo_t* demo, S16 map_number, S64* frame_count){
      return true;
 }
 
-bool load_map_number_map(S16 map_number, World_t* world, Undo_t* undo,
-                         Coord_t* player_start, PlayerAction_t* player_action){
+bool setup_map_number(S16 map_number, World_t* world, Undo_t* undo,
+                      Coord_t* player_start, PlayerAction_t* player_action){
      if(load_map_number(map_number, player_start, world)){
           setup_map(*player_start, world, undo);
           *player_action = {};
@@ -97,6 +147,16 @@ bool load_map_number_map(S16 map_number, World_t* world, Undo_t* undo,
      }
 
      return false;
+}
+
+void restart_demo_to_seek_backward(World_t* world, Undo_t* undo, TileMap_t* demo_starting_tilemap, ObjectArray_t<Block_t>* demo_starting_blocks,
+                                   ObjectArray_t<Interactive_t>* demo_starting_interactives, PlayerAction_t* player_action,
+                                   Coord_t player_start, S64* demo_entry_index, S64* frame_count){
+     fetch_cache_for_demo_seek(world, demo_starting_tilemap, demo_starting_blocks, demo_starting_interactives);
+     setup_map(player_start, world, undo);
+     *player_action = {};
+     *demo_entry_index = 0;
+     *frame_count = 1;
 }
 
 Block_t block_from_stamp(Stamp_t* stamp){
@@ -171,13 +231,14 @@ int main(int argc, char** argv){
           return 1;
      }
 
-     int window_width = 1080;
-     int window_height = 1080;
+     int window_width = 800;
+     int window_height = 800;
      SDL_Window* window = nullptr;
      SDL_GLContext opengl_context = nullptr;
      GLuint theme_texture = 0;
      GLuint player_texture = 0;
      GLuint arrow_texture = 0;
+     GLuint text_texture = 0;
 
      if(!suite || show_suite){
           if(SDL_Init(SDL_INIT_EVERYTHING) != 0){
@@ -216,6 +277,8 @@ int main(int argc, char** argv){
           if(player_texture == 0) return 1;
           arrow_texture = transparent_texture_from_file("content/arrow.bmp");
           if(arrow_texture == 0) return 1;
+          text_texture = transparent_texture_from_file("content/text.bmp");
+          if(text_texture == 0) return 1;
      }
 
      switch(demo.mode){
@@ -280,8 +343,10 @@ int main(int argc, char** argv){
           if(demo.mode == DEMO_MODE_PLAY){
                cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
           }
+
+          setup_map(player_start, &world, &undo);
      }else if(suite){
-          if(!load_map_number(map_number, &player_start, &world)){
+          if(!setup_map_number(map_number, &world, &undo, &player_start, &player_action)){
                return 1;
           }
 
@@ -292,7 +357,7 @@ int main(int argc, char** argv){
                return 1;
           }
      }else if(map_number){
-          if(!load_map_number(map_number, &player_start, &world)){
+          if(!setup_map_number(map_number, &world, &undo, &player_start, &player_action)){
                return 1;
           }
 
@@ -345,9 +410,10 @@ int main(int argc, char** argv){
                return 1;
           }
           world.blocks.elements[0].pos = coord_to_pos(Coord_t{-1, -1});
+
+          setup_map(player_start, &world, &undo);
      }
 
-     setup_map(player_start, &world, &undo);
      init(&editor);
 
      F32 dt = 0.0f;
@@ -411,8 +477,7 @@ int main(int argc, char** argv){
                               map_number++;
                               S16 maps_tested = map_number - first_map_number;
 
-                              if(load_map_number_map(map_number, &world, &undo, &player_start, &player_action)){
-
+                              if(setup_map_number(map_number, &world, &undo, &player_start, &player_action)){
                                    cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
 
                                    if(load_map_number_demo(&demo, map_number, &frame_count)){
@@ -420,6 +485,7 @@ int main(int argc, char** argv){
                                    }else{
                                         return 1;
                                    }
+                                   frame_count = 1;
                               }else{
                                    LOG("Done Testing %d maps.\n", maps_tested);
                                    return 0;
@@ -496,7 +562,7 @@ int main(int argc, char** argv){
                          }
                          break;
                     case SDL_SCANCODE_L:
-                         if(load_map_number_map(map_number, &world, &undo, &player_start, &player_action)){
+                         if(setup_map_number(map_number, &world, &undo, &player_start, &player_action)){
                               if(demo.mode == DEMO_MODE_PLAY){
                                    cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
                               }
@@ -504,7 +570,7 @@ int main(int argc, char** argv){
                          break;
                     case SDL_SCANCODE_LEFTBRACKET:
                          map_number--;
-                         if(load_map_number_map(map_number, &world, &undo, &player_start, &player_action)){
+                         if(setup_map_number(map_number, &world, &undo, &player_start, &player_action)){
                               if(demo.mode == DEMO_MODE_PLAY){
                                    cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
 
@@ -520,7 +586,7 @@ int main(int argc, char** argv){
                          break;
                     case SDL_SCANCODE_RIGHTBRACKET:
                          map_number++;
-                         if(load_map_number_map(map_number, &world, &undo, &player_start, &player_action)){
+                         if(setup_map_number(map_number, &world, &undo, &player_start, &player_action)){
                               if(demo.mode == DEMO_MODE_PLAY){
                                    cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
 
@@ -639,6 +705,20 @@ int main(int argc, char** argv){
                                    *new_player = world.players.elements[0];
                                    new_player->pos = pixel_to_pos(pixel);
                               }
+                         }
+                         break;
+                    case SDL_SCANCODE_1:
+                         if(demo.mode == DEMO_MODE_PLAY){
+                              demo.seek_frame = frame_count - 1;
+
+                              restart_demo_to_seek_backward(&world, &undo, &demo_starting_tilemap, &demo_starting_blocks,
+                                                            &demo_starting_interactives, &player_action,
+                                                            player_start, &demo.entry_index, &frame_count);
+                         }
+                         break;
+                    case SDL_SCANCODE_3:
+                         if(demo.mode == DEMO_MODE_PLAY){
+                              demo.seek_frame = frame_count + 1;
                          }
                          break;
                     // TODO: #ifdef DEBUG
@@ -804,16 +884,9 @@ int main(int argc, char** argv){
                                         demo.seek_frame = (S64)((F32)(demo.last_frame) * mouse_screen.x);
 
                                         if(demo.seek_frame < frame_count){
-                                             // TODO: compress with same comment elsewhere in this file
-                                             fetch_cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
-
-                                             setup_map(player_start, &world, &undo);
-
-                                             // reset some vars
-                                             player_action = {};
-
-                                             demo.entry_index = 0;
-                                             frame_count = 0;
+                                             restart_demo_to_seek_backward(&world, &undo, &demo_starting_tilemap, &demo_starting_blocks,
+                                                                           &demo_starting_interactives, &player_action,
+                                                                           player_start, &demo.entry_index, &frame_count);
                                         }else if(demo.seek_frame == frame_count){
                                              demo.seek_frame = -1;
                                         }
@@ -983,16 +1056,9 @@ int main(int argc, char** argv){
                          demo.seek_frame = (S64)((F32)(demo.last_frame) * mouse_screen.x);
 
                          if(demo.seek_frame < frame_count){
-                              // TODO: compress with same comment elsewhere in this file
-                              fetch_cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
-
-                              setup_map(player_start, &world, &undo);
-
-                              // reset some vars
-                              player_action = {};
-
-                              demo.entry_index = 0;
-                              frame_count = 0;
+                              restart_demo_to_seek_backward(&world, &undo, &demo_starting_tilemap, &demo_starting_blocks,
+                                                            &demo_starting_interactives, &player_action,
+                                                            player_start, &demo.entry_index, &frame_count);
                          }else if(demo.seek_frame == frame_count){
                               demo.seek_frame = -1;
                          }
@@ -1355,6 +1421,219 @@ int main(int argc, char** argv){
                Position_t camera_movement = room_center - camera;
                camera += camera_movement * 0.05f;
 
+               // player movement
+               S16 update_player_count = world.players.count; // save due to adding/removing players
+               for(S16 i = 0; i < update_player_count; i++){
+                    Player_t* player = world.players.elements + i;
+
+                    player->accel = vec_normalize(player->accel);
+                    player->accel = player->accel * PLAYER_SPEED;
+
+                    Vec_t pos_delta = mass_move(&player->vel, player->accel, dt);
+
+                    if(fabs(vec_magnitude(player->vel)) > PLAYER_SPEED){
+                         player->vel = vec_normalize(player->vel) * PLAYER_SPEED;
+                    }
+
+                    Coord_t skip_coord[DIRECTION_COUNT];
+                    Coord_t player_previous_coord = pos_to_coord(player->pos);
+                    Coord_t player_coord = pos_to_coord(player->pos + pos_delta);
+
+                    find_portal_adjacents_to_skip_collision_check(player_coord, world.interactive_qt, skip_coord);
+                    auto teleport_result = teleport_position_across_portal(player->pos, pos_delta, &world,
+                                                                           player_previous_coord, player_coord);
+                    auto teleport_clone_id = player->clone_id;
+                    if(player_coord != player->clone_start){
+                         // if we are going back to our clone portal, then all clones should go back
+
+                         // find the index closest to our original clone portal
+                         F32 shortest_distance = FLT_MAX;
+                         auto clone_start_center = coord_to_pixel_at_center(player->clone_start);
+
+                         for(S8 t = 0; t < teleport_result.count; t++){
+                              F32 distance = pixel_distance_between(clone_start_center, teleport_result.results[t].pos.pixel);
+                              if(distance < shortest_distance){
+                                   shortest_distance = distance;
+                                   teleport_clone_id = t;
+                              }
+                         }
+                    }
+                    if(teleport_result.count > teleport_clone_id){
+                         player->pos = teleport_result.results[teleport_clone_id].pos;
+                         pos_delta = teleport_result.results[teleport_clone_id].delta;
+                    }
+
+                    player->pushing_block = -1;
+                    bool collide_with_interactive = false;
+                    Vec_t player_delta_pos = move_player_position_through_world(player->pos, pos_delta,
+                                                                                player->face, skip_coord,
+                                                                                player, &world,
+                                                                                &collide_with_interactive, &resetting);
+
+                    player_coord = pos_to_coord(player->pos + player_delta_pos);
+
+                    if(player->pushing_block >= 0){
+                         Block_t* block_to_push = world.blocks.elements + player->pushing_block;
+                         DirectionMask_t block_move_dir_mask = vec_direction_mask(block_to_push->vel);
+                         if(direction_in_mask(direction_mask_opposite(block_move_dir_mask), player->pushing_block_dir))
+                         {
+                              // if the player is pushing against a block moving towards them, the block wins
+                              player->push_time = 0;
+                              player->pushing_block = -1;
+                         }else{
+                              F32 save_push_time = player->push_time;
+
+                              // TODO: get back to this once we improve our demo tools
+                              player->push_time += dt;
+                              if(player->push_time > BLOCK_PUSH_TIME){
+
+                                   // if this is the frame that causes the block to be pushed, make a commit
+                                   if(save_push_time <= BLOCK_PUSH_TIME) undo_commit(&undo, &world.players, &world.tilemap, &world.blocks, &world.interactives);
+
+                                   bool pushed = block_push(block_to_push, player->pushing_block_dir, &world, false);
+                                   if(pushed){
+                                        if(block_to_push->entangle_index >= 0 && block_to_push->entangle_index < world.blocks.count){
+                                             // TODO: take into account block_to_push->face to rotate face
+                                             Block_t* entangled_block = world.blocks.elements + block_to_push->entangle_index;
+                                             U8 push_rotation = 0;
+                                             if(block_to_push->rotation){
+                                                  push_rotation = block_to_push->rotation;
+                                             }else if(entangled_block->rotation){
+                                                  push_rotation = entangled_block->rotation;
+                                             }
+                                             Direction_t rotated_dir = direction_rotate_clockwise(player->pushing_block_dir, push_rotation);
+                                             block_push(entangled_block, rotated_dir, &world, false);
+                                        }
+                                   }
+
+                                   if(block_to_push->pos.z > 0) player->push_time = -0.5f; // TODO: wtf is this line?
+                              }
+                         }
+                    }else{
+                         player->push_time = 0;
+                    }
+
+                    if(teleport_result.count == 0){
+                         teleport_result = teleport_position_across_portal(player->pos, player_delta_pos, &world,
+                                                                           player_previous_coord, player_coord);
+                         if(teleport_result.count > teleport_clone_id){
+                              player->pos = teleport_result.results[teleport_clone_id].pos;
+                              player_delta_pos = teleport_result.results[teleport_clone_id].delta;
+                         }
+                    }else{
+                         auto new_teleport_result = teleport_position_across_portal(player->pos, player_delta_pos, &world,
+                                                                                    player_previous_coord, player_coord);
+                         if(new_teleport_result.count > teleport_clone_id){
+                              player->pos = new_teleport_result.results[teleport_clone_id].pos;
+                              player_delta_pos = new_teleport_result.results[teleport_clone_id].delta;
+                         }
+                    }
+
+                    if(teleport_result.count > teleport_clone_id){
+                         player->face = direction_rotate_clockwise(player->face, teleport_result.results[teleport_clone_id].rotations);
+                         player->vel = vec_rotate_quadrants_clockwise(player->vel, teleport_result.results[teleport_clone_id].rotations);
+                         player->accel = vec_rotate_quadrants_clockwise(player->accel, teleport_result.results[teleport_clone_id].rotations);
+
+                         if(i != 0) player->rotation = (player->rotation + teleport_result.results[teleport_clone_id].rotations) % DIRECTION_COUNT;
+
+                         // set rotations for each direction the player wants to move
+                         for(S8 d = 0; d < DIRECTION_COUNT; d++){
+                              if(player_action.move[d]) player->move_rotation[d] = (player->move_rotation[d] + teleport_result.results[teleport_clone_id].rotations) % DIRECTION_COUNT;
+                         }
+                    }
+
+                    auto* portal = player_is_teleporting(player, world.interactive_qt);
+
+                    player->pos += player_delta_pos;
+
+                    if(portal && player->clone_start.x == 0){
+                         // at the first instant of the block teleporting, check if we should create an entangled_block
+
+                         PortalExit_t portal_exits = find_portal_exits(portal->coord, &world.tilemap, world.interactive_qt);
+                         S8 count = portal_exit_count(&portal_exits);
+                         if(count >= 3){ // src portal, dst portal, clone portal
+                              world.clone_instance++;
+
+                              S8 clone_id = 0;
+                              for (auto &direction : portal_exits.directions) {
+                                   for(int p = 0; p < direction.count; p++){
+                                        if(direction.coords[p] == portal->coord) continue;
+
+                                        if(clone_id == 0){
+                                             player->clone_id = clone_id;
+                                             player->clone_instance = world.clone_instance;
+                                        }else{
+                                             S16 new_player_index = world.players.count;
+
+                                             if(resize(&world.players, world.players.count + (S16)(1))){
+                                                  // a resize will kill our player ptr, so we gotta update it
+                                                  player = world.players.elements + i;
+                                                  player->clone_start = portal->coord;
+
+                                                  Player_t* new_player = world.players.elements + new_player_index;
+                                                  *new_player = *player;
+                                                  new_player->clone_id = clone_id;
+                                             }
+                                        }
+
+                                        clone_id++;
+                                   }
+                              }
+                         }
+                    }else if(!portal && player->clone_start.x > 0){
+                         auto clone_portal_center = coord_to_pixel_at_center(player->clone_start);
+                         F64 player_distance_from_portal = pixel_distance_between(clone_portal_center, player->pos.pixel);
+                         bool from_clone_start = (player_distance_from_portal < TILE_SIZE_IN_PIXELS);
+
+                         if(from_clone_start){
+                              // loop across all players after this one
+                              for(S16 p = 0; p < world.players.count; p++){
+                                   if(p == i) continue;
+                                   Player_t* other_player = world.players.elements + p;
+                                   if(other_player->clone_instance == player->clone_instance){
+                                        // TODO: I think I may have a really subtle bug here where we actually move
+                                        // TODO: the i'th player around because it was the last in the array
+                                        remove(&world.players, p);
+
+                                        // update ptr since we could have resized
+                                        player = world.players.elements + i;
+
+                                        update_player_count--;
+                                   }
+                              }
+                         }else{
+                              for(S16 p = 0; p < world.players.count; p++){
+                                   if(p == i) continue;
+                                   Player_t* other_player = world.players.elements + p;
+                                   if(other_player->clone_instance == player->clone_instance){
+                                        other_player->clone_id = 0;
+                                        other_player->clone_instance = 0;
+                                        other_player->clone_start = Coord_t{};
+                                   }
+                              }
+
+                              // turn off the circuit
+                              activate(&world, player->clone_start);
+                              auto* src_portal = quad_tree_find_at(world.interactive_qt, player->clone_start.x, player->clone_start.y);
+                              if(is_active_portal(src_portal)) src_portal->portal.on = false;
+                         }
+
+                         player->clone_id = 0;
+                         player->clone_instance = 0;
+                         player->clone_start = Coord_t{};
+                    }
+
+                    Interactive_t* interactive = quad_tree_find_at(world.interactive_qt, player_coord.x, player_coord.y);
+                    if(interactive && interactive->type == INTERACTIVE_TYPE_CLONE_KILLER){
+                         if(i == 0){
+                              resize(&world.players, 1);
+                              update_player_count = 1;
+                         }else{
+                              resetting = true;
+                         }
+                    }
+               }
+
                // block movement
                // do a pass moving the block as far as possible, so that collision doesn't rely on order of blocks in the array
                for(S16 i = 0; i < world.blocks.count; i++){
@@ -1459,10 +1738,23 @@ int main(int argc, char** argv){
                     for(S16 p = 0; p < world.players.count; p++){
                          Player_t* player = world.players.elements + p;
                          if(player->pushing_block >= 0){
-                              block_pushed = world.blocks.elements + player->pushing_block;
-                              if(block_pushed && block_pushed->entangle_index >= 0 && block_pushed->entangle_index < world.blocks.count){
+                              Block_t* player_pushing_block = world.blocks.elements + player->pushing_block;
+                              if(player_pushing_block != block){
+                                   continue;
+                              }
+
+                              block_pushed = player_pushing_block;
+
+                              if(block_pushed->entangle_index >= 0 && block_pushed->entangle_index < world.blocks.count){
                                    entangled_block_pushed = world.blocks.elements + block_pushed->entangle_index;
-                                   entangled_block_pushed_dir = player->pushing_block_dir;
+                                   // TODO: compress this logic, I don't think it's exactly right anyways
+                                   U8 entangle_rotations = 0;
+                                   if(block_pushed->rotation){
+                                        entangle_rotations = block_pushed->rotation;
+                                   }else if(entangled_block_pushed->rotation){
+                                        entangle_rotations = entangled_block_pushed->rotation;
+                                   }
+                                   entangled_block_pushed_dir = direction_rotate_clockwise(player->pushing_block_dir, entangle_rotations);
                               }
                          }
                     }
@@ -1575,7 +1867,7 @@ int main(int argc, char** argv){
 
                          block->vel = vec_rotate_quadrants_clockwise(block->vel, teleport_result.results[block->clone_id].rotations);
                          block->accel = vec_rotate_quadrants_clockwise(block->accel, teleport_result.results[block->clone_id].rotations);
-                         block->rotation = teleport_result.results[block->clone_id].rotations;
+                         block->rotation = (block->rotation + teleport_result.results[block->clone_id].rotations) % DIRECTION_COUNT;
 
                          block->pre_move_pos = block->pos;
 
@@ -1595,7 +1887,7 @@ int main(int argc, char** argv){
 
                               block->vel = vec_rotate_quadrants_clockwise(block->vel, collided_teleport_result.results[block->clone_id].rotations);
                               block->accel = vec_rotate_quadrants_clockwise(block->accel, collided_teleport_result.results[block->clone_id].rotations);
-                              block->rotation = collided_teleport_result.results[block->clone_id].rotations;
+                              block->rotation = (block->rotation + teleport_result.results[block->clone_id].rotations) % DIRECTION_COUNT;
                          }
                     }
 
@@ -1752,223 +2044,12 @@ int main(int argc, char** argv){
                     }
                }
 
-               // player movement
-               S16 update_player_count = world.players.count; // save due to adding/removing players
-               for(S16 i = 0; i < update_player_count; i++){
-                    Player_t* player = world.players.elements + i;
-
-                    player->accel = vec_normalize(player->accel);
-                    player->accel = player->accel * PLAYER_SPEED;
-
-                    Vec_t pos_delta = mass_move(&player->vel, player->accel, dt);
-
-                    if(fabs(vec_magnitude(player->vel)) > PLAYER_SPEED){
-                         player->vel = vec_normalize(player->vel) * PLAYER_SPEED;
-                    }
-
-                    Coord_t skip_coord[DIRECTION_COUNT];
-                    Coord_t player_previous_coord = pos_to_coord(player->pos);
-                    Coord_t player_coord = pos_to_coord(player->pos + pos_delta);
-
-                    find_portal_adjacents_to_skip_collision_check(player_coord, world.interactive_qt, skip_coord);
-                    auto teleport_result = teleport_position_across_portal(player->pos, pos_delta, &world,
-                                                                           player_previous_coord, player_coord);
-                    auto teleport_clone_id = player->clone_id;
-                    if(player_coord != player->clone_start){
-                         // if we are going back to our clone portal, then all clones should go back
-
-                         // find the index closest to our original clone portal
-                         F32 shortest_distance = FLT_MAX;
-                         auto clone_start_center = coord_to_pixel_at_center(player->clone_start);
-
-                         for(S8 t = 0; t < teleport_result.count; t++){
-                              F32 distance = pixel_distance_between(clone_start_center, teleport_result.results[t].pos.pixel);
-                              if(distance < shortest_distance){
-                                   shortest_distance = distance;
-                                   teleport_clone_id = t;
-                              }
-                         }
-                    }
-                    if(teleport_result.count > teleport_clone_id){
-                         player->pos = teleport_result.results[teleport_clone_id].pos;
-                         pos_delta = teleport_result.results[teleport_clone_id].delta;
-                    }
-
-                    player->pushing_block = -1;
-                    bool collide_with_interactive = false;
-                    Vec_t player_delta_pos = move_player_position_through_world(player->pos, pos_delta,
-                                                                                player->face, skip_coord,
-                                                                                player, &world,
-                                                                                &collide_with_interactive, &resetting);
-
-                    player_coord = pos_to_coord(player->pos + player_delta_pos);
-
-                    if(player->pushing_block >= 0){
-                         Block_t* block_to_push = world.blocks.elements + player->pushing_block;
-                         DirectionMask_t block_move_dir_mask = vec_direction_mask(block_to_push->vel);
-                         if(direction_in_mask(direction_mask_opposite(block_move_dir_mask), player->pushing_block_dir))
-                         {
-                              // if the player is pushing against a block moving towards them, the block wins
-                              player->push_time = 0;
-                              player->pushing_block = -1;
-                         }else{
-                              F32 save_push_time = player->push_time;
-
-                              // TODO: get back to this once we improve our demo tools
-                              player->push_time += dt;
-                              if(player->push_time > BLOCK_PUSH_TIME){
-
-                                   // if this is the frame that causes the block to be pushed, make a commit
-                                   if(save_push_time <= BLOCK_PUSH_TIME) undo_commit(&undo, &world.players, &world.tilemap, &world.blocks, &world.interactives);
-
-                                   bool pushed = block_push(block_to_push, player->pushing_block_dir, &world, false);
-                                   if(pushed && block_to_push->entangle_index >= 0 && block_to_push->entangle_index < world.blocks.count){
-                                        // TODO: take into account block_to_push->face to rotate face
-                                        Block_t* entangled_block = world.blocks.elements + block_to_push->entangle_index;
-                                        U8 push_rotation = 0;
-                                        if(block_to_push->rotation){
-                                             push_rotation = block_to_push->rotation;
-                                        }else if(entangled_block->rotation){
-                                             push_rotation = entangled_block->rotation;
-                                        }
-                                        Direction_t rotated_dir = direction_rotate_clockwise(player->pushing_block_dir, push_rotation);
-                                        block_push(entangled_block, rotated_dir, &world, false);
-                                   }
-
-                                   if(block_to_push->pos.z > 0) player->push_time = -0.5f; // TODO: wtf is this line?
-                              }
-                         }
-                    }else{
-                         player->push_time = 0;
-                    }
-
-                    if(teleport_result.count == 0){
-                         teleport_result = teleport_position_across_portal(player->pos, player_delta_pos, &world,
-                                                                           player_previous_coord, player_coord);
-                         if(teleport_result.count > teleport_clone_id){
-                              player->pos = teleport_result.results[teleport_clone_id].pos;
-                              player_delta_pos = teleport_result.results[teleport_clone_id].delta;
-                         }
-                    }else{
-                         auto new_teleport_result = teleport_position_across_portal(player->pos, player_delta_pos, &world,
-                                                                                    player_previous_coord, player_coord);
-                         if(new_teleport_result.count > teleport_clone_id){
-                              player->pos = new_teleport_result.results[teleport_clone_id].pos;
-                              player_delta_pos = new_teleport_result.results[teleport_clone_id].delta;
-                         }
-                    }
-
-                    if(teleport_result.count > teleport_clone_id){
-                         player->face = direction_rotate_clockwise(player->face, teleport_result.results[teleport_clone_id].rotations);
-                         player->vel = vec_rotate_quadrants_clockwise(player->vel, teleport_result.results[teleport_clone_id].rotations);
-                         player->accel = vec_rotate_quadrants_clockwise(player->accel, teleport_result.results[teleport_clone_id].rotations);
-
-                         if(i != 0) player->rotation = (player->rotation + teleport_result.results[teleport_clone_id].rotations) % DIRECTION_COUNT;
-
-                         // set rotations for each direction the player wants to move
-                         for(S8 d = 0; d < DIRECTION_COUNT; d++){
-                              if(player_action.move[d]) player->move_rotation[d] = (player->move_rotation[d] + teleport_result.results[teleport_clone_id].rotations) % DIRECTION_COUNT;
-                         }
-                    }
-
-                    auto* portal = player_is_teleporting(player, world.interactive_qt);
-
-                    player->pos += player_delta_pos;
-
-                    if(portal && player->clone_start.x == 0){
-                         // at the first instant of the block teleporting, check if we should create an entangled_block
-
-                         PortalExit_t portal_exits = find_portal_exits(portal->coord, &world.tilemap, world.interactive_qt);
-                         S8 count = portal_exit_count(&portal_exits);
-                         if(count >= 3){ // src portal, dst portal, clone portal
-                              world.clone_instance++;
-
-                              S8 clone_id = 0;
-                              for (auto &direction : portal_exits.directions) {
-                                   for(int p = 0; p < direction.count; p++){
-                                        if(direction.coords[p] == portal->coord) continue;
-
-                                        if(clone_id == 0){
-                                             player->clone_id = clone_id;
-                                             player->clone_instance = world.clone_instance;
-                                        }else{
-                                             S16 new_player_index = world.players.count;
-
-                                             if(resize(&world.players, world.players.count + (S16)(1))){
-                                                  // a resize will kill our player ptr, so we gotta update it
-                                                  player = world.players.elements + i;
-                                                  player->clone_start = portal->coord;
-
-                                                  Player_t* new_player = world.players.elements + new_player_index;
-                                                  *new_player = *player;
-                                                  new_player->clone_id = clone_id;
-                                             }
-                                        }
-
-                                        clone_id++;
-                                   }
-                              }
-                         }
-                    }else if(!portal && player->clone_start.x > 0){
-                         auto clone_portal_center = coord_to_pixel_at_center(player->clone_start);
-                         F64 player_distance_from_portal = pixel_distance_between(clone_portal_center, player->pos.pixel);
-                         bool from_clone_start = (player_distance_from_portal < TILE_SIZE_IN_PIXELS);
-
-                         if(from_clone_start){
-                              // loop across all players after this one
-                              for(S16 p = 0; p < world.players.count; p++){
-                                   if(p == i) continue;
-                                   Player_t* other_player = world.players.elements + p;
-                                   if(other_player->clone_instance == player->clone_instance){
-                                        // TODO: I think I may have a really subtle bug here where we actually move
-                                        // TODO: the i'th player around because it was the last in the array
-                                        remove(&world.players, p);
-
-                                        // update ptr since we could have resized
-                                        player = world.players.elements + i;
-
-                                        update_player_count--;
-                                   }
-                              }
-                         }else{
-                              for(S16 p = 0; p < world.players.count; p++){
-                                   if(p == i) continue;
-                                   Player_t* other_player = world.players.elements + p;
-                                   if(other_player->clone_instance == player->clone_instance){
-                                        other_player->clone_id = 0;
-                                        other_player->clone_instance = 0;
-                                        other_player->clone_start = Coord_t{};
-                                   }
-                              }
-
-                              // turn off the circuit
-                              activate(&world, player->clone_start);
-                              auto* src_portal = quad_tree_find_at(world.interactive_qt, player->clone_start.x, player->clone_start.y);
-                              if(is_active_portal(src_portal)) src_portal->portal.on = false;
-                         }
-
-                         player->clone_id = 0;
-                         player->clone_instance = 0;
-                         player->clone_start = Coord_t{};
-                    }
-
-                    Interactive_t* interactive = quad_tree_find_at(world.interactive_qt, player_coord.x, player_coord.y);
-                    if(interactive && interactive->type == INTERACTIVE_TYPE_CLONE_KILLER){
-                         if(i == 0){
-                              resize(&world.players, 1);
-                              update_player_count = 1;
-                         }else{
-                              resetting = true;
-                         }
-                    }
-               }
-
                if(resetting){
                     reset_timer += dt;
                     if(reset_timer >= RESET_TIME){
                          resetting = false;
 
-                         load_map_number_map(map_number, &world, &undo, &player_start, &player_action);
+                         setup_map_number(map_number, &world, &undo, &player_start, &player_action);
                     }
                }else{
                     reset_timer -= dt;
@@ -2402,6 +2483,35 @@ int main(int argc, char** argv){
           } break;
           }
 
+          if(editor.mode){
+               auto mouse_coord = pos_to_coord(mouse_world);
+               char buffer[64];
+               snprintf(buffer, 64, "M: %d,%d", mouse_coord.x, mouse_coord.y);
+
+               glBindTexture(GL_TEXTURE_2D, text_texture);
+               glBegin(GL_QUADS);
+
+               Vec_t text_pos {0.005f, 0.965f};
+
+               glColor3f(0.0f, 0.0f, 0.0f);
+               draw_text(buffer, text_pos + Vec_t{0.002f, -0.002f});
+
+               glColor3f(1.0f, 1.0f, 1.0f);
+               draw_text(buffer, text_pos);
+
+               Player_t* player = world.players.elements;
+               snprintf(buffer, 64, "P: %d,%d", player->pos.pixel.x, player->pos.pixel.y);
+               text_pos.y -= 0.045f;
+
+               glColor3f(0.0f, 0.0f, 0.0f);
+               draw_text(buffer, text_pos + Vec_t{0.002f, -0.002f});
+
+               glColor3f(1.0f, 1.0f, 1.0f);
+               draw_text(buffer, text_pos);
+
+               glEnd();
+          }
+
           if(reset_timer >= 0.0f){
                glBegin(GL_QUADS);
                glColor4f(0.0f, 0.0f, 0.0f, reset_timer / RESET_TIME);
@@ -2412,29 +2522,27 @@ int main(int argc, char** argv){
                glEnd();
           }
 
-          if(world.players.count >= 1){
-               Player_t* player = world.players.elements + 0;
-
-               glBegin(GL_QUADS);
-
-               if(player_is_teleporting(player, world.interactive_qt)){
-                    glColor3f(0.0f, 1.0f, 0.0f);
-               }else{
-                    glColor3f(1.0f, 0.0f, 0.0f);
-               }
-
-               glVertex2f(0.02, 0.02);
-               glVertex2f(0.02, 0.04);
-               glVertex2f(0.04, 0.04);
-               glVertex2f(0.04, 0.02);
-               glEnd();
-          }
-
           if(demo.mode == DEMO_MODE_PLAY){
                F32 demo_pct = (F32)(frame_count) / (F32)(demo.last_frame);
                Quad_t pct_bar_quad = {pct_bar_outline_quad.left, pct_bar_outline_quad.bottom, demo_pct, pct_bar_outline_quad.top};
                draw_quad_filled(&pct_bar_quad, 255.0f, 255.0f, 255.0f);
                draw_quad_wireframe(&pct_bar_outline_quad, 255.0f, 255.0f, 255.0f);
+
+               char buffer[64];
+               snprintf(buffer, 64, "F: %ld/%ld", frame_count, demo.last_frame);
+
+               glBindTexture(GL_TEXTURE_2D, text_texture);
+               glBegin(GL_QUADS);
+
+               Vec_t text_pos {0.005f, 0.965f};
+
+               glColor3f(0.0f, 0.0f, 0.0f);
+               draw_text(buffer, text_pos + Vec_t{0.002f, -0.002f});
+
+               glColor3f(1.0f, 1.0f, 1.0f);
+               draw_text(buffer, text_pos);
+
+               glEnd();
           }
 
           SDL_GL_SwapWindow(window);
@@ -2482,6 +2590,7 @@ int main(int argc, char** argv){
           glDeleteTextures(1, &theme_texture);
           glDeleteTextures(1, &player_texture);
           glDeleteTextures(1, &arrow_texture);
+          glDeleteTextures(1, &text_texture);
 
           SDL_GL_DeleteContext(opengl_context);
           SDL_DestroyWindow(window);
