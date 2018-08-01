@@ -83,4 +83,3 @@ void position_slide_against_rect(Position_t pos, Coord_t coord, F32 player_radiu
           break;
      }
 }
-

@@ -845,16 +845,16 @@ bool block_push(Block_t* block, Direction_t direction, World_t* world, bool push
      default:
           break;
      case DIRECTION_LEFT:
-          block->accel.x = -PLAYER_SPEED * 0.99f;
+          block->accel.x = -PLAYER_SPEED;
           break;
      case DIRECTION_RIGHT:
-          block->accel.x = PLAYER_SPEED * 0.99f;
+          block->accel.x = PLAYER_SPEED;
           break;
      case DIRECTION_DOWN:
-          block->accel.y = -PLAYER_SPEED * 0.99f;
+          block->accel.y = -PLAYER_SPEED;
           break;
      case DIRECTION_UP:
-          block->accel.y = PLAYER_SPEED * 0.99f;
+          block->accel.y = PLAYER_SPEED;
           break;
      }
 

@@ -24,6 +24,8 @@ struct Player_t{
      bool has_bow = false;
      F32 bow_draw_time = 0.0;
 
+     Vec_t pos_delta; // save how far the player moves in the current frame
+
      Coord_t clone_start;
      S8 clone_id = 0;
      S32 clone_instance = 0;
