@@ -1192,11 +1192,9 @@ int main(int argc, char** argv){
                for(S16 i = 0; i < update_player_count; i++){
                     Player_t* player = world.players.elements + i;
 
-                    Coord_t skip_coord[DIRECTION_COUNT];
                     Coord_t player_previous_coord = pos_to_coord(player->pos);
                     Coord_t player_coord = pos_to_coord(player->pos + player->pos_delta);
 
-                    find_portal_adjacents_to_skip_collision_check(player_coord, world.interactive_qt, skip_coord);
                     auto teleport_result = teleport_position_across_portal(player->pos, player->pos_delta, &world,
                                                                            player_previous_coord, player_coord);
                     auto teleport_clone_id = player->clone_id;
@@ -1223,8 +1221,7 @@ int main(int argc, char** argv){
                     player->pushing_block = -1;
                     bool collide_with_interactive = false;
                     Vec_t player_delta_pos = move_player_position_through_world(player->pos, player->pos_delta,
-                                                                                player->face, skip_coord,
-                                                                                player, &world,
+                                                                                player->face, player, &world,
                                                                                 &collide_with_interactive, &resetting);
 
                     player_coord = pos_to_coord(player->pos + player_delta_pos);
@@ -1270,6 +1267,7 @@ int main(int argc, char** argv){
                          player->push_time = 0;
                     }
 
+                    // player entanglement
                     if(teleport_result.count == 0){
                          teleport_result = teleport_position_across_portal(player->pos, player_delta_pos, &world,
                                                                            player_previous_coord, player_coord);
@@ -1410,9 +1408,6 @@ int main(int argc, char** argv){
                     Pixel_t center = block->pos.pixel + HALF_TILE_SIZE_PIXEL;
                     Coord_t coord = pixel_to_coord(center);
 
-                    Coord_t skip_coord[DIRECTION_COUNT];
-                    find_portal_adjacents_to_skip_collision_check(coord, world.interactive_qt, skip_coord);
-
                     // check for adjacent walls
                     if(block->vel.x > 0.0f){
                          Pixel_t pixel_a {};
@@ -1420,9 +1415,9 @@ int main(int argc, char** argv){
                          block_adjacent_pixels_to_check(block, DIRECTION_RIGHT, &pixel_a, &pixel_b);
                          Coord_t coord_a = pixel_to_coord(pixel_a);
                          Coord_t coord_b = pixel_to_coord(pixel_b);
-                         if(coord_a != skip_coord[DIRECTION_RIGHT] && tilemap_is_solid(&world.tilemap, coord_a)){
+                         if(tilemap_is_solid(&world.tilemap, coord_a)){
                               stop_on_boundary_x = true;
-                         }else if(coord_b != skip_coord[DIRECTION_RIGHT] && tilemap_is_solid(&world.tilemap, coord_b)){
+                         }else if(tilemap_is_solid(&world.tilemap, coord_b)){
                               stop_on_boundary_x = true;
                          }else{
                               stop_on_boundary_x = quad_tree_interactive_solid_at(world.interactive_qt, &world.tilemap, coord_a) ||
@@ -1434,9 +1429,9 @@ int main(int argc, char** argv){
                          block_adjacent_pixels_to_check(block, DIRECTION_LEFT, &pixel_a, &pixel_b);
                          Coord_t coord_a = pixel_to_coord(pixel_a);
                          Coord_t coord_b = pixel_to_coord(pixel_b);
-                         if(coord_a != skip_coord[DIRECTION_LEFT] && tilemap_is_solid(&world.tilemap, coord_a)){
+                         if(tilemap_is_solid(&world.tilemap, coord_a)){
                               stop_on_boundary_x = true;
-                         }else if(coord_b != skip_coord[DIRECTION_LEFT] && tilemap_is_solid(&world.tilemap, coord_b)){
+                         }else if(tilemap_is_solid(&world.tilemap, coord_b)){
                               stop_on_boundary_x = true;
                          }else{
                               stop_on_boundary_x = quad_tree_interactive_solid_at(world.interactive_qt, &world.tilemap, coord_a) ||
@@ -1450,9 +1445,9 @@ int main(int argc, char** argv){
                          block_adjacent_pixels_to_check(block, DIRECTION_UP, &pixel_a, &pixel_b);
                          Coord_t coord_a = pixel_to_coord(pixel_a);
                          Coord_t coord_b = pixel_to_coord(pixel_b);
-                         if(coord_a != skip_coord[DIRECTION_UP] && tilemap_is_solid(&world.tilemap, coord_a)){
+                         if(tilemap_is_solid(&world.tilemap, coord_a)){
                               stop_on_boundary_y = true;
-                         }else if(coord_b != skip_coord[DIRECTION_UP] && tilemap_is_solid(&world.tilemap, coord_b)){
+                         }else if(tilemap_is_solid(&world.tilemap, coord_b)){
                               stop_on_boundary_y = true;
                          }else{
                               stop_on_boundary_y = quad_tree_interactive_solid_at(world.interactive_qt, &world.tilemap, coord_a) ||
@@ -1464,9 +1459,9 @@ int main(int argc, char** argv){
                          block_adjacent_pixels_to_check(block, DIRECTION_DOWN, &pixel_a, &pixel_b);
                          Coord_t coord_a = pixel_to_coord(pixel_a);
                          Coord_t coord_b = pixel_to_coord(pixel_b);
-                         if(coord_a != skip_coord[DIRECTION_DOWN] && tilemap_is_solid(&world.tilemap, coord_a)){
+                         if(tilemap_is_solid(&world.tilemap, coord_a)){
                               stop_on_boundary_y = true;
-                         }else if(coord_b != skip_coord[DIRECTION_DOWN] && tilemap_is_solid(&world.tilemap, coord_b)){
+                         }else if(tilemap_is_solid(&world.tilemap, coord_b)){
                               stop_on_boundary_y = true;
                          }else{
                               stop_on_boundary_y = quad_tree_interactive_solid_at(world.interactive_qt, &world.tilemap, coord_a) ||
@@ -1598,6 +1593,7 @@ int main(int argc, char** argv){
                          }
                     }
 
+                    // block entanglement
                     coord = pixel_to_coord(block->pos.pixel + HALF_TILE_SIZE_PIXEL);
                     Coord_t premove_coord = pixel_to_coord(block->pre_move_pos.pixel + HALF_TILE_SIZE_PIXEL);
 
@@ -1835,20 +1831,10 @@ int main(int argc, char** argv){
                          arrow->element_from_block = -1;
                     }
 
-                    Coord_t skip_coord[DIRECTION_COUNT];
-                    find_portal_adjacents_to_skip_collision_check(pre_move_coord, world.interactive_qt, skip_coord);
-
                     if(pre_move_coord != post_move_coord){
-                         bool skip = false;
-                         for (auto d : skip_coord) {
-                              if(post_move_coord == d) skip = true;
-                         }
-
-                         if(!skip){
-                              Tile_t* tile = tilemap_get_tile(&world.tilemap, post_move_coord);
-                              if(tile_is_solid(tile)){
-                                   arrow->stuck_time = dt;
-                              }
+                         Tile_t* tile = tilemap_get_tile(&world.tilemap, post_move_coord);
+                         if(tile_is_solid(tile)){
+                              arrow->stuck_time = dt;
                          }
 
                          // catch or give elements

@@ -298,7 +298,7 @@ void activate(World_t* world, Coord_t coord){
      toggle_electricity(&world->tilemap, world->interactive_qt, coord, DIRECTION_DOWN, false, false);
 }
 
-Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, Direction_t player_face, Coord_t* skip_coord,
+Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, Direction_t player_face,
                                          Player_t* player, World_t* world, bool* collided_with_interactive, bool* resetting){
      // figure out tiles that are close by
      Position_t final_player_pos = position + pos_delta;
@@ -457,14 +457,6 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
           for(S16 x = min.x; x <= max.x; x++){
                if(world->tilemap.tiles[y][x].id){
                     Coord_t coord {x, y};
-                    bool skip = false;
-                    for(S16 d = 0; d < DIRECTION_COUNT; d++){
-                         if(skip_coord[d] == coord){
-                              skip = true;
-                              break;
-                         }
-                    }
-                    if(skip) continue;
                     bool collide_with_tile = false;
                     position_slide_against_rect(position, coord, PLAYER_RADIUS, &pos_delta, &collide_with_tile);
                     if(collide_with_tile) collided_tile_dir = direction_between(player_coord, coord);
