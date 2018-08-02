@@ -169,6 +169,25 @@ Block_t block_from_stamp(Stamp_t* stamp){
      return block;
 }
 
+void teleport_impact_player(Player_t* player, const TeleportPositionResult_t* teleport_result, S8 clone_id){
+     if(teleport_result->count > clone_id){
+          player->face = direction_rotate_clockwise(player->face, teleport_result->results[clone_id].rotations);
+          player->pos = teleport_result->results[clone_id].pos;
+          player->vel = vec_rotate_quadrants_clockwise(player->vel, teleport_result->results[clone_id].rotations);
+          player->accel = vec_rotate_quadrants_clockwise(player->accel, teleport_result->results[clone_id].rotations);
+          player->pos_delta = teleport_result->results[clone_id].delta;
+     }
+}
+
+void teleport_impact_block(Block_t* block, const TeleportPositionResult_t* teleport_result){
+     block->pos = teleport_result->results[block->clone_id].pos;
+     block->pos.pixel -= HALF_TILE_SIZE_PIXEL;
+
+     block->vel = vec_rotate_quadrants_clockwise(block->vel, teleport_result->results[block->clone_id].rotations);
+     block->accel = vec_rotate_quadrants_clockwise(block->accel, teleport_result->results[block->clone_id].rotations);
+     block->rotation = (block->rotation + teleport_result->results[block->clone_id].rotations) % DIRECTION_COUNT;
+}
+
 int main(int argc, char** argv){
      const char* load_map_filepath = nullptr;
      bool test = false;
@@ -1079,7 +1098,7 @@ int main(int argc, char** argv){
                     }
                }
 
-               // update player
+               // respond to player controls
                for(S16 i = 0; i < world.players.count; i++){
                     Player_t* player = world.players.elements + i;
 
@@ -1213,16 +1232,14 @@ int main(int argc, char** argv){
                               }
                          }
                     }
-                    if(teleport_result.count > teleport_clone_id){
-                         player->pos = teleport_result.results[teleport_clone_id].pos;
-                         player->pos_delta = teleport_result.results[teleport_clone_id].delta;
-                    }
+
+                    teleport_impact_player(player, &teleport_result, teleport_clone_id);
 
                     player->pushing_block = -1;
-                    bool collide_with_interactive = false;
+                    bool collided = false;
                     Vec_t player_delta_pos = move_player_position_through_world(player->pos, player->pos_delta,
                                                                                 player->face, player, &world,
-                                                                                &collide_with_interactive, &resetting);
+                                                                                &collided);
 
                     player_coord = pos_to_coord(player->pos + player_delta_pos);
 
@@ -1271,24 +1288,14 @@ int main(int argc, char** argv){
                     if(teleport_result.count == 0){
                          teleport_result = teleport_position_across_portal(player->pos, player_delta_pos, &world,
                                                                            player_previous_coord, player_coord);
-                         if(teleport_result.count > teleport_clone_id){
-                              player->pos = teleport_result.results[teleport_clone_id].pos;
-                              player_delta_pos = teleport_result.results[teleport_clone_id].delta;
-                         }
+                         teleport_impact_player(player, &teleport_result, teleport_clone_id);
                     }else{
                          auto new_teleport_result = teleport_position_across_portal(player->pos, player_delta_pos, &world,
                                                                                     player_previous_coord, player_coord);
-                         if(new_teleport_result.count > teleport_clone_id){
-                              player->pos = new_teleport_result.results[teleport_clone_id].pos;
-                              player_delta_pos = new_teleport_result.results[teleport_clone_id].delta;
-                         }
+                         teleport_impact_player(player, &new_teleport_result, teleport_clone_id);
                     }
 
                     if(teleport_result.count > teleport_clone_id){
-                         player->face = direction_rotate_clockwise(player->face, teleport_result.results[teleport_clone_id].rotations);
-                         player->vel = vec_rotate_quadrants_clockwise(player->vel, teleport_result.results[teleport_clone_id].rotations);
-                         player->accel = vec_rotate_quadrants_clockwise(player->accel, teleport_result.results[teleport_clone_id].rotations);
-
                          if(i != 0) player->rotation = (player->rotation + teleport_result.results[teleport_clone_id].rotations) % DIRECTION_COUNT;
 
                          // set rotations for each direction the player wants to move
@@ -1603,12 +1610,7 @@ int main(int argc, char** argv){
                     auto teleport_result = teleport_position_across_portal(block_center, Vec_t{}, &world, premove_coord,
                                                                            coord);
                     if(teleport_result.count > block->clone_id){
-                         block->pos = teleport_result.results[block->clone_id].pos;
-                         block->pos.pixel -= HALF_TILE_SIZE_PIXEL;
-
-                         block->vel = vec_rotate_quadrants_clockwise(block->vel, teleport_result.results[block->clone_id].rotations);
-                         block->accel = vec_rotate_quadrants_clockwise(block->accel, teleport_result.results[block->clone_id].rotations);
-                         block->rotation = (block->rotation + teleport_result.results[block->clone_id].rotations) % DIRECTION_COUNT;
+                         teleport_impact_block(block, &teleport_result);
 
                          block->pre_move_pos = block->pos;
 
@@ -1623,12 +1625,7 @@ int main(int argc, char** argv){
                          auto collided_teleport_result = teleport_position_across_portal(block_center, Vec_t{}, &world,
                                                                                          premove_coord, coord);
                          if(collided_teleport_result.count > block->clone_id){
-                              block->pos = collided_teleport_result.results[block->clone_id].pos;
-                              block->pos.pixel -= HALF_TILE_SIZE_PIXEL;
-
-                              block->vel = vec_rotate_quadrants_clockwise(block->vel, collided_teleport_result.results[block->clone_id].rotations);
-                              block->accel = vec_rotate_quadrants_clockwise(block->accel, collided_teleport_result.results[block->clone_id].rotations);
-                              block->rotation = (block->rotation + teleport_result.results[block->clone_id].rotations) % DIRECTION_COUNT;
+                              teleport_impact_block(block, &collided_teleport_result);
                          }
                     }
 

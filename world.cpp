@@ -299,7 +299,7 @@ void activate(World_t* world, Coord_t coord){
 }
 
 Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, Direction_t player_face,
-                                         Player_t* player, World_t* world, bool* collided_with_interactive, bool* resetting){
+                                         Player_t* player, World_t* world, bool* collided){
      // figure out tiles that are close by
      Position_t final_player_pos = position + pos_delta;
      Coord_t player_coord = pos_to_coord(final_player_pos);
@@ -311,7 +311,7 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
      min = coord_clamp_zero_to_dim(min, world->tilemap.width - (S16)(1), world->tilemap.height - (S16)(1));
      max = coord_clamp_zero_to_dim(max, world->tilemap.width - (S16)(1), world->tilemap.height - (S16)(1));
 
-     // TODO: convert to use quad tree
+     // TODO: convert to use quad tree, but we also have to query through portals
      Vec_t collided_block_delta {};
 
      // where the player has collided with blocks
@@ -321,25 +321,25 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
      for(S16 i = 0; i < world->blocks.count; i++){
           Vec_t pos_delta_save = pos_delta;
 
-          bool collide_with_block = false;
+          bool collided_with_block = false;
           Position_t block_pos = world->blocks.elements[i].pos;
-          position_collide_with_rect(position, block_pos, TILE_SIZE, &pos_delta, &collide_with_block);
+          position_collide_with_rect(position, block_pos, TILE_SIZE, &pos_delta, &collided_with_block);
           Coord_t block_coord = block_get_coord(world->blocks.elements + i);
           U8 portal_rotations = 0;
 
-          if(!collide_with_block){
+          if(!collided_with_block){
                // check if the block is in a portal and try to collide with it
                Vec_t coord_offset = pos_to_vec(world->blocks.elements[i].pos +
                                                pixel_to_pos(HALF_TILE_SIZE_PIXEL) -
                                                coord_to_pos_at_tile_center(block_coord));
-               for(S8 r = 0; r < DIRECTION_COUNT && !collide_with_block; r++){
+               for(S8 r = 0; r < DIRECTION_COUNT && !collided_with_block; r++){
                     Coord_t check_coord = block_coord + (Direction_t)(r);
                     Interactive_t* interactive = quad_tree_interactive_find_at(world->interactive_qt, check_coord);
 
                     if(is_active_portal(interactive)){
                          PortalExit_t portal_exits = find_portal_exits(check_coord, &world->tilemap, world->interactive_qt);
 
-                         for(S8 d = 0; d < DIRECTION_COUNT && !collide_with_block; d++){
+                         for(S8 d = 0; d < DIRECTION_COUNT && !collided_with_block; d++){
                               Vec_t final_coord_offset = rotate_vec_between_dirs_clockwise(interactive->portal.face, (Direction_t)(d), coord_offset);
 
                               for(S8 p = 0; p < portal_exits.directions[d].count; p++){
@@ -347,9 +347,9 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
 
                                    Position_t portal_pos = coord_to_pos_at_tile_center(portal_exits.directions[d].coords[p]) + final_coord_offset -
                                                            pixel_to_pos(HALF_TILE_SIZE_PIXEL);
-                                   position_collide_with_rect(position, portal_pos, TILE_SIZE, &pos_delta, &collide_with_block);
-
-                                   if(collide_with_block){
+                                   position_collide_with_rect(position, portal_pos, TILE_SIZE, &pos_delta, &collided_with_block);
+                                   if(collided_with_block){
+                                        *collided = true;
                                         block_pos = portal_pos;
                                         if(is_active_portal(interactive)){
                                              player_face = direction_opposite(interactive->portal.face);
@@ -363,14 +363,15 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
                }
           }
 
-          if(collide_with_block){
+          if(collided_with_block){
+               *collided = true;
+
                Vec_t pos_delta_diff = pos_delta - pos_delta_save;
                collided_block_delta = vec_rotate_quadrants_clockwise(pos_delta_diff, (U8)(4) - portal_rotations);
                auto collided_block_dir = relative_quadrant(position.pixel, block_pos.pixel + HALF_TILE_SIZE_PIXEL);
                auto collided_block = world->blocks.elements + i;
                Position_t pre_move = collided_block->pos;
 
-#ifndef BLOCKS_SQUISH_PLAYER
                // this stops the block when it moves into the player
                Vec_t rotated_accel = vec_rotate_quadrants_clockwise(collided_block->accel, portal_rotations);
                Vec_t rotated_vel = vec_rotate_quadrants_clockwise(collided_block->vel, portal_rotations);
@@ -419,7 +420,6 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
                     }
                     break;
                }
-#endif
 
                Coord_t coord = pixel_to_coord(collided_block->pos.pixel + HALF_TILE_SIZE_PIXEL);
                Coord_t premove_coord = pixel_to_coord(pre_move.pixel + HALF_TILE_SIZE_PIXEL);
@@ -452,108 +452,35 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
           }
      }
 
-     Direction_t collided_tile_dir = DIRECTION_COUNT;
+     // colide with tiles
      for(S16 y = min.y; y <= max.y; y++){
           for(S16 x = min.x; x <= max.x; x++){
                if(world->tilemap.tiles[y][x].id){
                     Coord_t coord {x, y};
-                    bool collide_with_tile = false;
-                    position_slide_against_rect(position, coord, PLAYER_RADIUS, &pos_delta, &collide_with_tile);
-                    if(collide_with_tile) collided_tile_dir = direction_between(player_coord, coord);
+                    position_slide_against_rect(position, coord, PLAYER_RADIUS, &pos_delta, collided);
                }
           }
      }
 
-     Direction_t collided_interactive_dir = DIRECTION_COUNT;
-     *collided_with_interactive = false;
+     // collide with interactives
      for(S16 y = min.y; y <= max.y; y++){
           for(S16 x = min.x; x <= max.x; x++){
                Coord_t coord {x, y};
-
                Interactive_t* interactive = quad_tree_interactive_solid_at(world->interactive_qt, &world->tilemap, coord);
-               if(interactive){
-                    bool collided = false;
-                    position_slide_against_rect(position, coord, PLAYER_RADIUS, &pos_delta, &collided);
-                    if(collided && !(*collided_with_interactive)){
-                         *collided_with_interactive = true;
-                         collided_interactive_dir = direction_between(player_coord, coord);
-                    }
-               }
+               if(!interactive) continue;
+               position_slide_against_rect(position, coord, PLAYER_RADIUS, &pos_delta, collided);
           }
      }
 
+     // collide with other players
      for(S16 i = 0; i < world->players.count; i++){
           Player_t* other_player = world->players.elements + i;
           if(other_player == player) continue;
           if(other_player->clone_instance > 0 && other_player->clone_instance == player->clone_instance) continue; // don't collide while cloning
           F64 distance = pixel_distance_between(player->pos.pixel, other_player->pos.pixel);
           if(distance > PLAYER_RADIUS_IN_SUB_PIXELS * 3.0f) continue;
-          bool collided = false;
           Position_t other_player_bottom_left = other_player->pos - Vec_t{PLAYER_RADIUS, PLAYER_RADIUS};
-          position_collide_with_rect(position, other_player_bottom_left, 2.0f * PLAYER_RADIUS, &pos_delta, &collided);
-     }
-
-     // TODO do we care about other directions for colliding with interactives and tiles like we do for blocks?
-
-     // check if block is squishing the player against something
-     for(S8 d = 0; d < DIRECTION_COUNT; d++){
-          if(!collided_blocks[d]) continue;
-
-          auto dir = (Direction_t)(d);
-
-#ifdef BLOCKS_SQUISH_PLAYER
-          Direction_t opposite = direction_opposite(dir);
-          DirectionMask_t block_vel_mask = vec_direction_mask(collided_blocks[dir]->vel);
-
-          // ignore if the block is moving away
-          if(direction_in_mask(block_vel_mask, dir)) continue;
-
-          // if, on the opposite side of the collision, is a wall, interactive, or block, then kill the player muhahaha
-          if((dir == direction_opposite(collided_interactive_dir) ||
-              dir == direction_opposite(collided_tile_dir) ||
-              direction_in_mask(collided_blocks_mask_dir, opposite))){
-               *resetting = true;
-               break;
-          }
-#else
-          (void)(resetting);
-
-          if(dir != DIRECTION_COUNT &&
-             (dir == direction_opposite(collided_interactive_dir) ||
-              dir == direction_opposite(collided_tile_dir))){
-               switch(dir){
-               default:
-                    break;
-               case DIRECTION_LEFT:
-                    if(collided_blocks[d]->accel.x > 0){
-                         collided_blocks[d]->pos -= collided_block_delta;
-                         collided_blocks[d]->accel.x = 0.0f;
-                         collided_blocks[d]->vel.x = 0.0f;
-                    }
-                    break;
-               case DIRECTION_RIGHT:
-                    if(collided_blocks[d]->accel.x < 0){
-                         collided_blocks[d]->pos -= collided_block_delta;
-                         collided_blocks[d]->accel.x = 0.0f;
-                         collided_blocks[d]->vel.x = 0.0f;
-                    }
-                    break;
-               case DIRECTION_DOWN:
-                    if(collided_blocks[d]->accel.y > 0){
-                         collided_blocks[d]->pos -= collided_block_delta;
-                         collided_blocks[d]->accel.y = 0.0f;
-                         collided_blocks[d]->vel.y = 0.0f;
-                    }
-                    break;
-               case DIRECTION_UP:
-                    if(collided_blocks[d]->accel.y < 0){
-                         collided_blocks[d]->pos -= collided_block_delta;
-                         collided_blocks[d]->accel.y = 0.0f;
-                         collided_blocks[d]->vel.y = 0.0f;
-                    }
-               }
-          }
-#endif
+          position_collide_with_rect(position, other_player_bottom_left, 2.0f * PLAYER_RADIUS, &pos_delta, collided);
      }
 
      return pos_delta;

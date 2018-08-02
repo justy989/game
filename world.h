@@ -41,7 +41,7 @@ void setup_map(Coord_t player_start, World_t* world, Undo_t* undo);
 void activate(World_t* world, Coord_t coord);
 
 Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, Direction_t player_face,
-                                         Player_t* player, World_t* world, bool* collided_with_interactive, bool* resetting);
+                                         Player_t* player, World_t* world, bool* collided);
 
 TeleportPositionResult_t teleport_position_across_portal(Position_t position, Vec_t pos_delta, World_t* world,
                                                          Coord_t premove_coord, Coord_t postmove_coord);
