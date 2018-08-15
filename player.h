@@ -1,7 +1,6 @@
 #pragma once
 
-#include "position.h"
-#include "vec.h"
+#include "motion.h"
 #include "coord.h"
 #include "direction.h"
 
@@ -12,10 +11,8 @@
 #define PLAYER_IDLE_SPEED 0.0025f
 #define PLAYER_BOW_DRAW_DELAY 0.3f
 
-struct Player_t{
+struct Player_t : public Motion_t {
      Position_t pos;
-     Vec_t vel;
-     Vec_t accel;
      Direction_t face = DIRECTION_LEFT;
      F32 push_time = 0.0f;
      S8 walk_frame = 0;

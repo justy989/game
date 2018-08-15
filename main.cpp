@@ -1239,12 +1239,14 @@ int main(int argc, char** argv){
                     }
                }
 
+               // TODO: deal with this for multiple players
+               bool rotated_move_actions[4];
+               for (bool &rotated_move_action : rotated_move_actions) rotated_move_action = false;
+
                // update player
                for(S16 i = 0; i < world.players.count; i++){
                     Player_t* player = world.players.elements + i;
 
-                    bool rotated_move_actions[4];
-                    for (bool &rotated_move_action : rotated_move_actions) rotated_move_action = false;
                     for(int d = 0; d < 4; d++){
                          if(player_action.move[d]){
                               Direction_t rot_dir = direction_rotate_clockwise((Direction_t)(d), player->rotation);
@@ -1254,6 +1256,23 @@ int main(int argc, char** argv){
 
                     player->accel = vec_zero();
 
+                    if(rotated_move_actions[DIRECTION_LEFT]){
+                         if(player->horizontal_move.state == MOVE_STATE_IDLING){
+                              player->horizontal_move.sign = MOVE_SIGN_NEGATIVE;
+                              player->horizontal_move.state = MOVE_STATE_STARTING;
+                              player->horizontal_move.distance = 0;
+                         }
+                    }
+
+                    if(rotated_move_actions[DIRECTION_RIGHT]){
+                         if(player->horizontal_move.state == MOVE_STATE_IDLING){
+                              player->horizontal_move.sign = MOVE_SIGN_POSITIVE;
+                              player->horizontal_move.state = MOVE_STATE_STARTING;
+                              player->horizontal_move.distance = 0;
+                         }
+                    }
+
+#if 0
                     for(int d = 0; d < DIRECTION_COUNT; d++){
                          if(rotated_move_actions[d]){
                               auto direction = (Direction_t)(d);
@@ -1262,6 +1281,7 @@ int main(int argc, char** argv){
                               if(player->reface) player->face = direction;
                          }
                     }
+#endif
 
                     if(player_action.activate && !player_action.last_activate){
                          undo_commit(&undo, &world.players, &world.tilemap, &world.blocks, &world.interactives);
@@ -1756,6 +1776,7 @@ int main(int argc, char** argv){
                for(S16 i = 0; i < update_player_count; i++){
                     Player_t* player = world.players.elements + i;
 
+#if 0
                     player->accel = vec_normalize(player->accel);
                     player->accel = player->accel * PLAYER_SPEED;
 
@@ -1764,6 +1785,17 @@ int main(int argc, char** argv){
                     if(fabs(vec_magnitude(player->vel)) > PLAYER_SPEED){
                          player->vel = vec_normalize(player->vel) * PLAYER_SPEED;
                     }
+#else
+                    player->accel.x = calc_accel_component_move(player->horizontal_move);
+
+                    player->prev_vel = player->vel;
+                    player->pos_delta.x = calc_position_motion(player->vel.x, player->accel.x, dt);
+                    player->vel.x = calc_velocity_motion(player->vel.x, player->accel.x, dt);
+
+                    Vec_t pos_delta = player->pos_delta;
+
+                    update_motion_free_form(&player->horizontal_move, motion_x_component(player), rotated_move_actions[DIRECTION_RIGHT], rotated_move_actions[DIRECTION_LEFT], dt);
+#endif
 
                     Coord_t skip_coord[DIRECTION_COUNT];
                     Coord_t player_previous_coord = pos_to_coord(player->pos);
