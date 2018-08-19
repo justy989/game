@@ -432,7 +432,7 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
                }
 
                auto rotated_player_face = direction_rotate_clockwise(player_face, portal_rotations);
-               if(collided_block_dir == rotated_player_face && (player->accel.x != 0.0f || player->accel.y != 0.0f)){
+               if(collided_block_dir == rotated_player_face && (player->vel.x != 0.0f || player->vel.y != 0.0f)){
                     if(player->pushing_block < 0){ // also check that the player is actually pushing against the block
                          player->pushing_block = i;
                          player->pushing_block_dir = player_face;
@@ -841,16 +841,32 @@ bool block_push(Block_t* block, Direction_t direction, World_t* world, bool push
      default:
           break;
      case DIRECTION_LEFT:
-          block->accel.x = -PLAYER_SPEED * 0.99f;
+          if(block->horizontal_move.state == MOVE_STATE_IDLING){
+               block->horizontal_move.sign = MOVE_SIGN_NEGATIVE;
+               block->horizontal_move.state = MOVE_STATE_STARTING;
+               block->horizontal_move.distance = 0;
+          }
           break;
      case DIRECTION_RIGHT:
-          block->accel.x = PLAYER_SPEED * 0.99f;
+          if(block->horizontal_move.state == MOVE_STATE_IDLING){
+               block->horizontal_move.sign = MOVE_SIGN_POSITIVE;
+               block->horizontal_move.state = MOVE_STATE_STARTING;
+               block->horizontal_move.distance = 0;
+          }
           break;
      case DIRECTION_DOWN:
-          block->accel.y = -PLAYER_SPEED * 0.99f;
+          if(block->vertical_move.state == MOVE_STATE_IDLING){
+               block->vertical_move.sign = MOVE_SIGN_NEGATIVE;
+               block->vertical_move.state = MOVE_STATE_STARTING;
+               block->vertical_move.distance = 0;
+          }
           break;
      case DIRECTION_UP:
-          block->accel.y = PLAYER_SPEED * 0.99f;
+          if(block->vertical_move.state == MOVE_STATE_IDLING){
+               block->vertical_move.sign = MOVE_SIGN_POSITIVE;
+               block->vertical_move.state = MOVE_STATE_STARTING;
+               block->vertical_move.distance = 0;
+          }
           break;
      }
 

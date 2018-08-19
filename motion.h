@@ -1,6 +1,5 @@
 #pragma once
 
-#include "position.h"
 #include "vec.h"
 
 enum MoveState_t{
@@ -48,6 +47,8 @@ MotionComponent_t* motion_y_component(Motion_t* motion);
 
 void update_motion_free_form(Move_t* move, MotionComponent_t* motion, bool positive_key_down, bool negative_key_down,
                              float dt, float accel, float accel_distance);
+void update_motion_grid_aligned(Move_t* move, MotionComponent_t* motion, bool coast, float dt, float accel,
+                                float accel_distance, float pos);
 
 float calc_position_motion(float v, float a, float dt);
 float calc_velocity_motion(float v, float a, float dt);

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "position.h"
 #include "motion.h"
 #include "coord.h"
 #include "direction.h"

@@ -1398,12 +1398,55 @@ int main(int argc, char** argv){
                // do a pass moving the block as far as possible, so that collision doesn't rely on order of blocks in the array
                for(S16 i = 0; i < world.blocks.count; i++){
                     Block_t* block = world.blocks.elements + i;
-                    Vec_t pos_delta = mass_move(&block->vel, block->accel, dt);
 
-                    // TODO: blocks with velocity need to be checked against other blocks
+                    block->prev_vel = block->vel;
 
-                    block->pre_move_pos = block->pos;
-                    block->pos += pos_delta;
+                    block->accel.x = calc_accel_component_move(block->horizontal_move, BLOCK_ACCEL);
+                    block->accel.y = calc_accel_component_move(block->vertical_move, BLOCK_ACCEL);
+
+                    block->pos_delta.x = calc_position_motion(block->vel.x, block->accel.x, dt);
+                    block->vel.x = calc_velocity_motion(block->vel.x, block->accel.x, dt);
+
+                    block->pos_delta.y = calc_position_motion(block->vel.y, block->accel.y, dt);
+                    block->vel.y = calc_velocity_motion(block->vel.y, block->accel.y, dt);
+
+                    Vec_t pos_vec = pos_to_vec(block->pos + block->pos_delta);
+
+                    update_motion_grid_aligned(&block->horizontal_move, motion_x_component(block),
+                                               false, dt, BLOCK_ACCEL, BLOCK_ACCEL_DISTANCE, pos_vec.x);
+
+                    update_motion_grid_aligned(&block->vertical_move, motion_y_component(block),
+                                               false, dt, BLOCK_ACCEL, BLOCK_ACCEL_DISTANCE, pos_vec.y);
+               }
+
+               for(S16 i = 0; i < world.players.count; i++){
+                    Player_t* player = world.players.elements + i;
+
+                    player->prev_vel = player->vel;
+
+                    float player_accel = PLAYER_ACCEL;
+                    if(player->horizontal_move.state >= MOVE_STATE_STARTING &&
+                       player->vertical_move.state >= MOVE_STATE_STARTING){
+                         player_accel *= .70710678f; // sqrt(2) / 2.0;
+                    }
+
+                    player->accel.x = calc_accel_component_move(player->horizontal_move, player_accel);
+                    player->accel.y = calc_accel_component_move(player->vertical_move, player_accel);
+
+                    player->pos_delta.x = calc_position_motion(player->vel.x, player->accel.x, dt);
+                    player->vel.x = calc_velocity_motion(player->vel.x, player->accel.x, dt);
+
+                    player->pos_delta.y = calc_position_motion(player->vel.y, player->accel.y, dt);
+                    player->vel.y = calc_velocity_motion(player->vel.y, player->accel.y, dt);
+
+                    update_motion_free_form(&player->horizontal_move, motion_x_component(player),
+                                            rotated_move_actions[DIRECTION_RIGHT], rotated_move_actions[DIRECTION_LEFT],
+                                            dt, PLAYER_ACCEL, PLAYER_ACCEL_DISTANCE);
+
+                    update_motion_free_form(&player->vertical_move, motion_y_component(player),
+                                            rotated_move_actions[DIRECTION_UP], rotated_move_actions[DIRECTION_DOWN],
+                                            dt, PLAYER_ACCEL, PLAYER_ACCEL_DISTANCE);
+
                }
 
                // do a collision pass on each block
@@ -1415,7 +1458,7 @@ int main(int argc, char** argv){
                     bool stop_on_boundary_y = false;
                     bool held_up = false;
 
-                    Vec_t pos_delta = pos_to_vec(block->pos - block->pre_move_pos);
+                    Vec_t pos_delta = block->pos_delta;
 
                     if(pos_delta.x != 0.0f || pos_delta.y != 0.0f){
                          check_block_collision_with_other_blocks(block, &world);
@@ -1549,9 +1592,10 @@ int main(int argc, char** argv){
                          }
                     }
 
+#if 0
                     if(stop_on_boundary_x){
                          // stop on tile boundaries separately for each axis
-                         S16 boundary_x = range_passes_tile_boundary(block->pre_move_pos.pixel.x, block->pos.pixel.x, block->push_start.x);
+                         S16 boundary_x = range_passes_tile_boundary(block->prev_pos.pixel.x, block->pos.pixel.x, block->push_start.x);
                          if(boundary_x){
                               block->pos.pixel.x = boundary_x;
                               block->pos.decimal.x = 0.0f;
@@ -1561,7 +1605,7 @@ int main(int argc, char** argv){
                     }
 
                     if(stop_on_boundary_y){
-                         S16 boundary_y = range_passes_tile_boundary(block->pre_move_pos.pixel.y, block->pos.pixel.y, block->push_start.y);
+                         S16 boundary_y = range_passes_tile_boundary(block->prev_pos.pixel.y, block->pos.pixel.y, block->push_start.y);
                          if(boundary_y){
                               block->pos.pixel.y = boundary_y;
                               block->pos.decimal.y = 0.0f;
@@ -1569,6 +1613,7 @@ int main(int argc, char** argv){
                               block->accel.y = 0.0f;
                          }
                     }
+#endif
 
                     held_up = block_held_up_by_another_block(block, world.block_qt);
 
@@ -1600,8 +1645,9 @@ int main(int argc, char** argv){
                          }
                     }
 
-                    coord = pixel_to_coord(block->pos.pixel + HALF_TILE_SIZE_PIXEL);
-                    Coord_t premove_coord = pixel_to_coord(block->pre_move_pos.pixel + HALF_TILE_SIZE_PIXEL);
+                    Position_t final_pos = block->pos + block->pos_delta;
+                    coord = pixel_to_coord(final_pos.pixel + HALF_TILE_SIZE_PIXEL);
+                    Coord_t premove_coord = pixel_to_coord(block->pos.pixel + HALF_TILE_SIZE_PIXEL);
 
                     Position_t block_center = block->pos;
                     block_center.pixel += HALF_TILE_SIZE_PIXEL;
@@ -1615,8 +1661,6 @@ int main(int argc, char** argv){
                          block->vel = vec_rotate_quadrants_clockwise(block->vel, teleport_result.results[block->clone_id].rotations);
                          block->accel = vec_rotate_quadrants_clockwise(block->accel, teleport_result.results[block->clone_id].rotations);
                          block->rotation = teleport_result.results[block->clone_id].rotations;
-
-                         block->pre_move_pos = block->pos;
 
                          check_block_collision_with_other_blocks(block, &world);
 
@@ -1730,6 +1774,8 @@ int main(int argc, char** argv){
 
                          block->clone_start = Coord_t{};
                     }
+
+                    block->pos += pos_delta;
                }
 
                // illuminate and ice
@@ -1795,45 +1841,7 @@ int main(int argc, char** argv){
                S16 update_player_count = world.players.count; // save due to adding/removing players
                for(S16 i = 0; i < update_player_count; i++){
                     Player_t* player = world.players.elements + i;
-
-#if 0
-                    player->accel = vec_normalize(player->accel);
-                    player->accel = player->accel * PLAYER_SPEED;
-
-                    Vec_t pos_delta = mass_move(&player->vel, player->accel, dt);
-
-                    if(fabs(vec_magnitude(player->vel)) > PLAYER_SPEED){
-                         player->vel = vec_normalize(player->vel) * PLAYER_SPEED;
-                    }
-#else
-
-                    float player_accel = PLAYER_ACCEL;
-                    if(player->horizontal_move.state >= MOVE_STATE_STARTING &&
-                       player->vertical_move.state >= MOVE_STATE_STARTING){
-                         player_accel *= .70710678f; // sqrt(2) / 2.0;
-                    }
-
-                    player->accel.x = calc_accel_component_move(player->horizontal_move, player_accel);
-                    player->accel.y = calc_accel_component_move(player->vertical_move, player_accel);
-
-                    player->prev_vel = player->vel;
-
-                    player->pos_delta.x = calc_position_motion(player->vel.x, player->accel.x, dt);
-                    player->vel.x = calc_velocity_motion(player->vel.x, player->accel.x, dt);
-
-                    player->pos_delta.y = calc_position_motion(player->vel.y, player->accel.y, dt);
-                    player->vel.y = calc_velocity_motion(player->vel.y, player->accel.y, dt);
-
                     Vec_t pos_delta = player->pos_delta;
-
-                    update_motion_free_form(&player->horizontal_move, motion_x_component(player),
-                                            rotated_move_actions[DIRECTION_RIGHT], rotated_move_actions[DIRECTION_LEFT],
-                                            dt, PLAYER_ACCEL, PLAYER_ACCEL_DISTANCE);
-
-                    update_motion_free_form(&player->vertical_move, motion_y_component(player),
-                                            rotated_move_actions[DIRECTION_UP], rotated_move_actions[DIRECTION_DOWN],
-                                            dt, PLAYER_ACCEL, PLAYER_ACCEL_DISTANCE);
-#endif
 
                     Coord_t skip_coord[DIRECTION_COUNT];
                     Coord_t player_previous_coord = pos_to_coord(player->pos);
