@@ -1410,6 +1410,7 @@ int main(int argc, char** argv){
                     block->pos_delta.y = calc_position_motion(block->vel.y, block->accel.y, dt);
                     block->vel.y = calc_velocity_motion(block->vel.y, block->accel.y, dt);
 
+                    // TODO: creating this potentially big vector could lead to precision issues
                     Vec_t pos_vec = pos_to_vec(block->pos + block->pos_delta);
 
                     update_motion_grid_aligned(&block->horizontal_move, motion_x_component(block),

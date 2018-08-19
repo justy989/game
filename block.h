@@ -11,7 +11,6 @@
 struct Block_t : public Motion_t{
      Position_t pos;
      Element_t element;
-     Pixel_t push_start;
      F32 fall_time;
      S16 entangle_index; // -1 means not entangled, 0 - N = entangled with that block
      U8 rotation;

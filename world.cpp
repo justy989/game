@@ -367,6 +367,7 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
                auto collided_block = world->blocks.elements + i;
                Position_t pre_move = collided_block->pos;
 
+#if 0
 #ifndef BLOCKS_SQUISH_PLAYER
                // this stops the block when it moves into the player
                Vec_t rotated_accel = vec_rotate_quadrants_clockwise(collided_block->accel, portal_rotations);
@@ -416,6 +417,7 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
                     }
                     break;
                }
+#endif
 #endif
 
                Coord_t coord = pixel_to_coord(collided_block->pos.pixel + HALF_TILE_SIZE_PIXEL);
@@ -870,7 +872,6 @@ bool block_push(Block_t* block, Direction_t direction, World_t* world, bool push
           break;
      }
 
-     block->push_start = block->pos.pixel;
      return true;
 }
 
