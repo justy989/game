@@ -47,9 +47,9 @@ MotionComponent_t* motion_x_component(Motion_t* motion);
 MotionComponent_t* motion_y_component(Motion_t* motion);
 
 void update_motion_free_form(Move_t* move, MotionComponent_t* motion, bool positive_key_down, bool negative_key_down,
-                             float dt);
+                             float dt, float accel, float accel_distance);
 
 float calc_position_motion(float v, float a, float dt);
 float calc_velocity_motion(float v, float a, float dt);
 
-float calc_accel_component_move(Move_t move);
+float calc_accel_component_move(Move_t move, float accel);

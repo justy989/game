@@ -1256,19 +1256,21 @@ int main(int argc, char** argv){
 
                     player->accel = vec_zero();
 
-                    if(rotated_move_actions[DIRECTION_LEFT]){
+                    if(rotated_move_actions[DIRECTION_LEFT] && !rotated_move_actions[DIRECTION_RIGHT]){
                          if(player->horizontal_move.state == MOVE_STATE_IDLING){
                               player->horizontal_move.sign = MOVE_SIGN_NEGATIVE;
                               player->horizontal_move.state = MOVE_STATE_STARTING;
                               player->horizontal_move.distance = 0;
+                              if(player->reface) player->face = DIRECTION_LEFT;
                          }
                     }
 
-                    if(rotated_move_actions[DIRECTION_RIGHT]){
+                    if(rotated_move_actions[DIRECTION_RIGHT] && !rotated_move_actions[DIRECTION_LEFT]){
                          if(player->horizontal_move.state == MOVE_STATE_IDLING){
                               player->horizontal_move.sign = MOVE_SIGN_POSITIVE;
                               player->horizontal_move.state = MOVE_STATE_STARTING;
                               player->horizontal_move.distance = 0;
+                              if(player->reface) player->face = DIRECTION_RIGHT;
                          }
                     }
 
@@ -1786,7 +1788,7 @@ int main(int argc, char** argv){
                          player->vel = vec_normalize(player->vel) * PLAYER_SPEED;
                     }
 #else
-                    player->accel.x = calc_accel_component_move(player->horizontal_move);
+                    player->accel.x = calc_accel_component_move(player->horizontal_move, PLAYER_ACCEL);
 
                     player->prev_vel = player->vel;
                     player->pos_delta.x = calc_position_motion(player->vel.x, player->accel.x, dt);
@@ -1794,7 +1796,9 @@ int main(int argc, char** argv){
 
                     Vec_t pos_delta = player->pos_delta;
 
-                    update_motion_free_form(&player->horizontal_move, motion_x_component(player), rotated_move_actions[DIRECTION_RIGHT], rotated_move_actions[DIRECTION_LEFT], dt);
+                    update_motion_free_form(&player->horizontal_move, motion_x_component(player),
+                                            rotated_move_actions[DIRECTION_RIGHT], rotated_move_actions[DIRECTION_LEFT],
+                                            dt, PLAYER_ACCEL, PLAYER_ACCEL_DISTANCE);
 #endif
 
                     Coord_t skip_coord[DIRECTION_COUNT];

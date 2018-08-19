@@ -11,7 +11,7 @@ MotionComponent_t* motion_y_component(Motion_t* motion){
      return (MotionComponent_t*)((char*)(motion) + sizeof(float));
 }
 
-float calc_accel_component_move(Move_t move){
+float calc_accel_component_move(Move_t move, float accel){
      switch(move.state){
      default:
      case MOVE_STATE_IDLING:
@@ -22,9 +22,9 @@ float calc_accel_component_move(Move_t move){
           default:
                break;
           case MOVE_SIGN_POSITIVE:
-               return ACCEL;
+               return accel;
           case MOVE_SIGN_NEGATIVE:
-               return -ACCEL;
+               return -accel;
           }
           break;
      case MOVE_STATE_STOPPING:
@@ -32,9 +32,9 @@ float calc_accel_component_move(Move_t move){
           default:
              break;
           case MOVE_SIGN_POSITIVE:
-               return -ACCEL;
+               return -accel;
           case MOVE_SIGN_NEGATIVE:
-               return ACCEL;
+               return accel;
           }
           break;
      }
@@ -43,7 +43,7 @@ float calc_accel_component_move(Move_t move){
 }
 
 void update_motion_free_form(Move_t* move, MotionComponent_t* motion, bool positive_key_down, bool negative_key_down,
-                             float dt){
+                             float dt, float accel, float accel_distance){
      switch(move->state){
      default:
      case MOVE_STATE_IDLING:
@@ -51,11 +51,17 @@ void update_motion_free_form(Move_t* move, MotionComponent_t* motion, bool posit
      case MOVE_STATE_STARTING:
           move->distance += motion->pos_delta;
 
+          if(positive_key_down && negative_key_down){
+               motion->accel = -motion->accel;
+               move->state = MOVE_STATE_STOPPING;
+               break;
+          }
+
           if((!positive_key_down && move->sign == MOVE_SIGN_POSITIVE) ||
              (!negative_key_down && move->sign == MOVE_SIGN_NEGATIVE)){
                motion->accel = -motion->accel;
                move->state = MOVE_STATE_STOPPING;
-          }else if(fabs(move->distance) > ACCEL_DISTANCE){
+          }else if(fabs(move->distance) > accel_distance){
                F32 new_accel = -motion->accel;
                MoveState_t new_push_state = MOVE_STATE_STOPPING;
 
@@ -65,7 +71,7 @@ void update_motion_free_form(Move_t* move, MotionComponent_t* motion, bool posit
                     new_push_state = MOVE_STATE_COASTING;
                }
 
-               float distance_over = fabs(move->distance) - ACCEL_DISTANCE; // TODO: multiply by mass
+               float distance_over = fabs(move->distance) - accel_distance; // TODO: multiply by mass
 
                switch(move->sign){
                default:
@@ -116,20 +122,29 @@ void update_motion_free_form(Move_t* move, MotionComponent_t* motion, bool posit
           }
           break;
      case MOVE_STATE_COASTING:
-          if(positive_key_down && move->sign == MOVE_SIGN_POSITIVE){
+          if(!positive_key_down && move->sign == MOVE_SIGN_POSITIVE){
                move->state = MOVE_STATE_STOPPING;
                move->distance = 0;
 
-               motion->accel = -ACCEL;
-          }else if(negative_key_down && move->sign == MOVE_SIGN_NEGATIVE){
+               motion->accel = -accel;
+          }else if(!negative_key_down && move->sign == MOVE_SIGN_NEGATIVE){
                move->state = MOVE_STATE_STOPPING;
                move->distance = 0;
 
-               motion->accel = ACCEL;
+               motion->accel = accel;
+          }else if(positive_key_down && negative_key_down){
+               move->state = MOVE_STATE_STOPPING;
+               move->distance = 0;
+
+               if(move->sign == MOVE_SIGN_POSITIVE){
+                    motion->accel = -accel;
+               }else if(move->sign == MOVE_SIGN_POSITIVE){
+                    motion->accel = accel;
+               }
           }
           break;
      case MOVE_STATE_STOPPING:
-          if((motion->prev_vel > 0 && motion->vel < 0) || (motion->prev_vel < 0 && motion->vel > 0)){
+          if((motion->prev_vel >= 0 && motion->vel <= 0) || (motion->prev_vel <= 0 && motion->vel >= 0)){
                move->state = MOVE_STATE_IDLING;
                move->sign = MOVE_SIGN_ZERO;
                move->distance = 0;
