@@ -1274,6 +1274,24 @@ int main(int argc, char** argv){
                          }
                     }
 
+                    if(rotated_move_actions[DIRECTION_DOWN] && !rotated_move_actions[DIRECTION_UP]){
+                         if(player->vertical_move.state == MOVE_STATE_IDLING){
+                              player->vertical_move.sign = MOVE_SIGN_NEGATIVE;
+                              player->vertical_move.state = MOVE_STATE_STARTING;
+                              player->vertical_move.distance = 0;
+                              if(player->reface) player->face = DIRECTION_DOWN;
+                         }
+                    }
+
+                    if(rotated_move_actions[DIRECTION_UP] && !rotated_move_actions[DIRECTION_DOWN]){
+                         if(player->vertical_move.state == MOVE_STATE_IDLING){
+                              player->vertical_move.sign = MOVE_SIGN_POSITIVE;
+                              player->vertical_move.state = MOVE_STATE_STARTING;
+                              player->vertical_move.distance = 0;
+                              if(player->reface) player->face = DIRECTION_UP;
+                         }
+                    }
+
 #if 0
                     for(int d = 0; d < DIRECTION_COUNT; d++){
                          if(rotated_move_actions[d]){
@@ -1788,16 +1806,32 @@ int main(int argc, char** argv){
                          player->vel = vec_normalize(player->vel) * PLAYER_SPEED;
                     }
 #else
-                    player->accel.x = calc_accel_component_move(player->horizontal_move, PLAYER_ACCEL);
+
+                    float player_accel = PLAYER_ACCEL;
+                    if(player->horizontal_move.state >= MOVE_STATE_STARTING &&
+                       player->vertical_move.state >= MOVE_STATE_STARTING){
+                         player_accel *= .70710678f; // sqrt(2) / 2.0;
+                    }
+
+                    player->accel.x = calc_accel_component_move(player->horizontal_move, player_accel);
+                    player->accel.y = calc_accel_component_move(player->vertical_move, player_accel);
 
                     player->prev_vel = player->vel;
+
                     player->pos_delta.x = calc_position_motion(player->vel.x, player->accel.x, dt);
                     player->vel.x = calc_velocity_motion(player->vel.x, player->accel.x, dt);
+
+                    player->pos_delta.y = calc_position_motion(player->vel.y, player->accel.y, dt);
+                    player->vel.y = calc_velocity_motion(player->vel.y, player->accel.y, dt);
 
                     Vec_t pos_delta = player->pos_delta;
 
                     update_motion_free_form(&player->horizontal_move, motion_x_component(player),
                                             rotated_move_actions[DIRECTION_RIGHT], rotated_move_actions[DIRECTION_LEFT],
+                                            dt, PLAYER_ACCEL, PLAYER_ACCEL_DISTANCE);
+
+                    update_motion_free_form(&player->vertical_move, motion_y_component(player),
+                                            rotated_move_actions[DIRECTION_UP], rotated_move_actions[DIRECTION_DOWN],
                                             dt, PLAYER_ACCEL, PLAYER_ACCEL_DISTANCE);
 #endif
 
