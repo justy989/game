@@ -1399,6 +1399,9 @@ int main(int argc, char** argv){
                for(S16 i = 0; i < world.blocks.count; i++){
                     Block_t* block = world.blocks.elements + i;
 
+                    block->prev_push_mask = block->cur_push_mask;
+                    block->cur_push_mask = DIRECTION_MASK_NONE;
+
                     block->prev_vel = block->vel;
 
                     block->accel.x = calc_accel_component_move(block->horizontal_move, BLOCK_ACCEL);
@@ -1413,11 +1416,37 @@ int main(int argc, char** argv){
                     // TODO: creating this potentially big vector could lead to precision issues
                     Vec_t pos_vec = pos_to_vec(block->pos + block->pos_delta);
 
+                    bool coast_horizontal = false;
+                    bool coast_vertical = false;
+
+                    if(block_on_ice(block, &world.tilemap, world.interactive_qt)){
+                         coast_horizontal = true;
+                         coast_vertical = true;
+                    }else{
+                         if(block->horizontal_move.state == MOVE_STATE_STARTING ||
+                            block->horizontal_move.state == MOVE_STATE_COASTING){
+                              if(block->horizontal_move.sign == MOVE_SIGN_POSITIVE){
+                                   coast_horizontal = (block->prev_push_mask & DIRECTION_MASK_RIGHT);
+                              }else if(block->horizontal_move.sign == MOVE_SIGN_NEGATIVE){
+                                   coast_horizontal = (block->prev_push_mask & DIRECTION_MASK_LEFT);
+                              }
+                         }
+
+                         if(block->vertical_move.state == MOVE_STATE_STARTING ||
+                            block->vertical_move.state == MOVE_STATE_COASTING){
+                              if(block->vertical_move.sign == MOVE_SIGN_POSITIVE){
+                                   coast_vertical = (block->prev_push_mask & DIRECTION_MASK_UP);
+                              }else if(block->vertical_move.sign == MOVE_SIGN_NEGATIVE){
+                                   coast_vertical = (block->prev_push_mask & DIRECTION_MASK_DOWN);
+                              }
+                         }
+                    }
+
                     update_motion_grid_aligned(&block->horizontal_move, motion_x_component(block),
-                                               false, dt, BLOCK_ACCEL, BLOCK_ACCEL_DISTANCE, pos_vec.x);
+                                               coast_horizontal, dt, BLOCK_ACCEL, BLOCK_ACCEL_DISTANCE, pos_vec.x);
 
                     update_motion_grid_aligned(&block->vertical_move, motion_y_component(block),
-                                               false, dt, BLOCK_ACCEL, BLOCK_ACCEL_DISTANCE, pos_vec.y);
+                                               coast_vertical, dt, BLOCK_ACCEL, BLOCK_ACCEL_DISTANCE, pos_vec.y);
                }
 
                for(S16 i = 0; i < world.players.count; i++){
@@ -1889,6 +1918,8 @@ int main(int argc, char** argv){
                               // if the player is pushing against a block moving towards them, the block wins
                               player->push_time = 0;
                               player->pushing_block = -1;
+                         }else if(direction_in_mask(block_move_dir_mask, player->pushing_block_dir)){
+                              block_to_push->cur_push_mask = direction_mask_add(block_to_push->cur_push_mask, player->pushing_block_dir);
                          }else{
                               F32 save_push_time = player->push_time;
 
