@@ -1622,28 +1622,32 @@ int main(int argc, char** argv){
                          }
                     }
 
-#if 0
+// #if 0
+                    auto final_pos = block->pos + pos_delta;
+
                     if(stop_on_boundary_x){
                          // stop on tile boundaries separately for each axis
-                         S16 boundary_x = range_passes_tile_boundary(block->prev_pos.pixel.x, block->pos.pixel.x, block->push_start.x);
+                         S16 boundary_x = range_passes_tile_boundary(block->pos.pixel.x, final_pos.pixel.x, -1);
                          if(boundary_x){
-                              block->pos.pixel.x = boundary_x;
-                              block->pos.decimal.x = 0.0f;
-                              block->vel.x = 0.0f;
-                              block->accel.x = 0.0f;
+                              final_pos.pixel.x = boundary_x;
+                              final_pos.decimal.x = 0.0;
+                              block->accel.x = 0.0;
+                              block->vel.x = 0.0;
+                              block->horizontal_move.state = MOVE_STATE_IDLING;
                          }
                     }
 
                     if(stop_on_boundary_y){
-                         S16 boundary_y = range_passes_tile_boundary(block->prev_pos.pixel.y, block->pos.pixel.y, block->push_start.y);
+                         S16 boundary_y = range_passes_tile_boundary(block->pos.pixel.y, final_pos.pixel.y, -1);
                          if(boundary_y){
-                              block->pos.pixel.y = boundary_y;
-                              block->pos.decimal.y = 0.0f;
-                              block->vel.y = 0.0f;
-                              block->accel.y = 0.0f;
+                              final_pos.pixel.y = boundary_y;
+                              final_pos.decimal.y = 0.0;
+                              block->accel.y = 0.0;
+                              block->vel.y = 0.0;
+                              block->vertical_move.state = MOVE_STATE_IDLING;
                          }
                     }
-#endif
+// #endif
 
                     held_up = block_held_up_by_another_block(block, world.block_qt);
 
@@ -1675,7 +1679,7 @@ int main(int argc, char** argv){
                          }
                     }
 
-                    Position_t final_pos = block->pos + block->pos_delta;
+                    // Position_t final_pos = block->pos + block->pos_delta;
                     coord = pixel_to_coord(final_pos.pixel + HALF_TILE_SIZE_PIXEL);
                     Coord_t premove_coord = pixel_to_coord(block->pos.pixel + HALF_TILE_SIZE_PIXEL);
 
@@ -1805,7 +1809,7 @@ int main(int argc, char** argv){
                          block->clone_start = Coord_t{};
                     }
 
-                    block->pos += pos_delta;
+                    block->pos = final_pos;
                }
 
                // illuminate and ice
