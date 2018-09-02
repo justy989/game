@@ -17,6 +17,9 @@ Big Features:
 - Block ice collision with masses
 - 3D
 
+TODO:
+- collision infinite loop lol
+
 NOTES:
 - Only 2 blocks high can go through portals
 */
@@ -1413,9 +1416,6 @@ int main(int argc, char** argv){
                     block->pos_delta.y = calc_position_motion(block->vel.y, block->accel.y, dt);
                     block->vel.y = calc_velocity_motion(block->vel.y, block->accel.y, dt);
 
-                    // TODO: creating this potentially big vector could lead to precision issues
-                    Vec_t pos_vec = pos_to_vec(block->pos + block->pos_delta);
-
                     bool coast_horizontal = false;
                     bool coast_vertical = false;
 
@@ -1441,6 +1441,9 @@ int main(int argc, char** argv){
                               }
                          }
                     }
+
+                    // TODO: creating this potentially big vector could lead to precision issues
+                    Vec_t pos_vec = pos_to_vec(block->pos);
 
                     update_motion_grid_aligned(&block->horizontal_move, motion_x_component(block),
                                                coast_horizontal, dt, BLOCK_ACCEL, BLOCK_ACCEL_DISTANCE, pos_vec.x);
@@ -1622,7 +1625,6 @@ int main(int argc, char** argv){
                          }
                     }
 
-// #if 0
                     auto final_pos = block->pos + pos_delta;
 
                     if(stop_on_boundary_x){
@@ -1647,7 +1649,6 @@ int main(int argc, char** argv){
                               block->vertical_move.state = MOVE_STATE_IDLING;
                          }
                     }
-// #endif
 
                     held_up = block_held_up_by_another_block(block, world.block_qt);
 
@@ -1809,7 +1810,36 @@ int main(int argc, char** argv){
                          block->clone_start = Coord_t{};
                     }
 
-                    block->pos = final_pos;
+                    // finalize position for each component, stopping on a pixel boundary if we have to
+                    if(block->stop_on_pixel_x != 0){
+                         if(fabs(block->pos_delta.x) <= fabs(pos_delta.x)){
+                              block->pos.pixel.x = block->stop_on_pixel_x;
+                              block->pos.decimal.x = 0.0;
+                         }else{
+                              block->pos.pixel.x = final_pos.pixel.x;
+                              block->pos.decimal.x = final_pos.decimal.x;
+                         }
+
+                         block->stop_on_pixel_x = 0;
+                    }else{
+                         block->pos.pixel.x = final_pos.pixel.x;
+                         block->pos.decimal.x = final_pos.decimal.x;
+                    }
+
+                    if(block->stop_on_pixel_y != 0){
+                         if(fabs(block->pos_delta.y) <= fabs(pos_delta.y)){
+                              block->pos.pixel.y = block->stop_on_pixel_y;
+                              block->pos.decimal.y = 0.0;
+                         }else{
+                              block->pos.pixel.y = final_pos.pixel.y;
+                              block->pos.decimal.y = final_pos.decimal.y;
+                         }
+
+                         block->stop_on_pixel_y = 0;
+                    }else{
+                         block->pos.pixel.y = final_pos.pixel.y;
+                         block->pos.decimal.y = final_pos.decimal.y;
+                    }
                }
 
                // illuminate and ice

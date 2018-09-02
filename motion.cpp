@@ -164,21 +164,19 @@ void update_motion_free_form(Move_t* move, MotionComponent_t* motion, bool posit
      }
 }
 
-static float closest_grid_center(float grid_width, float x){
-     int lower_index = x / grid_width;
-     int upper_index = lower_index + 1;
+static S16 closest_grid_center_pixel(S16 grid_width, S16 v){
+     S16 lower_index = v / grid_width;
+     S16 upper_index = lower_index + 1;
 
-     float lower_bound = grid_width * lower_index;
-     float upper_bound = grid_width * upper_index;
+     S16 lower_bound = grid_width * lower_index;
+     S16 upper_bound = grid_width * upper_index;
 
-     float upper_diff = upper_bound - x;
-     float lower_diff = x - lower_bound;
+     S16 lower_diff = v - lower_bound;
+     S16 upper_diff = upper_bound - v;
 
-     if(upper_diff < lower_diff){
-          return upper_bound;
-     }
+     if(lower_diff < upper_diff) return lower_bound;
 
-     return lower_bound;
+     return upper_bound;
 }
 
 void update_motion_grid_aligned(Move_t* move, MotionComponent_t* motion, bool coast, float dt, float accel,
@@ -291,15 +289,14 @@ void update_motion_grid_aligned(Move_t* move, MotionComponent_t* motion, bool co
           move->distance += motion->pos_delta;
 
           if((motion->prev_vel > 0 && motion->vel < 0) || (motion->prev_vel < 0 && motion->vel > 0)){
-               float destination = closest_grid_center(TILE_SIZE, pos);
-
                move->state = MOVE_STATE_IDLING;
                move->sign = MOVE_SIGN_ZERO;
                move->distance = 0;
 
-               motion->pos_delta = destination - pos;
-               motion->vel = 0;
-               motion->accel = 0;
+               motion->stop_on_pixel = closest_grid_center_pixel(TILE_SIZE_IN_PIXELS, (S16)(pos / PIXEL_SIZE));
+               motion->pos_delta = (motion->stop_on_pixel * PIXEL_SIZE) - pos;
+               motion->vel = 0.0;
+               motion->accel = 0.0;
           }
      } break;
      }

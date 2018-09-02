@@ -396,29 +396,37 @@ void check_block_collision_with_other_blocks(Block_t* block_to_check, World_t* w
                default:
                     break;
                case DIRECTION_LEFT:
-                    block_to_check->pos.pixel.x = block_inside_result.collision_pos.pixel.x + HALF_TILE_SIZE_IN_PIXELS;
-                    block_to_check->pos.decimal.x = 0.0f;
+               {
+                    auto pos_vec = pos_to_vec(block_to_check->pos);
+                    block_to_check->stop_on_pixel_x = block_inside_result.collision_pos.pixel.x + HALF_TILE_SIZE_IN_PIXELS;
+                    block_to_check->pos_delta.x = (block_to_check->stop_on_pixel_x * PIXEL_SIZE) - pos_vec.x;
                     block_to_check->vel.x = 0.0f;
                     block_to_check->accel.x = 0.0f;
-                    break;
+               } break;
                case DIRECTION_RIGHT:
-                    block_to_check->pos.pixel.x = block_inside_result.collision_pos.pixel.x - HALF_TILE_SIZE_IN_PIXELS - TILE_SIZE_IN_PIXELS;
-                    block_to_check->pos.decimal.x = 0.0f;
+               {
+                    auto pos_vec = pos_to_vec(block_to_check->pos);
+                    block_to_check->stop_on_pixel_x = block_inside_result.collision_pos.pixel.x - HALF_TILE_SIZE_IN_PIXELS - TILE_SIZE_IN_PIXELS;
+                    block_to_check->pos_delta.x = (block_to_check->stop_on_pixel_x * PIXEL_SIZE) - pos_vec.x;
                     block_to_check->vel.x = 0.0f;
                     block_to_check->accel.x = 0.0f;
-                    break;
+               } break;
                case DIRECTION_DOWN:
-                    block_to_check->pos.pixel.y = block_inside_result.collision_pos.pixel.y + HALF_TILE_SIZE_IN_PIXELS;
-                    block_to_check->pos.decimal.y = 0.0f;
+               {
+                    auto pos_vec = pos_to_vec(block_to_check->pos);
+                    block_to_check->stop_on_pixel_y = block_inside_result.collision_pos.pixel.y + HALF_TILE_SIZE_IN_PIXELS;
+                    block_to_check->pos_delta.y = (block_to_check->stop_on_pixel_x * PIXEL_SIZE) - pos_vec.y;
                     block_to_check->vel.y = 0.0f;
                     block_to_check->accel.y = 0.0f;
-                    break;
+               } break;
                case DIRECTION_UP:
-                    block_to_check->pos.pixel.y = block_inside_result.collision_pos.pixel.y - HALF_TILE_SIZE_IN_PIXELS - TILE_SIZE_IN_PIXELS;
-                    block_to_check->pos.decimal.y = 0.0f;
+               {
+                    auto pos_vec = pos_to_vec(block_to_check->pos);
+                    block_to_check->stop_on_pixel_y = block_inside_result.collision_pos.pixel.y - HALF_TILE_SIZE_IN_PIXELS - TILE_SIZE_IN_PIXELS;
+                    block_to_check->pos_delta.y = (block_to_check->stop_on_pixel_x * PIXEL_SIZE) - pos_vec.y;
                     block_to_check->vel.y = 0.0f;
                     block_to_check->accel.y = 0.0f;
-                    break;
+               } break;
                }
           }
 

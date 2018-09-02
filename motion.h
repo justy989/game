@@ -1,6 +1,7 @@
 #pragma once
 
 #include "vec.h"
+#include "pixel.h"
 
 enum MoveState_t{
      MOVE_STATE_IDLING,
@@ -27,6 +28,13 @@ struct Motion_t{
      Vec_t vel;
      Vec_t accel;
 
+     union{
+          S16 stop_on_pixel_x;
+          F32 padding_0;
+     };
+
+     S16 stop_on_pixel_y;
+
      Move_t horizontal_move;
      Move_t vertical_move;
 };
@@ -40,6 +48,7 @@ struct MotionComponent_t{
      F32 padding_3;
      F32 accel;
      F32 padding_4;
+     S16 stop_on_pixel;
 };
 
 MotionComponent_t* motion_x_component(Motion_t* motion);

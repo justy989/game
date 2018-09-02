@@ -262,7 +262,7 @@ Coord_t mouse_select_world(Vec_t mouse_screen, Position_t camera){
 
 Vec_t coord_to_screen_position(Coord_t coord){
      Pixel_t pixel = coord_to_pixel(coord);
-     Position_t relative_loc {pixel, 0, {0.0f, 0.0f}};
+     Position_t relative_loc {pixel, {0.0f, 0.0f}, 0};
      return pos_to_vec(relative_loc);
 }
 
