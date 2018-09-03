@@ -94,3 +94,7 @@ Direction_t direction_from_single_mask(DirectionMask_t mask){
 
      return DIRECTION_COUNT;
 }
+
+bool direction_is_horizontal(Direction_t dir){
+     return dir == DIRECTION_LEFT || dir == DIRECTION_RIGHT;
+}

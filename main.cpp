@@ -1828,9 +1828,11 @@ int main(int argc, char** argv){
 
                     if(block->stop_on_pixel_y != 0){
                          if(fabs(block->pos_delta.y) <= fabs(pos_delta.y)){
+                              printf("we da best\n");
                               block->pos.pixel.y = block->stop_on_pixel_y;
                               block->pos.decimal.y = 0.0;
                          }else{
+                              printf("no we not: %f > %f: stop on: %d\n", block->pos_delta.y, pos_delta.y, block->stop_on_pixel_y);
                               block->pos.pixel.y = final_pos.pixel.y;
                               block->pos.decimal.y = final_pos.decimal.y;
                          }

@@ -814,7 +814,7 @@ void melt_ice(Coord_t center, S16 radius, World_t* world, bool teleported){
      impact_ice(center, radius, world, teleported, false);
 }
 
-bool block_push(Block_t* block, Direction_t direction, World_t* world, bool pushed_by_ice){
+bool block_push(Block_t* block, Direction_t direction, World_t* world, bool pushed_by_ice, F32 instant_vel){
      Direction_t collided_block_push_dir = DIRECTION_COUNT;
      Block_t* collided_block = block_against_another_block(block, direction, world->block_qt, world->interactive_qt,
                                                            &world->tilemap, &collided_block_push_dir);
@@ -845,28 +845,48 @@ bool block_push(Block_t* block, Direction_t direction, World_t* world, bool push
      case DIRECTION_LEFT:
           if(block->horizontal_move.state == MOVE_STATE_IDLING){
                block->horizontal_move.sign = MOVE_SIGN_NEGATIVE;
-               block->horizontal_move.state = MOVE_STATE_STARTING;
+               if(pushed_by_ice){
+                    block->horizontal_move.state = MOVE_STATE_COASTING;
+                    block->vel.x = instant_vel;
+               }else{
+                    block->horizontal_move.state = MOVE_STATE_STARTING;
+               }
                block->horizontal_move.distance = 0;
           }
           break;
      case DIRECTION_RIGHT:
           if(block->horizontal_move.state == MOVE_STATE_IDLING){
                block->horizontal_move.sign = MOVE_SIGN_POSITIVE;
-               block->horizontal_move.state = MOVE_STATE_STARTING;
+               if(pushed_by_ice){
+                    block->horizontal_move.state = MOVE_STATE_COASTING;
+                    block->vel.x = instant_vel;
+               }else{
+                    block->horizontal_move.state = MOVE_STATE_STARTING;
+               }
                block->horizontal_move.distance = 0;
           }
           break;
      case DIRECTION_DOWN:
           if(block->vertical_move.state == MOVE_STATE_IDLING){
                block->vertical_move.sign = MOVE_SIGN_NEGATIVE;
-               block->vertical_move.state = MOVE_STATE_STARTING;
+               if(pushed_by_ice){
+                    block->vertical_move.state = MOVE_STATE_COASTING;
+                    block->vel.y = instant_vel;
+               }else{
+                    block->vertical_move.state = MOVE_STATE_STARTING;
+               }
                block->vertical_move.distance = 0;
           }
           break;
      case DIRECTION_UP:
           if(block->vertical_move.state == MOVE_STATE_IDLING){
                block->vertical_move.sign = MOVE_SIGN_POSITIVE;
-               block->vertical_move.state = MOVE_STATE_STARTING;
+               if(pushed_by_ice){
+                    block->vertical_move.state = MOVE_STATE_COASTING;
+                    block->vel.y = instant_vel;
+               }else{
+                    block->vertical_move.state = MOVE_STATE_STARTING;
+               }
                block->vertical_move.distance = 0;
           }
           break;
@@ -979,8 +999,9 @@ void describe_coord(Coord_t coord, World_t* world){
      quad_tree_find_in(world->block_qt, coord_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
      for(S16 i = 0; i < block_count; i++){
           auto* block = blocks[i];
-          LOG("block %ld: pixel %d, %d, rot: %d, element: %s, entangle: %d, clone id: %d\n\n",
+          LOG("block %ld: pixel %d, %d, decimal: %f, %f, rot: %d, element: %s, entangle: %d, clone id: %d\n\n",
               block - world->blocks.elements, block->pos.pixel.x, block->pos.pixel.y,
+              block->pos.decimal.x, block->pos.decimal.y,
               block->rotation, element_to_string(block->element),
               block->entangle_index, block->clone_id);
      }

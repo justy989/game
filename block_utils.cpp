@@ -199,9 +199,10 @@ Interactive_t* block_against_solid_interactive(Block_t* block_to_check, Directio
 }
 
 Block_t* block_inside_block_list(Block_t* block_to_check, Block_t** blocks, S16 block_count, ObjectArray_t<Block_t>* blocks_array, Position_t* collided_with, Pixel_t* portal_offsets){
-     Rect_t rect = {block_to_check->pos.pixel.x, block_to_check->pos.pixel.y,
-                    (S16)(block_to_check->pos.pixel.x + BLOCK_SOLID_SIZE_IN_PIXELS),
-                    (S16)(block_to_check->pos.pixel.y + BLOCK_SOLID_SIZE_IN_PIXELS)};
+     auto check_pos = block_to_check->pos + block_to_check->pos_delta;
+     Rect_t rect = {check_pos.pixel.x, check_pos.pixel.y,
+                    (S16)(check_pos.pixel.x + BLOCK_SOLID_SIZE_IN_PIXELS),
+                    (S16)(check_pos.pixel.y + BLOCK_SOLID_SIZE_IN_PIXELS)};
 
      Block_t* entangled_block = nullptr;
      if(block_to_check->entangle_index >= 0){
@@ -215,7 +216,9 @@ Block_t* block_inside_block_list(Block_t* block_to_check, Block_t** blocks, S16 
           if(block == entangled_block && block_to_check->clone_start.x > 0) continue;
           if(block == block_to_check && portal_offsets[i].x == 0 && portal_offsets[i].y == 0) continue;
 
-          Pixel_t pixel_to_check = block->pos.pixel + portal_offsets[i];
+          auto block_pos = block->pos + block->pos_delta;
+
+          Pixel_t pixel_to_check = block_pos.pixel + portal_offsets[i];
 
           if(pixel_in_rect(pixel_to_check, rect) ||
              pixel_in_rect(block_top_left_pixel(pixel_to_check), rect) ||
@@ -389,6 +392,8 @@ void check_block_collision_with_other_blocks(Block_t* block_to_check, World_t* w
           bool a_on_ice = block_on_ice(block_to_check, &world->tilemap, world->interactive_qt);
           bool b_on_ice = block_on_ice(block_inside_result.block, &world->tilemap, world->interactive_qt);
 
+          Vec_t save_vel = block_to_check->vel;
+
           if(block_inside_result.block == block_to_check){
                block_to_check->pos = coord_to_pos(block_get_coord(block_to_check));
           }else{
@@ -397,35 +402,75 @@ void check_block_collision_with_other_blocks(Block_t* block_to_check, World_t* w
                     break;
                case DIRECTION_LEFT:
                {
-                    auto pos_vec = pos_to_vec(block_to_check->pos);
                     block_to_check->stop_on_pixel_x = block_inside_result.collision_pos.pixel.x + HALF_TILE_SIZE_IN_PIXELS;
-                    block_to_check->pos_delta.x = (block_to_check->stop_on_pixel_x * PIXEL_SIZE) - pos_vec.x;
+
+                    Position_t dest_pos;
+                    dest_pos.pixel.x = block_to_check->stop_on_pixel_y;
+                    dest_pos.pixel.y = block_to_check->pos.pixel.x;
+                    dest_pos.decimal.x = 0;
+                    dest_pos.decimal.y = 0;
+                    dest_pos.z = block_to_check->pos.z;
+
+                    Position_t new_pos_delta = dest_pos - block_to_check->pos;
+                    block_to_check->pos_delta.y = pos_y_unit(new_pos_delta);
+
                     block_to_check->vel.x = 0.0f;
                     block_to_check->accel.x = 0.0f;
+                    block_to_check->horizontal_move.state = MOVE_STATE_IDLING;
                } break;
                case DIRECTION_RIGHT:
                {
-                    auto pos_vec = pos_to_vec(block_to_check->pos);
-                    block_to_check->stop_on_pixel_x = block_inside_result.collision_pos.pixel.x - HALF_TILE_SIZE_IN_PIXELS - TILE_SIZE_IN_PIXELS;
-                    block_to_check->pos_delta.x = (block_to_check->stop_on_pixel_x * PIXEL_SIZE) - pos_vec.x;
+                    block_to_check->stop_on_pixel_x = (block_inside_result.collision_pos.pixel.x - HALF_TILE_SIZE_IN_PIXELS) - TILE_SIZE_IN_PIXELS;
+
+                    Position_t dest_pos;
+                    dest_pos.pixel.x = block_to_check->stop_on_pixel_y;
+                    dest_pos.pixel.y = block_to_check->pos.pixel.x;
+                    dest_pos.decimal.x = 0;
+                    dest_pos.decimal.y = 0;
+                    dest_pos.z = block_to_check->pos.z;
+
+                    Position_t new_pos_delta = dest_pos - block_to_check->pos;
+                    block_to_check->pos_delta.y = pos_y_unit(new_pos_delta);
+
                     block_to_check->vel.x = 0.0f;
                     block_to_check->accel.x = 0.0f;
+                    block_to_check->horizontal_move.state = MOVE_STATE_IDLING;
                } break;
                case DIRECTION_DOWN:
                {
-                    auto pos_vec = pos_to_vec(block_to_check->pos);
                     block_to_check->stop_on_pixel_y = block_inside_result.collision_pos.pixel.y + HALF_TILE_SIZE_IN_PIXELS;
-                    block_to_check->pos_delta.y = (block_to_check->stop_on_pixel_x * PIXEL_SIZE) - pos_vec.y;
+
+                    Position_t dest_pos;
+                    dest_pos.pixel.x = block_to_check->pos.pixel.x;
+                    dest_pos.pixel.y = block_to_check->stop_on_pixel_y;
+                    dest_pos.decimal.x = 0;
+                    dest_pos.decimal.y = 0;
+                    dest_pos.z = block_to_check->pos.z;
+
+                    Position_t new_pos_delta = dest_pos - block_to_check->pos;
+                    block_to_check->pos_delta.y = pos_y_unit(new_pos_delta);
+
                     block_to_check->vel.y = 0.0f;
                     block_to_check->accel.y = 0.0f;
+                    block_to_check->vertical_move.state = MOVE_STATE_IDLING;
                } break;
                case DIRECTION_UP:
                {
-                    auto pos_vec = pos_to_vec(block_to_check->pos);
-                    block_to_check->stop_on_pixel_y = block_inside_result.collision_pos.pixel.y - HALF_TILE_SIZE_IN_PIXELS - TILE_SIZE_IN_PIXELS;
-                    block_to_check->pos_delta.y = (block_to_check->stop_on_pixel_x * PIXEL_SIZE) - pos_vec.y;
+                    block_to_check->stop_on_pixel_y = (block_inside_result.collision_pos.pixel.y - HALF_TILE_SIZE_IN_PIXELS) - TILE_SIZE_IN_PIXELS;
+
+                    Position_t dest_pos;
+                    dest_pos.pixel.x = block_to_check->pos.pixel.x;
+                    dest_pos.pixel.y = block_to_check->stop_on_pixel_y;
+                    dest_pos.decimal.x = 0;
+                    dest_pos.decimal.y = 0;
+                    dest_pos.z = block_to_check->pos.z;
+
+                    Position_t new_pos_delta = dest_pos - block_to_check->pos;
+                    block_to_check->pos_delta.y = pos_y_unit(new_pos_delta);
+
                     block_to_check->vel.y = 0.0f;
                     block_to_check->accel.y = 0.0f;
+                    block_to_check->vertical_move.state = MOVE_STATE_IDLING;
                } break;
                }
           }
@@ -495,7 +540,10 @@ void check_block_collision_with_other_blocks(Block_t* block_to_check, World_t* w
                     }
                }
 
-               if(push) block_push(block_inside_result.block, push_dir, world, true);
+               if(push){
+                    F32 instant_vel = direction_is_horizontal(push_dir) ? save_vel.x : save_vel.y;
+                    block_push(block_inside_result.block, push_dir, world, true, instant_vel);
+               }
           }
 
           // TODO: there is no way this is the right way to do this

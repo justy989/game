@@ -108,3 +108,6 @@ Position_t operator*(Position_t p, float scale){
      canonicalize(&p);
      return p;
 }
+
+F32 pos_x_unit(Position_t p){return (F32)(p.pixel.x) * PIXEL_SIZE + p.decimal.x;}
+F32 pos_y_unit(Position_t p){return (F32)(p.pixel.y) * PIXEL_SIZE + p.decimal.y;}
