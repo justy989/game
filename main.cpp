@@ -49,6 +49,54 @@ NOTES:
 #include "collision.h"
 #include "world.h"
 
+
+#define TEXT_CHAR_WIDTH (5.0f * PIXEL_SIZE)
+#define TEXT_CHAR_HEIGHT (8.0f * PIXEL_SIZE)
+#define TEXT_CHAR_SPACING (1.0f * PIXEL_SIZE)
+#define TEXT_CHAR_TEX_WIDTH 0.01953125f
+#define TEXT_CHAR_TEX_HEIGHT 1.0f
+
+void draw_text(const char* message, Vec_t pos)
+{
+     char c;
+     Vec_t dimensions {TEXT_CHAR_WIDTH, TEXT_CHAR_HEIGHT};
+     Vec_t tex {};
+     Vec_t tex_dimensions {TEXT_CHAR_TEX_WIDTH, TEXT_CHAR_TEX_HEIGHT};
+
+     while((c = *message)){
+          if(isalpha(c)){
+               tex.x = (F32)((c - 'A')) * TEXT_CHAR_TEX_WIDTH;
+          }else if(isdigit(c)){
+               tex.x = (F32)((c - '0') + ('Z' - 'A') + 1) * TEXT_CHAR_TEX_WIDTH;
+          }else if(c == ':'){
+               tex.x = 36.0f * TEXT_CHAR_TEX_WIDTH;
+          }else if(c == '.'){
+               tex.x = 37.0f * TEXT_CHAR_TEX_WIDTH;
+          }else if(c == ','){
+               tex.x = 38.0f * TEXT_CHAR_TEX_WIDTH;
+          }else if(c == '+'){
+               tex.x = 39.0f * TEXT_CHAR_TEX_WIDTH;
+          }else if(c == '?'){
+               tex.x = 40.0f * TEXT_CHAR_TEX_WIDTH;
+          }else if(c == '!'){
+               tex.x = 41.0f * TEXT_CHAR_TEX_WIDTH;
+          }else if(c == '\''){
+               tex.x = 42.0f * TEXT_CHAR_TEX_WIDTH;
+          }else if(c == '*'){
+               tex.x = 43.0f * TEXT_CHAR_TEX_WIDTH;
+          }else if(c == '/'){
+               tex.x = 44.0f * TEXT_CHAR_TEX_WIDTH;
+          }else{
+               tex.x = 1.0f - TEXT_CHAR_TEX_WIDTH;
+          }
+
+          draw_screen_texture(pos, tex, dimensions, tex_dimensions);
+
+          pos.x += TEXT_CHAR_WIDTH + TEXT_CHAR_SPACING;
+          message++;
+     }
+}
+
 // #define BLOCKS_SQUISH_PLAYER
 
 FILE* load_demo_number(S32 map_number, const char** demo_filepath){
@@ -174,13 +222,14 @@ int main(int argc, char** argv){
           return 1;
      }
 
-     int window_width = 1080;
-     int window_height = 1080;
+     int window_width = 1024;
+     int window_height = 1024;
      SDL_Window* window = nullptr;
      SDL_GLContext opengl_context = nullptr;
      GLuint theme_texture = 0;
      GLuint player_texture = 0;
      GLuint arrow_texture = 0;
+     GLuint text_texture = 0;
 
      if(!suite || show_suite){
           if(SDL_Init(SDL_INIT_EVERYTHING) != 0){
@@ -219,6 +268,8 @@ int main(int argc, char** argv){
           if(player_texture == 0) return 1;
           arrow_texture = transparent_texture_from_file("content/arrow.bmp");
           if(arrow_texture == 0) return 1;
+          text_texture = transparent_texture_from_file("content/text.bmp");
+          if(text_texture == 0) return 1;
      }
 
      switch(demo.mode){
@@ -2547,6 +2598,55 @@ int main(int argc, char** argv){
           } break;
           }
 
+          if(world.players.elements[0].vel.x == 0){
+               glBindTexture(GL_TEXTURE_2D, text_texture);
+               glBegin(GL_QUADS);
+               glColor3f(1.0f, 1.0f, 1.0f);
+
+               draw_text("PX", Vec_t{0.5, 0.5});
+
+               glEnd();
+          }
+
+          if(world.players.elements[0].vel.y == 0){
+               glBindTexture(GL_TEXTURE_2D, text_texture);
+               glBegin(GL_QUADS);
+               glColor3f(1.0f, 1.0f, 1.0f);
+
+               draw_text("P4", Vec_t{0.5, 0.45});
+
+               glEnd();
+          }
+
+          if(editor.mode){
+               glBindTexture(GL_TEXTURE_2D, text_texture);
+               glBegin(GL_QUADS);
+
+               auto mouse_coord = pos_to_coord(mouse_world);
+               char buffer[64];
+               snprintf(buffer, 64, "M: %d,%d", mouse_coord.x, mouse_coord.y);
+
+               Vec_t text_pos {0.005f, 0.965f};
+
+               glColor3f(0.0f, 0.0f, 0.0f);
+               draw_text(buffer, text_pos + Vec_t{0.002f, -0.002f});
+
+               glColor3f(1.0f, 1.0f, 1.0f);
+               draw_text(buffer, text_pos);
+
+               Player_t* player = world.players.elements;
+               snprintf(buffer, 64, "P: %d,%d", player->pos.pixel.x, player->pos.pixel.y);
+               text_pos.y -= 0.045f;
+
+               glColor3f(0.0f, 0.0f, 0.0f);
+               draw_text(buffer, text_pos + Vec_t{0.002f, -0.002f});
+
+               glColor3f(1.0f, 1.0f, 1.0f);
+               draw_text(buffer, text_pos);
+
+               glEnd();
+		}
+
           if(reset_timer >= 0.0f){
                glBegin(GL_QUADS);
                glColor4f(0.0f, 0.0f, 0.0f, reset_timer / RESET_TIME);
@@ -2557,6 +2657,30 @@ int main(int argc, char** argv){
                glEnd();
           }
 
+          if(demo.mode == DEMO_MODE_PLAY){
+               F32 demo_pct = (F32)(frame_count) / (F32)(demo.last_frame);
+               Quad_t pct_bar_quad = {pct_bar_outline_quad.left, pct_bar_outline_quad.bottom, demo_pct, pct_bar_outline_quad.top};
+               draw_quad_filled(&pct_bar_quad, 255.0f, 255.0f, 255.0f);
+               draw_quad_wireframe(&pct_bar_outline_quad, 255.0f, 255.0f, 255.0f);
+
+               char buffer[64];
+               snprintf(buffer, 64, "F: %ld/%ld", frame_count, demo.last_frame);
+
+               glBindTexture(GL_TEXTURE_2D, text_texture);
+               glBegin(GL_QUADS);
+
+               Vec_t text_pos {0.005f, 0.965f};
+
+               glColor3f(0.0f, 0.0f, 0.0f);
+               draw_text(buffer, text_pos + Vec_t{0.002f, -0.002f});
+
+               glColor3f(1.0f, 1.0f, 1.0f);
+               draw_text(buffer, text_pos);
+
+               glEnd();
+          }
+
+#if 0
           if(world.players.count >= 1){
                Player_t* player = world.players.elements + 0;
 
@@ -2574,6 +2698,7 @@ int main(int argc, char** argv){
                glVertex2f(0.04, 0.02);
                glEnd();
           }
+#endif
 
           if(demo.mode == DEMO_MODE_PLAY){
                F32 demo_pct = (F32)(frame_count) / (F32)(demo.last_frame);
@@ -2627,6 +2752,7 @@ int main(int argc, char** argv){
           glDeleteTextures(1, &theme_texture);
           glDeleteTextures(1, &player_texture);
           glDeleteTextures(1, &arrow_texture);
+          glDeleteTextures(1, &text_texture);
 
           SDL_GL_DeleteContext(opengl_context);
           SDL_DestroyWindow(window);
