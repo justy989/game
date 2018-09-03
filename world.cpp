@@ -852,6 +852,7 @@ bool block_push(Block_t* block, Direction_t direction, World_t* world, bool push
                     block->horizontal_move.state = MOVE_STATE_STARTING;
                }
                block->horizontal_move.distance = 0;
+               block->started_on_pixel_x = block->pos.pixel.x;
           }
           break;
      case DIRECTION_RIGHT:
@@ -864,6 +865,7 @@ bool block_push(Block_t* block, Direction_t direction, World_t* world, bool push
                     block->horizontal_move.state = MOVE_STATE_STARTING;
                }
                block->horizontal_move.distance = 0;
+               block->started_on_pixel_x = block->pos.pixel.x;
           }
           break;
      case DIRECTION_DOWN:
@@ -876,6 +878,7 @@ bool block_push(Block_t* block, Direction_t direction, World_t* world, bool push
                     block->vertical_move.state = MOVE_STATE_STARTING;
                }
                block->vertical_move.distance = 0;
+               block->started_on_pixel_y = block->pos.pixel.y;
           }
           break;
      case DIRECTION_UP:
@@ -888,6 +891,7 @@ bool block_push(Block_t* block, Direction_t direction, World_t* world, bool push
                     block->vertical_move.state = MOVE_STATE_STARTING;
                }
                block->vertical_move.distance = 0;
+               block->started_on_pixel_y = block->pos.pixel.y;
           }
           break;
      }

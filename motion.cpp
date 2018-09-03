@@ -1,6 +1,7 @@
 #include "motion.h"
 #include "defines.h"
 #include "position.h"
+#include "log.h"
 
 #include <math.h>
 

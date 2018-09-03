@@ -1374,7 +1374,7 @@ int main(int argc, char** argv){
                     }
                }
 
-     #if 0
+#if 0
                Vec_t pos_vec = pos_to_vec(player->pos);
 
                // TODO: do we want this in the future?
@@ -1390,9 +1390,9 @@ int main(int argc, char** argv){
                          break;
                     }
                }
-     #else
+#else
                Position_t room_center = coord_to_pos(Coord_t{8, 8});
-     #endif
+#endif
 
                Position_t camera_movement = room_center - camera;
                camera += camera_movement * 0.05f;
@@ -1629,7 +1629,7 @@ int main(int argc, char** argv){
 
                     if(stop_on_boundary_x){
                          // stop on tile boundaries separately for each axis
-                         S16 boundary_x = range_passes_tile_boundary(block->pos.pixel.x, final_pos.pixel.x, -1);
+                         S16 boundary_x = range_passes_tile_boundary(block->pos.pixel.x, final_pos.pixel.x, block->started_on_pixel_x);
                          if(boundary_x){
                               final_pos.pixel.x = boundary_x;
                               final_pos.decimal.x = 0.0;
@@ -1640,7 +1640,7 @@ int main(int argc, char** argv){
                     }
 
                     if(stop_on_boundary_y){
-                         S16 boundary_y = range_passes_tile_boundary(block->pos.pixel.y, final_pos.pixel.y, -1);
+                         S16 boundary_y = range_passes_tile_boundary(block->pos.pixel.y, final_pos.pixel.y, block->started_on_pixel_y);
                          if(boundary_y){
                               final_pos.pixel.y = boundary_y;
                               final_pos.decimal.y = 0.0;
@@ -1828,11 +1828,9 @@ int main(int argc, char** argv){
 
                     if(block->stop_on_pixel_y != 0){
                          if(fabs(block->pos_delta.y) <= fabs(pos_delta.y)){
-                              printf("we da best\n");
                               block->pos.pixel.y = block->stop_on_pixel_y;
                               block->pos.decimal.y = 0.0;
                          }else{
-                              printf("no we not: %f > %f: stop on: %d\n", block->pos_delta.y, pos_delta.y, block->stop_on_pixel_y);
                               block->pos.pixel.y = final_pos.pixel.y;
                               block->pos.decimal.y = final_pos.decimal.y;
                          }
@@ -2291,6 +2289,7 @@ int main(int argc, char** argv){
 
           glEnd();
 
+#if 0
           glBindTexture(GL_TEXTURE_2D, 0);
           glBegin(GL_LINES);
 
@@ -2337,6 +2336,7 @@ int main(int argc, char** argv){
           }
 
           glEnd();
+#endif
 
 #if 0
           Vec_t collided_with_center = {(float)(g_collided_with_pixel.x) * PIXEL_SIZE, (float)(g_collided_with_pixel.y) * PIXEL_SIZE};
@@ -2346,7 +2346,7 @@ int main(int argc, char** argv){
           draw_quad_wireframe(&collided_with_quad, 255.0f, 0.0f, 255.0f);
 #endif
 
-#if 0
+#if 1
           // light
           glBindTexture(GL_TEXTURE_2D, 0);
           glBegin(GL_QUADS);

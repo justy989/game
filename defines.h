@@ -42,7 +42,7 @@
 
 #define FALL_TIME 0.03f
 
-#define BLOCK_PUSH_TIME 0.25f
+#define BLOCK_PUSH_TIME 0.4f
 
 #define LIGHT_DETECTOR_THRESHOLD 176
 

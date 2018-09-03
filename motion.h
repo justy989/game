@@ -29,6 +29,13 @@ struct Motion_t{
      Vec_t accel;
 
      union{
+          S16 started_on_pixel_x;
+          F32 padding_2;
+     };
+
+     S16 started_on_pixel_y;
+
+     union{
           S16 stop_on_pixel_x;
           F32 padding_0;
      };
@@ -48,6 +55,8 @@ struct MotionComponent_t{
      F32 padding_3;
      F32 accel;
      F32 padding_4;
+     S16 start_on_pixel;
+     F32 padding_5;
      S16 stop_on_pixel;
 };
 

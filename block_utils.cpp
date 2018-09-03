@@ -363,7 +363,21 @@ Block_t* block_held_up_by_another_block(Block_t* block_to_check, QuadTreeNode_t<
 
 bool block_on_ice(Block_t* block, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree){
      if(block->pos.z == 0){
-          Coord_t coord = block_get_coord(block);
+          Pixel_t block_pixel_check = block->pos.pixel + Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS};
+
+          // if the block is moving, to the right or up, then check the pixel adjacent to the center in the direction we are moving
+          // this will have to change in the future anyway once blocks are no longer square
+          if(block->horizontal_move.state > MOVE_STATE_IDLING &&
+             block->horizontal_move.sign == MOVE_SIGN_POSITIVE){
+               block_pixel_check.x++;
+          }
+
+          if(block->vertical_move.state > MOVE_STATE_IDLING &&
+             block->vertical_move.sign == MOVE_SIGN_POSITIVE){
+               block_pixel_check.y++;
+          }
+
+          Coord_t coord = pixel_to_coord(block_pixel_check);
           Interactive_t* interactive = quad_tree_interactive_find_at(interactive_quad_tree, coord);
           if(interactive){
                if(interactive->type == INTERACTIVE_TYPE_POPUP){
@@ -402,17 +416,16 @@ void check_block_collision_with_other_blocks(Block_t* block_to_check, World_t* w
                     break;
                case DIRECTION_LEFT:
                {
+                    // TODO: compress these cases
                     block_to_check->stop_on_pixel_x = block_inside_result.collision_pos.pixel.x + HALF_TILE_SIZE_IN_PIXELS;
 
                     Position_t dest_pos;
-                    dest_pos.pixel.x = block_to_check->stop_on_pixel_y;
-                    dest_pos.pixel.y = block_to_check->pos.pixel.x;
+                    dest_pos.pixel.x = block_to_check->stop_on_pixel_x;
                     dest_pos.decimal.x = 0;
-                    dest_pos.decimal.y = 0;
                     dest_pos.z = block_to_check->pos.z;
 
                     Position_t new_pos_delta = dest_pos - block_to_check->pos;
-                    block_to_check->pos_delta.y = pos_y_unit(new_pos_delta);
+                    block_to_check->pos_delta.x = pos_y_unit(new_pos_delta);
 
                     block_to_check->vel.x = 0.0f;
                     block_to_check->accel.x = 0.0f;
@@ -423,14 +436,12 @@ void check_block_collision_with_other_blocks(Block_t* block_to_check, World_t* w
                     block_to_check->stop_on_pixel_x = (block_inside_result.collision_pos.pixel.x - HALF_TILE_SIZE_IN_PIXELS) - TILE_SIZE_IN_PIXELS;
 
                     Position_t dest_pos;
-                    dest_pos.pixel.x = block_to_check->stop_on_pixel_y;
-                    dest_pos.pixel.y = block_to_check->pos.pixel.x;
+                    dest_pos.pixel.x = block_to_check->stop_on_pixel_x;
                     dest_pos.decimal.x = 0;
-                    dest_pos.decimal.y = 0;
                     dest_pos.z = block_to_check->pos.z;
 
                     Position_t new_pos_delta = dest_pos - block_to_check->pos;
-                    block_to_check->pos_delta.y = pos_y_unit(new_pos_delta);
+                    block_to_check->pos_delta.x = pos_y_unit(new_pos_delta);
 
                     block_to_check->vel.x = 0.0f;
                     block_to_check->accel.x = 0.0f;
@@ -441,9 +452,7 @@ void check_block_collision_with_other_blocks(Block_t* block_to_check, World_t* w
                     block_to_check->stop_on_pixel_y = block_inside_result.collision_pos.pixel.y + HALF_TILE_SIZE_IN_PIXELS;
 
                     Position_t dest_pos;
-                    dest_pos.pixel.x = block_to_check->pos.pixel.x;
                     dest_pos.pixel.y = block_to_check->stop_on_pixel_y;
-                    dest_pos.decimal.x = 0;
                     dest_pos.decimal.y = 0;
                     dest_pos.z = block_to_check->pos.z;
 
@@ -459,9 +468,7 @@ void check_block_collision_with_other_blocks(Block_t* block_to_check, World_t* w
                     block_to_check->stop_on_pixel_y = (block_inside_result.collision_pos.pixel.y - HALF_TILE_SIZE_IN_PIXELS) - TILE_SIZE_IN_PIXELS;
 
                     Position_t dest_pos;
-                    dest_pos.pixel.x = block_to_check->pos.pixel.x;
                     dest_pos.pixel.y = block_to_check->stop_on_pixel_y;
-                    dest_pos.decimal.x = 0;
                     dest_pos.decimal.y = 0;
                     dest_pos.z = block_to_check->pos.z;
 
