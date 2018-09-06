@@ -303,3 +303,8 @@ void update_motion_grid_aligned(Move_t* move, MotionComponent_t* motion, bool co
      } break;
      }
 }
+
+float calc_distance_from_derivatives(float v, float a){
+     float t = v / a;
+     return v * t + 0.5f * a * (t * t);
+}

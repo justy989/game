@@ -72,3 +72,5 @@ float calc_position_motion(float v, float a, float dt);
 float calc_velocity_motion(float v, float a, float dt);
 
 float calc_accel_component_move(Move_t move, float accel);
+
+float calc_distance_from_derivatives(float v, float a);

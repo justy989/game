@@ -19,6 +19,7 @@ Big Features:
 
 TODO:
 - collision infinite loop lol
+- do we have a walk stuttering problem on other machines ?
 
 NOTES:
 - Only 2 blocks high can go through portals
@@ -86,6 +87,8 @@ void draw_text(const char* message, Vec_t pos)
                tex.x = 43.0f * TEXT_CHAR_TEX_WIDTH;
           }else if(c == '/'){
                tex.x = 44.0f * TEXT_CHAR_TEX_WIDTH;
+          }else if(c == '-'){
+               tex.x = 45.0f * TEXT_CHAR_TEX_WIDTH;
           }else{
                tex.x = 1.0f - TEXT_CHAR_TEX_WIDTH;
           }
@@ -404,6 +407,8 @@ int main(int argc, char** argv){
      setup_map(player_start, &world, &undo);
      init(&editor);
 
+     bool arrows_down[DIRECTION_COUNT] = {false, false, false, false};
+
      F32 dt = 0.0f;
 
      auto last_time = std::chrono::system_clock::now();
@@ -504,6 +509,7 @@ int main(int argc, char** argv){
                               player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_LEFT_START,
                                                     demo.mode, demo.file, frame_count);
                          }
+                         arrows_down[DIRECTION_LEFT] = true;
                          break;
                     case SDL_SCANCODE_RIGHT:
                          if(editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
@@ -513,6 +519,7 @@ int main(int argc, char** argv){
                               player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_RIGHT_START,
                                                     demo.mode, demo.file, frame_count);
                          }
+                         arrows_down[DIRECTION_RIGHT] = true;
                          break;
                     case SDL_SCANCODE_UP:
                          if(editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
@@ -522,6 +529,7 @@ int main(int argc, char** argv){
                               player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_UP_START,
                                                     demo.mode, demo.file, frame_count);
                          }
+                         arrows_down[DIRECTION_UP] = true;
                          break;
                     case SDL_SCANCODE_DOWN:
                          if(editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
@@ -531,6 +539,7 @@ int main(int argc, char** argv){
                               player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_DOWN_START,
                                                     demo.mode, demo.file, frame_count);
                          }
+                         arrows_down[DIRECTION_DOWN] = true;
                          break;
                     case SDL_SCANCODE_E:
                          if(!resetting){
@@ -815,18 +824,22 @@ int main(int argc, char** argv){
                     case SDL_SCANCODE_LEFT:
                          player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_LEFT_STOP,
                                                demo.mode, demo.file, frame_count);
+                         arrows_down[DIRECTION_LEFT] = false;
                          break;
                     case SDL_SCANCODE_RIGHT:
                          player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_RIGHT_STOP,
                                                demo.mode, demo.file, frame_count);
+                         arrows_down[DIRECTION_RIGHT] = false;
                          break;
                     case SDL_SCANCODE_UP:
                          player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_UP_STOP,
                                                demo.mode, demo.file, frame_count);
+                         arrows_down[DIRECTION_UP] = false;
                          break;
                     case SDL_SCANCODE_DOWN:
                          player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_DOWN_STOP,
                                                demo.mode, demo.file, frame_count);
+                         arrows_down[DIRECTION_DOWN] = false;
                          break;
                     case SDL_SCANCODE_E:
                          player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_ACTIVATE_STOP,
@@ -1312,36 +1325,54 @@ int main(int argc, char** argv){
 
                     if(rotated_move_actions[DIRECTION_LEFT] && !rotated_move_actions[DIRECTION_RIGHT]){
                          if(player->horizontal_move.state == MOVE_STATE_IDLING){
-                              player->horizontal_move.sign = MOVE_SIGN_NEGATIVE;
-                              player->horizontal_move.state = MOVE_STATE_STARTING;
                               player->horizontal_move.distance = 0;
+                              player->horizontal_move.state = MOVE_STATE_STARTING;
                               if(player->reface) player->face = DIRECTION_LEFT;
+                              player->horizontal_move.sign = MOVE_SIGN_NEGATIVE;
+                         }else if(player->horizontal_move.state == MOVE_STATE_STOPPING){
+                              player->horizontal_move.distance = calc_distance_from_derivatives(player->vel.x, player->accel.x);
+                              player->horizontal_move.state = MOVE_STATE_STARTING;
+                              if(player->reface) player->face = DIRECTION_LEFT;
+                              player->horizontal_move.sign = MOVE_SIGN_NEGATIVE;
                          }
                     }
 
                     if(rotated_move_actions[DIRECTION_RIGHT] && !rotated_move_actions[DIRECTION_LEFT]){
                          if(player->horizontal_move.state == MOVE_STATE_IDLING){
+                              player->horizontal_move.distance = 0;
                               player->horizontal_move.sign = MOVE_SIGN_POSITIVE;
                               player->horizontal_move.state = MOVE_STATE_STARTING;
-                              player->horizontal_move.distance = 0;
+                              if(player->reface) player->face = DIRECTION_RIGHT;
+                         }else if(player->horizontal_move.state == MOVE_STATE_STOPPING){
+                              player->horizontal_move.distance = calc_distance_from_derivatives(player->vel.x, player->accel.x);
+                              player->horizontal_move.sign = MOVE_SIGN_POSITIVE;
+                              player->horizontal_move.state = MOVE_STATE_STARTING;
                               if(player->reface) player->face = DIRECTION_RIGHT;
                          }
                     }
 
                     if(rotated_move_actions[DIRECTION_DOWN] && !rotated_move_actions[DIRECTION_UP]){
                          if(player->vertical_move.state == MOVE_STATE_IDLING){
+                              player->vertical_move.distance = 0;
                               player->vertical_move.sign = MOVE_SIGN_NEGATIVE;
                               player->vertical_move.state = MOVE_STATE_STARTING;
-                              player->vertical_move.distance = 0;
+                              if(player->reface) player->face = DIRECTION_DOWN;
+                         }else if(player->horizontal_move.state == MOVE_STATE_STOPPING){
+                              player->horizontal_move.distance = calc_distance_from_derivatives(player->vel.y, player->accel.y);
+                              player->vertical_move.sign = MOVE_SIGN_NEGATIVE;
+                              player->vertical_move.state = MOVE_STATE_STARTING;
                               if(player->reface) player->face = DIRECTION_DOWN;
                          }
                     }
 
                     if(rotated_move_actions[DIRECTION_UP] && !rotated_move_actions[DIRECTION_DOWN]){
                          if(player->vertical_move.state == MOVE_STATE_IDLING){
+                              player->vertical_move.distance = 0;
+                         // }else if(player->horizontal_move.state == MOVE_STATE_STOPPING){
+                         //      player->horizontal_move.distance = calc_distance_from_derivatives(player->vel.y, player->accel.y);
+
                               player->vertical_move.sign = MOVE_SIGN_POSITIVE;
                               player->vertical_move.state = MOVE_STATE_STARTING;
-                              player->vertical_move.distance = 0;
                               if(player->reface) player->face = DIRECTION_UP;
                          }
                     }
@@ -2598,25 +2629,28 @@ int main(int argc, char** argv){
           } break;
           }
 
+          // TODO: remove this stuff
+          glBindTexture(GL_TEXTURE_2D, text_texture);
+          glBegin(GL_QUADS);
+          glColor3f(1.0f, 1.0f, 1.0f);
+
           if(world.players.elements[0].vel.x == 0){
-               glBindTexture(GL_TEXTURE_2D, text_texture);
-               glBegin(GL_QUADS);
-               glColor3f(1.0f, 1.0f, 1.0f);
-
                draw_text("PX", Vec_t{0.5, 0.5});
-
-               glEnd();
           }
 
-          if(world.players.elements[0].vel.y == 0){
-               glBindTexture(GL_TEXTURE_2D, text_texture);
-               glBegin(GL_QUADS);
-               glColor3f(1.0f, 1.0f, 1.0f);
-
-               draw_text("P4", Vec_t{0.5, 0.45});
-
-               glEnd();
+          if(arrows_down[DIRECTION_LEFT]){
+               draw_text("X", Vec_t{0.45f, 0.5f});
           }
+
+          if(arrows_down[DIRECTION_RIGHT]){
+               draw_text("X", Vec_t{0.55f, 0.5f});
+          }
+
+          if(world.players.elements[0].vel.x == 0 && (arrows_down[DIRECTION_LEFT] || arrows_down[DIRECTION_RIGHT])){
+               draw_text("WAT", Vec_t{0.5f, 0.7f});
+          }
+
+          glEnd();
 
           if(editor.mode){
                glBindTexture(GL_TEXTURE_2D, text_texture);
@@ -2645,7 +2679,14 @@ int main(int argc, char** argv){
                draw_text(buffer, text_pos);
 
                glEnd();
-		}
+		}else{
+               glBindTexture(GL_TEXTURE_2D, text_texture);
+               glBegin(GL_QUADS);
+
+               char buffer[64];
+               snprintf(buffer, 64, "PV: %.4f,%.4f", world.players.elements->vel.x, world.players.elements->vel.y);
+               draw_text(buffer, Vec_t{0.005f, 0.0965f});
+          }
 
           if(reset_timer >= 0.0f){
                glBegin(GL_QUADS);
