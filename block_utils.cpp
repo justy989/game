@@ -9,13 +9,15 @@
 Pixel_t g_collided_with_pixel = {};
 
 bool block_adjacent_pixels_to_check(Block_t* block_to_check, Direction_t direction, Pixel_t* a, Pixel_t* b){
+     auto block_to_check_pos = block_to_check->pos + block_to_check->pos_delta;
+
      switch(direction){
      default:
           break;
      case DIRECTION_LEFT:
      {
           // check bottom corner
-          Pixel_t pixel = block_to_check->pos.pixel;
+          Pixel_t pixel = block_to_check_pos.pixel;
           pixel.x--;
           *a = pixel;
 
@@ -27,7 +29,7 @@ bool block_adjacent_pixels_to_check(Block_t* block_to_check, Direction_t directi
      case DIRECTION_RIGHT:
      {
           // check bottom corner
-          Pixel_t pixel = block_to_check->pos.pixel;
+          Pixel_t pixel = block_to_check_pos.pixel;
           pixel.x += TILE_SIZE_IN_PIXELS;
           *a = pixel;
 
@@ -39,7 +41,7 @@ bool block_adjacent_pixels_to_check(Block_t* block_to_check, Direction_t directi
      case DIRECTION_DOWN:
      {
           // check left corner
-          Pixel_t pixel = block_to_check->pos.pixel;
+          Pixel_t pixel = block_to_check_pos.pixel;
           pixel.y--;
           *a = pixel;
 
@@ -51,7 +53,7 @@ bool block_adjacent_pixels_to_check(Block_t* block_to_check, Direction_t directi
      case DIRECTION_UP:
      {
           // check left corner
-          Pixel_t pixel = block_to_check->pos.pixel;
+          Pixel_t pixel = block_to_check_pos.pixel;
           pixel.y += TILE_SIZE_IN_PIXELS;
           *a = pixel;
 
@@ -66,6 +68,8 @@ bool block_adjacent_pixels_to_check(Block_t* block_to_check, Direction_t directi
 }
 
 Block_t* block_against_block_in_list(Block_t* block_to_check, Block_t** blocks, S16 block_count, Direction_t direction, Pixel_t* offsets){
+     auto block_to_check_pos = block_to_check->pos + block_to_check->pos_delta;
+
      switch(direction){
      default:
           break;
@@ -74,10 +78,12 @@ Block_t* block_against_block_in_list(Block_t* block_to_check, Block_t** blocks, 
                Block_t* block = blocks[i];
                if(!blocks_at_collidable_height(block_to_check, block)) continue;
 
-               Pixel_t pixel_to_check = block->pos.pixel + offsets[i];
-               if((pixel_to_check.x + TILE_SIZE_IN_PIXELS) == block_to_check->pos.pixel.x &&
-                  pixel_to_check.y >= block_to_check->pos.pixel.y &&
-                  pixel_to_check.y < (block_to_check->pos.pixel.y + TILE_SIZE_IN_PIXELS)){
+               auto block_pos = block->pos + block->pos_delta;
+
+               Pixel_t pixel_to_check = block_pos.pixel + offsets[i];
+               if((pixel_to_check.x + TILE_SIZE_IN_PIXELS) == block_to_check_pos.pixel.x &&
+                  pixel_to_check.y >= block_to_check_pos.pixel.y &&
+                  pixel_to_check.y < (block_to_check_pos.pixel.y + TILE_SIZE_IN_PIXELS)){
                     return block;
                }
           }
@@ -87,10 +93,12 @@ Block_t* block_against_block_in_list(Block_t* block_to_check, Block_t** blocks, 
                Block_t* block = blocks[i];
                if(!blocks_at_collidable_height(block_to_check, block)) continue;
 
-               Pixel_t pixel_to_check = block->pos.pixel + offsets[i];
-               if(pixel_to_check.x == (block_to_check->pos.pixel.x + TILE_SIZE_IN_PIXELS) &&
-                  pixel_to_check.y >= block_to_check->pos.pixel.y &&
-                  pixel_to_check.y < (block_to_check->pos.pixel.y + TILE_SIZE_IN_PIXELS)){
+               auto block_pos = block->pos + block->pos_delta;
+
+               Pixel_t pixel_to_check = block_pos.pixel + offsets[i];
+               if(pixel_to_check.x == (block_to_check_pos.pixel.x + TILE_SIZE_IN_PIXELS) &&
+                  pixel_to_check.y >= block_to_check_pos.pixel.y &&
+                  pixel_to_check.y < (block_to_check_pos.pixel.y + TILE_SIZE_IN_PIXELS)){
                     return block;
                }
           }
@@ -100,10 +108,12 @@ Block_t* block_against_block_in_list(Block_t* block_to_check, Block_t** blocks, 
                Block_t* block = blocks[i];
                if(!blocks_at_collidable_height(block_to_check, block)) continue;
 
-               Pixel_t pixel_to_check = block->pos.pixel + offsets[i];
-               if((pixel_to_check.y + TILE_SIZE_IN_PIXELS) == block_to_check->pos.pixel.y &&
-                  pixel_to_check.x >= block_to_check->pos.pixel.x &&
-                  pixel_to_check.x < (block_to_check->pos.pixel.x + TILE_SIZE_IN_PIXELS)){
+               auto block_pos = block->pos + block->pos_delta;
+
+               Pixel_t pixel_to_check = block_pos.pixel + offsets[i];
+               if((pixel_to_check.y + TILE_SIZE_IN_PIXELS) == block_to_check_pos.pixel.y &&
+                  pixel_to_check.x >= block_to_check_pos.pixel.x &&
+                  pixel_to_check.x < (block_to_check_pos.pixel.x + TILE_SIZE_IN_PIXELS)){
                     return block;
                }
           }
@@ -113,10 +123,12 @@ Block_t* block_against_block_in_list(Block_t* block_to_check, Block_t** blocks, 
                Block_t* block = blocks[i];
                if(!blocks_at_collidable_height(block_to_check, block)) continue;
 
-               Pixel_t pixel_to_check = block->pos.pixel + offsets[i];
-               if(pixel_to_check.y == (block_to_check->pos.pixel.y + TILE_SIZE_IN_PIXELS) &&
-                  pixel_to_check.x >= block_to_check->pos.pixel.x &&
-                  pixel_to_check.x < (block_to_check->pos.pixel.x + TILE_SIZE_IN_PIXELS)){
+               auto block_pos = block->pos + block->pos_delta;
+
+               Pixel_t pixel_to_check = block_pos.pixel + offsets[i];
+               if(pixel_to_check.y == (block_to_check_pos.pixel.y + TILE_SIZE_IN_PIXELS) &&
+                  pixel_to_check.x >= block_to_check_pos.pixel.x &&
+                  pixel_to_check.x < (block_to_check_pos.pixel.x + TILE_SIZE_IN_PIXELS)){
                     return block;
                }
           }
@@ -338,9 +350,10 @@ Tile_t* block_against_solid_tile(Block_t* block_to_check, Direction_t direction,
 
 Block_t* block_held_up_by_another_block(Block_t* block_to_check, QuadTreeNode_t<Block_t>* block_quad_tree){
      // TODO: need more complicated function to detect this
-     Rect_t rect = {block_to_check->pos.pixel.x, block_to_check->pos.pixel.y,
-                    (S16)(block_to_check->pos.pixel.x + BLOCK_SOLID_SIZE_IN_PIXELS),
-                    (S16)(block_to_check->pos.pixel.y + BLOCK_SOLID_SIZE_IN_PIXELS)};
+     auto block_to_check_pos = block_to_check->pos + block_to_check->pos_delta;
+     Rect_t rect = {block_to_check_pos.pixel.x, block_to_check_pos.pixel.y,
+                    (S16)(block_to_check_pos.pixel.x + BLOCK_SOLID_SIZE_IN_PIXELS),
+                    (S16)(block_to_check_pos.pixel.y + BLOCK_SOLID_SIZE_IN_PIXELS)};
      Rect_t surrounding_rect = rect_to_check_surrounding_blocks(block_center_pixel(block_to_check));
      S16 block_count = 0;
      Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
@@ -349,11 +362,12 @@ Block_t* block_held_up_by_another_block(Block_t* block_to_check, QuadTreeNode_t<
      for(S16 i = 0; i < block_count; i++){
           Block_t* block = blocks[i];
           if(block == block_to_check || block->pos.z != held_at_height) continue;
+          auto block_pos = block->pos + block->pos_delta;
 
-          if(pixel_in_rect(block->pos.pixel, rect) ||
-             pixel_in_rect(block_top_left_pixel(block->pos.pixel), rect) ||
-             pixel_in_rect(block_top_right_pixel(block->pos.pixel), rect) ||
-             pixel_in_rect(block_bottom_right_pixel(block->pos.pixel), rect)){
+          if(pixel_in_rect(block_pos.pixel, rect) ||
+             pixel_in_rect(block_top_left_pixel(block_pos.pixel), rect) ||
+             pixel_in_rect(block_top_right_pixel(block_pos.pixel), rect) ||
+             pixel_in_rect(block_bottom_right_pixel(block_pos.pixel), rect)){
                return block;
           }
      }
@@ -363,7 +377,9 @@ Block_t* block_held_up_by_another_block(Block_t* block_to_check, QuadTreeNode_t<
 
 bool block_on_ice(Block_t* block, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree){
      if(block->pos.z == 0){
-          Pixel_t block_pixel_check = block->pos.pixel + Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS};
+          auto block_pos = block->pos + block->pos_delta;
+
+          Pixel_t block_pixel_check = block_pos.pixel + Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS};
 
           // if the block is moving, to the right or up, then check the pixel adjacent to the center in the direction we are moving
           // this will have to change in the future anyway once blocks are no longer square
@@ -399,7 +415,9 @@ void check_block_collision_with_other_blocks(Block_t* block_to_check, World_t* w
          block_inside_result.block && blocks_at_collidable_height(block_to_check, block_inside_result.block);
          block_inside_result = block_inside_another_block(block_to_check, world->block_qt, world->interactive_qt, &world->tilemap, &world->blocks)){
 
-          auto block_center_pixel = block_to_check->pos.pixel + HALF_TILE_SIZE_PIXEL;
+          auto block_to_check_pos = block_to_check->pos + block_to_check->pos_delta;
+
+          auto block_center_pixel = block_to_check_pos.pixel + HALF_TILE_SIZE_PIXEL;
           auto quadrant = relative_quadrant(block_center_pixel, block_inside_result.collision_pos.pixel);
 
           // check if they are on ice before we adjust the position on our block to check
@@ -424,9 +442,7 @@ void check_block_collision_with_other_blocks(Block_t* block_to_check, World_t* w
                     dest_pos.decimal.x = 0;
                     dest_pos.z = block_to_check->pos.z;
 
-                    Position_t new_pos_delta = dest_pos - block_to_check->pos;
-                    block_to_check->pos_delta.x = pos_y_unit(new_pos_delta);
-
+                    block_to_check->pos_delta.x = 0;
                     block_to_check->vel.x = 0.0f;
                     block_to_check->accel.x = 0.0f;
                     block_to_check->horizontal_move.state = MOVE_STATE_IDLING;
@@ -440,9 +456,7 @@ void check_block_collision_with_other_blocks(Block_t* block_to_check, World_t* w
                     dest_pos.decimal.x = 0;
                     dest_pos.z = block_to_check->pos.z;
 
-                    Position_t new_pos_delta = dest_pos - block_to_check->pos;
-                    block_to_check->pos_delta.x = pos_y_unit(new_pos_delta);
-
+                    block_to_check->pos_delta.x = 0;
                     block_to_check->vel.x = 0.0f;
                     block_to_check->accel.x = 0.0f;
                     block_to_check->horizontal_move.state = MOVE_STATE_IDLING;
@@ -456,9 +470,7 @@ void check_block_collision_with_other_blocks(Block_t* block_to_check, World_t* w
                     dest_pos.decimal.y = 0;
                     dest_pos.z = block_to_check->pos.z;
 
-                    Position_t new_pos_delta = dest_pos - block_to_check->pos;
-                    block_to_check->pos_delta.y = pos_y_unit(new_pos_delta);
-
+                    block_to_check->pos_delta.y = 0;
                     block_to_check->vel.y = 0.0f;
                     block_to_check->accel.y = 0.0f;
                     block_to_check->vertical_move.state = MOVE_STATE_IDLING;
@@ -472,9 +484,7 @@ void check_block_collision_with_other_blocks(Block_t* block_to_check, World_t* w
                     dest_pos.decimal.y = 0;
                     dest_pos.z = block_to_check->pos.z;
 
-                    Position_t new_pos_delta = dest_pos - block_to_check->pos;
-                    block_to_check->pos_delta.y = pos_y_unit(new_pos_delta);
-
+                    block_to_check->pos_delta.y = 0;
                     block_to_check->vel.y = 0.0f;
                     block_to_check->accel.y = 0.0f;
                     block_to_check->vertical_move.state = MOVE_STATE_IDLING;

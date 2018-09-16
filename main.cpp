@@ -2689,14 +2689,6 @@ int main(int argc, char** argv){
                draw_text(buffer, text_pos);
 
                glEnd();
-		}else{
-               glBindTexture(GL_TEXTURE_2D, text_texture);
-               glBegin(GL_QUADS);
-               glColor3f(1.0f, 1.0f, 1.0f);
-
-               char buffer[64];
-               snprintf(buffer, 64, "PV: %.4f,%.4f", world.players.elements->pos_delta.x, world.players.elements->pos_delta.y);
-               draw_text(buffer, Vec_t{0.005f, 0.0965f});
           }
 
           if(reset_timer >= 0.0f){
