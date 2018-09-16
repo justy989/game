@@ -1306,9 +1306,11 @@ int main(int argc, char** argv){
                     }
                }
 
-               // TODO: deal with this for multiple players
+               // TODO: deal with all this for multiple players
                bool rotated_move_actions[4];
                for (bool &rotated_move_action : rotated_move_actions) rotated_move_action = false;
+               bool user_stopping_x = false;
+               bool user_stopping_y = false;
 
                // update player
                for(S16 i = 0; i < world.players.count; i++){
@@ -1323,58 +1325,48 @@ int main(int argc, char** argv){
 
                     player->accel = vec_zero();
 
-                    if(rotated_move_actions[DIRECTION_LEFT] && !rotated_move_actions[DIRECTION_RIGHT]){
-                         if(player->horizontal_move.state == MOVE_STATE_IDLING){
-                              player->horizontal_move.distance = 0;
-                              player->horizontal_move.state = MOVE_STATE_STARTING;
-                              if(player->reface) player->face = DIRECTION_LEFT;
-                              player->horizontal_move.sign = MOVE_SIGN_NEGATIVE;
-                         }else if(player->horizontal_move.state == MOVE_STATE_STOPPING){
-                              player->horizontal_move.distance = calc_distance_from_derivatives(player->vel.x, player->accel.x);
-                              player->horizontal_move.state = MOVE_STATE_STARTING;
-                              if(player->reface) player->face = DIRECTION_LEFT;
-                              player->horizontal_move.sign = MOVE_SIGN_NEGATIVE;
+                    if(rotated_move_actions[DIRECTION_RIGHT]){
+                         if(rotated_move_actions[DIRECTION_LEFT]){
+                              user_stopping_x = true;
+
+                              if(player->vel.x > 0){
+                                   player->accel.x -= PLAYER_ACCEL;
+                              }else if(player->vel.x < 0){
+                                   player->accel.x += PLAYER_ACCEL;
+                              }
+                         }else{
+                              player->accel.x += PLAYER_ACCEL;
                          }
+                    }else if(rotated_move_actions[DIRECTION_LEFT]){
+                         player->accel.x -= PLAYER_ACCEL;
+                    }else if(player->vel.x > 0){
+                         user_stopping_x = true;
+                         player->accel.x -= PLAYER_ACCEL;
+                    }else if(player->vel.x < 0){
+                         user_stopping_x = true;
+                         player->accel.x += PLAYER_ACCEL;
                     }
 
-                    if(rotated_move_actions[DIRECTION_RIGHT] && !rotated_move_actions[DIRECTION_LEFT]){
-                         if(player->horizontal_move.state == MOVE_STATE_IDLING){
-                              player->horizontal_move.distance = 0;
-                              player->horizontal_move.sign = MOVE_SIGN_POSITIVE;
-                              player->horizontal_move.state = MOVE_STATE_STARTING;
-                              if(player->reface) player->face = DIRECTION_RIGHT;
-                         }else if(player->horizontal_move.state == MOVE_STATE_STOPPING){
-                              player->horizontal_move.distance = calc_distance_from_derivatives(player->vel.x, player->accel.x);
-                              player->horizontal_move.sign = MOVE_SIGN_POSITIVE;
-                              player->horizontal_move.state = MOVE_STATE_STARTING;
-                              if(player->reface) player->face = DIRECTION_RIGHT;
-                         }
-                    }
+                    if(rotated_move_actions[DIRECTION_UP]){
+                         if(rotated_move_actions[DIRECTION_DOWN]){
+                              user_stopping_y = true;
 
-                    if(rotated_move_actions[DIRECTION_DOWN] && !rotated_move_actions[DIRECTION_UP]){
-                         if(player->vertical_move.state == MOVE_STATE_IDLING){
-                              player->vertical_move.distance = 0;
-                              player->vertical_move.sign = MOVE_SIGN_NEGATIVE;
-                              player->vertical_move.state = MOVE_STATE_STARTING;
-                              if(player->reface) player->face = DIRECTION_DOWN;
-                         }else if(player->horizontal_move.state == MOVE_STATE_STOPPING){
-                              player->horizontal_move.distance = calc_distance_from_derivatives(player->vel.y, player->accel.y);
-                              player->vertical_move.sign = MOVE_SIGN_NEGATIVE;
-                              player->vertical_move.state = MOVE_STATE_STARTING;
-                              if(player->reface) player->face = DIRECTION_DOWN;
+                              if(player->vel.y > 0){
+                                   player->accel.y -= PLAYER_ACCEL;
+                              }else if(player->vel.y < 0){
+                                   player->accel.y += PLAYER_ACCEL;
+                              }
+                         }else{
+                              player->accel.y += PLAYER_ACCEL;
                          }
-                    }
-
-                    if(rotated_move_actions[DIRECTION_UP] && !rotated_move_actions[DIRECTION_DOWN]){
-                         if(player->vertical_move.state == MOVE_STATE_IDLING){
-                              player->vertical_move.distance = 0;
-                         // }else if(player->horizontal_move.state == MOVE_STATE_STOPPING){
-                         //      player->horizontal_move.distance = calc_distance_from_derivatives(player->vel.y, player->accel.y);
-
-                              player->vertical_move.sign = MOVE_SIGN_POSITIVE;
-                              player->vertical_move.state = MOVE_STATE_STARTING;
-                              if(player->reface) player->face = DIRECTION_UP;
-                         }
+                    }else if(rotated_move_actions[DIRECTION_DOWN]){
+                         player->accel.y -= PLAYER_ACCEL;
+                    }else if(player->vel.y > 0){
+                         user_stopping_y = true;
+                         player->accel.y -= PLAYER_ACCEL;
+                    }else if(player->vel.y < 0){
+                         user_stopping_y = true;
+                         player->accel.y += PLAYER_ACCEL;
                     }
 
 #if 0
@@ -1539,29 +1531,69 @@ int main(int argc, char** argv){
 
                     player->prev_vel = player->vel;
 
-                    float player_accel = PLAYER_ACCEL;
-                    if(player->horizontal_move.state >= MOVE_STATE_STARTING &&
-                       player->vertical_move.state >= MOVE_STATE_STARTING){
-                         player_accel *= .70710678f; // sqrt(2) / 2.0;
-                    }
-
-                    player->accel.x = calc_accel_component_move(player->horizontal_move, player_accel);
-                    player->accel.y = calc_accel_component_move(player->vertical_move, player_accel);
-
                     player->pos_delta.x = calc_position_motion(player->vel.x, player->accel.x, dt);
                     player->vel.x = calc_velocity_motion(player->vel.x, player->accel.x, dt);
 
                     player->pos_delta.y = calc_position_motion(player->vel.y, player->accel.y, dt);
                     player->vel.y = calc_velocity_motion(player->vel.y, player->accel.y, dt);
 
-                    update_motion_free_form(&player->horizontal_move, motion_x_component(player),
-                                            rotated_move_actions[DIRECTION_RIGHT], rotated_move_actions[DIRECTION_LEFT],
-                                            dt, PLAYER_ACCEL, PLAYER_ACCEL_DISTANCE);
+                    // handle free form stopping
+                    if(user_stopping_x){
+                         if((player->prev_vel.x > 0 && player->vel.x < 0) ||
+                            (player->prev_vel.x < 0 && player->vel.x > 0)){
+                              float dt_consumed = -player->prev_vel.x / player->accel.x;
 
-                    update_motion_free_form(&player->vertical_move, motion_y_component(player),
-                                            rotated_move_actions[DIRECTION_UP], rotated_move_actions[DIRECTION_DOWN],
-                                            dt, PLAYER_ACCEL, PLAYER_ACCEL_DISTANCE);
+                              player->pos_delta.x = player->prev_vel.x * dt_consumed + 0.5f * player->accel.x * dt_consumed * dt_consumed;
 
+                              player->accel.x = 0;
+                              player->vel.x = 0;
+                              player->prev_vel.x = 0;
+                         }
+                    }
+
+                    if(user_stopping_y){
+                         if((player->prev_vel.y > 0 && player->vel.y < 0) ||
+                            (player->prev_vel.y < 0 && player->vel.y > 0)){
+                              float dt_consumed = -player->prev_vel.y / player->accel.y;
+
+                              player->pos_delta.y = player->prev_vel.y * dt_consumed + 0.5f * player->accel.y * dt_consumed * dt_consumed;
+
+                              player->accel.y = 0;
+                              player->vel.y = 0;
+                              player->prev_vel.y = 0;
+                         }
+                    }
+
+                    if(fabs(player->vel.x) > PLAYER_MAX_VEL){
+                         // vf = v0 + a * dt
+                         // (vf - v0) / a = dt
+                         float max_vel_mag = PLAYER_MAX_VEL;
+                         if(player->vel.x < 0) max_vel_mag = -max_vel_mag;
+                         float dt_consumed = (max_vel_mag - player->prev_vel.x) / player->accel.x;
+                         float dt_leftover = dt - dt_consumed;
+
+                         player->pos_delta.x = player->prev_vel.x * dt + (0.5f * player->accel.x * dt * dt);
+                         player->vel.x = (player->vel.x > 0) ? PLAYER_MAX_VEL : -PLAYER_MAX_VEL;
+
+                         player->pos_delta.x += player->vel.x * dt_leftover;
+                    }
+
+                    if(fabs(player->vel.y) > PLAYER_MAX_VEL){
+                         float max_vel_mag = PLAYER_MAX_VEL;
+                         if(player->vel.y < 0) max_vel_mag = -max_vel_mag;
+                         float dt_consumed = (max_vel_mag - player->prev_vel.y) / player->accel.y;
+                         float dt_leftover = dt - dt_consumed;
+
+                         player->pos_delta.y = player->prev_vel.y * dt + (0.5f * player->accel.y * dt * dt);
+                         player->vel.y = (player->vel.y > 0) ? PLAYER_MAX_VEL : -PLAYER_MAX_VEL;
+
+                         player->pos_delta.y += player->vel.y * dt_leftover;
+                    }
+
+                    float max_pos_delta = PLAYER_MAX_VEL * dt + 0.5f * PLAYER_ACCEL * dt * dt;
+                    if(vec_magnitude(player->pos_delta) > max_pos_delta){
+                         player->pos_delta = vec_normalize(player->pos_delta) * max_pos_delta;
+                    }
                }
 
                // do a collision pass on each block
@@ -2629,32 +2661,10 @@ int main(int argc, char** argv){
           } break;
           }
 
-          // TODO: remove this stuff
-          glBindTexture(GL_TEXTURE_2D, text_texture);
-          glBegin(GL_QUADS);
-          glColor3f(1.0f, 1.0f, 1.0f);
-
-          if(world.players.elements[0].vel.x == 0){
-               draw_text("PX", Vec_t{0.5, 0.5});
-          }
-
-          if(arrows_down[DIRECTION_LEFT]){
-               draw_text("X", Vec_t{0.45f, 0.5f});
-          }
-
-          if(arrows_down[DIRECTION_RIGHT]){
-               draw_text("X", Vec_t{0.55f, 0.5f});
-          }
-
-          if(world.players.elements[0].vel.x == 0 && (arrows_down[DIRECTION_LEFT] || arrows_down[DIRECTION_RIGHT])){
-               draw_text("WAT", Vec_t{0.5f, 0.7f});
-          }
-
-          glEnd();
-
           if(editor.mode){
                glBindTexture(GL_TEXTURE_2D, text_texture);
                glBegin(GL_QUADS);
+               glColor3f(1.0f, 1.0f, 1.0f);
 
                auto mouse_coord = pos_to_coord(mouse_world);
                char buffer[64];
@@ -2682,9 +2692,10 @@ int main(int argc, char** argv){
 		}else{
                glBindTexture(GL_TEXTURE_2D, text_texture);
                glBegin(GL_QUADS);
+               glColor3f(1.0f, 1.0f, 1.0f);
 
                char buffer[64];
-               snprintf(buffer, 64, "PV: %.4f,%.4f", world.players.elements->vel.x, world.players.elements->vel.y);
+               snprintf(buffer, 64, "PV: %.4f,%.4f", world.players.elements->pos_delta.x, world.players.elements->pos_delta.y);
                draw_text(buffer, Vec_t{0.005f, 0.0965f});
           }
 

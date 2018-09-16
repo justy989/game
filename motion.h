@@ -27,7 +27,9 @@ struct Motion_t{
      Vec_t prev_vel;
      Vec_t vel;
      Vec_t accel;
+};
 
+struct GridMotion_t : public Motion_t{
      union{
           S16 started_on_pixel_x;
           F32 padding_2;

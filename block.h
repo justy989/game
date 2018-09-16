@@ -8,7 +8,7 @@
 #include "coord.h"
 #include "rect.h"
 
-struct Block_t : public Motion_t{
+struct Block_t : public GridMotion_t{
      Position_t      pos;
      Element_t       element;
      F32             fall_time;
