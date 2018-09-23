@@ -5,6 +5,7 @@
 #include "utils.h"
 
 #include <float.h>
+#include <ctype.h>
 
 Vec_t theme_frame(S16 x, S16 y){
      y = (THEME_FRAMES_TALL - (S16)(1)) - y;
@@ -465,3 +466,45 @@ void draw_solids(Vec_t pos, Interactive_t* interactive, Block_t** blocks, S16 bl
      }
 }
 
+void draw_text(const char* message, Vec_t pos)
+{
+     char c;
+     Vec_t dimensions {TEXT_CHAR_WIDTH, TEXT_CHAR_HEIGHT};
+     Vec_t tex {};
+     Vec_t tex_dimensions {TEXT_CHAR_TEX_WIDTH, TEXT_CHAR_TEX_HEIGHT};
+
+     while((c = *message)){
+          if(isalpha(c)){
+               tex.x = (F32)((c - 'A')) * TEXT_CHAR_TEX_WIDTH;
+          }else if(isdigit(c)){
+               tex.x = (F32)((c - '0') + ('Z' - 'A') + 1) * TEXT_CHAR_TEX_WIDTH;
+          }else if(c == ':'){
+               tex.x = 36.0f * TEXT_CHAR_TEX_WIDTH;
+          }else if(c == '.'){
+               tex.x = 37.0f * TEXT_CHAR_TEX_WIDTH;
+          }else if(c == ','){
+               tex.x = 38.0f * TEXT_CHAR_TEX_WIDTH;
+          }else if(c == '+'){
+               tex.x = 39.0f * TEXT_CHAR_TEX_WIDTH;
+          }else if(c == '?'){
+               tex.x = 40.0f * TEXT_CHAR_TEX_WIDTH;
+          }else if(c == '!'){
+               tex.x = 41.0f * TEXT_CHAR_TEX_WIDTH;
+          }else if(c == '\''){
+               tex.x = 42.0f * TEXT_CHAR_TEX_WIDTH;
+          }else if(c == '*'){
+               tex.x = 43.0f * TEXT_CHAR_TEX_WIDTH;
+          }else if(c == '/'){
+               tex.x = 44.0f * TEXT_CHAR_TEX_WIDTH;
+          }else if(c == '-'){
+               tex.x = 45.0f * TEXT_CHAR_TEX_WIDTH;
+          }else{
+               tex.x = 1.0f - TEXT_CHAR_TEX_WIDTH;
+          }
+
+          draw_screen_texture(pos, tex, dimensions, tex_dimensions);
+
+          pos.x += TEXT_CHAR_WIDTH + TEXT_CHAR_SPACING;
+          message++;
+     }
+}

@@ -50,56 +50,6 @@ NOTES:
 #include "collision.h"
 #include "world.h"
 
-
-#define TEXT_CHAR_WIDTH (5.0f * PIXEL_SIZE)
-#define TEXT_CHAR_HEIGHT (8.0f * PIXEL_SIZE)
-#define TEXT_CHAR_SPACING (1.0f * PIXEL_SIZE)
-#define TEXT_CHAR_TEX_WIDTH 0.01953125f
-#define TEXT_CHAR_TEX_HEIGHT 1.0f
-
-void draw_text(const char* message, Vec_t pos)
-{
-     char c;
-     Vec_t dimensions {TEXT_CHAR_WIDTH, TEXT_CHAR_HEIGHT};
-     Vec_t tex {};
-     Vec_t tex_dimensions {TEXT_CHAR_TEX_WIDTH, TEXT_CHAR_TEX_HEIGHT};
-
-     while((c = *message)){
-          if(isalpha(c)){
-               tex.x = (F32)((c - 'A')) * TEXT_CHAR_TEX_WIDTH;
-          }else if(isdigit(c)){
-               tex.x = (F32)((c - '0') + ('Z' - 'A') + 1) * TEXT_CHAR_TEX_WIDTH;
-          }else if(c == ':'){
-               tex.x = 36.0f * TEXT_CHAR_TEX_WIDTH;
-          }else if(c == '.'){
-               tex.x = 37.0f * TEXT_CHAR_TEX_WIDTH;
-          }else if(c == ','){
-               tex.x = 38.0f * TEXT_CHAR_TEX_WIDTH;
-          }else if(c == '+'){
-               tex.x = 39.0f * TEXT_CHAR_TEX_WIDTH;
-          }else if(c == '?'){
-               tex.x = 40.0f * TEXT_CHAR_TEX_WIDTH;
-          }else if(c == '!'){
-               tex.x = 41.0f * TEXT_CHAR_TEX_WIDTH;
-          }else if(c == '\''){
-               tex.x = 42.0f * TEXT_CHAR_TEX_WIDTH;
-          }else if(c == '*'){
-               tex.x = 43.0f * TEXT_CHAR_TEX_WIDTH;
-          }else if(c == '/'){
-               tex.x = 44.0f * TEXT_CHAR_TEX_WIDTH;
-          }else if(c == '-'){
-               tex.x = 45.0f * TEXT_CHAR_TEX_WIDTH;
-          }else{
-               tex.x = 1.0f - TEXT_CHAR_TEX_WIDTH;
-          }
-
-          draw_screen_texture(pos, tex, dimensions, tex_dimensions);
-
-          pos.x += TEXT_CHAR_WIDTH + TEXT_CHAR_SPACING;
-          message++;
-     }
-}
-
 // #define BLOCKS_SQUISH_PLAYER
 
 FILE* load_demo_number(S32 map_number, const char** demo_filepath){
@@ -1529,6 +1479,8 @@ int main(int argc, char** argv){
                for(S16 i = 0; i < world.players.count; i++){
                     Player_t* player = world.players.elements + i;
 
+                    player->pushing_block = -1;
+
                     player->prev_vel = player->vel;
 
                     player->pos_delta.x = calc_position_motion(player->vel.x, player->accel.x, dt);
@@ -1590,350 +1542,529 @@ int main(int argc, char** argv){
                          player->pos_delta.y += player->vel.y * dt_leftover;
                     }
 
+                    // limit the max velocity and normalize the vector
                     float max_pos_delta = PLAYER_MAX_VEL * dt + 0.5f * PLAYER_ACCEL * dt * dt;
                     if(vec_magnitude(player->pos_delta) > max_pos_delta){
                          player->pos_delta = vec_normalize(player->pos_delta) * max_pos_delta;
                     }
                }
 
-               // do a collision pass on each block
-               S16 update_blocks_count = world.blocks.count;
-               for(S16 i = 0; i < update_blocks_count; i++){
-                    Block_t* block = world.blocks.elements + i;
+               // unbounded collision: this should be exciting
+               // we have our initial position and our initial pos_delta, update pos_delta for all players and blocks until nothing is colliding anymore
+               bool collided = true;
+               while(collided){
+                    collided = false;
 
-                    bool stop_on_boundary_x = false;
-                    bool stop_on_boundary_y = false;
-                    bool held_up = false;
+                    // do a collision pass on each block
+                    S16 update_blocks_count = world.blocks.count;
+                    for(S16 i = 0; i < update_blocks_count; i++){
+                         Block_t* block = world.blocks.elements + i;
 
-                    Vec_t pos_delta = block->pos_delta;
+                         bool stop_on_boundary_x = false;
+                         bool stop_on_boundary_y = false;
+                         bool held_up = false;
 
-                    if(pos_delta.x != 0.0f || pos_delta.y != 0.0f){
-                         check_block_collision_with_other_blocks(block, &world);
-                    }
-
-                    // get the current coord of the center of the block
-                    Pixel_t center = block->pos.pixel + HALF_TILE_SIZE_PIXEL;
-                    Coord_t coord = pixel_to_coord(center);
-
-                    Coord_t skip_coord[DIRECTION_COUNT];
-                    find_portal_adjacents_to_skip_collision_check(coord, world.interactive_qt, skip_coord);
-
-                    // check for adjacent walls
-                    if(block->vel.x > 0.0f){
-                         Pixel_t pixel_a {};
-                         Pixel_t pixel_b {};
-                         block_adjacent_pixels_to_check(block, DIRECTION_RIGHT, &pixel_a, &pixel_b);
-                         Coord_t coord_a = pixel_to_coord(pixel_a);
-                         Coord_t coord_b = pixel_to_coord(pixel_b);
-                         if(coord_a != skip_coord[DIRECTION_RIGHT] && tilemap_is_solid(&world.tilemap, coord_a)){
-                              stop_on_boundary_x = true;
-                         }else if(coord_b != skip_coord[DIRECTION_RIGHT] && tilemap_is_solid(&world.tilemap, coord_b)){
-                              stop_on_boundary_x = true;
-                         }else{
-                              stop_on_boundary_x = quad_tree_interactive_solid_at(world.interactive_qt, &world.tilemap, coord_a) ||
-                                                   quad_tree_interactive_solid_at(world.interactive_qt, &world.tilemap, coord_b);
-                         }
-                    }else if(block->vel.x < 0.0f){
-                         Pixel_t pixel_a {};
-                         Pixel_t pixel_b {};
-                         block_adjacent_pixels_to_check(block, DIRECTION_LEFT, &pixel_a, &pixel_b);
-                         Coord_t coord_a = pixel_to_coord(pixel_a);
-                         Coord_t coord_b = pixel_to_coord(pixel_b);
-                         if(coord_a != skip_coord[DIRECTION_LEFT] && tilemap_is_solid(&world.tilemap, coord_a)){
-                              stop_on_boundary_x = true;
-                         }else if(coord_b != skip_coord[DIRECTION_LEFT] && tilemap_is_solid(&world.tilemap, coord_b)){
-                              stop_on_boundary_x = true;
-                         }else{
-                              stop_on_boundary_x = quad_tree_interactive_solid_at(world.interactive_qt, &world.tilemap, coord_a) ||
-                                                   quad_tree_interactive_solid_at(world.interactive_qt, &world.tilemap, coord_b);
-                         }
-                    }
-
-                    if(block->vel.y > 0.0f){
-                         Pixel_t pixel_a {};
-                         Pixel_t pixel_b {};
-                         block_adjacent_pixels_to_check(block, DIRECTION_UP, &pixel_a, &pixel_b);
-                         Coord_t coord_a = pixel_to_coord(pixel_a);
-                         Coord_t coord_b = pixel_to_coord(pixel_b);
-                         if(coord_a != skip_coord[DIRECTION_UP] && tilemap_is_solid(&world.tilemap, coord_a)){
-                              stop_on_boundary_y = true;
-                         }else if(coord_b != skip_coord[DIRECTION_UP] && tilemap_is_solid(&world.tilemap, coord_b)){
-                              stop_on_boundary_y = true;
-                         }else{
-                              stop_on_boundary_y = quad_tree_interactive_solid_at(world.interactive_qt, &world.tilemap, coord_a) ||
-                                                   quad_tree_interactive_solid_at(world.interactive_qt, &world.tilemap, coord_b);
-                         }
-                    }else if(block->vel.y < 0.0f){
-                         Pixel_t pixel_a {};
-                         Pixel_t pixel_b {};
-                         block_adjacent_pixels_to_check(block, DIRECTION_DOWN, &pixel_a, &pixel_b);
-                         Coord_t coord_a = pixel_to_coord(pixel_a);
-                         Coord_t coord_b = pixel_to_coord(pixel_b);
-                         if(coord_a != skip_coord[DIRECTION_DOWN] && tilemap_is_solid(&world.tilemap, coord_a)){
-                              stop_on_boundary_y = true;
-                         }else if(coord_b != skip_coord[DIRECTION_DOWN] && tilemap_is_solid(&world.tilemap, coord_b)){
-                              stop_on_boundary_y = true;
-                         }else{
-                              stop_on_boundary_y = quad_tree_interactive_solid_at(world.interactive_qt, &world.tilemap, coord_a) ||
-                                                   quad_tree_interactive_solid_at(world.interactive_qt, &world.tilemap, coord_b);
-                         }
-                    }
-
-                    // TODO: I think we may want to keep track of more of these and resolve multiple directions as well?
-                    // used to make sure the pushing is smooth on the entangled block as well
-                    Block_t* entangled_block_pushed = nullptr;
-                    Direction_t entangled_block_pushed_dir = DIRECTION_COUNT;
-                    Block_t* block_pushed = nullptr;
-
-                    for(S16 p = 0; p < world.players.count; p++){
-                         Player_t* player = world.players.elements + p;
-                         if(player->pushing_block >= 0){
-                              block_pushed = world.blocks.elements + player->pushing_block;
-                              if(block_pushed && block_pushed->entangle_index >= 0 && block_pushed->entangle_index < world.blocks.count){
-                                   entangled_block_pushed = world.blocks.elements + block_pushed->entangle_index;
-                                   entangled_block_pushed_dir = player->pushing_block_dir;
+                         if(block->pos_delta.x != 0.0f || block->pos_delta.y != 0.0f){
+                              if(check_block_collision_with_other_blocks(block, &world)){
+                                   collided = true;
                               }
                          }
-                    }
 
-                    // this instance of last_block_pushed is to keep the pushing smooth and not have it stop at the tile boundaries
-                    if(block != block_pushed && !block_on_ice(block, &world.tilemap, world.interactive_qt)){
-                         if(block == entangled_block_pushed){
-                              // TODO: take into account block rotation
-                              DirectionMask_t vel_mask = vec_direction_mask(block->vel);
-                              switch(entangled_block_pushed_dir){
-                              default:
-                                   break;
-                              case DIRECTION_LEFT:
-                                   if(vel_mask & DIRECTION_MASK_RIGHT){
-                                        stop_on_boundary_x = true;
-                                   }else if(vel_mask & DIRECTION_MASK_UP || vel_mask & DIRECTION_MASK_DOWN){
-                                        stop_on_boundary_y = true;
-                                   }
-                                   break;
-                              case DIRECTION_RIGHT:
-                                   if(vel_mask & DIRECTION_MASK_LEFT){
-                                        stop_on_boundary_x = true;
-                                   }else if(vel_mask & DIRECTION_MASK_UP || vel_mask & DIRECTION_MASK_DOWN){
-                                        stop_on_boundary_y = true;
-                                   }
-                                   break;
-                              case DIRECTION_UP:
-                                   if(vel_mask & DIRECTION_MASK_DOWN){
-                                        stop_on_boundary_y = true;
-                                   }else if(vel_mask & DIRECTION_MASK_LEFT || vel_mask & DIRECTION_MASK_RIGHT){
-                                        stop_on_boundary_x = true;
-                                   }
-                                   break;
-                              case DIRECTION_DOWN:
-                                   if(vel_mask & DIRECTION_MASK_UP){
-                                        stop_on_boundary_y = true;
-                                   }else if(vel_mask & DIRECTION_MASK_LEFT || vel_mask & DIRECTION_MASK_RIGHT){
-                                        stop_on_boundary_x = true;
-                                   }
-                                   break;
+                         // get the current coord of the center of the block
+                         Pixel_t center = block->pos.pixel + HALF_TILE_SIZE_PIXEL;
+                         Coord_t coord = pixel_to_coord(center);
+
+                         Coord_t skip_coord[DIRECTION_COUNT];
+                         find_portal_adjacents_to_skip_collision_check(coord, world.interactive_qt, skip_coord);
+
+                         // check for adjacent walls
+                         if(block->vel.x > 0.0f){
+                              Pixel_t pixel_a {};
+                              Pixel_t pixel_b {};
+                              block_adjacent_pixels_to_check(block, DIRECTION_RIGHT, &pixel_a, &pixel_b);
+                              Coord_t coord_a = pixel_to_coord(pixel_a);
+                              Coord_t coord_b = pixel_to_coord(pixel_b);
+                              if(coord_a != skip_coord[DIRECTION_RIGHT] && tilemap_is_solid(&world.tilemap, coord_a)){
+                                   stop_on_boundary_x = true;
+                              }else if(coord_b != skip_coord[DIRECTION_RIGHT] && tilemap_is_solid(&world.tilemap, coord_b)){
+                                   stop_on_boundary_x = true;
+                              }else{
+                                   stop_on_boundary_x = quad_tree_interactive_solid_at(world.interactive_qt, &world.tilemap, coord_a) ||
+                                                        quad_tree_interactive_solid_at(world.interactive_qt, &world.tilemap, coord_b);
                               }
-                         }else{
-                              stop_on_boundary_x = true;
-                              stop_on_boundary_y = true;
-                         }
-                    }
-
-                    auto final_pos = block->pos + pos_delta;
-
-                    if(stop_on_boundary_x){
-                         // stop on tile boundaries separately for each axis
-                         S16 boundary_x = range_passes_tile_boundary(block->pos.pixel.x, final_pos.pixel.x, block->started_on_pixel_x);
-                         if(boundary_x){
-                              final_pos.pixel.x = boundary_x;
-                              final_pos.decimal.x = 0.0;
-                              block->accel.x = 0.0;
-                              block->vel.x = 0.0;
-                              block->horizontal_move.state = MOVE_STATE_IDLING;
-                         }
-                    }
-
-                    if(stop_on_boundary_y){
-                         S16 boundary_y = range_passes_tile_boundary(block->pos.pixel.y, final_pos.pixel.y, block->started_on_pixel_y);
-                         if(boundary_y){
-                              final_pos.pixel.y = boundary_y;
-                              final_pos.decimal.y = 0.0;
-                              block->accel.y = 0.0;
-                              block->vel.y = 0.0;
-                              block->vertical_move.state = MOVE_STATE_IDLING;
-                         }
-                    }
-
-                    held_up = block_held_up_by_another_block(block, world.block_qt);
-
-                    // TODO: should we care about the decimal component of the position ?
-                    auto* interactive = quad_tree_interactive_find_at(world.interactive_qt, coord);
-                    if(interactive){
-                         if(interactive->type == INTERACTIVE_TYPE_POPUP){
-                              if(block->pos.z == interactive->popup.lift.ticks - 2){
-                                   block->pos.z++;
-                                   held_up = true;
-                              }else if(block->pos.z > (interactive->popup.lift.ticks - 1)){
-                                   block->fall_time += dt;
-                                   if(block->fall_time >= FALL_TIME){
-                                        block->fall_time -= FALL_TIME;
-                                        block->pos.z--;
-                                   }
-                                   held_up = true;
-                              }else if(block->pos.z == (interactive->popup.lift.ticks - 1)){
-                                   held_up = true;
+                         }else if(block->vel.x < 0.0f){
+                              Pixel_t pixel_a {};
+                              Pixel_t pixel_b {};
+                              block_adjacent_pixels_to_check(block, DIRECTION_LEFT, &pixel_a, &pixel_b);
+                              Coord_t coord_a = pixel_to_coord(pixel_a);
+                              Coord_t coord_b = pixel_to_coord(pixel_b);
+                              if(coord_a != skip_coord[DIRECTION_LEFT] && tilemap_is_solid(&world.tilemap, coord_a)){
+                                   stop_on_boundary_x = true;
+                              }else if(coord_b != skip_coord[DIRECTION_LEFT] && tilemap_is_solid(&world.tilemap, coord_b)){
+                                   stop_on_boundary_x = true;
+                              }else{
+                                   stop_on_boundary_x = quad_tree_interactive_solid_at(world.interactive_qt, &world.tilemap, coord_a) ||
+                                                        quad_tree_interactive_solid_at(world.interactive_qt, &world.tilemap, coord_b);
                               }
                          }
-                    }
 
-                    if(!held_up && block->pos.z > 0){
-                         block->fall_time += dt;
-                         if(block->fall_time >= FALL_TIME){
-                              block->fall_time -= FALL_TIME;
-                              block->pos.z--;
+                         if(block->vel.y > 0.0f){
+                              Pixel_t pixel_a {};
+                              Pixel_t pixel_b {};
+                              block_adjacent_pixels_to_check(block, DIRECTION_UP, &pixel_a, &pixel_b);
+                              Coord_t coord_a = pixel_to_coord(pixel_a);
+                              Coord_t coord_b = pixel_to_coord(pixel_b);
+                              if(coord_a != skip_coord[DIRECTION_UP] && tilemap_is_solid(&world.tilemap, coord_a)){
+                                   stop_on_boundary_y = true;
+                              }else if(coord_b != skip_coord[DIRECTION_UP] && tilemap_is_solid(&world.tilemap, coord_b)){
+                                   stop_on_boundary_y = true;
+                              }else{
+                                   stop_on_boundary_y = quad_tree_interactive_solid_at(world.interactive_qt, &world.tilemap, coord_a) ||
+                                                        quad_tree_interactive_solid_at(world.interactive_qt, &world.tilemap, coord_b);
+                              }
+                         }else if(block->vel.y < 0.0f){
+                              Pixel_t pixel_a {};
+                              Pixel_t pixel_b {};
+                              block_adjacent_pixels_to_check(block, DIRECTION_DOWN, &pixel_a, &pixel_b);
+                              Coord_t coord_a = pixel_to_coord(pixel_a);
+                              Coord_t coord_b = pixel_to_coord(pixel_b);
+                              if(coord_a != skip_coord[DIRECTION_DOWN] && tilemap_is_solid(&world.tilemap, coord_a)){
+                                   stop_on_boundary_y = true;
+                              }else if(coord_b != skip_coord[DIRECTION_DOWN] && tilemap_is_solid(&world.tilemap, coord_b)){
+                                   stop_on_boundary_y = true;
+                              }else{
+                                   stop_on_boundary_y = quad_tree_interactive_solid_at(world.interactive_qt, &world.tilemap, coord_a) ||
+                                                        quad_tree_interactive_solid_at(world.interactive_qt, &world.tilemap, coord_b);
+                              }
                          }
-                    }
 
-                    // Position_t final_pos = block->pos + block->pos_delta;
-                    coord = pixel_to_coord(final_pos.pixel + HALF_TILE_SIZE_PIXEL);
-                    Coord_t premove_coord = pixel_to_coord(block->pos.pixel + HALF_TILE_SIZE_PIXEL);
+                         // TODO: I think we may want to keep track of more of these and resolve multiple directions as well?
+                         // used to make sure the pushing is smooth on the entangled block as well
+                         Block_t* entangled_block_pushed = nullptr;
+                         Direction_t entangled_block_pushed_dir = DIRECTION_COUNT;
+                         Block_t* block_pushed = nullptr;
 
-                    Position_t block_center = block->pos;
-                    block_center.pixel += HALF_TILE_SIZE_PIXEL;
+                         for(S16 p = 0; p < world.players.count; p++){
+                              Player_t* player = world.players.elements + p;
+                              if(player->pushing_block >= 0){
+                                   block_pushed = world.blocks.elements + player->pushing_block;
+                                   if(block_pushed && block_pushed->entangle_index >= 0 && block_pushed->entangle_index < world.blocks.count){
+                                        entangled_block_pushed = world.blocks.elements + block_pushed->entangle_index;
+                                        entangled_block_pushed_dir = player->pushing_block_dir;
+                                   }
+                              }
+                         }
 
-                    auto teleport_result = teleport_position_across_portal(block_center, Vec_t{}, &world, premove_coord,
-                                                                           coord);
-                    if(teleport_result.count > block->clone_id){
-                         block->pos = teleport_result.results[block->clone_id].pos;
-                         block->pos.pixel -= HALF_TILE_SIZE_PIXEL;
+                         // this instance of last_block_pushed is to keep the pushing smooth and not have it stop at the tile boundaries
+                         if(block != block_pushed && !block_on_ice(block, &world.tilemap, world.interactive_qt)){
+                              if(block == entangled_block_pushed){
+                                   // TODO: take into account block rotation
+                                   DirectionMask_t vel_mask = vec_direction_mask(block->vel);
+                                   switch(entangled_block_pushed_dir){
+                                   default:
+                                        break;
+                                   case DIRECTION_LEFT:
+                                        if(vel_mask & DIRECTION_MASK_RIGHT){
+                                             stop_on_boundary_x = true;
+                                        }else if(vel_mask & DIRECTION_MASK_UP || vel_mask & DIRECTION_MASK_DOWN){
+                                             stop_on_boundary_y = true;
+                                        }
+                                        break;
+                                   case DIRECTION_RIGHT:
+                                        if(vel_mask & DIRECTION_MASK_LEFT){
+                                             stop_on_boundary_x = true;
+                                        }else if(vel_mask & DIRECTION_MASK_UP || vel_mask & DIRECTION_MASK_DOWN){
+                                             stop_on_boundary_y = true;
+                                        }
+                                        break;
+                                   case DIRECTION_UP:
+                                        if(vel_mask & DIRECTION_MASK_DOWN){
+                                             stop_on_boundary_y = true;
+                                        }else if(vel_mask & DIRECTION_MASK_LEFT || vel_mask & DIRECTION_MASK_RIGHT){
+                                             stop_on_boundary_x = true;
+                                        }
+                                        break;
+                                   case DIRECTION_DOWN:
+                                        if(vel_mask & DIRECTION_MASK_UP){
+                                             stop_on_boundary_y = true;
+                                        }else if(vel_mask & DIRECTION_MASK_LEFT || vel_mask & DIRECTION_MASK_RIGHT){
+                                             stop_on_boundary_x = true;
+                                        }
+                                        break;
+                                   }
+                              }else{
+                                   if(block->vel.x != 0) stop_on_boundary_x = true;
+                                   if(block->vel.y != 0) stop_on_boundary_y = true;
+                              }
+                         }
 
-                         block->vel = vec_rotate_quadrants_clockwise(block->vel, teleport_result.results[block->clone_id].rotations);
-                         block->accel = vec_rotate_quadrants_clockwise(block->accel, teleport_result.results[block->clone_id].rotations);
-                         block->rotation = teleport_result.results[block->clone_id].rotations;
+                         auto final_pos = block->pos + block->pos_delta;
 
-                         check_block_collision_with_other_blocks(block, &world);
+                         if(stop_on_boundary_x){
+                              // stop on tile boundaries separately for each axis
+                              S16 boundary_x = range_passes_tile_boundary(block->pos.pixel.x, final_pos.pixel.x, block->started_on_pixel_x);
+                              if(boundary_x){
+                                   collided = true;
 
-                         // try teleporting if we collided with a block
-                         premove_coord = pixel_to_coord(block_center.pixel + HALF_TILE_SIZE_PIXEL);
-                         coord = pixel_to_coord(block->pos.pixel + HALF_TILE_SIZE_PIXEL);
+                                   block->stop_on_pixel_x = boundary_x;
+                                   block->accel.x = 0;
+                                   block->vel.x = 0;
+                                   block->pos_delta.x = 0;
+                                   block->horizontal_move.state = MOVE_STATE_IDLING;
+                              }
+                         }
 
-                         block_center = block_get_center(block);
+                         if(stop_on_boundary_y){
+                              S16 boundary_y = range_passes_tile_boundary(block->pos.pixel.y, final_pos.pixel.y, block->started_on_pixel_y);
+                              if(boundary_y){
+                                   collided = true;
 
-                         auto collided_teleport_result = teleport_position_across_portal(block_center, Vec_t{}, &world,
-                                                                                         premove_coord, coord);
-                         if(collided_teleport_result.count > block->clone_id){
-                              block->pos = collided_teleport_result.results[block->clone_id].pos;
+                                   block->stop_on_pixel_y = boundary_y;
+                                   block->accel.y = 0;
+                                   block->vel.y = 0;
+                                   block->pos_delta.y = 0;
+                                   block->vertical_move.state = MOVE_STATE_IDLING;
+                              }
+                         }
+
+                         held_up = block_held_up_by_another_block(block, world.block_qt);
+
+                         // TODO: should we care about the decimal component of the position ?
+                         auto* interactive = quad_tree_interactive_find_at(world.interactive_qt, coord);
+                         if(interactive){
+                              if(interactive->type == INTERACTIVE_TYPE_POPUP){
+                                   if(block->pos.z == interactive->popup.lift.ticks - 2){
+                                        block->pos.z++;
+                                        held_up = true;
+                                   }else if(block->pos.z > (interactive->popup.lift.ticks - 1)){
+                                        block->fall_time += dt;
+                                        if(block->fall_time >= FALL_TIME){
+                                             block->fall_time -= FALL_TIME;
+                                             block->pos.z--;
+                                        }
+                                        held_up = true;
+                                   }else if(block->pos.z == (interactive->popup.lift.ticks - 1)){
+                                        held_up = true;
+                                   }
+                              }
+                         }
+
+                         if(!held_up && block->pos.z > 0){
+                              block->fall_time += dt;
+                              if(block->fall_time >= FALL_TIME){
+                                   block->fall_time -= FALL_TIME;
+                                   block->pos.z--;
+                              }
+                         }
+
+                         // Position_t final_pos = block->pos + block->pos_delta;
+                         coord = pixel_to_coord(final_pos.pixel + HALF_TILE_SIZE_PIXEL);
+                         Coord_t premove_coord = pixel_to_coord(block->pos.pixel + HALF_TILE_SIZE_PIXEL);
+
+                         Position_t block_center = block->pos + block->pos_delta;
+                         block_center.pixel += HALF_TILE_SIZE_PIXEL;
+
+                         auto teleport_result = teleport_position_across_portal(block_center, Vec_t{}, &world, premove_coord,
+                                                                                coord);
+                         if(teleport_result.count > block->clone_id){
+                              block->pos = teleport_result.results[block->clone_id].pos;
                               block->pos.pixel -= HALF_TILE_SIZE_PIXEL;
 
-                              block->vel = vec_rotate_quadrants_clockwise(block->vel, collided_teleport_result.results[block->clone_id].rotations);
-                              block->accel = vec_rotate_quadrants_clockwise(block->accel, collided_teleport_result.results[block->clone_id].rotations);
-                              block->rotation = collided_teleport_result.results[block->clone_id].rotations;
+                              block->vel = vec_rotate_quadrants_clockwise(block->vel, teleport_result.results[block->clone_id].rotations);
+                              block->accel = vec_rotate_quadrants_clockwise(block->accel, teleport_result.results[block->clone_id].rotations);
+                              block->rotation = teleport_result.results[block->clone_id].rotations;
+
+                              if(check_block_collision_with_other_blocks(block, &world)){
+                                   collided = true;
+                              }
+
+                              // try teleporting if we collided with a block
+                              premove_coord = pixel_to_coord(block_center.pixel + HALF_TILE_SIZE_PIXEL);
+                              coord = pixel_to_coord(block->pos.pixel + HALF_TILE_SIZE_PIXEL);
+
+                              block_center = block_get_center(block);
+
+                              auto collided_teleport_result = teleport_position_across_portal(block_center, Vec_t{}, &world,
+                                                                                              premove_coord, coord);
+                              if(collided_teleport_result.count > block->clone_id){
+                                   block->pos = collided_teleport_result.results[block->clone_id].pos;
+                                   block->pos.pixel -= HALF_TILE_SIZE_PIXEL;
+
+                                   block->vel = vec_rotate_quadrants_clockwise(block->vel, collided_teleport_result.results[block->clone_id].rotations);
+                                   block->accel = vec_rotate_quadrants_clockwise(block->accel, collided_teleport_result.results[block->clone_id].rotations);
+                                   block->rotation = collided_teleport_result.results[block->clone_id].rotations;
+                              }
                          }
-                    }
 
-                    auto* portal = block_is_teleporting(block, world.interactive_qt);
+                         auto* portal = block_is_teleporting(block, world.interactive_qt);
 
-                    // is the block teleporting and it hasn't been cloning ?
-                    if(portal && block->clone_start.x == 0){
-                         // at the first instant of the block teleporting, check if we should create an entangled_block
+                         // is the block teleporting and it hasn't been cloning ?
+                         if(portal && block->clone_start.x == 0){
+                              // at the first instant of the block teleporting, check if we should create an entangled_block
 
-                         PortalExit_t portal_exits = find_portal_exits(portal->coord, &world.tilemap, world.interactive_qt);
-                         S8 clone_id = 0;
-                         for (auto &direction : portal_exits.directions) {
-                              for(int p = 0; p < direction.count; p++){
-                                   if(direction.coords[p] == portal->coord) continue;
+                              PortalExit_t portal_exits = find_portal_exits(portal->coord, &world.tilemap, world.interactive_qt);
+                              S8 clone_id = 0;
+                              for (auto &direction : portal_exits.directions) {
+                                   for(int p = 0; p < direction.count; p++){
+                                        if(direction.coords[p] == portal->coord) continue;
 
-                                   if(clone_id == 0){
-                                        block->clone_id = clone_id;
-                                   }else{
-                                        S16 new_block_index = world.blocks.count;
-                                        S16 old_block_index = (S16)(block - world.blocks.elements);
+                                        if(clone_id == 0){
+                                             block->clone_id = clone_id;
+                                        }else{
+                                             S16 new_block_index = world.blocks.count;
+                                             S16 old_block_index = (S16)(block - world.blocks.elements);
 
-                                        if(resize(&world.blocks, world.blocks.count + (S16)(1))){
-                                             // update quad tree now that we have resized the world
-                                             quad_tree_free(world.block_qt);
-                                             world.block_qt = quad_tree_build(&world.blocks);
+                                             if(resize(&world.blocks, world.blocks.count + (S16)(1))){
+                                                  // update quad tree now that we have resized the world
+                                                  quad_tree_free(world.block_qt);
+                                                  world.block_qt = quad_tree_build(&world.blocks);
 
-                                             // a resize will kill our block ptr, so we gotta update it
-                                             block = world.blocks.elements + old_block_index;
-                                             block->clone_start = portal->coord;
+                                                  // a resize will kill our block ptr, so we gotta update it
+                                                  block = world.blocks.elements + old_block_index;
+                                                  block->clone_start = portal->coord;
 
-                                             Block_t* entangled_block = world.blocks.elements + new_block_index;
+                                                  Block_t* entangled_block = world.blocks.elements + new_block_index;
 
-                                             *entangled_block = *block;
-                                             entangled_block->clone_id = clone_id;
+                                                  *entangled_block = *block;
+                                                  entangled_block->clone_id = clone_id;
 
-                                             // the magic
-                                             entangled_block->entangle_index = old_block_index;
-                                             block->entangle_index = new_block_index;
+                                                  // the magic
+                                                  entangled_block->entangle_index = old_block_index;
+                                                  block->entangle_index = new_block_index;
+                                             }
+                                        }
+
+                                        clone_id++;
+                                   }
+                              }
+
+                         // if we didn't find a portal but we have been cloning, we are done cloning! We either need to kill the clone or complete it
+                         }else if(!portal && block->clone_start.x > 0 &&
+                                  block->entangle_index < world.blocks.count){
+                              // TODO: do we need to update the block quad tree here?
+                              auto block_move_dir = vec_direction(block->pos_delta);
+                              auto block_from_coord = block_get_coord(block) - block_move_dir;
+                              if(block_from_coord == block->clone_start){
+                                   // in this instance, despawn the clone
+                                   // NOTE: I think this relies on new entangle blocks being
+                                   S16 block_index = (S16)(block - world.blocks.elements);
+                                   remove(&world.blocks, block->entangle_index);
+
+                                   // TODO: This could lead to a subtle bug where our block index is no longer correct
+                                   // TODO: because this was the last index in the list which got swapped to our index
+                                   // update ptr since we could have resized
+                                   block = world.blocks.elements + block_index;
+
+                                   update_blocks_count--;
+
+                                   // if our entangled block was not the last element, then it was replaced by another
+                                   if(block->entangle_index < world.blocks.count){
+                                        Block_t* replaced_block = world.blocks.elements + block->entangle_index;
+                                        if(replaced_block->entangle_index >= 0){
+                                             // update the block's entangler that moved into our entangled blocks spot
+                                             Block_t* replaced_block_entangler = world.blocks.elements + replaced_block->entangle_index;
+                                             replaced_block_entangler->entangle_index = (S16)(replaced_block - world.blocks.elements);
                                         }
                                    }
 
-                                   clone_id++;
-                              }
-                         }
+                                   block->entangle_index = -1;
+                              }else{
+                                   assert(block->entangle_index >= 0);
 
-                    // if we didn't find a portal but we have been cloning, we are done cloning! We either need to kill the clone or complete it
-                    }else if(!portal && block->clone_start.x > 0 &&
-                             block->entangle_index < world.blocks.count){
-                         // TODO: do we need to update the block quad tree here?
-                         auto block_move_dir = vec_direction(pos_delta);
-                         auto block_from_coord = block_get_coord(block) - block_move_dir;
-                         if(block_from_coord == block->clone_start){
-                              // in this instance, despawn the clone
-                              // NOTE: I think this relies on new entangle blocks being
-                              S16 block_index = (S16)(block - world.blocks.elements);
-                              remove(&world.blocks, block->entangle_index);
+                                   // great news everyone, the clone was a success
+                                   Block_t* entangled_block = world.blocks.elements + block->entangle_index;
 
-                              // TODO: This could lead to a subtle bug where our block index is no longer correct
-                              // TODO: because this was the last index in the list which got swapped to our index
-                              // update ptr since we could have resized
-                              block = world.blocks.elements + block_index;
+                                   block->clone_id = 0;
+                                   entangled_block->clone_id = 0;
+                                   entangled_block->clone_start = Coord_t{};
 
-                              update_blocks_count--;
-
-                              // if our entangled block was not the last element, then it was replaced by another
-                              if(block->entangle_index < world.blocks.count){
-                                   Block_t* replaced_block = world.blocks.elements + block->entangle_index;
-                                   if(replaced_block->entangle_index >= 0){
-                                        // update the block's entangler that moved into our entangled blocks spot
-                                        Block_t* replaced_block_entangler = world.blocks.elements + replaced_block->entangle_index;
-                                        replaced_block_entangler->entangle_index = (S16)(replaced_block - world.blocks.elements);
+                                   // turn off the circuit
+                                   activate(&world, block->clone_start);
+                                   auto* src_portal = quad_tree_find_at(world.interactive_qt, block->clone_start.x, block->clone_start.y);
+                                   if(is_active_portal(src_portal)){
+                                        src_portal->portal.on = false;
                                    }
                               }
 
-                              block->entangle_index = -1;
+                              block->clone_start = Coord_t{};
+                         }
+                    }
+
+                    // player movement
+                    S16 update_player_count = world.players.count; // save due to adding/removing players
+                    for(S16 i = 0; i < update_player_count; i++){
+                         Player_t* player = world.players.elements + i;
+
+                         Coord_t skip_coord[DIRECTION_COUNT];
+                         Coord_t player_previous_coord = pos_to_coord(player->pos);
+                         Coord_t player_coord = pos_to_coord(player->pos + player->pos_delta);
+
+                         find_portal_adjacents_to_skip_collision_check(player_coord, world.interactive_qt, skip_coord);
+                         auto teleport_result = teleport_position_across_portal(player->pos, player->pos_delta, &world,
+                                                                                player_previous_coord, player_coord);
+                         auto teleport_clone_id = player->clone_id;
+                         if(player_coord != player->clone_start){
+                              // if we are going back to our clone portal, then all clones should go back
+
+                              // find the index closest to our original clone portal
+                              F32 shortest_distance = FLT_MAX;
+                              auto clone_start_center = coord_to_pixel_at_center(player->clone_start);
+
+                              for(S8 t = 0; t < teleport_result.count; t++){
+                                   F32 distance = pixel_distance_between(clone_start_center, teleport_result.results[t].pos.pixel);
+                                   if(distance < shortest_distance){
+                                        shortest_distance = distance;
+                                        teleport_clone_id = t;
+                                   }
+                              }
+                         }
+                         if(teleport_result.count > teleport_clone_id){
+                              player->pos = teleport_result.results[teleport_clone_id].pos;
+                              player->pos_delta = teleport_result.results[teleport_clone_id].delta;
+                         }
+
+                         auto result = move_player_through_world(player, skip_coord, &world);
+                         if(result.collided) collided = true;
+
+                         resetting = result.resetting;
+
+                         player_coord = pos_to_coord(player->pos + player->pos_delta);
+
+                         if(teleport_result.count == 0){
+                              teleport_result = teleport_position_across_portal(player->pos, player->pos_delta, &world,
+                                                                                player_previous_coord, player_coord);
+                              if(teleport_result.count > teleport_clone_id){
+                                   player->pos = teleport_result.results[teleport_clone_id].pos;
+                                   player->pos_delta = teleport_result.results[teleport_clone_id].delta;
+                              }
                          }else{
-                              assert(block->entangle_index >= 0);
-
-                              // great news everyone, the clone was a success
-                              Block_t* entangled_block = world.blocks.elements + block->entangle_index;
-
-                              block->clone_id = 0;
-                              entangled_block->clone_id = 0;
-                              entangled_block->clone_start = Coord_t{};
-
-                              // turn off the circuit
-                              activate(&world, block->clone_start);
-                              auto* src_portal = quad_tree_find_at(world.interactive_qt, block->clone_start.x, block->clone_start.y);
-                              if(is_active_portal(src_portal)){
-                                   src_portal->portal.on = false;
+                              auto new_teleport_result = teleport_position_across_portal(player->pos, player->pos_delta, &world,
+                                                                                         player_previous_coord, player_coord);
+                              if(new_teleport_result.count > teleport_clone_id){
+                                   player->pos = new_teleport_result.results[teleport_clone_id].pos;
+                                   player->pos_delta = new_teleport_result.results[teleport_clone_id].delta;
                               }
                          }
 
-                         block->clone_start = Coord_t{};
+                         if(teleport_result.count > teleport_clone_id){
+                              player->face = direction_rotate_clockwise(player->face, teleport_result.results[teleport_clone_id].rotations);
+                              player->vel = vec_rotate_quadrants_clockwise(player->vel, teleport_result.results[teleport_clone_id].rotations);
+                              player->accel = vec_rotate_quadrants_clockwise(player->accel, teleport_result.results[teleport_clone_id].rotations);
+
+                              if(i != 0) player->rotation = (player->rotation + teleport_result.results[teleport_clone_id].rotations) % DIRECTION_COUNT;
+
+                              // set rotations for each direction the player wants to move
+                              for(S8 d = 0; d < DIRECTION_COUNT; d++){
+                                   if(player_action.move[d]) player->move_rotation[d] = (player->move_rotation[d] + teleport_result.results[teleport_clone_id].rotations) % DIRECTION_COUNT;
+                              }
+                         }
+
+                         auto* portal = player_is_teleporting(player, world.interactive_qt);
+
+                         if(portal && player->clone_start.x == 0){
+                              // at the first instant of the block teleporting, check if we should create an entangled_block
+
+                              PortalExit_t portal_exits = find_portal_exits(portal->coord, &world.tilemap, world.interactive_qt);
+                              S8 count = portal_exit_count(&portal_exits);
+                              if(count >= 3){ // src portal, dst portal, clone portal
+                                   world.clone_instance++;
+
+                                   S8 clone_id = 0;
+                                   for (auto &direction : portal_exits.directions) {
+                                        for(int p = 0; p < direction.count; p++){
+                                             if(direction.coords[p] == portal->coord) continue;
+
+                                             if(clone_id == 0){
+                                                  player->clone_id = clone_id;
+                                                  player->clone_instance = world.clone_instance;
+                                             }else{
+                                                  S16 new_player_index = world.players.count;
+
+                                                  if(resize(&world.players, world.players.count + (S16)(1))){
+                                                       // a resize will kill our player ptr, so we gotta update it
+                                                       player = world.players.elements + i;
+                                                       player->clone_start = portal->coord;
+
+                                                       Player_t* new_player = world.players.elements + new_player_index;
+                                                       *new_player = *player;
+                                                       new_player->clone_id = clone_id;
+                                                  }
+                                             }
+
+                                             clone_id++;
+                                        }
+                                   }
+                              }
+                         }else if(!portal && player->clone_start.x > 0){
+                              auto clone_portal_center = coord_to_pixel_at_center(player->clone_start);
+                              F64 player_distance_from_portal = pixel_distance_between(clone_portal_center, player->pos.pixel);
+                              bool from_clone_start = (player_distance_from_portal < TILE_SIZE_IN_PIXELS);
+
+                              if(from_clone_start){
+                                   // loop across all players after this one
+                                   for(S16 p = 0; p < world.players.count; p++){
+                                        if(p == i) continue;
+                                        Player_t* other_player = world.players.elements + p;
+                                        if(other_player->clone_instance == player->clone_instance){
+                                             // TODO: I think I may have a really subtle bug here where we actually move
+                                             // TODO: the i'th player around because it was the last in the array
+                                             remove(&world.players, p);
+
+                                             // update ptr since we could have resized
+                                             player = world.players.elements + i;
+
+                                             update_player_count--;
+                                        }
+                                   }
+                              }else{
+                                   for(S16 p = 0; p < world.players.count; p++){
+                                        if(p == i) continue;
+                                        Player_t* other_player = world.players.elements + p;
+                                        if(other_player->clone_instance == player->clone_instance){
+                                             other_player->clone_id = 0;
+                                             other_player->clone_instance = 0;
+                                             other_player->clone_start = Coord_t{};
+                                        }
+                                   }
+
+                                   // turn off the circuit
+                                   activate(&world, player->clone_start);
+                                   auto* src_portal = quad_tree_find_at(world.interactive_qt, player->clone_start.x, player->clone_start.y);
+                                   if(is_active_portal(src_portal)) src_portal->portal.on = false;
+                              }
+
+                              player->clone_id = 0;
+                              player->clone_instance = 0;
+                              player->clone_start = Coord_t{};
+                         }
+
+                         Interactive_t* interactive = quad_tree_find_at(world.interactive_qt, player_coord.x, player_coord.y);
+                         if(interactive && interactive->type == INTERACTIVE_TYPE_CLONE_KILLER){
+                              if(i == 0){
+                                   resize(&world.players, 1);
+                                   update_player_count = 1;
+                              }else{
+                                   resetting = true;
+                              }
+                         }
                     }
+               }
+
+               // finalize positions
+               for(S16 i = 0; i < world.players.count; i++){
+                    auto player = world.players.elements + i;
+                    player->pos += player->pos_delta;
+               }
+
+               for(S16 i = 0; i < world.blocks.count; i++){
+                    Block_t* block = world.blocks.elements + i;
+
+                    auto final_pos = block->pos + block->pos_delta;
 
                     // finalize position for each component, stopping on a pixel boundary if we have to
                     if(block->stop_on_pixel_x != 0){
-                         if(fabs(block->pos_delta.x) <= fabs(pos_delta.x)){
-                              block->pos.pixel.x = block->stop_on_pixel_x;
-                              block->pos.decimal.x = 0.0;
-                         }else{
-                              block->pos.pixel.x = final_pos.pixel.x;
-                              block->pos.decimal.x = final_pos.decimal.x;
-                         }
-
+                         block->pos.pixel.x = block->stop_on_pixel_x;
+                         block->pos.decimal.x = 0;
                          block->stop_on_pixel_x = 0;
                     }else{
                          block->pos.pixel.x = final_pos.pixel.x;
@@ -1941,18 +2072,57 @@ int main(int argc, char** argv){
                     }
 
                     if(block->stop_on_pixel_y != 0){
-                         if(fabs(block->pos_delta.y) <= fabs(pos_delta.y)){
-                              block->pos.pixel.y = block->stop_on_pixel_y;
-                              block->pos.decimal.y = 0.0;
-                         }else{
-                              block->pos.pixel.y = final_pos.pixel.y;
-                              block->pos.decimal.y = final_pos.decimal.y;
-                         }
-
+                         block->pos.pixel.y = block->stop_on_pixel_y;
+                         block->pos.decimal.y = 0;
                          block->stop_on_pixel_y = 0;
                     }else{
                          block->pos.pixel.y = final_pos.pixel.y;
                          block->pos.decimal.y = final_pos.decimal.y;
+                    }
+               }
+
+               // have player push block
+               for(S16 i = 0; i < world.players.count; i++){
+                    auto player = world.players.elements + i;
+                    if(player->pushing_block >= 0){
+                         Block_t* block_to_push = world.blocks.elements + player->pushing_block;
+                         DirectionMask_t block_move_dir_mask = vec_direction_mask(block_to_push->vel);
+                         if(direction_in_mask(direction_mask_opposite(block_move_dir_mask), player->pushing_block_dir))
+                         {
+                              // if the player is pushing against a block moving towards them, the block wins
+                              player->push_time = 0;
+                              player->pushing_block = -1;
+                         }else if(direction_in_mask(block_move_dir_mask, player->pushing_block_dir)){
+                              block_to_push->cur_push_mask = direction_mask_add(block_to_push->cur_push_mask, player->pushing_block_dir);
+                         }else{
+                              F32 save_push_time = player->push_time;
+
+                              // TODO: get back to this once we improve our demo tools
+                              player->push_time += dt;
+                              if(player->push_time > BLOCK_PUSH_TIME){
+
+                                   // if this is the frame that causes the block to be pushed, make a commit
+                                   if(save_push_time <= BLOCK_PUSH_TIME) undo_commit(&undo, &world.players, &world.tilemap, &world.blocks, &world.interactives);
+
+                                   bool pushed = block_push(block_to_push, player->pushing_block_dir, &world, false);
+                                   if(pushed && block_to_push->entangle_index >= 0 && block_to_push->entangle_index < world.blocks.count){
+                                        // TODO: take into account block_to_push->face to rotate face
+                                        Block_t* entangled_block = world.blocks.elements + block_to_push->entangle_index;
+                                        U8 push_rotation = 0;
+                                        if(block_to_push->rotation){
+                                             push_rotation = block_to_push->rotation;
+                                        }else if(entangled_block->rotation){
+                                             push_rotation = entangled_block->rotation;
+                                        }
+                                        Direction_t rotated_dir = direction_rotate_clockwise(player->pushing_block_dir, push_rotation);
+                                        block_push(entangled_block, rotated_dir, &world, false);
+                                   }
+
+                                   if(block_to_push->pos.z > 0) player->push_time = -0.5f; // TODO: wtf is this line?
+                              }
+                         }
+                    }else{
+                         player->push_time = 0;
                     }
                }
 
@@ -2011,211 +2181,6 @@ int main(int argc, char** argv){
                                    activate(&world, interactive->coord);
                                    interactive->detector.on = true;
                               }
-                         }
-                    }
-               }
-
-               // player movement
-               S16 update_player_count = world.players.count; // save due to adding/removing players
-               for(S16 i = 0; i < update_player_count; i++){
-                    Player_t* player = world.players.elements + i;
-                    Vec_t pos_delta = player->pos_delta;
-
-                    Coord_t skip_coord[DIRECTION_COUNT];
-                    Coord_t player_previous_coord = pos_to_coord(player->pos);
-                    Coord_t player_coord = pos_to_coord(player->pos + pos_delta);
-
-                    find_portal_adjacents_to_skip_collision_check(player_coord, world.interactive_qt, skip_coord);
-                    auto teleport_result = teleport_position_across_portal(player->pos, pos_delta, &world,
-                                                                           player_previous_coord, player_coord);
-                    auto teleport_clone_id = player->clone_id;
-                    if(player_coord != player->clone_start){
-                         // if we are going back to our clone portal, then all clones should go back
-
-                         // find the index closest to our original clone portal
-                         F32 shortest_distance = FLT_MAX;
-                         auto clone_start_center = coord_to_pixel_at_center(player->clone_start);
-
-                         for(S8 t = 0; t < teleport_result.count; t++){
-                              F32 distance = pixel_distance_between(clone_start_center, teleport_result.results[t].pos.pixel);
-                              if(distance < shortest_distance){
-                                   shortest_distance = distance;
-                                   teleport_clone_id = t;
-                              }
-                         }
-                    }
-                    if(teleport_result.count > teleport_clone_id){
-                         player->pos = teleport_result.results[teleport_clone_id].pos;
-                         pos_delta = teleport_result.results[teleport_clone_id].delta;
-                    }
-
-                    player->pushing_block = -1;
-                    bool collide_with_interactive = false;
-                    Vec_t player_delta_pos = move_player_position_through_world(player->pos, pos_delta,
-                                                                                player->face, skip_coord,
-                                                                                player, &world,
-                                                                                &collide_with_interactive, &resetting);
-
-                    player_coord = pos_to_coord(player->pos + player_delta_pos);
-
-                    if(player->pushing_block >= 0){
-                         Block_t* block_to_push = world.blocks.elements + player->pushing_block;
-                         DirectionMask_t block_move_dir_mask = vec_direction_mask(block_to_push->vel);
-                         if(direction_in_mask(direction_mask_opposite(block_move_dir_mask), player->pushing_block_dir))
-                         {
-                              // if the player is pushing against a block moving towards them, the block wins
-                              player->push_time = 0;
-                              player->pushing_block = -1;
-                         }else if(direction_in_mask(block_move_dir_mask, player->pushing_block_dir)){
-                              block_to_push->cur_push_mask = direction_mask_add(block_to_push->cur_push_mask, player->pushing_block_dir);
-                         }else{
-                              F32 save_push_time = player->push_time;
-
-                              // TODO: get back to this once we improve our demo tools
-                              player->push_time += dt;
-                              if(player->push_time > BLOCK_PUSH_TIME){
-
-                                   // if this is the frame that causes the block to be pushed, make a commit
-                                   if(save_push_time <= BLOCK_PUSH_TIME) undo_commit(&undo, &world.players, &world.tilemap, &world.blocks, &world.interactives);
-
-                                   bool pushed = block_push(block_to_push, player->pushing_block_dir, &world, false);
-                                   if(pushed && block_to_push->entangle_index >= 0 && block_to_push->entangle_index < world.blocks.count){
-                                        // TODO: take into account block_to_push->face to rotate face
-                                        Block_t* entangled_block = world.blocks.elements + block_to_push->entangle_index;
-                                        U8 push_rotation = 0;
-                                        if(block_to_push->rotation){
-                                             push_rotation = block_to_push->rotation;
-                                        }else if(entangled_block->rotation){
-                                             push_rotation = entangled_block->rotation;
-                                        }
-                                        Direction_t rotated_dir = direction_rotate_clockwise(player->pushing_block_dir, push_rotation);
-                                        block_push(entangled_block, rotated_dir, &world, false);
-                                   }
-
-                                   if(block_to_push->pos.z > 0) player->push_time = -0.5f; // TODO: wtf is this line?
-                              }
-                         }
-                    }else{
-                         player->push_time = 0;
-                    }
-
-                    if(teleport_result.count == 0){
-                         teleport_result = teleport_position_across_portal(player->pos, player_delta_pos, &world,
-                                                                           player_previous_coord, player_coord);
-                         if(teleport_result.count > teleport_clone_id){
-                              player->pos = teleport_result.results[teleport_clone_id].pos;
-                              player_delta_pos = teleport_result.results[teleport_clone_id].delta;
-                         }
-                    }else{
-                         auto new_teleport_result = teleport_position_across_portal(player->pos, player_delta_pos, &world,
-                                                                                    player_previous_coord, player_coord);
-                         if(new_teleport_result.count > teleport_clone_id){
-                              player->pos = new_teleport_result.results[teleport_clone_id].pos;
-                              player_delta_pos = new_teleport_result.results[teleport_clone_id].delta;
-                         }
-                    }
-
-                    if(teleport_result.count > teleport_clone_id){
-                         player->face = direction_rotate_clockwise(player->face, teleport_result.results[teleport_clone_id].rotations);
-                         player->vel = vec_rotate_quadrants_clockwise(player->vel, teleport_result.results[teleport_clone_id].rotations);
-                         player->accel = vec_rotate_quadrants_clockwise(player->accel, teleport_result.results[teleport_clone_id].rotations);
-
-                         if(i != 0) player->rotation = (player->rotation + teleport_result.results[teleport_clone_id].rotations) % DIRECTION_COUNT;
-
-                         // set rotations for each direction the player wants to move
-                         for(S8 d = 0; d < DIRECTION_COUNT; d++){
-                              if(player_action.move[d]) player->move_rotation[d] = (player->move_rotation[d] + teleport_result.results[teleport_clone_id].rotations) % DIRECTION_COUNT;
-                         }
-                    }
-
-                    auto* portal = player_is_teleporting(player, world.interactive_qt);
-
-                    player->pos += player_delta_pos;
-
-                    if(portal && player->clone_start.x == 0){
-                         // at the first instant of the block teleporting, check if we should create an entangled_block
-
-                         PortalExit_t portal_exits = find_portal_exits(portal->coord, &world.tilemap, world.interactive_qt);
-                         S8 count = portal_exit_count(&portal_exits);
-                         if(count >= 3){ // src portal, dst portal, clone portal
-                              world.clone_instance++;
-
-                              S8 clone_id = 0;
-                              for (auto &direction : portal_exits.directions) {
-                                   for(int p = 0; p < direction.count; p++){
-                                        if(direction.coords[p] == portal->coord) continue;
-
-                                        if(clone_id == 0){
-                                             player->clone_id = clone_id;
-                                             player->clone_instance = world.clone_instance;
-                                        }else{
-                                             S16 new_player_index = world.players.count;
-
-                                             if(resize(&world.players, world.players.count + (S16)(1))){
-                                                  // a resize will kill our player ptr, so we gotta update it
-                                                  player = world.players.elements + i;
-                                                  player->clone_start = portal->coord;
-
-                                                  Player_t* new_player = world.players.elements + new_player_index;
-                                                  *new_player = *player;
-                                                  new_player->clone_id = clone_id;
-                                             }
-                                        }
-
-                                        clone_id++;
-                                   }
-                              }
-                         }
-                    }else if(!portal && player->clone_start.x > 0){
-                         auto clone_portal_center = coord_to_pixel_at_center(player->clone_start);
-                         F64 player_distance_from_portal = pixel_distance_between(clone_portal_center, player->pos.pixel);
-                         bool from_clone_start = (player_distance_from_portal < TILE_SIZE_IN_PIXELS);
-
-                         if(from_clone_start){
-                              // loop across all players after this one
-                              for(S16 p = 0; p < world.players.count; p++){
-                                   if(p == i) continue;
-                                   Player_t* other_player = world.players.elements + p;
-                                   if(other_player->clone_instance == player->clone_instance){
-                                        // TODO: I think I may have a really subtle bug here where we actually move
-                                        // TODO: the i'th player around because it was the last in the array
-                                        remove(&world.players, p);
-
-                                        // update ptr since we could have resized
-                                        player = world.players.elements + i;
-
-                                        update_player_count--;
-                                   }
-                              }
-                         }else{
-                              for(S16 p = 0; p < world.players.count; p++){
-                                   if(p == i) continue;
-                                   Player_t* other_player = world.players.elements + p;
-                                   if(other_player->clone_instance == player->clone_instance){
-                                        other_player->clone_id = 0;
-                                        other_player->clone_instance = 0;
-                                        other_player->clone_start = Coord_t{};
-                                   }
-                              }
-
-                              // turn off the circuit
-                              activate(&world, player->clone_start);
-                              auto* src_portal = quad_tree_find_at(world.interactive_qt, player->clone_start.x, player->clone_start.y);
-                              if(is_active_portal(src_portal)) src_portal->portal.on = false;
-                         }
-
-                         player->clone_id = 0;
-                         player->clone_instance = 0;
-                         player->clone_start = Coord_t{};
-                    }
-
-                    Interactive_t* interactive = quad_tree_find_at(world.interactive_qt, player_coord.x, player_coord.y);
-                    if(interactive && interactive->type == INTERACTIVE_TYPE_CLONE_KILLER){
-                         if(i == 0){
-                              resize(&world.players, 1);
-                              update_player_count = 1;
-                         }else{
-                              resetting = true;
                          }
                     }
                }

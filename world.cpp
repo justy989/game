@@ -295,10 +295,11 @@ void activate(World_t* world, Coord_t coord){
      toggle_electricity(&world->tilemap, world->interactive_qt, coord, DIRECTION_DOWN, false, false);
 }
 
-Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, Direction_t player_face, Coord_t* skip_coord,
-                                         Player_t* player, World_t* world, bool* collided_with_interactive, bool* resetting){
+MovePlayerThroughWorldResult_t move_player_through_world(Player_t* player, Coord_t* skip_coord, World_t* world){
+     MovePlayerThroughWorldResult_t result = {};
+
      // figure out tiles that are close by
-     Position_t final_player_pos = position + pos_delta;
+     Position_t final_player_pos = player->pos + player->pos_delta;
      Coord_t player_coord = pos_to_coord(final_player_pos);
 
      // NOTE: this assumes the player can't move more than 1 coord in 1 frame
@@ -315,28 +316,31 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
      DirectionMask_t collided_blocks_mask_dir = DIRECTION_MASK_NONE;
      Block_t* collided_blocks[DIRECTION_COUNT] = {};
 
-     for(S16 i = 0; i < world->blocks.count; i++){
-          Vec_t pos_delta_save = pos_delta;
+     Direction_t player_face = player->face;
 
-          bool collide_with_block = false;
+     for(S16 i = 0; i < world->blocks.count; i++){
+          Vec_t pos_delta_save = player->pos_delta;
+
+          bool collided_with_block = false;
           Position_t block_pos = world->blocks.elements[i].pos;
-          position_collide_with_rect(position, block_pos, TILE_SIZE, &pos_delta, &collide_with_block);
+          position_collide_with_rect(player->pos, block_pos, TILE_SIZE, &player->pos_delta, &collided_with_block);
+          if(collided_with_block) result.collided = true;
           Coord_t block_coord = block_get_coord(world->blocks.elements + i);
           U8 portal_rotations = 0;
 
-          if(!collide_with_block){
+          if(!collided_with_block){
                // check if the block is in a portal and try to collide with it
                Vec_t coord_offset = pos_to_vec(world->blocks.elements[i].pos +
                                                pixel_to_pos(HALF_TILE_SIZE_PIXEL) -
                                                coord_to_pos_at_tile_center(block_coord));
-               for(S8 r = 0; r < DIRECTION_COUNT && !collide_with_block; r++){
+               for(S8 r = 0; r < DIRECTION_COUNT && !collided_with_block; r++){
                     Coord_t check_coord = block_coord + (Direction_t)(r);
                     Interactive_t* interactive = quad_tree_interactive_find_at(world->interactive_qt, check_coord);
 
                     if(is_active_portal(interactive)){
                          PortalExit_t portal_exits = find_portal_exits(check_coord, &world->tilemap, world->interactive_qt);
 
-                         for(S8 d = 0; d < DIRECTION_COUNT && !collide_with_block; d++){
+                         for(S8 d = 0; d < DIRECTION_COUNT && !collided_with_block; d++){
                               Vec_t final_coord_offset = rotate_vec_between_dirs_clockwise(interactive->portal.face, (Direction_t)(d), coord_offset);
 
                               for(S8 p = 0; p < portal_exits.directions[d].count; p++){
@@ -344,9 +348,10 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
 
                                    Position_t portal_pos = coord_to_pos_at_tile_center(portal_exits.directions[d].coords[p]) + final_coord_offset -
                                                            pixel_to_pos(HALF_TILE_SIZE_PIXEL);
-                                   position_collide_with_rect(position, portal_pos, TILE_SIZE, &pos_delta, &collide_with_block);
+                                   position_collide_with_rect(player->pos, portal_pos, TILE_SIZE, &player->pos_delta, &collided_with_block);
 
-                                   if(collide_with_block){
+                                   if(collided_with_block){
+                                        result.collided = true;
                                         block_pos = portal_pos;
                                         if(is_active_portal(interactive)){
                                              player_face = direction_opposite(interactive->portal.face);
@@ -360,66 +365,12 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
                }
           }
 
-          if(collide_with_block){
-               Vec_t pos_delta_diff = pos_delta - pos_delta_save;
+          if(collided_with_block){
+               Vec_t pos_delta_diff = player->pos_delta - pos_delta_save;
                collided_block_delta = vec_rotate_quadrants_clockwise(pos_delta_diff, (U8)(4) - portal_rotations);
-               auto collided_block_dir = relative_quadrant(position.pixel, block_pos.pixel + HALF_TILE_SIZE_PIXEL);
+               auto collided_block_dir = relative_quadrant(player->pos.pixel, block_pos.pixel + HALF_TILE_SIZE_PIXEL);
                auto collided_block = world->blocks.elements + i;
                Position_t pre_move = collided_block->pos;
-
-#if 0
-#ifndef BLOCKS_SQUISH_PLAYER
-               // this stops the block when it moves into the player
-               Vec_t rotated_accel = vec_rotate_quadrants_clockwise(collided_block->accel, portal_rotations);
-               Vec_t rotated_vel = vec_rotate_quadrants_clockwise(collided_block->vel, portal_rotations);
-
-               switch(collided_block_dir){
-               default:
-                    break;
-               case DIRECTION_LEFT:
-                    if(rotated_accel.x > 0.0f){
-                         collided_block->pos -= collided_block_delta;
-                         pos_delta -= pos_delta_diff;
-                         rotated_accel.x = 0.0f;
-                         rotated_vel.x = 0.0f;
-                         collided_block->accel = vec_rotate_quadrants_counter_clockwise(rotated_accel, portal_rotations);
-                         collided_block->vel = vec_rotate_quadrants_counter_clockwise(rotated_vel, portal_rotations);
-                    }
-                    break;
-               case DIRECTION_RIGHT:
-                    if(rotated_accel.x < 0.0f){
-                         collided_block->pos -= collided_block_delta;
-                         pos_delta -= pos_delta_diff;
-                         rotated_accel.x = 0.0f;
-                         rotated_vel.x = 0.0f;
-                         collided_block->accel = vec_rotate_quadrants_counter_clockwise(rotated_accel, portal_rotations);
-                         collided_block->vel = vec_rotate_quadrants_counter_clockwise(rotated_vel, portal_rotations);
-                    }
-                    break;
-               case DIRECTION_UP:
-                    if(rotated_accel.y < 0.0f){
-                         collided_block->pos -= collided_block_delta;
-                         pos_delta -= pos_delta_diff;
-                         rotated_accel.y = 0.0f;
-                         rotated_vel.y = 0.0f;
-                         collided_block->accel = vec_rotate_quadrants_counter_clockwise(rotated_accel, portal_rotations);
-                         collided_block->vel = vec_rotate_quadrants_counter_clockwise(rotated_vel, portal_rotations);
-                    }
-                    break;
-               case DIRECTION_DOWN:
-                    if(rotated_accel.y > 0.0f){
-                         collided_block->pos -= collided_block_delta;
-                         pos_delta -= pos_delta_diff;
-                         rotated_accel.y = 0.0f;
-                         rotated_vel.y = 0.0f;
-                         collided_block->accel = vec_rotate_quadrants_counter_clockwise(rotated_accel, portal_rotations);
-                         collided_block->vel = vec_rotate_quadrants_counter_clockwise(rotated_vel, portal_rotations);
-                    }
-                    break;
-               }
-#endif
-#endif
-
                Coord_t coord = pixel_to_coord(collided_block->pos.pixel + HALF_TILE_SIZE_PIXEL);
                Coord_t premove_coord = pixel_to_coord(pre_move.pixel + HALF_TILE_SIZE_PIXEL);
 
@@ -437,7 +388,7 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
                if(collided_block_dir == rotated_player_face && (player->vel.x != 0.0f || player->vel.y != 0.0f)){
                     if(player->pushing_block < 0){ // also check that the player is actually pushing against the block
                          player->pushing_block = i;
-                         player->pushing_block_dir = player_face;
+                         player->pushing_block_dir = player->face;
                     }else{
                          // stop the player from pushing 2 blocks at once
                          player->pushing_block = -1;
@@ -464,14 +415,16 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
                     }
                     if(skip) continue;
                     bool collide_with_tile = false;
-                    position_slide_against_rect(position, coord, PLAYER_RADIUS, &pos_delta, &collide_with_tile);
-                    if(collide_with_tile) collided_tile_dir = direction_between(player_coord, coord);
+                    position_slide_against_rect(player->pos, coord, PLAYER_RADIUS, &player->pos_delta, &collide_with_tile);
+                    if(collide_with_tile){
+                        result.collided = true;
+                        collided_tile_dir = direction_between(player_coord, coord);
+                    }
                }
           }
      }
 
      Direction_t collided_interactive_dir = DIRECTION_COUNT;
-     *collided_with_interactive = false;
      for(S16 y = min.y; y <= max.y; y++){
           for(S16 x = min.x; x <= max.x; x++){
                Coord_t coord {x, y};
@@ -479,9 +432,9 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
                Interactive_t* interactive = quad_tree_interactive_solid_at(world->interactive_qt, &world->tilemap, coord);
                if(interactive){
                     bool collided = false;
-                    position_slide_against_rect(position, coord, PLAYER_RADIUS, &pos_delta, &collided);
-                    if(collided && !(*collided_with_interactive)){
-                         *collided_with_interactive = true;
+                    position_slide_against_rect(player->pos, coord, PLAYER_RADIUS, &player->pos_delta, &collided);
+                    if(collided && !result.collided){
+                         result.collided = true;
                          collided_interactive_dir = direction_between(player_coord, coord);
                     }
                }
@@ -496,7 +449,7 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
           if(distance > PLAYER_RADIUS_IN_SUB_PIXELS * 3.0f) continue;
           bool collided = false;
           Position_t other_player_bottom_left = other_player->pos - Vec_t{PLAYER_RADIUS, PLAYER_RADIUS};
-          position_collide_with_rect(position, other_player_bottom_left, 2.0f * PLAYER_RADIUS, &pos_delta, &collided);
+          position_collide_with_rect(player->pos, other_player_bottom_left, 2.0f * PLAYER_RADIUS, &player->pos_delta, &collided);
      }
 
      // TODO do we care about other directions for colliding with interactives and tiles like we do for blocks?
@@ -518,11 +471,10 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
           if((dir == direction_opposite(collided_interactive_dir) ||
               dir == direction_opposite(collided_tile_dir) ||
               direction_in_mask(collided_blocks_mask_dir, opposite))){
-               *resetting = true;
+               result.resetting = true;
                break;
           }
 #else
-          (void)(resetting);
 
           if(dir != DIRECTION_COUNT &&
              (dir == direction_opposite(collided_interactive_dir) ||
@@ -562,7 +514,7 @@ Vec_t move_player_position_through_world(Position_t position, Vec_t pos_delta, D
 #endif
      }
 
-     return pos_delta;
+     return result;
 }
 
 TeleportPositionResult_t teleport_position_across_portal(Position_t position, Vec_t pos_delta, World_t* world, Coord_t premove_coord,

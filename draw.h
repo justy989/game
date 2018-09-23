@@ -26,6 +26,12 @@
 #define PLAYER_FRAMES_WIDE (S16)(4)
 #define PLAYER_FRAMES_TALL (S16)(32)
 
+#define TEXT_CHAR_WIDTH (5.0f * PIXEL_SIZE)
+#define TEXT_CHAR_HEIGHT (8.0f * PIXEL_SIZE)
+#define TEXT_CHAR_SPACING (1.0f * PIXEL_SIZE)
+#define TEXT_CHAR_TEX_WIDTH 0.01953125f
+#define TEXT_CHAR_TEX_HEIGHT 1.0f
+
 Vec_t theme_frame(S16 x, S16 y);
 Vec_t arrow_frame(S16 x, S16 y);
 Vec_t player_frame(S16 x, S16 y);
@@ -52,3 +58,5 @@ void draw_quad_wireframe(const Quad_t* quad, F32 red, F32 green, F32 blue);
 void draw_quad_filled(const Quad_t* quad, F32 red, F32 green, F32 blue);
 
 void draw_selection(Coord_t selection_start, Coord_t selection_end, Position_t camera, F32 red, F32 green, F32 blue);
+
+void draw_text(const char* message, Vec_t pos);

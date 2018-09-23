@@ -410,10 +410,13 @@ bool block_on_ice(Block_t* block, TileMap_t* tilemap, QuadTreeNode_t<Interactive
      return false;
 }
 
-void check_block_collision_with_other_blocks(Block_t* block_to_check, World_t* world){
+bool check_block_collision_with_other_blocks(Block_t* block_to_check, World_t* world){
+     bool collided = false;
+
      for(BlockInsideResult_t block_inside_result = block_inside_another_block(block_to_check, world->block_qt, world->interactive_qt, &world->tilemap, &world->blocks);
          block_inside_result.block && blocks_at_collidable_height(block_to_check, block_inside_result.block);
          block_inside_result = block_inside_another_block(block_to_check, world->block_qt, world->interactive_qt, &world->tilemap, &world->blocks)){
+          collided = true;
 
           auto block_to_check_pos = block_to_check->pos + block_to_check->pos_delta;
 
@@ -437,11 +440,6 @@ void check_block_collision_with_other_blocks(Block_t* block_to_check, World_t* w
                     // TODO: compress these cases
                     block_to_check->stop_on_pixel_x = block_inside_result.collision_pos.pixel.x + HALF_TILE_SIZE_IN_PIXELS;
 
-                    Position_t dest_pos;
-                    dest_pos.pixel.x = block_to_check->stop_on_pixel_x;
-                    dest_pos.decimal.x = 0;
-                    dest_pos.z = block_to_check->pos.z;
-
                     block_to_check->pos_delta.x = 0;
                     block_to_check->vel.x = 0.0f;
                     block_to_check->accel.x = 0.0f;
@@ -450,11 +448,6 @@ void check_block_collision_with_other_blocks(Block_t* block_to_check, World_t* w
                case DIRECTION_RIGHT:
                {
                     block_to_check->stop_on_pixel_x = (block_inside_result.collision_pos.pixel.x - HALF_TILE_SIZE_IN_PIXELS) - TILE_SIZE_IN_PIXELS;
-
-                    Position_t dest_pos;
-                    dest_pos.pixel.x = block_to_check->stop_on_pixel_x;
-                    dest_pos.decimal.x = 0;
-                    dest_pos.z = block_to_check->pos.z;
 
                     block_to_check->pos_delta.x = 0;
                     block_to_check->vel.x = 0.0f;
@@ -465,11 +458,6 @@ void check_block_collision_with_other_blocks(Block_t* block_to_check, World_t* w
                {
                     block_to_check->stop_on_pixel_y = block_inside_result.collision_pos.pixel.y + HALF_TILE_SIZE_IN_PIXELS;
 
-                    Position_t dest_pos;
-                    dest_pos.pixel.y = block_to_check->stop_on_pixel_y;
-                    dest_pos.decimal.y = 0;
-                    dest_pos.z = block_to_check->pos.z;
-
                     block_to_check->pos_delta.y = 0;
                     block_to_check->vel.y = 0.0f;
                     block_to_check->accel.y = 0.0f;
@@ -478,11 +466,6 @@ void check_block_collision_with_other_blocks(Block_t* block_to_check, World_t* w
                case DIRECTION_UP:
                {
                     block_to_check->stop_on_pixel_y = (block_inside_result.collision_pos.pixel.y - HALF_TILE_SIZE_IN_PIXELS) - TILE_SIZE_IN_PIXELS;
-
-                    Position_t dest_pos;
-                    dest_pos.pixel.y = block_to_check->stop_on_pixel_y;
-                    dest_pos.decimal.y = 0;
-                    dest_pos.z = block_to_check->pos.z;
 
                     block_to_check->pos_delta.y = 0;
                     block_to_check->vel.y = 0.0f;
@@ -566,6 +549,8 @@ void check_block_collision_with_other_blocks(Block_t* block_to_check, World_t* w
           // TODO: there is no way this is the right way to do this
           if(block_inside_result.block == block_to_check) break;
      }
+
+     return collided;
 }
 
 
