@@ -2111,7 +2111,7 @@ int main(int argc, char** argv){
                // have player push block
                for(S16 i = 0; i < world.players.count; i++){
                     auto player = world.players.elements + i;
-                    if(player->prev_pushing_block >= 0){
+                    if(player->prev_pushing_block >= 0 && player->prev_pushing_block == player->pushing_block){
                          Block_t* block_to_push = world.blocks.elements + player->prev_pushing_block;
                          DirectionMask_t block_move_dir_mask = vec_direction_mask(block_to_push->vel);
                          if(direction_in_mask(direction_mask_opposite(block_move_dir_mask), player->pushing_block_dir))
