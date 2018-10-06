@@ -308,3 +308,15 @@ float calc_distance_from_derivatives(float v, float a){
      float t = v / a;
      return v * t + 0.5f * a * (t * t);
 }
+
+bool operator==(const Move_t& a, const Move_t& b){
+     return a.state == b.state &&
+            a.sign == b.sign &&
+            a.distance == b.distance;
+}
+
+bool operator!=(const Move_t& a, const Move_t& b){
+     return a.state != b.state ||
+            a.sign != b.sign ||
+            a.distance != b.distance;
+}

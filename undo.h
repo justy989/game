@@ -14,6 +14,8 @@ struct UndoBlock_t{
      Vec_t vel;
      S16 entangle_index;
      S8 rotation;
+     Move_t horizontal_move;
+     Move_t vertical_move;
 };
 
 struct UndoPlayer_t{

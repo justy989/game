@@ -233,7 +233,9 @@ void undo_commit(Undo_t* undo, ObjectArray_t<Player_t>* players, TileMap_t* tile
                     if(last_block->pixel == block->pos.pixel &&
                        last_block->z == block->pos.z &&
                        last_block->element == block->element &&
-                       last_block->entangle_index == block->entangle_index){
+                       last_block->entangle_index == block->entangle_index &&
+                       last_block->horizontal_move == block->horizontal_move &&
+                       last_block->vertical_move == block->vertical_move){
                          found = true;
                          auto* undo_block_entry = (UndoBlock_t*)(undo->history.current);
                          *undo_block_entry = undo->blocks.elements[i];
@@ -261,7 +263,9 @@ void undo_commit(Undo_t* undo, ObjectArray_t<Player_t>* players, TileMap_t* tile
           if(undo_block->pixel != block->pos.pixel ||
              undo_block->z != block->pos.z ||
              undo_block->element != block->element ||
-             undo_block->entangle_index != block->entangle_index){
+             undo_block->entangle_index != block->entangle_index ||
+             undo_block->horizontal_move != block->horizontal_move ||
+             undo_block->vertical_move != block->vertical_move){
                auto* undo_block_entry = (UndoBlock_t*)(undo->history.current);
                *undo_block_entry = *undo_block;
                undo_history_add(&undo->history, UNDO_DIFF_TYPE_BLOCK, i);
