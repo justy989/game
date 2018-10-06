@@ -1421,64 +1421,10 @@ int main(int argc, char** argv){
                Position_t camera_movement = room_center - camera;
                camera += camera_movement * 0.05f;
 
-               // block movement
-               // do a pass moving the block as far as possible, so that collision doesn't rely on order of blocks in the array
-               for(S16 i = 0; i < world.blocks.count; i++){
-                    Block_t* block = world.blocks.elements + i;
-
-                    block->prev_push_mask = block->cur_push_mask;
-                    block->cur_push_mask = DIRECTION_MASK_NONE;
-
-                    block->prev_vel = block->vel;
-
-                    block->accel.x = calc_accel_component_move(block->horizontal_move, BLOCK_ACCEL);
-                    block->accel.y = calc_accel_component_move(block->vertical_move, BLOCK_ACCEL);
-
-                    block->pos_delta.x = calc_position_motion(block->vel.x, block->accel.x, dt);
-                    block->vel.x = calc_velocity_motion(block->vel.x, block->accel.x, dt);
-
-                    block->pos_delta.y = calc_position_motion(block->vel.y, block->accel.y, dt);
-                    block->vel.y = calc_velocity_motion(block->vel.y, block->accel.y, dt);
-
-                    bool coast_horizontal = false;
-                    bool coast_vertical = false;
-
-                    if(block_on_ice(block, &world.tilemap, world.interactive_qt)){
-                         coast_horizontal = true;
-                         coast_vertical = true;
-                    }else{
-                         if(block->horizontal_move.state == MOVE_STATE_STARTING ||
-                            block->horizontal_move.state == MOVE_STATE_COASTING){
-                              if(block->horizontal_move.sign == MOVE_SIGN_POSITIVE){
-                                   coast_horizontal = (block->prev_push_mask & DIRECTION_MASK_RIGHT);
-                              }else if(block->horizontal_move.sign == MOVE_SIGN_NEGATIVE){
-                                   coast_horizontal = (block->prev_push_mask & DIRECTION_MASK_LEFT);
-                              }
-                         }
-
-                         if(block->vertical_move.state == MOVE_STATE_STARTING ||
-                            block->vertical_move.state == MOVE_STATE_COASTING){
-                              if(block->vertical_move.sign == MOVE_SIGN_POSITIVE){
-                                   coast_vertical = (block->prev_push_mask & DIRECTION_MASK_UP);
-                              }else if(block->vertical_move.sign == MOVE_SIGN_NEGATIVE){
-                                   coast_vertical = (block->prev_push_mask & DIRECTION_MASK_DOWN);
-                              }
-                         }
-                    }
-
-                    // TODO: creating this potentially big vector could lead to precision issues
-                    Vec_t pos_vec = pos_to_vec(block->pos);
-
-                    update_motion_grid_aligned(&block->horizontal_move, motion_x_component(block),
-                                               coast_horizontal, dt, BLOCK_ACCEL, BLOCK_ACCEL_DISTANCE, pos_vec.x);
-
-                    update_motion_grid_aligned(&block->vertical_move, motion_y_component(block),
-                                               coast_vertical, dt, BLOCK_ACCEL, BLOCK_ACCEL_DISTANCE, pos_vec.y);
-               }
-
                for(S16 i = 0; i < world.players.count; i++){
                     Player_t* player = world.players.elements + i;
 
+                    player->prev_pushing_block = player->pushing_block;
                     player->pushing_block = -1;
 
                     player->prev_vel = player->vel;
@@ -1547,6 +1493,83 @@ int main(int argc, char** argv){
                     if(vec_magnitude(player->pos_delta) > max_pos_delta){
                          player->pos_delta = vec_normalize(player->pos_delta) * max_pos_delta;
                     }
+               }
+
+               // block movement
+               // do a pass moving the block as far as possible, so that collision doesn't rely on order of blocks in the array
+               for(S16 i = 0; i < world.blocks.count; i++){
+                    Block_t* block = world.blocks.elements + i;
+
+                    block->prev_push_mask = block->cur_push_mask;
+                    block->cur_push_mask = DIRECTION_MASK_NONE;
+
+                    block->prev_vel = block->vel;
+
+                    block->accel.x = calc_accel_component_move(block->horizontal_move, BLOCK_ACCEL);
+                    block->accel.y = calc_accel_component_move(block->vertical_move, BLOCK_ACCEL);
+
+                    block->pos_delta.x = calc_position_motion(block->vel.x, block->accel.x, dt);
+                    block->vel.x = calc_velocity_motion(block->vel.x, block->accel.x, dt);
+
+                    block->pos_delta.y = calc_position_motion(block->vel.y, block->accel.y, dt);
+                    block->vel.y = calc_velocity_motion(block->vel.y, block->accel.y, dt);
+
+                    bool coast_horizontal = false;
+                    bool coast_vertical = false;
+
+                    if(block_on_ice(block, &world.tilemap, world.interactive_qt)){
+                         coast_horizontal = true;
+                         coast_vertical = true;
+                    }else{
+                         if(block->horizontal_move.state == MOVE_STATE_STARTING ||
+                            block->horizontal_move.state == MOVE_STATE_COASTING){
+                              if(block->horizontal_move.sign == MOVE_SIGN_POSITIVE){
+                                   coast_horizontal = (block->prev_push_mask & DIRECTION_MASK_RIGHT);
+                              }else if(block->horizontal_move.sign == MOVE_SIGN_NEGATIVE){
+                                   coast_horizontal = (block->prev_push_mask & DIRECTION_MASK_LEFT);
+                              }
+                         }
+
+                         if(block->vertical_move.state == MOVE_STATE_STARTING ||
+                            block->vertical_move.state == MOVE_STATE_COASTING){
+                              if(block->vertical_move.sign == MOVE_SIGN_POSITIVE){
+                                   coast_vertical = (block->prev_push_mask & DIRECTION_MASK_UP);
+                              }else if(block->vertical_move.sign == MOVE_SIGN_NEGATIVE){
+                                   coast_vertical = (block->prev_push_mask & DIRECTION_MASK_DOWN);
+                              }
+                         }
+                    }
+
+                    if(!coast_vertical || !coast_horizontal){
+                         for(S16 p = 0; p < world.players.count; p++){
+                              Player_t* player = world.players.elements + p;
+
+                              // is the player pushing us ?
+                              if(player->prev_pushing_block != (block - world.blocks.elements)) continue;
+
+                              switch(player->face){
+                              default:
+                                   break;
+                              case DIRECTION_LEFT:
+                              case DIRECTION_RIGHT:
+                                   coast_horizontal = true;
+                                   break;
+                              case DIRECTION_UP:
+                              case DIRECTION_DOWN:
+                                   coast_vertical = true;
+                                   break;
+                              }
+                         }
+                    }
+
+                    // TODO: creating this potentially big vector could lead to precision issues
+                    Vec_t pos_vec = pos_to_vec(block->pos);
+
+                    update_motion_grid_aligned(&block->horizontal_move, motion_x_component(block),
+                                               coast_horizontal, dt, BLOCK_ACCEL, BLOCK_ACCEL_DISTANCE, pos_vec.x);
+
+                    update_motion_grid_aligned(&block->vertical_move, motion_y_component(block),
+                                               coast_vertical, dt, BLOCK_ACCEL, BLOCK_ACCEL_DISTANCE, pos_vec.y);
                }
 
                // unbounded collision: this should be exciting
@@ -1621,6 +1644,8 @@ int main(int argc, char** argv){
                               }else{
                                    stop_on_boundary_y = quad_tree_interactive_solid_at(world.interactive_qt, &world.tilemap, coord_a) ||
                                                         quad_tree_interactive_solid_at(world.interactive_qt, &world.tilemap, coord_b);
+                                   if(stop_on_boundary_y){
+                                   }
                               }
                          }else if(block->vel.y < 0.0f){
                               Pixel_t pixel_a {};
@@ -1635,6 +1660,8 @@ int main(int argc, char** argv){
                               }else{
                                    stop_on_boundary_y = quad_tree_interactive_solid_at(world.interactive_qt, &world.tilemap, coord_a) ||
                                                         quad_tree_interactive_solid_at(world.interactive_qt, &world.tilemap, coord_b);
+                                   if(stop_on_boundary_y){
+                                   }
                               }
                          }
 
@@ -1646,8 +1673,8 @@ int main(int argc, char** argv){
 
                          for(S16 p = 0; p < world.players.count; p++){
                               Player_t* player = world.players.elements + p;
-                              if(player->pushing_block >= 0){
-                                   block_pushed = world.blocks.elements + player->pushing_block;
+                              if(player->prev_pushing_block >= 0){
+                                   block_pushed = world.blocks.elements + player->prev_pushing_block;
                                    if(block_pushed && block_pushed->entangle_index >= 0 && block_pushed->entangle_index < world.blocks.count){
                                         entangled_block_pushed = world.blocks.elements + block_pushed->entangle_index;
                                         entangled_block_pushed_dir = player->pushing_block_dir;
@@ -2084,8 +2111,8 @@ int main(int argc, char** argv){
                // have player push block
                for(S16 i = 0; i < world.players.count; i++){
                     auto player = world.players.elements + i;
-                    if(player->pushing_block >= 0){
-                         Block_t* block_to_push = world.blocks.elements + player->pushing_block;
+                    if(player->prev_pushing_block >= 0){
+                         Block_t* block_to_push = world.blocks.elements + player->prev_pushing_block;
                          DirectionMask_t block_move_dir_mask = vec_direction_mask(block_to_push->vel);
                          if(direction_in_mask(direction_mask_opposite(block_move_dir_mask), player->pushing_block_dir))
                          {
@@ -2377,7 +2404,7 @@ int main(int argc, char** argv){
                Position_t player_camera_offset = world.players.elements[p].pos - screen_camera;
                Vec_t pos_vec = pos_to_vec(player_camera_offset);
 
-               if(world.players.elements[p].pushing_block >= 0){
+               if(world.players.elements[p].prev_pushing_block >= 0){
                     glColor3f(1.0f, 0.0f, 0.0f);
                }else{
                     glColor3f(1.0f, 1.0f, 1.0f);
