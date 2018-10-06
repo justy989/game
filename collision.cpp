@@ -14,8 +14,11 @@ Vec_t collide_circle_with_line(Vec_t circle_center, F32 circle_radius, Vec_t a, 
      if(vec_magnitude(collision_to_c) < circle_radius){
           // find edge of circle in that direction
           Vec_t edge_of_circle = vec_normalize(collision_to_c) * circle_radius;
-          *collided = true;
-          return collision_to_c - edge_of_circle;
+          Vec_t collision_vec = collision_to_c - edge_of_circle;
+          if(collision_vec != vec_zero()){
+               *collided = true;
+               return collision_vec;
+          }
      }
 
      return vec_zero();

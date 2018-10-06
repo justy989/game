@@ -322,7 +322,7 @@ MovePlayerThroughWorldResult_t move_player_through_world(Player_t* player, Coord
           Vec_t pos_delta_save = player->pos_delta;
 
           bool collided_with_block = false;
-          Position_t block_pos = world->blocks.elements[i].pos;
+          Position_t block_pos = world->blocks.elements[i].pos + world->blocks.elements[i].pos_delta;
           position_collide_with_rect(player->pos, block_pos, TILE_SIZE, &player->pos_delta, &collided_with_block);
           if(collided_with_block) result.collided = true;
           Coord_t block_coord = block_get_coord(world->blocks.elements + i);
