@@ -67,6 +67,6 @@ void destroy(Undo_t* undo);
 void undo_snapshot(Undo_t* undo, ObjectArray_t<Player_t>* players, TileMap_t* tilemap, ObjectArray_t<Block_t>* blocks,
                    ObjectArray_t<Interactive_t>* interactives);
 void undo_commit(Undo_t* undo, ObjectArray_t<Player_t>* players, TileMap_t* tilemap, ObjectArray_t<Block_t>* blocks,
-                 ObjectArray_t<Interactive_t>* interactives);
+                 ObjectArray_t<Interactive_t>* interactives, bool ignore_moving_stuff = false);
 void undo_revert(Undo_t* undo, ObjectArray_t<Player_t>* players, TileMap_t* tilemap, ObjectArray_t<Block_t>* blocks,
                  ObjectArray_t<Interactive_t>* interactives);

@@ -134,14 +134,15 @@ void undo_snapshot(Undo_t* undo, ObjectArray_t<Player_t>* players, TileMap_t* ti
 }
 
 void undo_commit(Undo_t* undo, ObjectArray_t<Player_t>* players, TileMap_t* tilemap, ObjectArray_t<Block_t>* blocks,
-                 ObjectArray_t<Interactive_t>* interactives){
-     // don't save undo if any blocks are moving
-     for(S16 i = 0; i < blocks->count; i++){
-          if(blocks->elements[i].vel.x != 0.0f ||
-             blocks->elements[i].vel.y != 0.0f) return;
-     }
-
+                 ObjectArray_t<Interactive_t>* interactives, bool ignore_moving_stuff){
      U32 diff_count = 0;
+
+     // don't save undo if any blocks are moving
+     if(!ignore_moving_stuff){
+          for(S16 i = 0; i < blocks->count; i++){
+               if(blocks->elements[i].vel.x != 0.0f || blocks->elements[i].vel.y != 0.0f) return;
+          }
+     }
 
      // TODO: compress this, interactives, and blocks doin the same damn thing
      // check for differences between player count in previous state and new state
@@ -389,6 +390,8 @@ void undo_revert(Undo_t* undo, ObjectArray_t<Player_t>* players, TileMap_t* tile
                block->vel = block_entry->vel;
                block->entangle_index = block_entry->entangle_index;
                block->rotation = block_entry->rotation;
+               block->horizontal_move = block_entry->horizontal_move;
+               block->vertical_move = block_entry->vertical_move;
           } break;
           case UNDO_DIFF_TYPE_BLOCK_INSERT:
           {
@@ -410,6 +413,8 @@ void undo_revert(Undo_t* undo, ObjectArray_t<Player_t>* players, TileMap_t* tile
                block->vel = block_entry->vel;
                block->entangle_index = block_entry->entangle_index;
                block->rotation = block_entry->rotation;
+               block->horizontal_move = block_entry->horizontal_move;
+               block->vertical_move = block_entry->vertical_move;
           } break;
           case UNDO_DIFF_TYPE_BLOCK_REMOVE:
           {
