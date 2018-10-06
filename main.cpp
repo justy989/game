@@ -1270,6 +1270,7 @@ int main(int argc, char** argv){
                          if(player_action.move[d]){
                               Direction_t rot_dir = direction_rotate_clockwise((Direction_t)(d), player->rotation);
                               rotated_move_actions[rot_dir] = true;
+                              if(player->reface) player->face = static_cast<Direction_t>(rot_dir);
                          }
                     }
 
@@ -1318,17 +1319,6 @@ int main(int argc, char** argv){
                          user_stopping_y = true;
                          player->accel.y += PLAYER_ACCEL;
                     }
-
-#if 0
-                    for(int d = 0; d < DIRECTION_COUNT; d++){
-                         if(rotated_move_actions[d]){
-                              auto direction = (Direction_t)(d);
-                              direction = direction_rotate_clockwise(direction, player->move_rotation[d]);
-                              player->accel += direction_to_vec(direction);
-                              if(player->reface) player->face = direction;
-                         }
-                    }
-#endif
 
                     if(player_action.activate && !player_action.last_activate){
                          undo_commit(&undo, &world.players, &world.tilemap, &world.blocks, &world.interactives);
