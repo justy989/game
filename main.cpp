@@ -2331,7 +2331,7 @@ int main(int argc, char** argv){
 
                for(S16 x = min.x; x <= max.x; x++){
                     Coord_t coord {x, y};
-                    Rect_t coord_rect = rect_surrounding_adjacent_coords(coord);
+                    Rect_t coord_rect = rect_surrounding_coord(coord);
                     Vec_t tile_pos {(F32)(x - min.x) * TILE_SIZE + camera_offset.x,
                                     (F32)(y - min.y) * TILE_SIZE + camera_offset.y};
 
