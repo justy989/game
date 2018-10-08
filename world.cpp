@@ -316,8 +316,6 @@ MovePlayerThroughWorldResult_t move_player_through_world(Player_t* player, Coord
      DirectionMask_t collided_blocks_mask_dir = DIRECTION_MASK_NONE;
      Block_t* collided_blocks[DIRECTION_COUNT] = {};
 
-     Direction_t player_face = player->face;
-
      for(S16 i = 0; i < world->blocks.count; i++){
           Vec_t pos_delta_save = player->pos_delta;
 
@@ -354,7 +352,6 @@ MovePlayerThroughWorldResult_t move_player_through_world(Player_t* player, Coord
                                         result.collided = true;
                                         block_pos = portal_pos;
                                         if(is_active_portal(interactive)){
-                                             player_face = direction_opposite(interactive->portal.face);
                                              portal_rotations = portal_rotations_between(interactive->portal.face, (Direction_t)(d));
                                              break;
                                         }
@@ -384,11 +381,12 @@ MovePlayerThroughWorldResult_t move_player_through_world(Player_t* player, Coord
                     collided_block->pos.pixel -= HALF_TILE_SIZE_PIXEL;
                }
 
-               auto rotated_player_face = direction_rotate_clockwise(player_face, portal_rotations);
-               if(collided_block_dir == rotated_player_face && (player->vel.x != 0.0f || player->vel.y != 0.0f)){
+
+               auto rotated_player_face = direction_rotate_counter_clockwise(player->face, portal_rotations);
+               if(collided_block_dir == player->face && (player->vel.x != 0.0f || player->vel.y != 0.0f)){
                     if(player->pushing_block < 0){ // also check that the player is actually pushing against the block
                          player->pushing_block = i;
-                         player->pushing_block_dir = player->face;
+                         player->pushing_block_dir = rotated_player_face;
                     }else{
                          // stop the player from pushing 2 blocks at once
                          player->pushing_block = -1;

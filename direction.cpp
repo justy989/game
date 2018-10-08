@@ -60,6 +60,11 @@ Direction_t direction_rotate_clockwise(Direction_t dir, U8 times){
      return (Direction_t)((U8)(dir + times) % DIRECTION_COUNT);
 }
 
+Direction_t direction_rotate_counter_clockwise(Direction_t dir, U8 times){
+     S8 real_rot = DIRECTION_COUNT - times;
+     return (Direction_t)((U8)(dir + real_rot) % DIRECTION_COUNT);
+}
+
 DirectionMask_t direction_mask_rotate_clockwise(DirectionMask_t mask){
      // TODO: could probably just shift?
      S8 rot = DIRECTION_MASK_NONE;
