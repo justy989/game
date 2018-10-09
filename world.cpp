@@ -772,7 +772,7 @@ bool block_push(Block_t* block, Direction_t direction, World_t* world, bool push
           if(collided_block == block){
                // pass, this happens in a corner portal!
           }else if(pushed_by_ice && block_on_ice(collided_block, &world->tilemap, world->interactive_qt)){
-               return block_push(collided_block, collided_block_push_dir, world, pushed_by_ice);
+               return block_push(collided_block, collided_block_push_dir, world, pushed_by_ice, instant_vel);
           }else if(block->entangle_index == (collided_block - world->blocks.elements)){
                // if block is entangled with the block it collides with, check if the entangled block can move, this is kind of duplicate work
                Block_t* entangled_collided_block = block_against_another_block(collided_block, direction, world->block_qt,
