@@ -553,7 +553,6 @@ bool check_block_collision_with_other_blocks(Block_t* block_to_check, World_t* w
      return collided;
 }
 
-
 void resolve_block_colliding_with_itself(Direction_t src_portal_dir, Direction_t dst_portal_dir, DirectionMask_t move_mask,
                                          Block_t* block, Direction_t check_horizontal, Direction_t check_vertical, Direction_t* push_dir){
      if(directions_meet_expectations(src_portal_dir, dst_portal_dir, check_horizontal, check_vertical)){

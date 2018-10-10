@@ -371,6 +371,61 @@ MovePlayerThroughWorldResult_t move_player_through_world(Player_t* player, Coord
                Coord_t coord = pixel_to_coord(collided_block->pos.pixel + HALF_TILE_SIZE_PIXEL);
                Coord_t premove_coord = pixel_to_coord(pre_move.pixel + HALF_TILE_SIZE_PIXEL);
 
+               {
+                    // this stops the block when it moves into the player
+                    Vec_t rotated_accel = vec_rotate_quadrants_clockwise(collided_block->accel, portal_rotations);
+                    Vec_t rotated_vel = vec_rotate_quadrants_clockwise(collided_block->vel, portal_rotations);
+
+                    switch(collided_block_dir){
+                    default:
+                         break;
+                    case DIRECTION_LEFT:
+                         if(rotated_vel.x > 0.0f){
+                              collided_block->pos -= collided_block_delta;
+                              player->pos_delta -= pos_delta_diff;
+                              rotated_accel.x = 0.0f;
+                              rotated_vel.x = 0.0f;
+                              collided_block->accel = vec_rotate_quadrants_counter_clockwise(rotated_accel, portal_rotations);
+                              collided_block->vel = vec_rotate_quadrants_counter_clockwise(rotated_vel, portal_rotations);
+                              collided_block->horizontal_move.state = MOVE_STATE_IDLING;
+                         }
+                         break;
+                    case DIRECTION_RIGHT:
+                         if(rotated_vel.x < 0.0f){
+                              collided_block->pos -= collided_block_delta;
+                              player->pos_delta -= pos_delta_diff;
+                              rotated_accel.x = 0.0f;
+                              rotated_vel.x = 0.0f;
+                              collided_block->accel = vec_rotate_quadrants_counter_clockwise(rotated_accel, portal_rotations);
+                              collided_block->vel = vec_rotate_quadrants_counter_clockwise(rotated_vel, portal_rotations);
+                              collided_block->horizontal_move.state = MOVE_STATE_IDLING;
+                         }
+                         break;
+                    case DIRECTION_UP:
+                         if(rotated_vel.y < 0.0f){
+                              collided_block->pos -= collided_block_delta;
+                              player->pos_delta -= pos_delta_diff;
+                              rotated_accel.y = 0.0f;
+                              rotated_vel.y = 0.0f;
+                              collided_block->accel = vec_rotate_quadrants_counter_clockwise(rotated_accel, portal_rotations);
+                              collided_block->vel = vec_rotate_quadrants_counter_clockwise(rotated_vel, portal_rotations);
+                              collided_block->vertical_move.state = MOVE_STATE_IDLING;
+                         }
+                         break;
+                    case DIRECTION_DOWN:
+                         if(rotated_vel.y > 0.0f){
+                              collided_block->pos -= collided_block_delta;
+                              player->pos_delta -= pos_delta_diff;
+                              rotated_accel.y = 0.0f;
+                              rotated_vel.y = 0.0f;
+                              collided_block->accel = vec_rotate_quadrants_counter_clockwise(rotated_accel, portal_rotations);
+                              collided_block->vel = vec_rotate_quadrants_counter_clockwise(rotated_vel, portal_rotations);
+                              collided_block->vertical_move.state = MOVE_STATE_IDLING;
+                         }
+                         break;
+                    }
+               }
+
                Position_t block_center = collided_block->pos;
                block_center.pixel += HALF_TILE_SIZE_PIXEL;
 
@@ -380,7 +435,6 @@ MovePlayerThroughWorldResult_t move_player_through_world(Player_t* player, Coord
                     collided_block->pos = teleport_result.results[0].pos;
                     collided_block->pos.pixel -= HALF_TILE_SIZE_PIXEL;
                }
-
 
                auto rotated_player_face = direction_rotate_counter_clockwise(player->face, portal_rotations);
                if(collided_block_dir == player->face && (player->vel.x != 0.0f || player->vel.y != 0.0f)){

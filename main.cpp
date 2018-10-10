@@ -1634,8 +1634,6 @@ int main(int argc, char** argv){
                               }else{
                                    stop_on_boundary_y = quad_tree_interactive_solid_at(world.interactive_qt, &world.tilemap, coord_a) ||
                                                         quad_tree_interactive_solid_at(world.interactive_qt, &world.tilemap, coord_b);
-                                   if(stop_on_boundary_y){
-                                   }
                               }
                          }else if(block->vel.y < 0.0f){
                               Pixel_t pixel_a {};
@@ -1650,8 +1648,6 @@ int main(int argc, char** argv){
                               }else{
                                    stop_on_boundary_y = quad_tree_interactive_solid_at(world.interactive_qt, &world.tilemap, coord_a) ||
                                                         quad_tree_interactive_solid_at(world.interactive_qt, &world.tilemap, coord_b);
-                                   if(stop_on_boundary_y){
-                                   }
                               }
                          }
 
