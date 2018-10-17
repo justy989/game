@@ -381,18 +381,6 @@ bool block_on_ice(Block_t* block, TileMap_t* tilemap, QuadTreeNode_t<Interactive
 
           Pixel_t block_pixel_check = block_pos.pixel + Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS};
 
-          // if the block is moving, to the right or up, then check the pixel adjacent to the center in the direction we are moving
-          // this will have to change in the future anyway once blocks are no longer square
-          if(block->horizontal_move.state > MOVE_STATE_IDLING &&
-             block->horizontal_move.sign == MOVE_SIGN_POSITIVE){
-               block_pixel_check.x++;
-          }
-
-          if(block->vertical_move.state > MOVE_STATE_IDLING &&
-             block->vertical_move.sign == MOVE_SIGN_POSITIVE){
-               block_pixel_check.y++;
-          }
-
           Coord_t coord = pixel_to_coord(block_pixel_check);
           Interactive_t* interactive = quad_tree_interactive_find_at(interactive_quad_tree, coord);
           if(interactive){

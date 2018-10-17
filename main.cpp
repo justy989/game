@@ -14,12 +14,12 @@ Entanglement:
 
 Big Features:
 - Block splitting
-- Block ice collision with masses
+- Bring block ice collision to the masses
 - 3D
 
 TODO:
 - collision infinite loop lol
-- do we have a walk stuttering problem on other machines ?
+- do we have a walk stuttering problem on other machines ? Doesn't look like it lol.
 
 NOTES:
 - Only 2 blocks high can go through portals
@@ -1268,7 +1268,7 @@ int main(int argc, char** argv){
 
                     for(int d = 0; d < 4; d++){
                          if(player_action.move[d]){
-                              Direction_t rot_dir = direction_rotate_clockwise((Direction_t)(d), player->rotation);
+                              Direction_t rot_dir = direction_rotate_clockwise((Direction_t)(d), player->move_rotation[d]);
                               rotated_move_actions[rot_dir] = true;
                               if(player->reface) player->face = static_cast<Direction_t>(rot_dir);
                          }
@@ -1774,10 +1774,10 @@ int main(int argc, char** argv){
                          coord = pixel_to_coord(final_pos.pixel + HALF_TILE_SIZE_PIXEL);
                          Coord_t premove_coord = pixel_to_coord(block->pos.pixel + HALF_TILE_SIZE_PIXEL);
 
-                         Position_t block_center = block->pos + block->pos_delta;
+                         Position_t block_center = block->pos;
                          block_center.pixel += HALF_TILE_SIZE_PIXEL;
 
-                         auto teleport_result = teleport_position_across_portal(block_center, Vec_t{}, &world, premove_coord,
+                         auto teleport_result = teleport_position_across_portal(block_center, block->pos_delta, &world, premove_coord,
                                                                                 coord);
                          if(teleport_result.count > block->clone_id){
                               block->pos = teleport_result.results[block->clone_id].pos;
@@ -1785,6 +1785,7 @@ int main(int argc, char** argv){
 
                               block->vel = vec_rotate_quadrants_clockwise(block->vel, teleport_result.results[block->clone_id].rotations);
                               block->accel = vec_rotate_quadrants_clockwise(block->accel, teleport_result.results[block->clone_id].rotations);
+                              block->pos_delta = vec_rotate_quadrants_clockwise(block->pos_delta, teleport_result.results[block->clone_id].rotations);
                               block->rotation = teleport_result.results[block->clone_id].rotations;
 
                               if(check_block_collision_with_other_blocks(block, &world)){
@@ -1797,7 +1798,7 @@ int main(int argc, char** argv){
 
                               block_center = block_get_center(block);
 
-                              auto collided_teleport_result = teleport_position_across_portal(block_center, Vec_t{}, &world,
+                              auto collided_teleport_result = teleport_position_across_portal(block_center, block->pos_delta, &world,
                                                                                               premove_coord, coord);
                               if(collided_teleport_result.count > block->clone_id){
                                    block->pos = collided_teleport_result.results[block->clone_id].pos;
@@ -1805,6 +1806,7 @@ int main(int argc, char** argv){
 
                                    block->vel = vec_rotate_quadrants_clockwise(block->vel, collided_teleport_result.results[block->clone_id].rotations);
                                    block->accel = vec_rotate_quadrants_clockwise(block->accel, collided_teleport_result.results[block->clone_id].rotations);
+                                   block->pos_delta = vec_rotate_quadrants_clockwise(block->pos_delta, teleport_result.results[block->clone_id].rotations);
                                    block->rotation = collided_teleport_result.results[block->clone_id].rotations;
                               }
                          }
@@ -2657,7 +2659,7 @@ int main(int argc, char** argv){
                draw_text(buffer, text_pos);
 
                Player_t* player = world.players.elements;
-               snprintf(buffer, 64, "P: %d,%d", player->pos.pixel.x, player->pos.pixel.y);
+               snprintf(buffer, 64, "P: %d,%d R: %d", player->pos.pixel.x, player->pos.pixel.y, player->rotation);
                text_pos.y -= 0.045f;
 
                glColor3f(0.0f, 0.0f, 0.0f);
@@ -2721,6 +2723,20 @@ int main(int argc, char** argv){
                glEnd();
           }
 #endif
+
+          for(S16 i = 0; i < world.blocks.count; i++){
+               auto* block = world.blocks.elements + i;
+               Vec_t screen_pos = pos_to_vec(block->pos);
+
+               Quad_t block_outline_quad = {screen_pos.x, screen_pos.y, screen_pos.x + TILE_SIZE, screen_pos.y + TILE_SIZE};
+
+               if(block_on_ice(block, &world.tilemap, world.interactive_qt)){
+                    draw_quad_wireframe(&block_outline_quad, 0.0f, 0.0f, 255.0f);
+               }else{
+                    draw_quad_wireframe(&block_outline_quad, 255.0f, 255.0f, 255.0f);
+               }
+          }
+
 
           if(demo.mode == DEMO_MODE_PLAY){
                F32 demo_pct = (F32)(frame_count) / (F32)(demo.last_frame);
