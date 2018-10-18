@@ -13,25 +13,31 @@
 #define PLAYER_BOW_DRAW_DELAY 0.3f
 
 struct Player_t : public Motion_t {
-     Position_t pos;
+     Position_t  pos;
+
+     bool        teleport;
+     Position_t  teleport_pos;
+     Vec_t       teleport_pos_delta;
+
      Direction_t face = DIRECTION_LEFT;
-     F32 push_time = 0.0f;
-     S8 walk_frame = 0;
-     S8 walk_frame_delta = 0;
-     F32 walk_frame_time = 0.0;
-     bool has_bow = false;
-     F32 bow_draw_time = 0.0;
+     bool        reface = false;
 
-     Coord_t clone_start;
-     S8 clone_id = 0;
-     S32 clone_instance = 0;
+     F32         push_time = 0.0f;
+     S8          walk_frame = 0;
+     S8          walk_frame_delta = 0;
+     F32         walk_frame_time = 0.0;
 
-     U8 rotation = 0;
+     bool        has_bow = false;
+     F32         bow_draw_time = 0.0;
 
-     bool reface = false;
-     U8 move_rotation[DIRECTION_COUNT];
+     Coord_t     clone_start;
+     S8          clone_id = 0;
+     S32         clone_instance = 0;
 
-     S16 pushing_block = -1;
-     S16 prev_pushing_block = -1;
+     U8          rotation = 0;
+     U8          move_rotation[DIRECTION_COUNT];
+
+     S16         pushing_block = -1;
+     S16         prev_pushing_block = -1;
      Direction_t pushing_block_dir = DIRECTION_COUNT; // we would use face but the pushing can be through rotated portal
 };

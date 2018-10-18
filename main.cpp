@@ -452,6 +452,7 @@ int main(int argc, char** argv){
                          quit = true;
                          break;
                     case SDL_SCANCODE_LEFT:
+                    case SDL_SCANCODE_A:
                          if(editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
                               editor.selection_start.x--;
                               editor.selection_end.x--;
@@ -462,6 +463,7 @@ int main(int argc, char** argv){
                          arrows_down[DIRECTION_LEFT] = true;
                          break;
                     case SDL_SCANCODE_RIGHT:
+                    case SDL_SCANCODE_D:
                          if(editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
                               editor.selection_start.x++;
                               editor.selection_end.x++;
@@ -472,6 +474,7 @@ int main(int argc, char** argv){
                          arrows_down[DIRECTION_RIGHT] = true;
                          break;
                     case SDL_SCANCODE_UP:
+                    case SDL_SCANCODE_W:
                          if(editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
                               editor.selection_start.y++;
                               editor.selection_end.y++;
@@ -482,6 +485,7 @@ int main(int argc, char** argv){
                          arrows_down[DIRECTION_UP] = true;
                          break;
                     case SDL_SCANCODE_DOWN:
+                    case SDL_SCANCODE_S:
                          if(editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
                               editor.selection_start.y--;
                               editor.selection_end.y--;
@@ -772,21 +776,25 @@ int main(int argc, char** argv){
                          quit = true;
                          break;
                     case SDL_SCANCODE_LEFT:
+                    case SDL_SCANCODE_A:
                          player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_LEFT_STOP,
                                                demo.mode, demo.file, frame_count);
                          arrows_down[DIRECTION_LEFT] = false;
                          break;
                     case SDL_SCANCODE_RIGHT:
+                    case SDL_SCANCODE_D:
                          player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_RIGHT_STOP,
                                                demo.mode, demo.file, frame_count);
                          arrows_down[DIRECTION_RIGHT] = false;
                          break;
                     case SDL_SCANCODE_UP:
+                    case SDL_SCANCODE_W:
                          player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_UP_STOP,
                                                demo.mode, demo.file, frame_count);
                          arrows_down[DIRECTION_UP] = false;
                          break;
                     case SDL_SCANCODE_DOWN:
+                    case SDL_SCANCODE_S:
                          player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_DOWN_STOP,
                                                demo.mode, demo.file, frame_count);
                          arrows_down[DIRECTION_DOWN] = false;
@@ -1483,6 +1491,8 @@ int main(int argc, char** argv){
                     if(vec_magnitude(player->pos_delta) > max_pos_delta){
                          player->pos_delta = vec_normalize(player->pos_delta) * max_pos_delta;
                     }
+
+                    // teleport position
                }
 
                // block movement
@@ -1933,31 +1943,29 @@ int main(int argc, char** argv){
                                    }
                               }
                          }
-                         if(teleport_result.count > teleport_clone_id){
+
+                         // if a teleport happened, update the position
+                         if(teleport_result.count){
+                              assert(teleport_result.count > teleport_clone_id);
+
                               player->pos = teleport_result.results[teleport_clone_id].pos;
                               player->pos_delta = teleport_result.results[teleport_clone_id].delta;
                          }
 
                          auto result = move_player_through_world(player, skip_coord, &world);
                          if(result.collided) collided = true;
-
-                         resetting = result.resetting;
+                         if(result.resetting) resetting = result.resetting;
 
                          player_coord = pos_to_coord(player->pos + player->pos_delta);
 
-                         if(teleport_result.count == 0){
-                              teleport_result = teleport_position_across_portal(player->pos, player->pos_delta, &world,
-                                                                                player_previous_coord, player_coord);
-                              if(teleport_result.count > teleport_clone_id){
-                                   player->pos = teleport_result.results[teleport_clone_id].pos;
-                                   player->pos_delta = teleport_result.results[teleport_clone_id].delta;
-                              }
-                         }else{
-                              auto new_teleport_result = teleport_position_across_portal(player->pos, player->pos_delta, &world,
-                                                                                         player_previous_coord, player_coord);
-                              if(new_teleport_result.count > teleport_clone_id){
-                                   player->pos = new_teleport_result.results[teleport_clone_id].pos;
-                                   player->pos_delta = new_teleport_result.results[teleport_clone_id].delta;
+                         auto new_teleport_result = teleport_position_across_portal(player->pos, player->pos_delta, &world,
+                                                                                    player_previous_coord, player_coord);
+                         if(new_teleport_result.count > teleport_clone_id){
+                              player->pos = new_teleport_result.results[teleport_clone_id].pos;
+                              player->pos_delta = new_teleport_result.results[teleport_clone_id].delta;
+
+                              if(teleport_result.count == 0){
+                                   teleport_result = new_teleport_result;
                               }
                          }
 
@@ -2455,7 +2463,6 @@ int main(int argc, char** argv){
                     glVertex2f(tile_pos.x, tile_pos.y + TILE_SIZE);
                     glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y + TILE_SIZE);
                     glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y);
-
                }
           }
           glEnd();
@@ -2724,6 +2731,7 @@ int main(int argc, char** argv){
           }
 #endif
 
+#if 0
           for(S16 i = 0; i < world.blocks.count; i++){
                auto* block = world.blocks.elements + i;
                Vec_t screen_pos = pos_to_vec(block->pos);
@@ -2736,7 +2744,7 @@ int main(int argc, char** argv){
                     draw_quad_wireframe(&block_outline_quad, 255.0f, 255.0f, 255.0f);
                }
           }
-
+#endif
 
           if(demo.mode == DEMO_MODE_PLAY){
                F32 demo_pct = (F32)(frame_count) / (F32)(demo.last_frame);
@@ -2798,6 +2806,5 @@ int main(int argc, char** argv){
      }
 
      Log_t::destroy();
-
      return 0;
 }
