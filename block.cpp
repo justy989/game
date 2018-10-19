@@ -25,15 +25,15 @@ Coord_t block_get_coord(Block_t* block){
      return pixel_to_coord(center);
 }
 
-bool blocks_at_collidable_height(Block_t* a, Block_t* b){
-     S8 a_top = a->pos.z + HEIGHT_INTERVAL - (S8)(1);
-     S8 b_top = b->pos.z + HEIGHT_INTERVAL - (S8)(1);
+bool blocks_at_collidable_height(S8 a_z, S8 b_z){
+     S8 a_top = a_z + HEIGHT_INTERVAL - (S8)(1);
+     S8 b_top = b_z + HEIGHT_INTERVAL - (S8)(1);
 
-     if(a_top >= b->pos.z && a_top <= b_top){
+     if(a_top >= b_z && a_top <= b_top){
           return true;
      }
 
-     if(a->pos.z >= b->pos.z && a->pos.z <= b_top){
+     if(a_z >= b_z && a_z <= b_top){
           return true;
      }
 

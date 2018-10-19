@@ -26,7 +26,7 @@ S16 get_object_y(Block_t* block);
 Pixel_t block_center_pixel(Block_t* block);
 Position_t block_get_center(Block_t* block);
 Coord_t block_get_coord(Block_t* block);
-bool blocks_at_collidable_height(Block_t* a, Block_t* b);
+bool blocks_at_collidable_height(S8 a_z, S8 b_z);
 Rect_t block_get_rect(Block_t* block);
 
 Pixel_t block_bottom_right_pixel(Pixel_t block);

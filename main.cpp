@@ -1638,7 +1638,7 @@ int main(int argc, char** argv){
                          if(block->vel.x > 0.0f){
                               Pixel_t pixel_a {};
                               Pixel_t pixel_b {};
-                              block_adjacent_pixels_to_check(block, DIRECTION_RIGHT, &pixel_a, &pixel_b);
+                              block_adjacent_pixels_to_check(block->pos, block->pos_delta, DIRECTION_RIGHT, &pixel_a, &pixel_b);
                               Coord_t coord_a = pixel_to_coord(pixel_a);
                               Coord_t coord_b = pixel_to_coord(pixel_b);
                               if(coord_a != skip_coord[DIRECTION_RIGHT] && tilemap_is_solid(&world.tilemap, coord_a)){
@@ -1652,7 +1652,7 @@ int main(int argc, char** argv){
                          }else if(block->vel.x < 0.0f){
                               Pixel_t pixel_a {};
                               Pixel_t pixel_b {};
-                              block_adjacent_pixels_to_check(block, DIRECTION_LEFT, &pixel_a, &pixel_b);
+                              block_adjacent_pixels_to_check(block->pos, block->pos_delta, DIRECTION_LEFT, &pixel_a, &pixel_b);
                               Coord_t coord_a = pixel_to_coord(pixel_a);
                               Coord_t coord_b = pixel_to_coord(pixel_b);
                               if(coord_a != skip_coord[DIRECTION_LEFT] && tilemap_is_solid(&world.tilemap, coord_a)){
@@ -1668,7 +1668,7 @@ int main(int argc, char** argv){
                          if(block->vel.y > 0.0f){
                               Pixel_t pixel_a {};
                               Pixel_t pixel_b {};
-                              block_adjacent_pixels_to_check(block, DIRECTION_UP, &pixel_a, &pixel_b);
+                              block_adjacent_pixels_to_check(block->pos, block->pos_delta, DIRECTION_UP, &pixel_a, &pixel_b);
                               Coord_t coord_a = pixel_to_coord(pixel_a);
                               Coord_t coord_b = pixel_to_coord(pixel_b);
                               if(coord_a != skip_coord[DIRECTION_UP] && tilemap_is_solid(&world.tilemap, coord_a)){
@@ -1682,7 +1682,7 @@ int main(int argc, char** argv){
                          }else if(block->vel.y < 0.0f){
                               Pixel_t pixel_a {};
                               Pixel_t pixel_b {};
-                              block_adjacent_pixels_to_check(block, DIRECTION_DOWN, &pixel_a, &pixel_b);
+                              block_adjacent_pixels_to_check(block->pos, block->pos_delta, DIRECTION_DOWN, &pixel_a, &pixel_b);
                               Coord_t coord_a = pixel_to_coord(pixel_a);
                               Coord_t coord_b = pixel_to_coord(pixel_b);
                               if(coord_a != skip_coord[DIRECTION_DOWN] && tilemap_is_solid(&world.tilemap, coord_a)){
@@ -1962,22 +1962,23 @@ int main(int argc, char** argv){
                          auto result = move_player_through_world(player->pos, player->vel, player->pos_delta, player->face,
                                                                  player->clone_instance, i, player->pushing_block,
                                                                  player->pushing_block_dir, skip_coord, &world);
-                         if(result.collided) collided = true;
-                         if(result.resetting) resetting = true;
-                         player->pos_delta = result.pos_delta;
-                         player->pushing_block = result.pushing_block;
-                         player->pushing_block_dir = result.pushing_block_dir;
 
                          if(player->teleport){
                               auto teleport_result = move_player_through_world(player->pos, player->vel, player->pos_delta, player->face,
-                                                                      player->clone_instance, i, player->pushing_block,
-                                                                      player->pushing_block_dir, skip_coord, &world);
+                                                                               player->clone_instance, i, player->pushing_block,
+                                                                               player->pushing_block_dir, skip_coord, &world);
                               if(teleport_result.collided) collided = true;
                               if(teleport_result.resetting) resetting = true;
                               player->teleport_pos_delta = teleport_result.pos_delta;
                               player->teleport_pushing_block = teleport_result.pushing_block;
                               player->teleport_pushing_block_dir = teleport_result.pushing_block_dir;
                          }
+
+                         if(result.collided) collided = true;
+                         if(result.resetting) resetting = true;
+                         player->pos_delta = result.pos_delta;
+                         player->pushing_block = result.pushing_block;
+                         player->pushing_block_dir = result.pushing_block_dir;
 
                          auto* portal = player_is_teleporting(player, world.interactive_qt);
 

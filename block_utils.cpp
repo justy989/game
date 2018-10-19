@@ -8,9 +8,10 @@
 
 Pixel_t g_collided_with_pixel = {};
 
-bool block_adjacent_pixels_to_check(Block_t* block_to_check, Direction_t direction, Pixel_t* a, Pixel_t* b){
-     auto block_to_check_pos = block_to_check->pos + block_to_check->pos_delta;
+bool block_adjacent_pixels_to_check(Position_t pos, Vec_t pos_delta, Direction_t direction, Pixel_t* a, Pixel_t* b){
+     auto block_to_check_pos = pos + pos_delta;
 
+     // TODO: account for width/height
      switch(direction){
      default:
           break;
@@ -76,7 +77,7 @@ Block_t* block_against_block_in_list(Block_t* block_to_check, Block_t** blocks, 
      case DIRECTION_LEFT:
           for(S16 i = 0; i < block_count; i++){
                Block_t* block = blocks[i];
-               if(!blocks_at_collidable_height(block_to_check, block)) continue;
+               if(!blocks_at_collidable_height(block_to_check->pos.z, block->pos.z)) continue;
 
                auto block_pos = block->pos + block->pos_delta;
 
@@ -91,7 +92,7 @@ Block_t* block_against_block_in_list(Block_t* block_to_check, Block_t** blocks, 
      case DIRECTION_RIGHT:
           for(S16 i = 0; i < block_count; i++){
                Block_t* block = blocks[i];
-               if(!blocks_at_collidable_height(block_to_check, block)) continue;
+               if(!blocks_at_collidable_height(block_to_check->pos.z, block->pos.z)) continue;
 
                auto block_pos = block->pos + block->pos_delta;
 
@@ -106,7 +107,7 @@ Block_t* block_against_block_in_list(Block_t* block_to_check, Block_t** blocks, 
      case DIRECTION_DOWN:
           for(S16 i = 0; i < block_count; i++){
                Block_t* block = blocks[i];
-               if(!blocks_at_collidable_height(block_to_check, block)) continue;
+               if(!blocks_at_collidable_height(block_to_check->pos.z, block->pos.z)) continue;
 
                auto block_pos = block->pos + block->pos_delta;
 
@@ -121,7 +122,7 @@ Block_t* block_against_block_in_list(Block_t* block_to_check, Block_t** blocks, 
      case DIRECTION_UP:
           for(S16 i = 0; i < block_count; i++){
                Block_t* block = blocks[i];
-               if(!blocks_at_collidable_height(block_to_check, block)) continue;
+               if(!blocks_at_collidable_height(block_to_check->pos.z, block->pos.z)) continue;
 
                auto block_pos = block->pos + block->pos_delta;
 
@@ -195,7 +196,7 @@ Interactive_t* block_against_solid_interactive(Block_t* block_to_check, Directio
      Pixel_t pixel_a;
      Pixel_t pixel_b;
 
-     if(!block_adjacent_pixels_to_check(block_to_check, direction, &pixel_a, &pixel_b)){
+     if(!block_adjacent_pixels_to_check(block_to_check->pos, block_to_check->pos_delta, direction, &pixel_a, &pixel_b)){
           return nullptr;
      }
 
@@ -308,7 +309,7 @@ Tile_t* block_against_solid_tile(Block_t* block_to_check, Direction_t direction,
      Pixel_t pixel_a {};
      Pixel_t pixel_b {};
 
-     if(!block_adjacent_pixels_to_check(block_to_check, direction, &pixel_a, &pixel_b)){
+     if(!block_adjacent_pixels_to_check(block_to_check->pos, block_to_check->pos_delta, direction, &pixel_a, &pixel_b)){
           return nullptr;
      }
 
@@ -402,7 +403,7 @@ bool check_block_collision_with_other_blocks(Block_t* block_to_check, World_t* w
      bool collided = false;
 
      for(BlockInsideResult_t block_inside_result = block_inside_another_block(block_to_check, world->block_qt, world->interactive_qt, &world->tilemap, &world->blocks);
-         block_inside_result.block && blocks_at_collidable_height(block_to_check, block_inside_result.block);
+         block_inside_result.block && blocks_at_collidable_height(block_to_check->pos.z, block_inside_result.block->pos.z);
          block_inside_result = block_inside_another_block(block_to_check, world->block_qt, world->interactive_qt, &world->tilemap, &world->blocks)){
           collided = true;
 
