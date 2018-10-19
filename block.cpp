@@ -20,6 +20,11 @@ Position_t block_get_center(Block_t* block){
      return pos;
 }
 
+Position_t block_get_center(Position_t pos){
+     pos.pixel += HALF_TILE_SIZE_PIXEL;
+     return pos;
+}
+
 Coord_t block_get_coord(Block_t* block){
      Pixel_t center = block->pos.pixel + HALF_TILE_SIZE_PIXEL;
      return pixel_to_coord(center);

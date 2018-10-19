@@ -17,8 +17,8 @@ struct BlockInsideResult_t{
 
 bool block_adjacent_pixels_to_check(Position_t pos, Vec_t pos_delta, Direction_t direction, Pixel_t* a, Pixel_t* b);
 
-Block_t* block_against_block_in_list(Block_t* block_to_check, Block_t** blocks, S16 block_count, Direction_t direction, Pixel_t* offsets);
-Block_t* block_against_another_block(Block_t* block_to_check, Direction_t direction, QuadTreeNode_t<Block_t>* block_quad_tree,
+Block_t* block_against_block_in_list(Position_t pos, Vec_t pos_delta, Block_t** blocks, S16 block_count, Direction_t direction, Pixel_t* offsets);
+Block_t* block_against_another_block(Position_t pos, Vec_t pos_delta, Direction_t direction, QuadTreeNode_t<Block_t>* block_quad_tree,
                                      QuadTreeNode_t<Interactive_t>* interactive_quad_tree, TileMap_t* tilemap, Direction_t* push_dir);
 Interactive_t* block_against_solid_interactive(Block_t* block_to_check, Direction_t direction,
                                                TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree);

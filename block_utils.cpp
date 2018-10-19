@@ -68,16 +68,17 @@ bool block_adjacent_pixels_to_check(Position_t pos, Vec_t pos_delta, Direction_t
      return false;
 }
 
-Block_t* block_against_block_in_list(Block_t* block_to_check, Block_t** blocks, S16 block_count, Direction_t direction, Pixel_t* offsets){
-     auto block_to_check_pos = block_to_check->pos + block_to_check->pos_delta;
+Block_t* block_against_block_in_list(Position_t pos, Vec_t pos_delta, Block_t** blocks, S16 block_count, Direction_t direction, Pixel_t* offsets){
+     auto block_to_check_pos = pos + pos_delta;
 
+     // TODO: account for block width/height
      switch(direction){
      default:
           break;
      case DIRECTION_LEFT:
           for(S16 i = 0; i < block_count; i++){
                Block_t* block = blocks[i];
-               if(!blocks_at_collidable_height(block_to_check->pos.z, block->pos.z)) continue;
+               if(!blocks_at_collidable_height(pos.z, block->pos.z)) continue;
 
                auto block_pos = block->pos + block->pos_delta;
 
@@ -92,7 +93,7 @@ Block_t* block_against_block_in_list(Block_t* block_to_check, Block_t** blocks, 
      case DIRECTION_RIGHT:
           for(S16 i = 0; i < block_count; i++){
                Block_t* block = blocks[i];
-               if(!blocks_at_collidable_height(block_to_check->pos.z, block->pos.z)) continue;
+               if(!blocks_at_collidable_height(pos.z, block->pos.z)) continue;
 
                auto block_pos = block->pos + block->pos_delta;
 
@@ -107,7 +108,7 @@ Block_t* block_against_block_in_list(Block_t* block_to_check, Block_t** blocks, 
      case DIRECTION_DOWN:
           for(S16 i = 0; i < block_count; i++){
                Block_t* block = blocks[i];
-               if(!blocks_at_collidable_height(block_to_check->pos.z, block->pos.z)) continue;
+               if(!blocks_at_collidable_height(pos.z, block->pos.z)) continue;
 
                auto block_pos = block->pos + block->pos_delta;
 
@@ -122,7 +123,7 @@ Block_t* block_against_block_in_list(Block_t* block_to_check, Block_t** blocks, 
      case DIRECTION_UP:
           for(S16 i = 0; i < block_count; i++){
                Block_t* block = blocks[i];
-               if(!blocks_at_collidable_height(block_to_check->pos.z, block->pos.z)) continue;
+               if(!blocks_at_collidable_height(pos.z, block->pos.z)) continue;
 
                auto block_pos = block->pos + block->pos_delta;
 
@@ -139,9 +140,10 @@ Block_t* block_against_block_in_list(Block_t* block_to_check, Block_t** blocks, 
      return nullptr;
 }
 
-Block_t* block_against_another_block(Block_t* block_to_check, Direction_t direction, QuadTreeNode_t<Block_t>* block_quad_tree,
+Block_t* block_against_another_block(Position_t pos, Vec_t pos_delta, Direction_t direction, QuadTreeNode_t<Block_t>* block_quad_tree,
                                      QuadTreeNode_t<Interactive_t>* interactive_quad_tree, TileMap_t* tilemap, Direction_t* push_dir){
-     Rect_t rect = rect_to_check_surrounding_blocks(block_center_pixel(block_to_check));
+     auto block_center = block_get_center(pos);
+     Rect_t rect = rect_to_check_surrounding_blocks(block_center.pixel);
 
      S16 block_count = 0;
      Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
@@ -150,14 +152,14 @@ Block_t* block_against_another_block(Block_t* block_to_check, Direction_t direct
      Pixel_t portal_offsets[BLOCK_QUAD_TREE_MAX_QUERY];
      memset(portal_offsets, 0, sizeof(portal_offsets));
 
-     Block_t* collided_block = block_against_block_in_list(block_to_check, blocks, block_count, direction, portal_offsets);
+     Block_t* collided_block = block_against_block_in_list(pos, pos_delta, blocks, block_count, direction, portal_offsets);
      if(collided_block){
           *push_dir = direction;
           return collided_block;
      }
 
      // check adjacent portals
-     auto block_coord = block_get_coord(block_to_check);
+     auto block_coord = pos_to_coord(block_center);
      Coord_t min = block_coord - Coord_t{1, 1};
      Coord_t max = block_coord + Coord_t{1, 1};
 
@@ -176,7 +178,7 @@ Block_t* block_against_another_block(Block_t* block_to_check, Direction_t direct
                               search_portal_destination_for_blocks(block_quad_tree, interactive->portal.face, (Direction_t)(d), src_coord,
                                                                    dst_coord, blocks, &block_count, portal_offsets);
 
-                              collided_block = block_against_block_in_list(block_to_check, blocks, block_count, direction, portal_offsets);
+                              collided_block = block_against_block_in_list(pos, pos_delta, blocks, block_count, direction, portal_offsets);
                               if(collided_block){
                                    U8 rotations = portal_rotations_between(interactive->portal.face, (Direction_t)(d));
                                    *push_dir = direction_rotate_clockwise(direction, rotations);
