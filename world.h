@@ -36,8 +36,11 @@ struct TeleportPositionResult_t{
 };
 
 struct MovePlayerThroughWorldResult_t{
-    bool collided;
-    bool resetting;
+     bool collided;
+     bool resetting;
+     Vec_t pos_delta;
+     S16 pushing_block;
+     Direction_t pushing_block_dir;
 };
 
 bool load_map_number(S32 map_number, Coord_t* player_start, World_t* world);
@@ -45,7 +48,10 @@ void setup_map(Coord_t player_start, World_t* world, Undo_t* undo);
 
 void activate(World_t* world, Coord_t coord);
 
-MovePlayerThroughWorldResult_t move_player_through_world(Player_t* player, Coord_t* skip_coord, World_t* world);
+MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, Vec_t player_vel, Vec_t player_pos_delta,
+                                                         Direction_t player_face, S8 player_clone_id, S16 player_index,
+                                                         S16 player_pushing_block, Direction_t player_pushing_block_dir,
+                                                         Coord_t* skip_coord, World_t* world);
 
 TeleportPositionResult_t teleport_position_across_portal(Position_t position, Vec_t pos_delta, World_t* world,
                                                          Coord_t premove_coord, Coord_t postmove_coord);
