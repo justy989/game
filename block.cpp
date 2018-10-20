@@ -14,6 +14,10 @@ Pixel_t block_center_pixel(Block_t* block){
      return block->pos.pixel + HALF_TILE_SIZE_PIXEL;
 }
 
+Pixel_t block_center_pixel(Position_t pos){
+     return pos.pixel + HALF_TILE_SIZE_PIXEL;
+}
+
 Position_t block_get_center(Block_t* block){
      Position_t pos = block->pos;
      pos.pixel += HALF_TILE_SIZE_PIXEL;

@@ -213,23 +213,26 @@ Interactive_t* block_against_solid_interactive(Block_t* block_to_check, Directio
      return nullptr;
 }
 
-Block_t* block_inside_block_list(Block_t* block_to_check, Block_t** blocks, S16 block_count, ObjectArray_t<Block_t>* blocks_array, Position_t* collided_with, Pixel_t* portal_offsets){
-     auto check_pos = block_to_check->pos + block_to_check->pos_delta;
+Block_t* block_inside_block_list(Position_t block_to_check_pos, Vec_t block_to_check_pos_delta,
+                                 S16 block_to_check_index, S16 block_to_check_entangle_index, bool block_to_check_cloning,
+                                 Block_t** blocks, S16 block_count, ObjectArray_t<Block_t>* blocks_array,
+                                 Position_t* collided_with, Pixel_t* portal_offsets){
+     auto check_pos = block_to_check_pos + block_to_check_pos_delta;
      Rect_t rect = {check_pos.pixel.x, check_pos.pixel.y,
                     (S16)(check_pos.pixel.x + BLOCK_SOLID_SIZE_IN_PIXELS),
                     (S16)(check_pos.pixel.y + BLOCK_SOLID_SIZE_IN_PIXELS)};
 
      Block_t* entangled_block = nullptr;
-     if(block_to_check->entangle_index >= 0){
-          entangled_block = blocks_array->elements + block_to_check->entangle_index;
+     if(block_to_check_entangle_index >= 0){
+          entangled_block = blocks_array->elements + block_to_check_entangle_index;
      }
 
      for(S16 i = 0; i < block_count; i++){
           Block_t* block = blocks[i];
 
           // don't collide with blocks that are cloning
-          if(block == entangled_block && block_to_check->clone_start.x > 0) continue;
-          if(block == block_to_check && portal_offsets[i].x == 0 && portal_offsets[i].y == 0) continue;
+          if(block == entangled_block && block_to_check_cloning) continue;
+          if(block_to_check_index == i && portal_offsets[i].x == 0 && portal_offsets[i].y == 0) continue;
 
           auto block_pos = block->pos + block->pos_delta;
 
@@ -249,13 +252,17 @@ Block_t* block_inside_block_list(Block_t* block_to_check, Block_t** blocks, S16 
      return nullptr;
 }
 
-BlockInsideResult_t block_inside_another_block(Block_t* block_to_check, QuadTreeNode_t<Block_t>* block_quad_tree,
+BlockInsideResult_t block_inside_another_block(Position_t block_to_check_pos, Vec_t block_to_check_pos_delta, S16 block_to_check_index,
+                                               S16 block_to_check_entangle_index, bool block_to_check_cloning,
+                                               QuadTreeNode_t<Block_t>* block_quad_tree,
                                                QuadTreeNode_t<Interactive_t>* interactive_quad_tree, TileMap_t* tilemap,
                                                ObjectArray_t<Block_t>* block_array){
      BlockInsideResult_t result = {};
 
+     auto block_to_check_center_pixel = block_center_pixel(block_to_check_pos);
+
      // TODO: need more complicated function to detect this
-     Rect_t surrounding_rect = rect_to_check_surrounding_blocks(block_center_pixel(block_to_check));
+     Rect_t surrounding_rect = rect_to_check_surrounding_blocks(block_to_check_center_pixel);
      S16 block_count = 0;
      Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
      quad_tree_find_in(block_quad_tree, surrounding_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
@@ -263,14 +270,26 @@ BlockInsideResult_t block_inside_another_block(Block_t* block_to_check, QuadTree
      Pixel_t portal_offsets[BLOCK_QUAD_TREE_MAX_QUERY];
      memset(portal_offsets, 0, sizeof(portal_offsets));
 
-     Block_t* collided_block = block_inside_block_list(block_to_check, blocks, block_count, block_array, &result.collision_pos, portal_offsets);
+     S16 block_to_check_list_index = -1;
+     for(S16 i = 0; i < block_count; i++){
+          S16 index = blocks[i] - block_array->elements;
+          if(index == block_to_check_index){
+               block_to_check_list_index = i;
+               break;
+          }
+     }
+
+     Block_t* collided_block = block_inside_block_list(block_to_check_pos, block_to_check_pos_delta,
+                                                       block_to_check_list_index, block_to_check_entangle_index,
+                                                       block_to_check_cloning, blocks, block_count,
+                                                       block_array, &result.collision_pos, portal_offsets);
      if(collided_block){
           result.block = collided_block;
           return result;
      }
 
      // find portals around the block to check
-     auto block_coord = block_get_coord(block_to_check);
+     auto block_coord = pixel_to_coord(block_to_check_center_pixel);
      Coord_t min = block_coord - Coord_t{1, 1};
      Coord_t max = block_coord + Coord_t{1, 1};
 
@@ -289,7 +308,10 @@ BlockInsideResult_t block_inside_another_block(Block_t* block_to_check, QuadTree
                               search_portal_destination_for_blocks(block_quad_tree, interactive->portal.face, (Direction_t)(d), src_coord,
                                                                    dst_coord, blocks, &block_count, portal_offsets);
 
-                              collided_block = block_inside_block_list(block_to_check, blocks, block_count, block_array, &result.collision_pos, portal_offsets);
+                              collided_block = block_inside_block_list(block_to_check_pos, block_to_check_pos_delta,
+                                                                       block_to_check_list_index, block_to_check_entangle_index,
+                                                                       block_to_check_cloning, blocks, block_count,
+                                                                       block_array, &result.collision_pos, portal_offsets);
                               if(collided_block){
                                    result.block = collided_block;
                                    result.portal_rotations = portal_rotations_between(interactive->portal.face, (Direction_t)(d));
@@ -404,9 +426,27 @@ bool block_on_ice(Block_t* block, TileMap_t* tilemap, QuadTreeNode_t<Interactive
 bool check_block_collision_with_other_blocks(Block_t* block_to_check, World_t* world){
      bool collided = false;
 
-     for(BlockInsideResult_t block_inside_result = block_inside_another_block(block_to_check, world->block_qt, world->interactive_qt, &world->tilemap, &world->blocks);
+     S16 block_to_check_index = block_to_check - world->blocks.elements;
+
+     for(BlockInsideResult_t block_inside_result = block_inside_another_block(block_to_check->pos,
+                                                                              block_to_check->pos_delta,
+                                                                              block_to_check_index,
+                                                                              block_to_check->entangle_index,
+                                                                              block_to_check->clone_start.x > 0,
+                                                                              world->block_qt,
+                                                                              world->interactive_qt,
+                                                                              &world->tilemap,
+                                                                              &world->blocks);
          block_inside_result.block && blocks_at_collidable_height(block_to_check->pos.z, block_inside_result.block->pos.z);
-         block_inside_result = block_inside_another_block(block_to_check, world->block_qt, world->interactive_qt, &world->tilemap, &world->blocks)){
+         block_inside_result = block_inside_another_block(block_to_check->pos,
+                                                          block_to_check->pos_delta,
+                                                          block_to_check_index,
+                                                          block_to_check->entangle_index,
+                                                          block_to_check->clone_start.x > 0,
+                                                          world->block_qt,
+                                                          world->interactive_qt,
+                                                          &world->tilemap,
+                                                          &world->blocks)){
           collided = true;
 
           auto block_to_check_pos = block_to_check->pos + block_to_check->pos_delta;

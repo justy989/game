@@ -24,6 +24,7 @@ struct Block_t : public GridMotion_t{
 S16 get_object_x(Block_t* block);
 S16 get_object_y(Block_t* block);
 Pixel_t block_center_pixel(Block_t* block);
+Pixel_t block_center_pixel(Position_t pos);
 Position_t block_get_center(Block_t* block);
 Position_t block_get_center(Position_t pos);
 Coord_t block_get_coord(Block_t* block);
