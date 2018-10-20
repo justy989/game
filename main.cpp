@@ -357,8 +357,6 @@ int main(int argc, char** argv){
      setup_map(player_start, &world, &undo);
      init(&editor);
 
-     bool arrows_down[DIRECTION_COUNT] = {false, false, false, false};
-
      F32 dt = 0.0f;
 
      auto last_time = std::chrono::system_clock::now();
@@ -456,22 +454,39 @@ int main(int argc, char** argv){
                          if(editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
                               editor.selection_start.x--;
                               editor.selection_end.x--;
+                         }else if(demo.mode == DEMO_MODE_PLAY){
+                              if(frame_count > 0 && demo.seek_frame < 0){
+                                   demo.seek_frame = frame_count - 1;
+
+                                   // TODO: compress with same comment elsewhere in this file
+                                   fetch_cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
+
+                                   setup_map(player_start, &world, &undo);
+
+                                   // reset some vars
+                                   player_action = {};
+
+                                   demo.entry_index = 0;
+                                   frame_count = 0;
+                              }
                          }else if(!resetting){
                               player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_LEFT_START,
                                                     demo.mode, demo.file, frame_count);
                          }
-                         arrows_down[DIRECTION_LEFT] = true;
                          break;
                     case SDL_SCANCODE_RIGHT:
                     case SDL_SCANCODE_D:
                          if(editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
                               editor.selection_start.x++;
                               editor.selection_end.x++;
+                         }else if(demo.mode == DEMO_MODE_PLAY){
+                              if(demo.seek_frame < 0){
+                                   demo.seek_frame = frame_count + 1;
+                              }
                          }else if(!resetting){
                               player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_RIGHT_START,
                                                     demo.mode, demo.file, frame_count);
                          }
-                         arrows_down[DIRECTION_RIGHT] = true;
                          break;
                     case SDL_SCANCODE_UP:
                     case SDL_SCANCODE_W:
@@ -482,7 +497,6 @@ int main(int argc, char** argv){
                               player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_UP_START,
                                                     demo.mode, demo.file, frame_count);
                          }
-                         arrows_down[DIRECTION_UP] = true;
                          break;
                     case SDL_SCANCODE_DOWN:
                     case SDL_SCANCODE_S:
@@ -493,7 +507,6 @@ int main(int argc, char** argv){
                               player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_DOWN_START,
                                                     demo.mode, demo.file, frame_count);
                          }
-                         arrows_down[DIRECTION_DOWN] = true;
                          break;
                     case SDL_SCANCODE_E:
                          if(!resetting){
@@ -777,33 +790,47 @@ int main(int argc, char** argv){
                          break;
                     case SDL_SCANCODE_LEFT:
                     case SDL_SCANCODE_A:
+                         if(demo.mode == DEMO_MODE_PLAY) break;
+                         if(resetting) break;
+
                          player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_LEFT_STOP,
                                                demo.mode, demo.file, frame_count);
-                         arrows_down[DIRECTION_LEFT] = false;
                          break;
                     case SDL_SCANCODE_RIGHT:
                     case SDL_SCANCODE_D:
+                         if(demo.mode == DEMO_MODE_PLAY) break;
+                         if(resetting) break;
+
                          player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_RIGHT_STOP,
                                                demo.mode, demo.file, frame_count);
-                         arrows_down[DIRECTION_RIGHT] = false;
                          break;
                     case SDL_SCANCODE_UP:
                     case SDL_SCANCODE_W:
+                         if(demo.mode == DEMO_MODE_PLAY) break;
+                         if(resetting) break;
+
                          player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_UP_STOP,
                                                demo.mode, demo.file, frame_count);
-                         arrows_down[DIRECTION_UP] = false;
                          break;
                     case SDL_SCANCODE_DOWN:
                     case SDL_SCANCODE_S:
+                         if(demo.mode == DEMO_MODE_PLAY) break;
+                         if(resetting) break;
+
                          player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_DOWN_STOP,
                                                demo.mode, demo.file, frame_count);
-                         arrows_down[DIRECTION_DOWN] = false;
                          break;
                     case SDL_SCANCODE_E:
+                         if(demo.mode == DEMO_MODE_PLAY) break;
+                         if(resetting) break;
+
                          player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_ACTIVATE_STOP,
                                                demo.mode, demo.file, frame_count);
                          break;
                     case SDL_SCANCODE_SPACE:
+                         if(demo.mode == DEMO_MODE_PLAY) break;
+                         if(resetting) break;
+
                          player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_SHOOT_STOP,
                                                demo.mode, demo.file, frame_count);
                          break;

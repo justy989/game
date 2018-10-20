@@ -445,7 +445,7 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
 
                auto rotated_player_face = direction_rotate_counter_clockwise(player_face, portal_rotations);
                if(collided_block_dir == player_face && (player_vel.x != 0.0f || player_vel.y != 0.0f)){
-                    if(player_pushing_block < 0){ // also check that the player is actually pushing against the block
+                    if(result.pushing_block < 0){ // also check that the player is actually pushing against the block
                          result.pushing_block = i;
                          result.pushing_block_dir = rotated_player_face;
                     }else{
