@@ -400,9 +400,9 @@ Block_t* block_held_up_by_another_block(Block_t* block_to_check, QuadTreeNode_t<
      return nullptr;
 }
 
-bool block_on_ice(Block_t* block, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree){
-     if(block->pos.z == 0){
-          auto block_pos = block->pos + block->pos_delta;
+bool block_on_ice(Position_t pos, Vec_t pos_delta, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree){
+     if(pos.z == 0){
+          auto block_pos = pos + pos_delta;
 
           Pixel_t block_pixel_check = block_pos.pixel + Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS};
 
@@ -423,45 +423,65 @@ bool block_on_ice(Block_t* block, TileMap_t* tilemap, QuadTreeNode_t<Interactive
      return false;
 }
 
-bool check_block_collision_with_other_blocks(Block_t* block_to_check, World_t* world){
-     bool collided = false;
 
-     S16 block_to_check_index = block_to_check - world->blocks.elements;
 
-     for(BlockInsideResult_t block_inside_result = block_inside_another_block(block_to_check->pos,
-                                                                              block_to_check->pos_delta,
-                                                                              block_to_check_index,
-                                                                              block_to_check->entangle_index,
-                                                                              block_to_check->clone_start.x > 0,
+CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t block_pos, Vec_t block_pos_delta, Vec_t block_vel,
+                                                                    Vec_t block_accel, S16 block_stop_on_pixel_x, S16 block_stop_on_pixel_y,
+                                                                    Move_t block_horizontal_move, Move_t block_vertical_move, S16 block_index,
+                                                                    S16 block_entangle_index, bool block_is_cloning, World_t* world){
+     CheckBlockCollisionResult_t result {};
+
+     result.pos = block_pos;
+     result.pos_delta = block_pos_delta;
+     result.vel = block_vel;
+     result.accel = block_accel;
+
+     result.stop_on_pixel_x = block_stop_on_pixel_x;
+     result.stop_on_pixel_y = block_stop_on_pixel_y;
+
+     result.horizontal_move = block_horizontal_move;
+     result.vertical_move = block_vertical_move;
+
+     for(BlockInsideResult_t block_inside_result = block_inside_another_block(result.pos,
+                                                                              result.pos_delta,
+                                                                              block_index,
+                                                                              block_entangle_index,
+                                                                              block_is_cloning,
                                                                               world->block_qt,
                                                                               world->interactive_qt,
                                                                               &world->tilemap,
                                                                               &world->blocks);
-         block_inside_result.block && blocks_at_collidable_height(block_to_check->pos.z, block_inside_result.block->pos.z);
-         block_inside_result = block_inside_another_block(block_to_check->pos,
-                                                          block_to_check->pos_delta,
-                                                          block_to_check_index,
-                                                          block_to_check->entangle_index,
-                                                          block_to_check->clone_start.x > 0,
+         block_inside_result.block && blocks_at_collidable_height(result.pos.z, block_inside_result.block->pos.z);
+         block_inside_result = block_inside_another_block(result.pos,
+                                                          result.pos_delta,
+                                                          block_index,
+                                                          block_entangle_index,
+                                                          block_is_cloning,
                                                           world->block_qt,
                                                           world->interactive_qt,
                                                           &world->tilemap,
                                                           &world->blocks)){
-          collided = true;
+          result.collided = true;
 
-          auto block_to_check_pos = block_to_check->pos + block_to_check->pos_delta;
-
-          auto block_center_pixel = block_to_check_pos.pixel + HALF_TILE_SIZE_PIXEL;
-          auto quadrant = relative_quadrant(block_center_pixel, block_inside_result.collision_pos.pixel);
+          auto block_pixel = block_center_pixel(result.pos + result.pos_delta);
+          auto quadrant = relative_quadrant(block_pixel, block_inside_result.collision_pos.pixel);
 
           // check if they are on ice before we adjust the position on our block to check
-          bool a_on_ice = block_on_ice(block_to_check, &world->tilemap, world->interactive_qt);
-          bool b_on_ice = block_on_ice(block_inside_result.block, &world->tilemap, world->interactive_qt);
+          bool a_on_ice = block_on_ice(result.pos, result.pos_delta, &world->tilemap,
+                                       world->interactive_qt);
+          bool b_on_ice = block_on_ice(block_inside_result.block->pos, block_inside_result.block->pos_delta,
+                                       &world->tilemap, world->interactive_qt);
 
-          Vec_t save_vel = block_to_check->vel;
+          Vec_t save_vel = result.vel;
 
-          if(block_inside_result.block == block_to_check){
-               block_to_check->pos = coord_to_pos(block_get_coord(block_to_check));
+          S16 block_inside_index = 0;
+          if(block_inside_result.block){
+              block_inside_index = get_block_index(world, block_inside_result.block);
+          }
+
+          if(block_inside_index == block_index){
+               // TODO: I don't understand this line
+               result.pos = coord_to_pos(block_get_coord(result.pos));
           }else{
                switch(quadrant){
                default:
@@ -469,71 +489,94 @@ bool check_block_collision_with_other_blocks(Block_t* block_to_check, World_t* w
                case DIRECTION_LEFT:
                {
                     // TODO: compress these cases
-                    block_to_check->stop_on_pixel_x = block_inside_result.collision_pos.pixel.x + HALF_TILE_SIZE_IN_PIXELS;
+                    result.stop_on_pixel_x = block_inside_result.collision_pos.pixel.x + HALF_TILE_SIZE_IN_PIXELS;
 
-                    block_to_check->pos_delta.x = 0;
-                    block_to_check->vel.x = 0.0f;
-                    block_to_check->accel.x = 0.0f;
-                    block_to_check->horizontal_move.state = MOVE_STATE_IDLING;
+                    result.pos_delta.x = 0;
+                    result.vel.x = 0.0f;
+                    result.accel.x = 0.0f;
+                    result.horizontal_move.state = MOVE_STATE_IDLING;
                } break;
                case DIRECTION_RIGHT:
                {
-                    block_to_check->stop_on_pixel_x = (block_inside_result.collision_pos.pixel.x - HALF_TILE_SIZE_IN_PIXELS) - TILE_SIZE_IN_PIXELS;
+                    result.stop_on_pixel_x = (block_inside_result.collision_pos.pixel.x - HALF_TILE_SIZE_IN_PIXELS) - TILE_SIZE_IN_PIXELS;
 
-                    block_to_check->pos_delta.x = 0;
-                    block_to_check->vel.x = 0.0f;
-                    block_to_check->accel.x = 0.0f;
-                    block_to_check->horizontal_move.state = MOVE_STATE_IDLING;
+                    result.pos_delta.x = 0;
+                    result.vel.x = 0.0f;
+                    result.accel.x = 0.0f;
+                    result.horizontal_move.state = MOVE_STATE_IDLING;
                } break;
                case DIRECTION_DOWN:
                {
-                    block_to_check->stop_on_pixel_y = block_inside_result.collision_pos.pixel.y + HALF_TILE_SIZE_IN_PIXELS;
+                    result.stop_on_pixel_y = block_inside_result.collision_pos.pixel.y + HALF_TILE_SIZE_IN_PIXELS;
 
-                    block_to_check->pos_delta.y = 0;
-                    block_to_check->vel.y = 0.0f;
-                    block_to_check->accel.y = 0.0f;
-                    block_to_check->vertical_move.state = MOVE_STATE_IDLING;
+                    result.pos_delta.y = 0;
+                    result.vel.y = 0.0f;
+                    result.accel.y = 0.0f;
+                    result.vertical_move.state = MOVE_STATE_IDLING;
                } break;
                case DIRECTION_UP:
                {
-                    block_to_check->stop_on_pixel_y = (block_inside_result.collision_pos.pixel.y - HALF_TILE_SIZE_IN_PIXELS) - TILE_SIZE_IN_PIXELS;
+                    result.stop_on_pixel_y = (block_inside_result.collision_pos.pixel.y - HALF_TILE_SIZE_IN_PIXELS) - TILE_SIZE_IN_PIXELS;
 
-                    block_to_check->pos_delta.y = 0;
-                    block_to_check->vel.y = 0.0f;
-                    block_to_check->accel.y = 0.0f;
-                    block_to_check->vertical_move.state = MOVE_STATE_IDLING;
+                    result.pos_delta.y = 0;
+                    result.vel.y = 0.0f;
+                    result.accel.y = 0.0f;
+                    result.vertical_move.state = MOVE_STATE_IDLING;
                } break;
                }
           }
 
           for(S16 i = 0; i < world->players.count; i++){
                Player_t* player = world->players.elements + i;
-               if(player->pushing_block == (S16)(block_to_check - world->blocks.elements) && quadrant == player->face){
+               if(player->pushing_block == block_index && quadrant == player->face){
                     player->push_time = 0.0f;
                }
           }
 
           if(a_on_ice && b_on_ice){
                bool push = true;
-               Direction_t push_dir = DIRECTION_COUNT;;
+               Direction_t push_dir = DIRECTION_COUNT;
 
-               if(block_inside_result.block == block_to_check){
-                    Coord_t block_coord = block_get_coord(block_to_check);
+               if(block_inside_index == block_index){
+                    Coord_t block_coord = block_get_coord(result.pos);
                     Direction_t src_portal_dir = direction_between(block_coord, block_inside_result.src_portal_coord);
                     Direction_t dst_portal_dir = direction_between(block_coord, block_inside_result.dst_portal_coord);
-                    DirectionMask_t move_mask = vec_direction_mask(block_to_check->vel);
+                    DirectionMask_t move_mask = vec_direction_mask(result.vel);
 
-                    resolve_block_colliding_with_itself(src_portal_dir, dst_portal_dir, move_mask, block_to_check,
-                                                        DIRECTION_LEFT, DIRECTION_UP, &push_dir);
+                    auto resolve_result = resolve_block_colliding_with_itself(src_portal_dir, dst_portal_dir, move_mask, block_vel,
+                                                                              block_accel, DIRECTION_LEFT, DIRECTION_UP);
+                    if(resolve_result.push_dir != DIRECTION_COUNT){
+                         push_dir = resolve_result.push_dir;
+                         resolve_result.vel = resolve_result.vel;
+                         resolve_result.accel = resolve_result.accel;
+                    }
 
-                    resolve_block_colliding_with_itself(src_portal_dir, dst_portal_dir, move_mask, block_to_check,
-                                                        DIRECTION_LEFT, DIRECTION_DOWN, &push_dir);
+                    resolve_result = resolve_block_colliding_with_itself(src_portal_dir, dst_portal_dir, move_mask, block_vel,
+                                                                         block_accel, DIRECTION_LEFT, DIRECTION_DOWN);
 
-                    resolve_block_colliding_with_itself(src_portal_dir, dst_portal_dir, move_mask, block_to_check,
-                                                        DIRECTION_RIGHT, DIRECTION_UP, &push_dir);
+                    if(resolve_result.push_dir != DIRECTION_COUNT){
+                         push_dir = resolve_result.push_dir;
+                         resolve_result.vel = resolve_result.vel;
+                         resolve_result.accel = resolve_result.accel;
+                    }
 
-                    resolve_block_colliding_with_itself(src_portal_dir, dst_portal_dir, move_mask, block_to_check,
-                                                        DIRECTION_RIGHT, DIRECTION_DOWN, &push_dir);
+                    resolve_result = resolve_block_colliding_with_itself(src_portal_dir, dst_portal_dir, move_mask, block_vel,
+                                                                         block_accel, DIRECTION_RIGHT, DIRECTION_UP);
+
+                    if(resolve_result.push_dir != DIRECTION_COUNT){
+                         push_dir = resolve_result.push_dir;
+                         resolve_result.vel = resolve_result.vel;
+                         resolve_result.accel = resolve_result.accel;
+                    }
+
+                    resolve_result = resolve_block_colliding_with_itself(src_portal_dir, dst_portal_dir, move_mask, block_vel,
+                                                                         block_accel, DIRECTION_RIGHT, DIRECTION_DOWN);
+
+                    if(resolve_result.push_dir != DIRECTION_COUNT){
+                         push_dir = resolve_result.push_dir;
+                         resolve_result.vel = resolve_result.vel;
+                         resolve_result.accel = resolve_result.accel;
+                    }
                }else{
                     push_dir = direction_rotate_clockwise(quadrant, block_inside_result.portal_rotations);
 
@@ -578,25 +621,32 @@ bool check_block_collision_with_other_blocks(Block_t* block_to_check, World_t* w
           }
 
           // TODO: there is no way this is the right way to do this
-          if(block_inside_result.block == block_to_check) break;
+          if(block_inside_index == block_index) break;
      }
 
-     return collided;
+     return result;
 }
 
-void resolve_block_colliding_with_itself(Direction_t src_portal_dir, Direction_t dst_portal_dir, DirectionMask_t move_mask,
-                                         Block_t* block, Direction_t check_horizontal, Direction_t check_vertical, Direction_t* push_dir){
+BlockCollidesWithItselfResult_t resolve_block_colliding_with_itself(Direction_t src_portal_dir, Direction_t dst_portal_dir, DirectionMask_t move_mask,
+                                                                    Vec_t block_vel, Vec_t block_accel, Direction_t check_horizontal, Direction_t check_vertical){
+     BlockCollidesWithItselfResult_t result {};
+     result.push_dir = DIRECTION_COUNT;
+     result.vel = block_vel;
+     result.accel = block_accel;
+
      if(directions_meet_expectations(src_portal_dir, dst_portal_dir, check_horizontal, check_vertical)){
           if(move_mask & direction_to_direction_mask(check_vertical)){
-               *push_dir = direction_opposite(check_horizontal);
-               block->vel.y = 0;
-               block->accel.y = 0;
+               result.push_dir = direction_opposite(check_horizontal);
+               result.vel.y = 0;
+               result.accel.y = 0;
           }else if(move_mask & direction_to_direction_mask(check_horizontal)){
-               *push_dir = direction_opposite(check_vertical);
-               block->vel.x = 0;
-               block->accel.x = 0;
+               result.push_dir = direction_opposite(check_vertical);
+               result.vel.x = 0;
+               result.accel.x = 0;
           }
      }
+
+     return result;
 }
 
 void search_portal_destination_for_blocks(QuadTreeNode_t<Block_t>* block_quad_tree, Direction_t src_portal_face,

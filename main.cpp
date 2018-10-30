@@ -150,6 +150,10 @@ int main(int argc, char** argv){
                if(next >= argc) continue;
                map_number = (S16)(atoi(argv[next]));
                first_map_number = map_number;
+          }else if(strcmp(argv[i], "-speed") == 0){
+               int next = i + 1;
+               if(next >= argc) continue;
+               demo.dt_scalar = (F32)(atof(argv[next]));
           }else if(strcmp(argv[i], "-h") == 0){
                printf("%s [options]\n", argv[0]);
                printf("  -play   <demo filepath> replay a recorded demo file\n");
@@ -159,6 +163,7 @@ int main(int argc, char** argv){
                printf("  -suite                  run map/demo combos in succession validating map state after each headless\n");
                printf("  -show                   use in combination with -suite to run with a head\n");
                printf("  -map    <number>        load a map by number\n");
+               printf("  -speed  <value>         when replaying a demo, specify how fast/slow to replay where 1.0 is realtime\n");
                printf("  -h this help.\n");
                return 0;
           }
@@ -1578,7 +1583,7 @@ int main(int argc, char** argv){
                     bool coast_horizontal = false;
                     bool coast_vertical = false;
 
-                    if(block_on_ice(block, &world.tilemap, world.interactive_qt)){
+                    if(block_on_ice(block->pos, block->pos_delta, &world.tilemap, world.interactive_qt)){
                          coast_horizontal = true;
                          coast_vertical = true;
                     }else{
@@ -1649,8 +1654,24 @@ int main(int argc, char** argv){
                          bool held_up = false;
 
                          if(block->pos_delta.x != 0.0f || block->pos_delta.y != 0.0f){
-                              if(check_block_collision_with_other_blocks(block, &world)){
+                              auto result = check_block_collision_with_other_blocks(block->pos, block->pos_delta, block->vel, block->accel,
+                                                                                    block->stop_on_pixel_x, block->stop_on_pixel_y, block->horizontal_move,
+                                                                                    block->vertical_move, i, block->entangle_index, block->clone_start.x > 0,
+                                                                                    &world);
+                              if(result.collided){
                                    collided = true;
+
+                                   block->pos = result.pos;
+
+                                   block->pos_delta = result.pos_delta;
+                                   block->vel = result.vel;
+                                   block->accel = result.accel;
+
+                                   block->stop_on_pixel_x = result.stop_on_pixel_x;
+                                   block->stop_on_pixel_y = result.stop_on_pixel_y;
+
+                                   block->horizontal_move = result.horizontal_move;
+                                   block->vertical_move = result.vertical_move;
                               }
                          }
 
@@ -1740,7 +1761,7 @@ int main(int argc, char** argv){
                          }
 
                          // this instance of last_block_pushed is to keep the pushing smooth and not have it stop at the tile boundaries
-                         if(block != block_pushed && !block_on_ice(block, &world.tilemap, world.interactive_qt)){
+                         if(block != block_pushed && !block_on_ice(block->pos, block->pos_delta, &world.tilemap, world.interactive_qt)){
                               if(block == entangled_block_pushed){
                                    // TODO: take into account block rotation
                                    DirectionMask_t vel_mask = vec_direction_mask(block->vel);
@@ -1859,8 +1880,25 @@ int main(int argc, char** argv){
                               block->pos_delta = vec_rotate_quadrants_clockwise(block->pos_delta, teleport_result.results[block->clone_id].rotations);
                               block->rotation = teleport_result.results[block->clone_id].rotations;
 
-                              if(check_block_collision_with_other_blocks(block, &world)){
+                              auto result = check_block_collision_with_other_blocks(block->pos, block->pos_delta, block->vel, block->accel,
+                                                                                    block->stop_on_pixel_x, block->stop_on_pixel_y, block->horizontal_move,
+                                                                                    block->vertical_move, i, block->entangle_index, block->clone_start.x > 0,
+                                                                                    &world);
+                              if(result.collided){
+                                   // TODO: compress this with the same code above (using check_block_collision_with_other_blocks)
                                    collided = true;
+
+                                   block->pos = result.pos;
+
+                                   block->pos_delta = result.pos_delta;
+                                   block->vel = result.vel;
+                                   block->accel = result.accel;
+
+                                   block->stop_on_pixel_x = result.stop_on_pixel_x;
+                                   block->stop_on_pixel_y = result.stop_on_pixel_y;
+
+                                   block->horizontal_move = result.horizontal_move;
+                                   block->vertical_move = result.vertical_move;
                               }
 
                               // try teleporting if we collided with a block
@@ -2783,7 +2821,7 @@ int main(int argc, char** argv){
 
                Quad_t block_outline_quad = {screen_pos.x, screen_pos.y, screen_pos.x + TILE_SIZE, screen_pos.y + TILE_SIZE};
 
-               if(block_on_ice(block, &world.tilemap, world.interactive_qt)){
+               if(block_on_ice(block->pos, block->pos_delta, &world.tilemap, world.interactive_qt)){
                     draw_quad_wireframe(&block_outline_quad, 0.0f, 0.0f, 255.0f);
                }else{
                     draw_quad_wireframe(&block_outline_quad, 255.0f, 255.0f, 255.0f);

@@ -34,6 +34,11 @@ Coord_t block_get_coord(Block_t* block){
      return pixel_to_coord(center);
 }
 
+Coord_t block_get_coord(Position_t pos){
+     Pixel_t center = pos.pixel + HALF_TILE_SIZE_PIXEL;
+     return pixel_to_coord(center);
+}
+
 bool blocks_at_collidable_height(S8 a_z, S8 b_z){
      S8 a_top = a_z + HEIGHT_INTERVAL - (S8)(1);
      S8 b_top = b_z + HEIGHT_INTERVAL - (S8)(1);

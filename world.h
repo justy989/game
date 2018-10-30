@@ -66,3 +66,5 @@ bool reset_players(ObjectArray_t<Player_t>* players);
 
 void describe_coord(Coord_t coord, World_t* world);
 bool test_map_end_state(World_t* world, Demo_t* demo);
+
+S16 get_block_index(World_t* world, Block_t* block);

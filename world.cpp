@@ -832,7 +832,7 @@ bool block_push(Block_t* block, Direction_t direction, World_t* world, bool push
      if(collided_block){
           if(collided_block == block){
                // pass, this happens in a corner portal!
-          }else if(pushed_by_ice && block_on_ice(collided_block, &world->tilemap, world->interactive_qt)){
+          }else if(pushed_by_ice && block_on_ice(collided_block->pos, collided_block->pos_delta, &world->tilemap, world->interactive_qt)){
                return block_push(collided_block, collided_block_push_dir, world, pushed_by_ice, instant_vel);
           }else if(block->entangle_index == (collided_block - world->blocks.elements)){
                // if block is entangled with the block it collides with, check if the entangled block can move, this is kind of duplicate work
@@ -1196,4 +1196,10 @@ bool test_map_end_state(World_t* world, Demo_t* demo){
      }
 
      return test_passed;
+}
+
+S16 get_block_index(World_t* world, Block_t* block){
+    S16 index = block - world->blocks.elements;
+    assert(index >= 0 && index <= world->blocks.count);
+    return index;
 }
