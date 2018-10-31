@@ -19,6 +19,17 @@ struct Block_t : public GridMotion_t{
      S8              clone_id; // helps when we are entangled in determining which portal we come out of
      DirectionMask_t cur_push_mask;
      DirectionMask_t prev_push_mask;
+
+     bool       teleport;
+     Position_t teleport_pos;
+     Vec_t      teleport_pos_delta;
+     Vec_t      teleport_vel;
+     Vec_t      teleport_accel;
+     S16        teleport_stop_on_pixel_x;
+     S16        teleport_stop_on_pixel_y;
+     Move_t     teleport_horizontal_move;
+     Move_t     teleport_vertical_move;
+     S8         teleport_rotation;
 };
 
 S16 get_object_x(Block_t* block);

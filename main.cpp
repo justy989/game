@@ -1636,6 +1636,24 @@ int main(int argc, char** argv){
 
                     update_motion_grid_aligned(&block->vertical_move, motion_y_component(block),
                                                coast_vertical, dt, BLOCK_ACCEL, BLOCK_ACCEL_DISTANCE, pos_vec.y);
+
+                    // teleport
+                    auto block_center = block_get_center(block);
+                    auto premove_coord = block_get_coord(block);
+                    auto coord = block_get_coord(block->pos + block->pos_delta);
+                    auto teleport_result = teleport_position_across_portal(block_center, block->pos_delta, &world, premove_coord, coord);
+                    if(teleport_result.count > block->clone_id){
+                         block->teleport = true;
+                         block->teleport_pos = teleport_result.results[block->clone_id].pos;
+                         block->teleport_pos.pixel -= HALF_TILE_SIZE_PIXEL;
+
+                         block->teleport_pos_delta = vec_rotate_quadrants_clockwise(block->pos_delta, teleport_result.results[block->clone_id].rotations);
+                         block->teleport_vel = vec_rotate_quadrants_clockwise(block->vel, teleport_result.results[block->clone_id].rotations);
+                         block->teleport_accel = vec_rotate_quadrants_clockwise(block->accel, teleport_result.results[block->clone_id].rotations);
+                         block->teleport_rotation = teleport_result.results[block->clone_id].rotations;
+                    }else{
+                         block->teleport = false;
+                    }
                }
 
                // unbounded collision: this should be exciting
@@ -1654,9 +1672,17 @@ int main(int argc, char** argv){
                          bool held_up = false;
 
                          if(block->pos_delta.x != 0.0f || block->pos_delta.y != 0.0f){
-                              auto result = check_block_collision_with_other_blocks(block->pos, block->pos_delta, block->vel, block->accel,
-                                                                                    block->stop_on_pixel_x, block->stop_on_pixel_y, block->horizontal_move,
-                                                                                    block->vertical_move, i, block->entangle_index, block->clone_start.x > 0,
+                              auto result = check_block_collision_with_other_blocks(block->pos,
+                                                                                    block->pos_delta,
+                                                                                    block->vel,
+                                                                                    block->accel,
+                                                                                    block->stop_on_pixel_x,
+                                                                                    block->stop_on_pixel_y,
+                                                                                    block->horizontal_move,
+                                                                                    block->vertical_move,
+                                                                                    i,
+                                                                                    block->entangle_index,
+                                                                                    block->clone_start.x > 0,
                                                                                     &world);
                               if(result.collided){
                                    collided = true;
@@ -1672,6 +1698,35 @@ int main(int argc, char** argv){
 
                                    block->horizontal_move = result.horizontal_move;
                                    block->vertical_move = result.vertical_move;
+                              }
+
+                              if(block->teleport){
+                                   auto teleport_result = check_block_collision_with_other_blocks(block->teleport_pos,
+                                                                                                  block->teleport_pos_delta,
+                                                                                                  block->teleport_vel,
+                                                                                                  block->teleport_accel,
+                                                                                                  block->stop_on_pixel_x,
+                                                                                                  block->stop_on_pixel_y,
+                                                                                                  block->horizontal_move,
+                                                                                                  block->vertical_move,
+                                                                                                  i,
+                                                                                                  block->entangle_index,
+                                                                                                  block->clone_start.x > 0,
+                                                                                                  &world);
+                                   if(teleport_result.collided){
+                                        collided = true;
+
+                                        block->teleport_pos = teleport_result.pos;
+                                        block->teleport_pos_delta = teleport_result.pos_delta;
+                                        block->teleport_vel = teleport_result.vel;
+                                        block->teleport_accel = teleport_result.accel;
+
+                                        block->teleport_stop_on_pixel_x = teleport_result.stop_on_pixel_x;
+                                        block->teleport_stop_on_pixel_y = teleport_result.stop_on_pixel_y;
+
+                                        block->teleport_horizontal_move = teleport_result.horizontal_move;
+                                        block->teleport_vertical_move = teleport_result.vertical_move;
+                                   }
                               }
                          }
 
@@ -1859,64 +1914,6 @@ int main(int argc, char** argv){
                               if(block->fall_time >= FALL_TIME){
                                    block->fall_time -= FALL_TIME;
                                    block->pos.z--;
-                              }
-                         }
-
-                         // Position_t final_pos = block->pos + block->pos_delta;
-                         coord = pixel_to_coord(final_pos.pixel + HALF_TILE_SIZE_PIXEL);
-                         Coord_t premove_coord = pixel_to_coord(block->pos.pixel + HALF_TILE_SIZE_PIXEL);
-
-                         Position_t block_center = block->pos;
-                         block_center.pixel += HALF_TILE_SIZE_PIXEL;
-
-                         auto teleport_result = teleport_position_across_portal(block_center, block->pos_delta, &world, premove_coord,
-                                                                                coord);
-                         if(teleport_result.count > block->clone_id){
-                              block->pos = teleport_result.results[block->clone_id].pos;
-                              block->pos.pixel -= HALF_TILE_SIZE_PIXEL;
-
-                              block->vel = vec_rotate_quadrants_clockwise(block->vel, teleport_result.results[block->clone_id].rotations);
-                              block->accel = vec_rotate_quadrants_clockwise(block->accel, teleport_result.results[block->clone_id].rotations);
-                              block->pos_delta = vec_rotate_quadrants_clockwise(block->pos_delta, teleport_result.results[block->clone_id].rotations);
-                              block->rotation = teleport_result.results[block->clone_id].rotations;
-
-                              auto result = check_block_collision_with_other_blocks(block->pos, block->pos_delta, block->vel, block->accel,
-                                                                                    block->stop_on_pixel_x, block->stop_on_pixel_y, block->horizontal_move,
-                                                                                    block->vertical_move, i, block->entangle_index, block->clone_start.x > 0,
-                                                                                    &world);
-                              if(result.collided){
-                                   // TODO: compress this with the same code above (using check_block_collision_with_other_blocks)
-                                   collided = true;
-
-                                   block->pos = result.pos;
-
-                                   block->pos_delta = result.pos_delta;
-                                   block->vel = result.vel;
-                                   block->accel = result.accel;
-
-                                   block->stop_on_pixel_x = result.stop_on_pixel_x;
-                                   block->stop_on_pixel_y = result.stop_on_pixel_y;
-
-                                   block->horizontal_move = result.horizontal_move;
-                                   block->vertical_move = result.vertical_move;
-                              }
-
-                              // try teleporting if we collided with a block
-                              premove_coord = pixel_to_coord(block_center.pixel + HALF_TILE_SIZE_PIXEL);
-                              coord = pixel_to_coord(block->pos.pixel + HALF_TILE_SIZE_PIXEL);
-
-                              block_center = block_get_center(block);
-
-                              auto collided_teleport_result = teleport_position_across_portal(block_center, block->pos_delta, &world,
-                                                                                              premove_coord, coord);
-                              if(collided_teleport_result.count > block->clone_id){
-                                   block->pos = collided_teleport_result.results[block->clone_id].pos;
-                                   block->pos.pixel -= HALF_TILE_SIZE_PIXEL;
-
-                                   block->vel = vec_rotate_quadrants_clockwise(block->vel, collided_teleport_result.results[block->clone_id].rotations);
-                                   block->accel = vec_rotate_quadrants_clockwise(block->accel, collided_teleport_result.results[block->clone_id].rotations);
-                                   block->pos_delta = vec_rotate_quadrants_clockwise(block->pos_delta, teleport_result.results[block->clone_id].rotations);
-                                   block->rotation = collided_teleport_result.results[block->clone_id].rotations;
                               }
                          }
 
@@ -2165,7 +2162,22 @@ int main(int argc, char** argv){
                for(S16 i = 0; i < world.blocks.count; i++){
                     Block_t* block = world.blocks.elements + i;
 
-                    auto final_pos = block->pos + block->pos_delta;
+                    Position_t final_pos;
+
+                    if(block->teleport){
+                         final_pos = block->teleport_pos + block->teleport_pos_delta;
+
+                         block->pos_delta = block->teleport_pos_delta;
+                         block->vel = block->teleport_vel;
+                         block->accel = block->teleport_accel;
+                         block->stop_on_pixel_x = block->teleport_stop_on_pixel_x;
+                         block->stop_on_pixel_y = block->teleport_stop_on_pixel_y;
+                         block->horizontal_move = block->teleport_horizontal_move;
+                         block->vertical_move = block->teleport_vertical_move;
+                         block->rotation = block->teleport_rotation;
+                    }else{
+                         final_pos = block->pos + block->pos_delta;
+                    }
 
                     // finalize position for each component, stopping on a pixel boundary if we have to
                     if(block->stop_on_pixel_x != 0){

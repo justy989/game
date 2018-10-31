@@ -232,7 +232,7 @@ Block_t* block_inside_block_list(Position_t block_to_check_pos, Vec_t block_to_c
 
           // don't collide with blocks that are cloning
           if(block == entangled_block && block_to_check_cloning) continue;
-          if(block_to_check_index == i && portal_offsets[i].x == 0 && portal_offsets[i].y == 0) continue;
+          if(block_to_check_index == (block - blocks_array->elements)) continue;
 
           auto block_pos = block->pos + block->pos_delta;
 
@@ -270,17 +270,8 @@ BlockInsideResult_t block_inside_another_block(Position_t block_to_check_pos, Ve
      Pixel_t portal_offsets[BLOCK_QUAD_TREE_MAX_QUERY];
      memset(portal_offsets, 0, sizeof(portal_offsets));
 
-     S16 block_to_check_list_index = -1;
-     for(S16 i = 0; i < block_count; i++){
-          S16 index = blocks[i] - block_array->elements;
-          if(index == block_to_check_index){
-               block_to_check_list_index = i;
-               break;
-          }
-     }
-
      Block_t* collided_block = block_inside_block_list(block_to_check_pos, block_to_check_pos_delta,
-                                                       block_to_check_list_index, block_to_check_entangle_index,
+                                                       block_to_check_index, block_to_check_entangle_index,
                                                        block_to_check_cloning, blocks, block_count,
                                                        block_array, &result.collision_pos, portal_offsets);
      if(collided_block){
@@ -309,7 +300,7 @@ BlockInsideResult_t block_inside_another_block(Position_t block_to_check_pos, Ve
                                                                    dst_coord, blocks, &block_count, portal_offsets);
 
                               collided_block = block_inside_block_list(block_to_check_pos, block_to_check_pos_delta,
-                                                                       block_to_check_list_index, block_to_check_entangle_index,
+                                                                       block_to_check_index, block_to_check_entangle_index,
                                                                        block_to_check_cloning, blocks, block_count,
                                                                        block_array, &result.collision_pos, portal_offsets);
                               if(collided_block){
