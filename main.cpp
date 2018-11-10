@@ -402,7 +402,7 @@ int main(int argc, char** argv){
           if(demo.mode == DEMO_MODE_PLAY){
                bool end_of_demo = false;
                if(demo.entries.entries[demo.entry_index].player_action_type == PLAYER_ACTION_TYPE_END_DEMO){
-                    end_of_demo = (frame_count == demo.entries.entries[demo.entry_index].frame);
+                    end_of_demo = (frame_count > demo.entries.entries[demo.entry_index].frame);
                }else{
                     while(frame_count == demo.entries.entries[demo.entry_index].frame){
                          player_action_perform(&player_action, &world.players,
