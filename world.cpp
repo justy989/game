@@ -343,12 +343,13 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                     collided_with_teleported_block = true;
                }
           }
-          Coord_t block_coord = block_get_coord(world->blocks.elements + i);
+
           U8 portal_rotations = 0;
+          Coord_t block_coord = block_get_coord(world->blocks.elements + i);
 
           if(!collided_with_block){
                // check if the block is in a portal and try to collide with it
-               Vec_t coord_offset = pos_to_vec(world->blocks.elements[i].pos +
+               Vec_t coord_offset = pos_to_vec(world->blocks.elements[i].pos + world->blocks.elements[i].pos_delta +
                                                pixel_to_pos(HALF_TILE_SIZE_PIXEL) -
                                                coord_to_pos_at_tile_center(block_coord));
                for(S8 r = 0; r < DIRECTION_COUNT && !collided_with_block; r++){
@@ -371,10 +372,8 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                                    if(collided_with_block){
                                         result.collided = true;
                                         block_pos = portal_pos;
-                                        if(is_active_portal(interactive)){
-                                             portal_rotations = portal_rotations_between(interactive->portal.face, (Direction_t)(d));
-                                             break;
-                                        }
+                                        portal_rotations = portal_rotations_between(interactive->portal.face, (Direction_t)(d));
+                                        break;
                                    }
                               }
                          }

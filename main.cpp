@@ -623,6 +623,7 @@ int main(int argc, char** argv){
                               auto coord = mouse_select_world(mouse_screen, camera);
                               auto rect = rect_surrounding_coord(coord);
 
+
                               S16 block_count = 0;
                               Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
                               quad_tree_find_in(world.block_qt, rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
@@ -1456,6 +1457,7 @@ int main(int argc, char** argv){
 
                     player->prev_pushing_block = player->pushing_block;
                     player->pushing_block = -1;
+                    player->teleport_pushing_block = -1;
 
                     player->prev_vel = player->vel;
 
@@ -1590,7 +1592,7 @@ int main(int argc, char** argv){
                          block->teleport_pos = teleport_result.results[block->clone_id].pos;
                          block->teleport_pos.pixel -= HALF_TILE_SIZE_PIXEL;
 
-                         block->teleport_pos_delta = vec_rotate_quadrants_clockwise(block->pos_delta, teleport_result.results[block->clone_id].rotations);
+                         block->teleport_pos_delta = teleport_result.results[block->clone_id].delta;
                          block->teleport_vel = vec_rotate_quadrants_clockwise(block->vel, teleport_result.results[block->clone_id].rotations);
                          block->teleport_accel = vec_rotate_quadrants_clockwise(block->accel, teleport_result.results[block->clone_id].rotations);
                          block->teleport_rotation = teleport_result.results[block->clone_id].rotations;
@@ -2026,9 +2028,14 @@ int main(int argc, char** argv){
                                                                  player->pushing_block_dir, skip_coord, &world);
 
                          if(player->teleport){
+                              Coord_t teleport_player_coord = pos_to_coord(player->teleport_pos + player->teleport_pos_delta);
+
+                              find_portal_adjacents_to_skip_collision_check(teleport_player_coord, world.interactive_qt, skip_coord);
+
                               auto teleport_result = move_player_through_world(player->teleport_pos, player->vel, player->teleport_pos_delta, player->face,
-                                                                               player->clone_instance, i, player->pushing_block,
-                                                                               player->pushing_block_dir, skip_coord, &world);
+                                                                               player->clone_instance, i, player->teleport_pushing_block,
+                                                                               player->teleport_pushing_block_dir, skip_coord, &world);
+
                               if(teleport_result.collided) collided = true;
                               if(teleport_result.resetting) resetting = true;
                               player->teleport_pos_delta = teleport_result.pos_delta;
