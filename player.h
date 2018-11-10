@@ -21,6 +21,7 @@ struct Player_t : public Motion_t {
      S16         teleport_pushing_block;
      Direction_t teleport_pushing_block_dir;
      U8          teleport_rotation;
+     Direction_t teleport_face;
 
      Direction_t face = DIRECTION_LEFT;
      bool        reface = false;

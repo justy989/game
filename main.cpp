@@ -17,10 +17,6 @@ Big Features:
 - Bring block ice collision to the masses
 - 3D
 
-TODO:
-- collision infinite loop lol
-- do we have a walk stuttering problem on other machines ? Doesn't look like it lol.
-
 NOTES:
 - Only 2 blocks high can go through portals
 */
@@ -1556,6 +1552,8 @@ int main(int argc, char** argv){
                          player->teleport = true;
                          player->teleport_pos = teleport_result.results[teleport_clone_id].pos;
                          player->teleport_pos_delta = teleport_result.results[teleport_clone_id].delta;
+                         player->teleport_rotation = teleport_result.results[teleport_clone_id].rotations;
+                         player->teleport_face = direction_rotate_clockwise(player->face, teleport_result.results[teleport_clone_id].rotations);
                     }else{
                          // if we collide enough to reduce our pos_delta, we could have previously teleported and are no
                          // longer teleporting in the same frame.
@@ -2032,7 +2030,7 @@ int main(int argc, char** argv){
 
                               find_portal_adjacents_to_skip_collision_check(teleport_player_coord, world.interactive_qt, skip_coord);
 
-                              auto teleport_result = move_player_through_world(player->teleport_pos, player->vel, player->teleport_pos_delta, player->face,
+                              auto teleport_result = move_player_through_world(player->teleport_pos, player->vel, player->teleport_pos_delta, player->teleport_face,
                                                                                player->clone_instance, i, player->teleport_pushing_block,
                                                                                player->teleport_pushing_block_dir, skip_coord, &world);
 
@@ -2148,7 +2146,7 @@ int main(int argc, char** argv){
                          player->pos = player->teleport_pos + player->teleport_pos_delta;
                          player->pos_delta = player->teleport_pos_delta;
 
-                         player->face = direction_rotate_clockwise(player->face, player->teleport_rotation);
+                         player->face = player->teleport_face;
                          player->vel = vec_rotate_quadrants_clockwise(player->vel, player->teleport_rotation);
                          player->accel = vec_rotate_quadrants_clockwise(player->accel, player->teleport_rotation);
                          player->pushing_block = player->teleport_pushing_block;

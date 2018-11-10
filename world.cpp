@@ -332,17 +332,7 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
           Position_t block_pre_move_pos = block->pos;
           Position_t block_pos = block->pos + block->pos_delta;
           position_collide_with_rect(player_pos, block_pos, TILE_SIZE, &result.pos_delta, &collided_with_block);
-          if(collided_with_block){
-               result.collided = true;
-          }else if(block->teleport){
-               Position_t teleport_block_pos = block->teleport_pos + block->teleport_pos_delta;
-               position_collide_with_rect(player_pos, teleport_block_pos, TILE_SIZE, &result.pos_delta, &collided_with_block);
-               if(collided_with_block){
-                    result.collided = true;
-                    block_pre_move_pos = block->teleport_pos;
-                    collided_with_teleported_block = true;
-               }
-          }
+          if(collided_with_block) result.collided = true;
 
           U8 portal_rotations = 0;
           Coord_t block_coord = block_get_coord(world->blocks.elements + i);
@@ -399,13 +389,8 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                          break;
                     case DIRECTION_LEFT:
                          if(rotated_vel.x > 0.0f){
-                              if(collided_with_teleported_block){
-                                   collided_block->teleport_pos -= collided_block_delta;
-                                   collided_block->teleport_horizontal_move.state = MOVE_STATE_IDLING;
-                              }else{
-                                   collided_block->pos -= collided_block_delta;
-                                   collided_block->horizontal_move.state = MOVE_STATE_IDLING;
-                              }
+                              collided_block->pos -= collided_block_delta;
+                              collided_block->horizontal_move.state = MOVE_STATE_IDLING;
                               result.pos_delta -= pos_delta_diff;
                               rotated_accel.x = 0.0f;
                               rotated_vel.x = 0.0f;
@@ -415,13 +400,8 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                          break;
                     case DIRECTION_RIGHT:
                          if(rotated_vel.x < 0.0f){
-                              if(collided_with_teleported_block){
-                                   collided_block->teleport_pos -= collided_block_delta;
-                                   collided_block->teleport_horizontal_move.state = MOVE_STATE_IDLING;
-                              }else{
-                                   collided_block->pos -= collided_block_delta;
-                                   collided_block->horizontal_move.state = MOVE_STATE_IDLING;
-                              }
+                              collided_block->pos -= collided_block_delta;
+                              collided_block->horizontal_move.state = MOVE_STATE_IDLING;
                               result.pos_delta -= pos_delta_diff;
                               rotated_accel.x = 0.0f;
                               rotated_vel.x = 0.0f;
@@ -431,13 +411,8 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                          break;
                     case DIRECTION_UP:
                          if(rotated_vel.y < 0.0f){
-                              if(collided_with_teleported_block){
-                                   collided_block->teleport_pos -= collided_block_delta;
-                                   collided_block->teleport_vertical_move.state = MOVE_STATE_IDLING;
-                              }else{
-                                   collided_block->pos -= collided_block_delta;
-                                   collided_block->vertical_move.state = MOVE_STATE_IDLING;
-                              }
+                              collided_block->pos -= collided_block_delta;
+                              collided_block->vertical_move.state = MOVE_STATE_IDLING;
                               result.pos_delta -= pos_delta_diff;
                               rotated_accel.y = 0.0f;
                               rotated_vel.y = 0.0f;
@@ -447,13 +422,8 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                          break;
                     case DIRECTION_DOWN:
                          if(rotated_vel.y > 0.0f){
-                              if(collided_with_teleported_block){
-                                   collided_block->teleport_pos -= collided_block_delta;
-                                   collided_block->teleport_vertical_move.state = MOVE_STATE_IDLING;
-                              }else{
-                                   collided_block->pos -= collided_block_delta;
-                                   collided_block->vertical_move.state = MOVE_STATE_IDLING;
-                              }
+                              collided_block->pos -= collided_block_delta;
+                              collided_block->vertical_move.state = MOVE_STATE_IDLING;
                               result.pos_delta -= pos_delta_diff;
                               rotated_accel.y = 0.0f;
                               rotated_vel.y = 0.0f;
