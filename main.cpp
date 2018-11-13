@@ -1594,6 +1594,21 @@ int main(int argc, char** argv){
                          block->teleport_vel = vec_rotate_quadrants_clockwise(block->vel, teleport_result.results[block->clone_id].rotations);
                          block->teleport_accel = vec_rotate_quadrants_clockwise(block->accel, teleport_result.results[block->clone_id].rotations);
                          block->teleport_rotation = teleport_result.results[block->clone_id].rotations;
+
+                         if(block->teleport_rotation % 2){
+                              LOG("rotate move\n");
+                              Move_t tmp = block->horizontal_move;
+                              block->horizontal_move = block->vertical_move;
+                              block->vertical_move = tmp;
+
+                              S16 p_tmp = block->started_on_pixel_x;
+                              block->started_on_pixel_x = block->started_on_pixel_y;
+                              block->started_on_pixel_y = p_tmp;
+
+                              p_tmp = block->stop_on_pixel_x;
+                              block->stop_on_pixel_x = block->stop_on_pixel_y;
+                              block->stop_on_pixel_y = p_tmp;
+                         }
                     }else{
                          block->teleport = false;
                     }
@@ -2158,6 +2173,8 @@ int main(int argc, char** argv){
                          for(S8 d = 0; d < DIRECTION_COUNT; d++){
                               if(player_action.move[d]) player->move_rotation[d] = (player->move_rotation[d] + player->teleport_rotation) % DIRECTION_COUNT;
                          }
+
+                         LOG("overrideing pushing block dir: %s\n", direction_to_string(player->teleport_pushing_block_dir));
                     }else{
                          player->pos += player->pos_delta;
                     }

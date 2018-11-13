@@ -326,10 +326,8 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
      for(S16 i = 0; i < world->blocks.count; i++){
           Vec_t pos_delta_save = result.pos_delta;
 
-          bool collided_with_teleported_block = false;
           bool collided_with_block = false;
           Block_t* block = world->blocks.elements + i;
-          Position_t block_pre_move_pos = block->pos;
           Position_t block_pos = block->pos + block->pos_delta;
           position_collide_with_rect(player_pos, block_pos, TILE_SIZE, &result.pos_delta, &collided_with_block);
           if(collided_with_block) result.collided = true;
@@ -376,8 +374,6 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                collided_block_delta = vec_rotate_quadrants_clockwise(pos_delta_diff, (U8)(4) - portal_rotations);
                auto collided_block_dir = relative_quadrant(player_pos.pixel, block_pos.pixel + HALF_TILE_SIZE_PIXEL);
                auto collided_block = world->blocks.elements + i;
-               Coord_t coord = pixel_to_coord(collided_block->pos.pixel + HALF_TILE_SIZE_PIXEL);
-               Coord_t premove_coord = pixel_to_coord(block_pre_move_pos.pixel + HALF_TILE_SIZE_PIXEL);
 
                {
                     // this stops the block when it moves into the player
@@ -431,21 +427,6 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                               collided_block->vel = vec_rotate_quadrants_counter_clockwise(rotated_vel, portal_rotations);
                          }
                          break;
-                    }
-               }
-
-               Position_t block_center = collided_with_teleported_block ? collided_block->teleport_pos : collided_block->pos;
-               block_center.pixel += HALF_TILE_SIZE_PIXEL;
-
-               auto teleport_result = teleport_position_across_portal(block_center, Vec_t{}, world, premove_coord,
-                                                                      coord);
-               if(teleport_result.count > 0){
-                    if(collided_with_teleported_block){
-                         collided_block->teleport_pos = teleport_result.results[0].pos;
-                         collided_block->teleport_pos.pixel -= HALF_TILE_SIZE_PIXEL;
-                    }else{
-                         collided_block->pos = teleport_result.results[0].pos;
-                         collided_block->pos.pixel -= HALF_TILE_SIZE_PIXEL;
                     }
                }
 
@@ -923,6 +904,17 @@ bool reset_players(ObjectArray_t<Player_t>* players){
      return success;
 }
 
+void describe_block(Block_t* block){
+     LOG("block %ld: pixel %d, %d, decimal: %f, %f, rot: %d, element: %s, entangle: %d, clone id: %d\n",
+         block - world->blocks.elements, block->pos.pixel.x, block->pos.pixel.y,
+         block->pos.decimal.x, block->pos.decimal.y,
+         block->rotation, element_to_string(block->element),
+         block->entangle_index, block->clone_id);
+     LOG(" hmove: %s %s %f\n", move_state_to_string(block->horizontal_move.state), move_sign_to_string(block->horizontal_move.sign), block->horizontal_move.distance);
+     LOG(" vmove: %s %s %f\n", move_state_to_string(block->vertical_move.state), move_sign_to_string(block->vertical_move.sign), block->vertical_move.distance);
+     LOG("\n");
+}
+
 void describe_coord(Coord_t coord, World_t* world){
      LOG("\ndescribe_coord(%d, %d)\n", coord.x, coord.y);
      auto* tile = tilemap_get_tile(&world->tilemap, coord);
@@ -1020,11 +1012,14 @@ void describe_coord(Coord_t coord, World_t* world){
      quad_tree_find_in(world->block_qt, coord_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
      for(S16 i = 0; i < block_count; i++){
           auto* block = blocks[i];
-          LOG("block %ld: pixel %d, %d, decimal: %f, %f, rot: %d, element: %s, entangle: %d, clone id: %d\n\n",
+          LOG("block %ld: pixel %d, %d, decimal: %f, %f, rot: %d, element: %s, entangle: %d, clone id: %d\n",
               block - world->blocks.elements, block->pos.pixel.x, block->pos.pixel.y,
               block->pos.decimal.x, block->pos.decimal.y,
               block->rotation, element_to_string(block->element),
               block->entangle_index, block->clone_id);
+          LOG(" hmove: %s %s %f\n", move_state_to_string(block->horizontal_move.state), move_sign_to_string(block->horizontal_move.sign), block->horizontal_move.distance);
+          LOG(" vmove: %s %s %f\n", move_state_to_string(block->vertical_move.state), move_sign_to_string(block->vertical_move.sign), block->vertical_move.distance);
+          LOG("\n");
      }
 }
 

@@ -320,3 +320,35 @@ bool operator!=(const Move_t& a, const Move_t& b){
             a.sign != b.sign ||
             a.distance != b.distance;
 }
+
+const char* move_state_to_string(MoveState_t state){
+     switch(state){
+     case MOVE_STATE_IDLING:
+          return "MOVE_STATE_IDLING";
+     case MOVE_STATE_STARTING:
+          return "MOVE_STATE_STARTING";
+     case MOVE_STATE_COASTING:
+          return "MOVE_STATE_COASTING";
+     case MOVE_STATE_STOPPING:
+          return "MOVE_STATE_STOPPING";
+     default:
+          break;
+     }
+
+     return "MOVE_STATE_UNKNOWN";
+}
+
+const char* move_sign_to_string(MoveSign_t sign){
+     switch(sign){
+     case MOVE_SIGN_ZERO:
+          return "MOVE_SIGN_ZERO";
+     case MOVE_SIGN_POSITIVE:
+          return "MOVE_SIGN_POSITIVE";
+     case MOVE_SIGN_NEGATIVE:
+          return "MOVE_SIGN_NEGATIVE";
+     default:
+          break;
+     }
+
+     return "MOVE_SIGN_UNKNOWN";
+}
