@@ -46,8 +46,6 @@ NOTES:
 #include "collision.h"
 #include "world.h"
 
-// #define BLOCKS_SQUISH_PLAYER
-
 FILE* load_demo_number(S32 map_number, const char** demo_filepath){
      char filepath[64] = {};
      snprintf(filepath, 64, "content/%03d.bd", map_number);

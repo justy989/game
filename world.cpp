@@ -507,22 +507,6 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
 
           auto dir = (Direction_t)(d);
 
-#ifdef BLOCKS_SQUISH_PLAYER
-          Direction_t opposite = direction_opposite(dir);
-          DirectionMask_t block_vel_mask = vec_direction_mask(collided_blocks[dir]->vel);
-
-          // ignore if the block is moving away
-          if(direction_in_mask(block_vel_mask, dir)) continue;
-
-          // if, on the opposite side of the collision, is a wall, interactive, or block, then kill the player muhahaha
-          if((dir == direction_opposite(collided_interactive_dir) ||
-              dir == direction_opposite(collided_tile_dir) ||
-              direction_in_mask(collided_blocks_mask_dir, opposite))){
-               result.resetting = true;
-               break;
-          }
-#else
-
           if(dir != DIRECTION_COUNT &&
              (dir == direction_opposite(collided_interactive_dir) ||
               dir == direction_opposite(collided_tile_dir))){
@@ -558,7 +542,6 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                     }
                }
           }
-#endif
      }
 
      return result;
