@@ -1615,7 +1615,6 @@ int main(int argc, char** argv){
                     }else if(block_on_ice(block->pos, block->pos_delta, &world.tilemap, world.interactive_qt)){
                          coast_horizontal = true;
                          coast_vertical = true;
-                    // }else if(block->teleport){
                     }else{
                          if(block->horizontal_move.state == MOVE_STATE_STARTING ||
                             block->horizontal_move.state == MOVE_STATE_COASTING){
@@ -1642,7 +1641,9 @@ int main(int argc, char** argv){
                               Player_t* player = world.players.elements + p;
 
                               // is the player pushing us ?
-                              if(player->prev_pushing_block != (block - world.blocks.elements)) continue;
+                              if(player->prev_pushing_block < 0 ||
+                                 (player->prev_pushing_block != (block - world.blocks.elements) &&
+                                  player->prev_pushing_block != (block->entangle_index))) continue;
 
                               switch(player->face){
                               default:
