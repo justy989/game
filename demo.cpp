@@ -74,8 +74,9 @@ void player_action_perform(PlayerAction_t* player_action, ObjectArray_t<Player_t
                Player_t* player = players->elements + i;
                if(player->face == direction_rotate_clockwise(DIRECTION_LEFT, player->move_rotation[DIRECTION_LEFT])){
                     player->reface = true;
-                    player->move_rotation[DIRECTION_LEFT] = 0;
                }
+
+               player->move_rotation[DIRECTION_LEFT] = 0;
           }
           player_action->move[DIRECTION_LEFT] = false;
           break;
@@ -92,8 +93,9 @@ void player_action_perform(PlayerAction_t* player_action, ObjectArray_t<Player_t
                Player_t* player = players->elements + i;
                if(player->face == direction_rotate_clockwise(DIRECTION_UP, player->move_rotation[DIRECTION_UP])){
                     player->reface = true;
-                    player->move_rotation[DIRECTION_UP] = 0;
                }
+
+               player->move_rotation[DIRECTION_UP] = 0;
           }
           player_action->move[DIRECTION_UP] = false;
           break;
@@ -110,8 +112,9 @@ void player_action_perform(PlayerAction_t* player_action, ObjectArray_t<Player_t
                Player_t* player = players->elements + i;
                if(player->face == direction_rotate_clockwise(DIRECTION_RIGHT, player->move_rotation[DIRECTION_RIGHT])){
                     player->reface = true;
-                    player->move_rotation[DIRECTION_RIGHT] = 0;
                }
+
+               player->move_rotation[DIRECTION_RIGHT] = 0;
           }
           player_action->move[DIRECTION_RIGHT] = false;
           break;
@@ -128,8 +131,9 @@ void player_action_perform(PlayerAction_t* player_action, ObjectArray_t<Player_t
                Player_t* player = players->elements + i;
                if(player->face == direction_rotate_clockwise(DIRECTION_DOWN, player->move_rotation[DIRECTION_DOWN])){
                     player->reface = true;
-                    player->move_rotation[DIRECTION_DOWN] = 0;
                }
+
+               player->move_rotation[DIRECTION_DOWN] = 0;
           }
           player_action->move[DIRECTION_DOWN] = false;
           break;
