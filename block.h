@@ -13,7 +13,7 @@ struct Block_t : public GridMotion_t{
      Element_t       element;
      F32             fall_time;
      S16             entangle_index; // -1 means not entangled, 0 - N = entangled with that block
-     U8              rotation;
+     U8              rotation; // one day we will use this !
 
      Coord_t         clone_start; // the portal where the clone started
      S8              clone_id; // helps when we are entangled in determining which portal we come out of

@@ -619,7 +619,6 @@ int main(int argc, char** argv){
                               auto coord = mouse_select_world(mouse_screen, camera);
                               auto rect = rect_surrounding_coord(coord);
 
-
                               S16 block_count = 0;
                               Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
                               quad_tree_find_in(world.block_qt, rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
@@ -1596,18 +1595,13 @@ int main(int argc, char** argv){
                          block->teleport_rotation = teleport_result.results[block->clone_id].rotations;
 
                          if(block->teleport_rotation % 2){
-                              LOG("rotate move\n");
                               Move_t tmp = block->horizontal_move;
                               block->horizontal_move = block->vertical_move;
                               block->vertical_move = tmp;
 
-                              S16 p_tmp = block->started_on_pixel_x;
-                              block->started_on_pixel_x = block->started_on_pixel_y;
-                              block->started_on_pixel_y = p_tmp;
-
-                              p_tmp = block->stop_on_pixel_x;
-                              block->stop_on_pixel_x = block->stop_on_pixel_y;
-                              block->stop_on_pixel_y = p_tmp;
+                              for(S8 r = 0; r < block->teleport_rotation; r++){
+                                   block->prev_push_mask = direction_mask_rotate_clockwise(block->prev_push_mask);
+                              }
                          }
                     }else{
                          block->teleport = false;
@@ -1615,10 +1609,13 @@ int main(int argc, char** argv){
 
                     bool coast_horizontal = false;
                     bool coast_vertical = false;
-
-                    if(block_on_ice(block->pos, block->pos_delta, &world.tilemap, world.interactive_qt)){
+                    if(block->teleport && block_on_ice(block->teleport_pos, block->teleport_pos_delta, &world.tilemap, world.interactive_qt)){
                          coast_horizontal = true;
                          coast_vertical = true;
+                    }else if(block_on_ice(block->pos, block->pos_delta, &world.tilemap, world.interactive_qt)){
+                         coast_horizontal = true;
+                         coast_vertical = true;
+                    // }else if(block->teleport){
                     }else{
                          if(block->horizontal_move.state == MOVE_STATE_STARTING ||
                             block->horizontal_move.state == MOVE_STATE_COASTING){
@@ -1640,6 +1637,7 @@ int main(int argc, char** argv){
                     }
 
                     if(!coast_vertical || !coast_horizontal){
+                         // TODO: this logic isn't strictly correct when the block teleports, but I also don't think there is any harm right now?
                          for(S16 p = 0; p < world.players.count; p++){
                               Player_t* player = world.players.elements + p;
 
@@ -1699,21 +1697,6 @@ int main(int argc, char** argv){
                                                                                     block->entangle_index,
                                                                                     block->clone_start.x > 0,
                                                                                     &world);
-                              if(result.collided){
-                                   collided = true;
-
-                                   block->pos = result.pos;
-
-                                   block->pos_delta = result.pos_delta;
-                                   block->vel = result.vel;
-                                   block->accel = result.accel;
-
-                                   block->stop_on_pixel_x = result.stop_on_pixel_x;
-                                   block->stop_on_pixel_y = result.stop_on_pixel_y;
-
-                                   block->horizontal_move = result.horizontal_move;
-                                   block->vertical_move = result.vertical_move;
-                              }
 
                               if(block->teleport){
                                    auto teleport_result = check_block_collision_with_other_blocks(block->teleport_pos,
@@ -1728,6 +1711,7 @@ int main(int argc, char** argv){
                                                                                                   block->entangle_index,
                                                                                                   block->clone_start.x > 0,
                                                                                                   &world);
+                                   // TODO: find the closer collision between the regular collided result and the teleported collided result
                                    if(teleport_result.collided){
                                         collided = true;
 
@@ -1738,10 +1722,23 @@ int main(int argc, char** argv){
 
                                         block->teleport_stop_on_pixel_x = teleport_result.stop_on_pixel_x;
                                         block->teleport_stop_on_pixel_y = teleport_result.stop_on_pixel_y;
-
-                                        block->teleport_horizontal_move = teleport_result.horizontal_move;
-                                        block->teleport_vertical_move = teleport_result.vertical_move;
                                    }
+                              }
+
+                              if(result.collided){
+                                   collided = true;
+
+                                   block->pos = result.pos;
+
+                                   block->pos_delta = result.pos_delta;
+                                   block->vel = result.vel;
+                                   block->accel = result.accel;
+
+                                   block->stop_on_pixel_x = result.stop_on_pixel_x;
+                                   block->stop_on_pixel_y = result.stop_on_pixel_y;
+
+                                   block->horizontal_move = result.horizontal_move;
+                                   block->vertical_move = result.vertical_move;
                               }
                          }
 
@@ -2046,8 +2043,8 @@ int main(int argc, char** argv){
                               find_portal_adjacents_to_skip_collision_check(teleport_player_coord, world.interactive_qt, skip_coord);
 
                               auto teleport_result = move_player_through_world(player->teleport_pos, player->vel, player->teleport_pos_delta, player->teleport_face,
-                                                                               player->clone_instance, i, player->teleport_pushing_block,
-                                                                               player->teleport_pushing_block_dir, skip_coord, &world);
+                                                                               player->clone_instance, i, player->pushing_block,
+                                                                               player->pushing_block_dir, skip_coord, &world);
 
                               if(teleport_result.collided) collided = true;
                               if(teleport_result.resetting) resetting = true;
@@ -2173,8 +2170,6 @@ int main(int argc, char** argv){
                          for(S8 d = 0; d < DIRECTION_COUNT; d++){
                               if(player_action.move[d]) player->move_rotation[d] = (player->move_rotation[d] + player->teleport_rotation) % DIRECTION_COUNT;
                          }
-
-                         LOG("overrideing pushing block dir: %s\n", direction_to_string(player->teleport_pushing_block_dir));
                     }else{
                          player->pos += player->pos_delta;
                     }
@@ -2193,8 +2188,6 @@ int main(int argc, char** argv){
                          block->accel = block->teleport_accel;
                          block->stop_on_pixel_x = block->teleport_stop_on_pixel_x;
                          block->stop_on_pixel_y = block->teleport_stop_on_pixel_y;
-                         block->horizontal_move = block->teleport_horizontal_move;
-                         block->vertical_move = block->teleport_vertical_move;
                          block->rotation = block->teleport_rotation;
                     }else{
                          final_pos = block->pos + block->pos_delta;
@@ -2226,13 +2219,16 @@ int main(int argc, char** argv){
                     if(player->prev_pushing_block >= 0 && player->prev_pushing_block == player->pushing_block){
                          Block_t* block_to_push = world.blocks.elements + player->prev_pushing_block;
                          DirectionMask_t block_move_dir_mask = vec_direction_mask(block_to_push->vel);
-                         if(direction_in_mask(direction_mask_opposite(block_move_dir_mask), player->pushing_block_dir))
+                         auto push_block_dir = player->pushing_block_dir;
+                         if(block_to_push->teleport) push_block_dir = direction_rotate_clockwise(push_block_dir, block_to_push->teleport_rotation);
+
+                         if(direction_in_mask(direction_mask_opposite(block_move_dir_mask), push_block_dir))
                          {
                               // if the player is pushing against a block moving towards them, the block wins
                               player->push_time = 0;
                               player->pushing_block = -1;
-                         }else if(direction_in_mask(block_move_dir_mask, player->pushing_block_dir)){
-                              block_to_push->cur_push_mask = direction_mask_add(block_to_push->cur_push_mask, player->pushing_block_dir);
+                         }else if(direction_in_mask(block_move_dir_mask, push_block_dir)){
+                              block_to_push->cur_push_mask = direction_mask_add(block_to_push->cur_push_mask, push_block_dir);
                          }else{
                               F32 save_push_time = player->push_time;
 
@@ -2243,8 +2239,10 @@ int main(int argc, char** argv){
                                    // if this is the frame that causes the block to be pushed, make a commit
                                    if(save_push_time <= BLOCK_PUSH_TIME) undo_commit(&undo, &world.players, &world.tilemap, &world.blocks, &world.interactives);
 
-                                   bool pushed = block_push(block_to_push, player->pushing_block_dir, &world, false);
+                                   bool pushed = block_push(block_to_push, push_block_dir, &world, false);
                                    if(pushed && block_to_push->entangle_index >= 0 && block_to_push->entangle_index < world.blocks.count){
+                                        player->pushing_block_dir = push_block_dir;
+
                                         // TODO: take into account block_to_push->face to rotate face
                                         Block_t* entangled_block = world.blocks.elements + block_to_push->entangle_index;
                                         U8 push_rotation = 0;
@@ -2253,7 +2251,7 @@ int main(int argc, char** argv){
                                         }else if(entangled_block->rotation){
                                              push_rotation = entangled_block->rotation;
                                         }
-                                        Direction_t rotated_dir = direction_rotate_clockwise(player->pushing_block_dir, push_rotation);
+                                        Direction_t rotated_dir = direction_rotate_clockwise(push_block_dir, push_rotation);
                                         block_push(entangled_block, rotated_dir, &world, false);
                                    }
 

@@ -332,7 +332,7 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
           position_collide_with_rect(player_pos, block_pos, TILE_SIZE, &result.pos_delta, &collided_with_block);
           if(collided_with_block) result.collided = true;
 
-          U8 portal_rotations = 0;
+          U8 collision_portal_rotations = 0;
           Coord_t block_coord = block_get_coord(world->blocks.elements + i);
 
           if(!collided_with_block){
@@ -360,7 +360,7 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                                    if(collided_with_block){
                                         result.collided = true;
                                         block_pos = portal_pos;
-                                        portal_rotations = portal_rotations_between(interactive->portal.face, (Direction_t)(d));
+                                        collision_portal_rotations = portal_rotations_between(interactive->portal.face, (Direction_t)(d));
                                         break;
                                    }
                               }
@@ -371,14 +371,14 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
 
           if(collided_with_block){
                Vec_t pos_delta_diff = result.pos_delta - pos_delta_save;
-               collided_block_delta = vec_rotate_quadrants_clockwise(pos_delta_diff, (U8)(4) - portal_rotations);
+               collided_block_delta = vec_rotate_quadrants_clockwise(pos_delta_diff, (U8)(4) - collision_portal_rotations);
                auto collided_block_dir = relative_quadrant(player_pos.pixel, block_pos.pixel + HALF_TILE_SIZE_PIXEL);
                auto collided_block = world->blocks.elements + i;
 
                {
                     // this stops the block when it moves into the player
-                    Vec_t rotated_accel = vec_rotate_quadrants_clockwise(collided_block->accel, portal_rotations);
-                    Vec_t rotated_vel = vec_rotate_quadrants_clockwise(collided_block->vel, portal_rotations);
+                    Vec_t rotated_accel = vec_rotate_quadrants_clockwise(collided_block->accel, collision_portal_rotations);
+                    Vec_t rotated_vel = vec_rotate_quadrants_clockwise(collided_block->vel, collision_portal_rotations);
 
                     switch(collided_block_dir){
                     default:
@@ -390,8 +390,8 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                               result.pos_delta -= pos_delta_diff;
                               rotated_accel.x = 0.0f;
                               rotated_vel.x = 0.0f;
-                              collided_block->accel = vec_rotate_quadrants_counter_clockwise(rotated_accel, portal_rotations);
-                              collided_block->vel = vec_rotate_quadrants_counter_clockwise(rotated_vel, portal_rotations);
+                              collided_block->accel = vec_rotate_quadrants_counter_clockwise(rotated_accel, collision_portal_rotations);
+                              collided_block->vel = vec_rotate_quadrants_counter_clockwise(rotated_vel, collision_portal_rotations);
                          }
                          break;
                     case DIRECTION_RIGHT:
@@ -401,8 +401,8 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                               result.pos_delta -= pos_delta_diff;
                               rotated_accel.x = 0.0f;
                               rotated_vel.x = 0.0f;
-                              collided_block->accel = vec_rotate_quadrants_counter_clockwise(rotated_accel, portal_rotations);
-                              collided_block->vel = vec_rotate_quadrants_counter_clockwise(rotated_vel, portal_rotations);
+                              collided_block->accel = vec_rotate_quadrants_counter_clockwise(rotated_accel, collision_portal_rotations);
+                              collided_block->vel = vec_rotate_quadrants_counter_clockwise(rotated_vel, collision_portal_rotations);
                          }
                          break;
                     case DIRECTION_UP:
@@ -412,8 +412,8 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                               result.pos_delta -= pos_delta_diff;
                               rotated_accel.y = 0.0f;
                               rotated_vel.y = 0.0f;
-                              collided_block->accel = vec_rotate_quadrants_counter_clockwise(rotated_accel, portal_rotations);
-                              collided_block->vel = vec_rotate_quadrants_counter_clockwise(rotated_vel, portal_rotations);
+                              collided_block->accel = vec_rotate_quadrants_counter_clockwise(rotated_accel, collision_portal_rotations);
+                              collided_block->vel = vec_rotate_quadrants_counter_clockwise(rotated_vel, collision_portal_rotations);
                          }
                          break;
                     case DIRECTION_DOWN:
@@ -423,14 +423,15 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                               result.pos_delta -= pos_delta_diff;
                               rotated_accel.y = 0.0f;
                               rotated_vel.y = 0.0f;
-                              collided_block->accel = vec_rotate_quadrants_counter_clockwise(rotated_accel, portal_rotations);
-                              collided_block->vel = vec_rotate_quadrants_counter_clockwise(rotated_vel, portal_rotations);
+                              collided_block->accel = vec_rotate_quadrants_counter_clockwise(rotated_accel, collision_portal_rotations);
+                              collided_block->vel = vec_rotate_quadrants_counter_clockwise(rotated_vel, collision_portal_rotations);
                          }
                          break;
                     }
                }
 
-               auto rotated_player_face = direction_rotate_counter_clockwise(player_face, portal_rotations);
+               auto rotated_player_face = direction_rotate_counter_clockwise(player_face, collision_portal_rotations);
+
                if(collided_block_dir == player_face && (player_vel.x != 0.0f || player_vel.y != 0.0f)){
                     if(result.pushing_block < 0){ // also check that the player is actually pushing against the block
                          result.pushing_block = i;
@@ -904,7 +905,7 @@ bool reset_players(ObjectArray_t<Player_t>* players){
      return success;
 }
 
-void describe_block(Block_t* block){
+void describe_block(World_t* world, Block_t* block){
      LOG("block %ld: pixel %d, %d, decimal: %f, %f, rot: %d, element: %s, entangle: %d, clone id: %d\n",
          block - world->blocks.elements, block->pos.pixel.x, block->pos.pixel.y,
          block->pos.decimal.x, block->pos.decimal.y,

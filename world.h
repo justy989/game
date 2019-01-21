@@ -64,7 +64,7 @@ void melt_ice(Coord_t center, S16 radius, World_t* world, bool teleported = fals
 bool block_push(Block_t* block, Direction_t direction, World_t* world, bool pushed_by_ice, F32 instant_vel = 0);
 bool reset_players(ObjectArray_t<Player_t>* players);
 
-void describe_block(Block_t* block);
+void describe_block(World_t* world, Block_t* block);
 void describe_coord(Coord_t coord, World_t* world);
 bool test_map_end_state(World_t* world, Demo_t* demo);
 
