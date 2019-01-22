@@ -121,3 +121,24 @@ bool tile_flags_cluster_all_on(U16 flags){
 
      return true;
 }
+
+void tile_toggle_wire_activated(Tile_t* tile){
+     if(tile->flags & TILE_FLAG_WIRE_CLUSTER_LEFT){
+          TOGGLE_BIT_FLAG(tile->flags, TILE_FLAG_WIRE_CLUSTER_LEFT_ON);
+     }
+
+     if(tile->flags & TILE_FLAG_WIRE_CLUSTER_MID){
+          TOGGLE_BIT_FLAG(tile->flags, TILE_FLAG_WIRE_CLUSTER_MID_ON);
+     }
+
+     if(tile->flags & TILE_FLAG_WIRE_CLUSTER_RIGHT){
+          TOGGLE_BIT_FLAG(tile->flags, TILE_FLAG_WIRE_CLUSTER_RIGHT_ON);
+     }
+
+     if(tile->flags & TILE_FLAG_WIRE_LEFT ||
+        tile->flags & TILE_FLAG_WIRE_UP ||
+        tile->flags & TILE_FLAG_WIRE_RIGHT ||
+        tile->flags & TILE_FLAG_WIRE_DOWN){
+          TOGGLE_BIT_FLAG(tile->flags, TILE_FLAG_WIRE_STATE);
+     }
+}

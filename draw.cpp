@@ -3,6 +3,8 @@
 #include "portal_exit.h"
 #include "conversion.h"
 #include "utils.h"
+#include "world.h"
+#include "editor.h"
 
 #include <float.h>
 #include <ctype.h>
@@ -506,5 +508,225 @@ void draw_text(const char* message, Vec_t pos)
 
           pos.x += TEXT_CHAR_WIDTH + TEXT_CHAR_SPACING;
           message++;
+     }
+}
+
+static Block_t block_from_stamp(Stamp_t* stamp){
+     Block_t block = {};
+     block.element = stamp->block.element;
+     // block.rotation = stamp->block.rotation;
+     block.entangle_index = stamp->block.entangle_index;
+     block.clone_start = Coord_t{};
+     block.clone_id = 0;
+     return block;
+}
+
+void draw_editor(Editor_t* editor, World_t* world, Position_t screen_camera, Vec_t mouse_screen,
+                 GLuint theme_texture, GLuint text_texture){
+     switch(editor->mode){
+     default:
+          break;
+     case EDITOR_MODE_OFF:
+          // pass
+          break;
+     case EDITOR_MODE_CATEGORY_SELECT:
+     {
+          glBindTexture(GL_TEXTURE_2D, theme_texture);
+          glBegin(GL_QUADS);
+          glColor3f(1.0f, 1.0f, 1.0f);
+
+          Vec_t vec = {0.0f, 0.0f};
+
+          for(S32 g = 0; g < editor->category_array.count; ++g){
+               auto* category = editor->category_array.elements + g;
+               auto* stamp_array = category->elements + 0;
+
+               for(S16 s = 0; s < stamp_array->count; s++){
+                    auto* stamp = stamp_array->elements + s;
+                    if(g && (g % ROOM_TILE_SIZE) == 0){
+                         vec.x = 0.0f;
+                         vec.y += TILE_SIZE;
+                    }
+
+                    switch(stamp->type){
+                    default:
+                         break;
+                    case STAMP_TYPE_TILE_ID:
+                         draw_tile_id(stamp->tile_id, vec);
+                         break;
+                    case STAMP_TYPE_TILE_FLAGS:
+                         draw_tile_flags(stamp->tile_flags, vec);
+                         break;
+                    case STAMP_TYPE_BLOCK:
+                    {
+                         Block_t block = block_from_stamp(stamp);
+                         draw_block(&block, vec);
+                    } break;
+                    case STAMP_TYPE_INTERACTIVE:
+                    {
+                         draw_interactive(&stamp->interactive, vec, Coord_t{-1, -1}, &world->tilemap, world->interactive_qt);
+                    } break;
+                    }
+               }
+
+               vec.x += TILE_SIZE;
+          }
+
+          glEnd();
+     } break;
+     case EDITOR_MODE_STAMP_SELECT:
+     case EDITOR_MODE_STAMP_HIDE:
+     {
+          glBindTexture(GL_TEXTURE_2D, theme_texture);
+          glBegin(GL_QUADS);
+          glColor3f(1.0f, 1.0f, 1.0f);
+
+          // draw stamp at mouse
+          auto* stamp_array = editor->category_array.elements[editor->category].elements + editor->stamp;
+          Coord_t mouse_coord = mouse_select_coord(mouse_screen);
+
+          for(S16 s = 0; s < stamp_array->count; s++){
+               auto* stamp = stamp_array->elements + s;
+               Vec_t stamp_pos = coord_to_screen_position(mouse_coord + stamp->offset);
+               switch(stamp->type){
+               default:
+                    break;
+               case STAMP_TYPE_TILE_ID:
+                    draw_tile_id(stamp->tile_id, stamp_pos);
+                    break;
+               case STAMP_TYPE_TILE_FLAGS:
+                    draw_tile_flags(stamp->tile_flags, stamp_pos);
+                    break;
+               case STAMP_TYPE_BLOCK:
+               {
+                    Block_t block = block_from_stamp(stamp);
+                    draw_block(&block, stamp_pos);
+               } break;
+               case STAMP_TYPE_INTERACTIVE:
+               {
+                    draw_interactive(&stamp->interactive, stamp_pos, Coord_t{-1, -1}, &world->tilemap, world->interactive_qt);
+               } break;
+               }
+          }
+
+          if(editor->mode == EDITOR_MODE_STAMP_SELECT){
+               // draw stamps to select from at the bottom
+               Vec_t pos = {0.0f, 0.0f};
+               S16 row_height = 1;
+               auto* category = editor->category_array.elements + editor->category;
+
+               for(S32 g = 0; g < category->count; ++g){
+                    stamp_array = category->elements + g;
+                    Coord_t dimensions = stamp_array_dimensions(stamp_array);
+                    if(dimensions.y > row_height) row_height = dimensions.y;
+
+                    for(S32 s = 0; s < stamp_array->count; s++){
+                         auto* stamp = stamp_array->elements + s;
+                         Vec_t stamp_vec = pos + coord_to_vec(stamp->offset);
+
+                         switch(stamp->type){
+                         default:
+                              break;
+                         case STAMP_TYPE_TILE_ID:
+                              draw_tile_id(stamp->tile_id, stamp_vec);
+                              break;
+                         case STAMP_TYPE_TILE_FLAGS:
+                              draw_tile_flags(stamp->tile_flags, stamp_vec);
+                              break;
+                         case STAMP_TYPE_BLOCK:
+                         {
+                              Block_t block = block_from_stamp(stamp);
+                              draw_block(&block, stamp_vec);
+                         } break;
+                         case STAMP_TYPE_INTERACTIVE:
+                         {
+                              draw_interactive(&stamp->interactive, stamp_vec, Coord_t{-1, -1}, &world->tilemap, world->interactive_qt);
+                         } break;
+                         }
+                    }
+
+                    pos.x += (dimensions.x * TILE_SIZE);
+                    if(pos.x >= 1.0f){
+                         pos.x = 0.0f;
+                         pos.y += row_height * TILE_SIZE;
+                         row_height = 1;
+                    }
+               }
+          }
+
+          glEnd();
+     } break;
+     case EDITOR_MODE_CREATE_SELECTION:
+          draw_selection(editor->selection_start, editor->selection_end, screen_camera, 1.0f, 0.0f, 0.0f);
+          break;
+     case EDITOR_MODE_SELECTION_MANIPULATION:
+     {
+          glBindTexture(GL_TEXTURE_2D, theme_texture);
+          glBegin(GL_QUADS);
+          glColor3f(1.0f, 1.0f, 1.0f);
+
+          for(S32 g = 0; g < editor->selection.count; ++g){
+               auto* stamp = editor->selection.elements + g;
+               Position_t stamp_pos = coord_to_pos(editor->selection_start + stamp->offset);
+               Vec_t stamp_vec = pos_to_vec(stamp_pos);
+
+               switch(stamp->type){
+               default:
+                    break;
+               case STAMP_TYPE_TILE_ID:
+                    draw_tile_id(stamp->tile_id, stamp_vec);
+                    break;
+               case STAMP_TYPE_TILE_FLAGS:
+                    draw_tile_flags(stamp->tile_flags, stamp_vec);
+                    break;
+               case STAMP_TYPE_BLOCK:
+               {
+                    Block_t block = block_from_stamp(stamp);
+                    draw_block(&block, stamp_vec);
+               } break;
+               case STAMP_TYPE_INTERACTIVE:
+               {
+                    draw_interactive(&stamp->interactive, stamp_vec, Coord_t{-1, -1}, &world->tilemap, world->interactive_qt);
+               } break;
+               }
+          }
+          glEnd();
+
+          Rect_t selection_bounds = editor_selection_bounds(editor);
+          Coord_t min_coord {selection_bounds.left, selection_bounds.bottom};
+          Coord_t max_coord {selection_bounds.right, selection_bounds.top};
+          draw_selection(min_coord, max_coord, screen_camera, 1.0f, 0.0f, 0.0f);
+     } break;
+     }
+
+     if(editor->mode){
+          glBindTexture(GL_TEXTURE_2D, text_texture);
+          glBegin(GL_QUADS);
+          glColor3f(1.0f, 1.0f, 1.0f);
+
+          auto mouse_world = vec_to_pos(mouse_screen);
+          auto mouse_coord = pos_to_coord(mouse_world);
+          char buffer[64];
+          snprintf(buffer, 64, "M: %d,%d", mouse_coord.x, mouse_coord.y);
+
+          Vec_t text_pos {0.005f, 0.965f};
+
+          glColor3f(0.0f, 0.0f, 0.0f);
+          draw_text(buffer, text_pos + Vec_t{0.002f, -0.002f});
+
+          glColor3f(1.0f, 1.0f, 1.0f);
+          draw_text(buffer, text_pos);
+
+          Player_t* player = world->players.elements;
+          snprintf(buffer, 64, "P: %d,%d R: %d", player->pos.pixel.x, player->pos.pixel.y, player->rotation);
+          text_pos.y -= 0.045f;
+
+          glColor3f(0.0f, 0.0f, 0.0f);
+          draw_text(buffer, text_pos + Vec_t{0.002f, -0.002f});
+
+          glColor3f(1.0f, 1.0f, 1.0f);
+          draw_text(buffer, text_pos);
+
+          glEnd();
      }
 }

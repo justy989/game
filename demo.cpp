@@ -7,6 +7,36 @@ struct DemoEntryNode_t{
      DemoEntryNode_t* next;
 };
 
+bool demo_begin(Demo_t* demo){
+     switch(demo->mode){
+     default:
+          break;
+     case DEMO_MODE_RECORD:
+          demo->file = fopen(demo->filepath, "w");
+          if(!demo->file){
+               LOG("failed to open demo file: %s\n", demo->filepath);
+               return false;
+          }
+          demo->version = 2;
+          fwrite(&demo->version, sizeof(demo->version), 1, demo->file);
+          break;
+     case DEMO_MODE_PLAY:
+          demo->file = fopen(demo->filepath, "r");
+          if(!demo->file){
+               LOG("failed to open demo file: %s\n", demo->filepath);
+               return false;
+          }
+          fread(&demo->version, sizeof(demo->version), 1, demo->file);
+          demo->entries = demo_entries_get(demo->file);
+          demo->last_frame = demo->entries.entries[demo->entries.count - 1].frame;
+          LOG("playing demo %s: version %d with %ld actions across %ld frames\n", demo->filepath,
+              demo->version, demo->entries.count, demo->last_frame);
+          break;
+     }
+
+     return true;
+}
+
 DemoEntries_t demo_entries_get(FILE* file){
      S64 entry_count = 0;
 
@@ -54,6 +84,23 @@ DemoEntries_t demo_entries_get(FILE* file){
      }
 
      return entries;
+}
+
+bool demo_play_frame(Demo_t* demo, PlayerAction_t* player_action, ObjectArray_t<Player_t>* players, S64 frame_count){
+     if(demo->entries.entries[demo->entry_index].player_action_type == PLAYER_ACTION_TYPE_END_DEMO){
+          if(frame_count > demo->entries.entries[demo->entry_index].frame){
+               return true;
+          }
+     }else{
+          while(frame_count == demo->entries.entries[demo->entry_index].frame){
+               player_action_perform(player_action, players,
+                                     demo->entries.entries[demo->entry_index].player_action_type, demo->mode,
+                                     demo->file, frame_count);
+               demo->entry_index++;
+          }
+     }
+
+     return false;
 }
 
 void player_action_perform(PlayerAction_t* player_action, ObjectArray_t<Player_t>* players, PlayerActionType_t player_action_type,

@@ -61,6 +61,9 @@ struct Demo_t{
      DemoEntries_t entries;
 };
 
+bool demo_begin(Demo_t* demo);
 DemoEntries_t demo_entries_get(FILE* file);
+bool demo_play_frame(Demo_t* demo, PlayerAction_t* player_action, ObjectArray_t<Player_t>* players, S64 frame_count);
+
 void player_action_perform(PlayerAction_t* player_action, ObjectArray_t<Player_t>* players, PlayerActionType_t player_action_type,
                            DemoMode_t demo_mode, FILE* demo_file, S64 frame_count);

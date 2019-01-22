@@ -11,6 +11,7 @@ Entanglement:
   the non-entangled block to accomplish that
 - arrow entanglement
 - arrow kills player
+- assertion when pushing block through portal to entangle the block
 
 Big Features:
 - Block splitting
@@ -37,7 +38,6 @@ NOTES:
 #include "object_array.h"
 #include "portal_exit.h"
 #include "block.h"
-#include "editor.h"
 #include "utils.h"
 #include "map_format.h"
 #include "draw.h"
@@ -45,6 +45,7 @@ NOTES:
 #include "demo.h"
 #include "collision.h"
 #include "world.h"
+#include "editor.h" // TODO: remove
 
 FILE* load_demo_number(S32 map_number, const char** demo_filepath){
      char filepath[64] = {};
@@ -97,6 +98,7 @@ bool load_map_number_map(S16 map_number, World_t* world, Undo_t* undo,
      return false;
 }
 
+// TODO: remove this
 Block_t block_from_stamp(Stamp_t* stamp){
      Block_t block = {};
      block.element = stamp->block.element;
@@ -105,6 +107,55 @@ Block_t block_from_stamp(Stamp_t* stamp){
      block.clone_start = Coord_t{};
      block.clone_id = 0;
      return block;
+}
+
+void update_light_and_ice_detectors(Interactive_t* interactive, World_t* world)
+{
+     switch(interactive->type){
+     default:
+          break;
+     case INTERACTIVE_TYPE_LIGHT_DETECTOR:
+     {
+          Tile_t* tile = tilemap_get_tile(&world->tilemap, interactive->coord);
+          Rect_t coord_rect = rect_surrounding_adjacent_coords(interactive->coord);
+
+          S16 block_count = 0;
+          Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
+          quad_tree_find_in(world->block_qt, coord_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
+
+          Block_t* block = nullptr;
+          for(S16 b = 0; b < block_count; b++){
+               // blocks on the coordinate and on the ground block light
+               if(block_get_coord(blocks[b]) == interactive->coord && blocks[b]->pos.z == 0){
+                    block = blocks[b];
+                    break;
+               }
+          }
+
+          if(interactive->detector.on && (tile->light < LIGHT_DETECTOR_THRESHOLD || block)){
+               activate(world, interactive->coord);
+               interactive->detector.on = false;
+          }else if(!interactive->detector.on && tile->light >= LIGHT_DETECTOR_THRESHOLD && !block){
+               activate(world, interactive->coord);
+               interactive->detector.on = true;
+          }
+          break;
+     }
+     case INTERACTIVE_TYPE_ICE_DETECTOR:
+     {
+          Tile_t* tile = tilemap_get_tile(&world->tilemap, interactive->coord);
+          if(tile){
+               if(interactive->detector.on && !tile_is_iced(tile)){
+                    activate(world, interactive->coord);
+                    interactive->detector.on = false;
+               }else if(!interactive->detector.on && tile_is_iced(tile)){
+                    activate(world, interactive->coord);
+                    interactive->detector.on = true;
+               }
+          }
+          break;
+     }
+     }
 }
 
 int main(int argc, char** argv){
@@ -224,30 +275,10 @@ int main(int argc, char** argv){
           if(text_texture == 0) return 1;
      }
 
-     switch(demo.mode){
-     default:
-          break;
-     case DEMO_MODE_RECORD:
-          demo.file = fopen(demo.filepath, "w");
-          if(!demo.file){
-               LOG("failed to open demo file: %s\n", demo.filepath);
+     if(demo.mode != DEMO_MODE_NONE){
+          if(!demo_begin(&demo)){
                return 1;
           }
-          demo.version = 2;
-          fwrite(&demo.version, sizeof(demo.version), 1, demo.file);
-          break;
-     case DEMO_MODE_PLAY:
-          demo.file = fopen(demo.filepath, "r");
-          if(!demo.file){
-               LOG("failed to open demo file: %s\n", demo.filepath);
-               return 1;
-          }
-          fread(&demo.version, sizeof(demo.version), 1, demo.file);
-          demo.entries = demo_entries_get(demo.file);
-          demo.last_frame = demo.entries.entries[demo.entries.count - 1].frame;
-          LOG("playing demo %s: version %d with %ld actions across %ld frames\n", demo.filepath,
-              demo.version, demo.entries.count, demo.last_frame);
-          break;
      }
 
      World_t world {};
@@ -394,19 +425,7 @@ int main(int argc, char** argv){
           }
 
           if(demo.mode == DEMO_MODE_PLAY){
-               bool end_of_demo = false;
-               if(demo.entries.entries[demo.entry_index].player_action_type == PLAYER_ACTION_TYPE_END_DEMO){
-                    end_of_demo = (frame_count > demo.entries.entries[demo.entry_index].frame);
-               }else{
-                    while(frame_count == demo.entries.entries[demo.entry_index].frame){
-                         player_action_perform(&player_action, &world.players,
-                                               demo.entries.entries[demo.entry_index].player_action_type, demo.mode,
-                                               demo.file, frame_count);
-                         demo.entry_index++;
-                    }
-               }
-
-               if(end_of_demo){
+               if(demo_play_frame(&demo, &player_action, &world.players, frame_count)){
                     if(test){
                          if(!test_map_end_state(&world, &demo)){
                               LOG("test failed\n");
@@ -417,7 +436,6 @@ int main(int argc, char** argv){
                               S16 maps_tested = map_number - first_map_number;
 
                               if(load_map_number_map(map_number, &world, &undo, &player_start, &player_action)){
-
                                    cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
 
                                    if(load_map_number_demo(&demo, map_number, &frame_count)){
@@ -591,26 +609,7 @@ int main(int argc, char** argv){
                     case SDL_SCANCODE_N:
                     {
                          Tile_t* tile = tilemap_get_tile(&world.tilemap, mouse_select_world(mouse_screen, camera));
-                         if(tile){
-                              if(tile->flags & TILE_FLAG_WIRE_CLUSTER_LEFT){
-                                   TOGGLE_BIT_FLAG(tile->flags, TILE_FLAG_WIRE_CLUSTER_LEFT_ON);
-                              }
-
-                              if(tile->flags & TILE_FLAG_WIRE_CLUSTER_MID){
-                                   TOGGLE_BIT_FLAG(tile->flags, TILE_FLAG_WIRE_CLUSTER_MID_ON);
-                              }
-
-                              if(tile->flags & TILE_FLAG_WIRE_CLUSTER_RIGHT){
-                                   TOGGLE_BIT_FLAG(tile->flags, TILE_FLAG_WIRE_CLUSTER_RIGHT_ON);
-                              }
-
-                              if(tile->flags & TILE_FLAG_WIRE_LEFT ||
-                                 tile->flags & TILE_FLAG_WIRE_UP ||
-                                 tile->flags & TILE_FLAG_WIRE_RIGHT ||
-                                 tile->flags & TILE_FLAG_WIRE_DOWN){
-                                   TOGGLE_BIT_FLAG(tile->flags, TILE_FLAG_WIRE_STATE);
-                              }
-                         }
+                         if(tile) tile_toggle_wire_activated(tile);
                     } break;
                     case SDL_SCANCODE_8:
                          if(editor.mode == EDITOR_MODE_CATEGORY_SELECT){
@@ -660,7 +659,7 @@ int main(int argc, char** argv){
                          if(editor.mode == EDITOR_MODE_CATEGORY_SELECT){
                               auto pixel = mouse_select_world_pixel(mouse_screen, camera);
 
-                              // TODO: make this a function where you can pass in entangler_index
+                              // TODO: make this a function where you can pass in entangle_index
                               S16 new_index = world.players.count;
                               if(resize(&world.players, world.players.count + (S16)(1))){
                                    Player_t* new_player = world.players.elements + new_index;
@@ -747,21 +746,6 @@ int main(int argc, char** argv){
                     case SDL_SCANCODE_LCTRL:
                          ctrl_down = true;
                          break;
-                    case SDL_SCANCODE_B:
-#if 0
-                    {
-                         undo_commit(&undo, &world.players, &world.tilemap, &world.blocks, &world.interactives);
-                         Coord_t player_coord = pos_to_coord(world.players.elements->pos)
-                         Coord_t min = player_coord - Coord_t{1, 1};
-                         Coord_t max = player_coord + Coord_t{1, 1};
-                         for(S16 y = min.y; y <= max.y; y++){
-                              for(S16 x = min.x; x <= max.x; x++){
-                                   Coord_t coord {x, y};
-                                   coord_clear(coord, &world.tilemap, &world.interactives, world.interactive_qt, &world.blocks);
-                              }
-                         }
-                    } break;
-#endif
                     case SDL_SCANCODE_5:
                     {
                          reset_players(&world.players);
@@ -1053,6 +1037,7 @@ int main(int argc, char** argv){
 
           if(!demo.paused || demo.seek_frame >= 0){
                // reset base light
+               // TODO: this will need to be optimized when the map is much bigger
                for(S16 j = 0; j < world.tilemap.height; j++){
                     for(S16 i = 0; i < world.tilemap.width; i++){
                          world.tilemap.tiles[j][i].light = BASE_LIGHT;
@@ -1422,26 +1407,7 @@ int main(int argc, char** argv){
                     }
                }
 
-#if 0
-               Vec_t pos_vec = pos_to_vec(player->pos);
-
-               // TODO: do we want this in the future?
-               // figure out what room we should focus on
-               Position_t room_center {};
-               for(U32 i = 0; i < ELEM_COUNT(rooms); i++){
-                    if(coord_in_rect(vec_to_coord(pos_vec), rooms[i])){
-                         S16 half_room_width = (rooms[i].right - rooms[i].left) / 2;
-                         S16 half_room_height = (rooms[i].top - rooms[i].bottom) / 2;
-                         Coord_t room_center_coord {(S16)(rooms[i].left + half_room_width),
-                                                    (S16)(rooms[i].bottom + half_room_height)};
-                         room_center = coord_to_pos(room_center_coord);
-                         break;
-                    }
-               }
-#else
                Position_t room_center = coord_to_pos(Coord_t{8, 8});
-#endif
-
                Position_t camera_movement = room_center - camera;
                camera += camera_movement * 0.05f;
 
@@ -2221,8 +2187,7 @@ int main(int argc, char** argv){
                          auto push_block_dir = player->pushing_block_dir;
                          if(block_to_push->teleport) push_block_dir = direction_rotate_clockwise(push_block_dir, block_to_push->teleport_rotation);
 
-                         if(direction_in_mask(direction_mask_opposite(block_move_dir_mask), push_block_dir))
-                         {
+                         if(direction_in_mask(direction_mask_opposite(block_move_dir_mask), push_block_dir)){
                               // if the player is pushing against a block moving towards them, the block wins
                               player->push_time = 0;
                               player->pushing_block = -1;
@@ -2262,7 +2227,7 @@ int main(int argc, char** argv){
                     }
                }
 
-               // illuminate and ice
+               // illuminate and spread ice
                for(S16 i = 0; i < world.blocks.count; i++){
                     Block_t* block = world.blocks.elements + i;
                     if(block->element == ELEMENT_FIRE){
@@ -2273,7 +2238,7 @@ int main(int argc, char** argv){
                     }
                }
 
-               // melt ice
+               // melt ice in a separate pass
                for(S16 i = 0; i < world.blocks.count; i++){
                     Block_t* block = world.blocks.elements + i;
                     if(block->element == ELEMENT_FIRE){
@@ -2281,44 +2246,9 @@ int main(int argc, char** argv){
                     }
                }
 
+               // update light and ice detectors
                for(S16 i = 0; i < world.interactives.count; i++){
-                    Interactive_t* interactive = world.interactives.elements + i;
-                    if(interactive->type == INTERACTIVE_TYPE_LIGHT_DETECTOR){
-                         Tile_t* tile = tilemap_get_tile(&world.tilemap, interactive->coord);
-                         Rect_t coord_rect = rect_surrounding_adjacent_coords(interactive->coord);
-
-                         S16 block_count = 0;
-                         Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
-                         quad_tree_find_in(world.block_qt, coord_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
-
-                         Block_t* block = nullptr;
-                         for(S16 b = 0; b < block_count; b++){
-                              // blocks on the coordinate and on the ground block light
-                              if(block_get_coord(blocks[b]) == interactive->coord && blocks[b]->pos.z == 0){
-                                   block = blocks[b];
-                                   break;
-                              }
-                         }
-
-                         if(interactive->detector.on && (tile->light < LIGHT_DETECTOR_THRESHOLD || block)){
-                              activate(&world, interactive->coord);
-                              interactive->detector.on = false;
-                         }else if(!interactive->detector.on && tile->light >= LIGHT_DETECTOR_THRESHOLD && !block){
-                              activate(&world, interactive->coord);
-                              interactive->detector.on = true;
-                         }
-                    }else if(interactive->type == INTERACTIVE_TYPE_ICE_DETECTOR){
-                         Tile_t* tile = tilemap_get_tile(&world.tilemap, interactive->coord);
-                         if(tile){
-                              if(interactive->detector.on && !tile_is_iced(tile)){
-                                   activate(&world, interactive->coord);
-                                   interactive->detector.on = false;
-                              }else if(!interactive->detector.on && tile_is_iced(tile)){
-                                   activate(&world, interactive->coord);
-                                   interactive->detector.on = true;
-                              }
-                         }
-                    }
+                    update_light_and_ice_detectors(world.interactives.elements + i, &world);
                }
 
                if(resetting){
@@ -2336,8 +2266,7 @@ int main(int argc, char** argv){
 
           if((suite && !show_suite) || demo.seek_frame >= 0) continue;
 
-          glClear(GL_COLOR_BUFFER_BIT);
-
+          // begin drawing
           Position_t screen_camera = camera - Vec_t{0.5f, 0.5f} + Vec_t{HALF_TILE_SIZE, HALF_TILE_SIZE};
 
           Coord_t min = pos_to_coord(screen_camera);
@@ -2346,6 +2275,8 @@ int main(int argc, char** argv){
           max = coord_clamp_zero_to_dim(max, world.tilemap.width - (S16)(1), world.tilemap.height - (S16)(1));
           Position_t tile_bottom_left = coord_to_pos(min);
           Vec_t camera_offset = pos_to_vec(tile_bottom_left - screen_camera);
+
+          glClear(GL_COLOR_BUFFER_BIT);
 
           // draw flats
           glBindTexture(GL_TEXTURE_2D, theme_texture);
@@ -2504,63 +2435,6 @@ int main(int argc, char** argv){
 
           glEnd();
 
-#if 0
-          glBindTexture(GL_TEXTURE_2D, 0);
-          glBegin(GL_LINES);
-
-          for(S16 p = 0; p < world.players.count; p++){
-               // player circle
-               Position_t player_camera_offset = world.players.elements[p].pos - screen_camera;
-               Vec_t pos_vec = pos_to_vec(player_camera_offset);
-
-               if(world.players.elements[p].prev_pushing_block >= 0){
-                    glColor3f(1.0f, 0.0f, 0.0f);
-               }else{
-                    glColor3f(1.0f, 1.0f, 1.0f);
-               }
-               Vec_t prev_vec {pos_vec.x + PLAYER_RADIUS, pos_vec.y};
-               S32 segments = 32;
-               F32 delta = 3.14159f * 2.0f / (F32)(segments);
-               F32 angle = 0.0f  + delta;
-               for(S32 i = 0; i <= segments; i++){
-                    F32 dx = cos(angle) * PLAYER_RADIUS;
-                    F32 dy = sin(angle) * PLAYER_RADIUS;
-
-                    glVertex2f(prev_vec.x, prev_vec.y);
-                    glVertex2f(pos_vec.x + dx, pos_vec.y + dy);
-                    prev_vec.x = pos_vec.x + dx;
-                    prev_vec.y = pos_vec.y + dy;
-                    angle += delta;
-               }
-
-               pos_vec = pos_to_vec(Position_t{} - screen_camera);
-               prev_vec = {pos_vec.x + PLAYER_RADIUS, pos_vec.y};
-               segments = 32;
-               delta = 3.14159f * 2.0f / (F32)(segments);
-               angle = 0.0f  + delta;
-               for(S32 i = 0; i <= segments; i++){
-                    F32 dx = cos(angle) * PLAYER_RADIUS;
-                    F32 dy = sin(angle) * PLAYER_RADIUS;
-
-                    glVertex2f(prev_vec.x, prev_vec.y);
-                    glVertex2f(pos_vec.x + dx, pos_vec.y + dy);
-                    prev_vec.x = pos_vec.x + dx;
-                    prev_vec.y = pos_vec.y + dy;
-                    angle += delta;
-               }
-          }
-
-          glEnd();
-#endif
-
-#if 0
-          Vec_t collided_with_center = {(float)(g_collided_with_pixel.x) * PIXEL_SIZE, (float)(g_collided_with_pixel.y) * PIXEL_SIZE};
-          const float half_block_size = PIXEL_SIZE * HALF_TILE_SIZE_IN_PIXELS;
-          Quad_t collided_with_quad = {collided_with_center.x - half_block_size, collided_with_center.y - half_block_size,
-                                       collided_with_center.x + half_block_size, collided_with_center.y + half_block_size};
-          draw_quad_wireframe(&collided_with_quad, 255.0f, 0.0f, 255.0f);
-#endif
-
 #if 1
           // light
           glBindTexture(GL_TEXTURE_2D, 0);
@@ -2585,211 +2459,7 @@ int main(int argc, char** argv){
           draw_selection(player_start, player_start, screen_camera, 0.0f, 1.0f, 0.0f);
 
           // editor
-          switch(editor.mode){
-          default:
-               break;
-          case EDITOR_MODE_OFF:
-               // pass
-               break;
-          case EDITOR_MODE_CATEGORY_SELECT:
-          {
-               glBindTexture(GL_TEXTURE_2D, theme_texture);
-               glBegin(GL_QUADS);
-               glColor3f(1.0f, 1.0f, 1.0f);
-
-               Vec_t vec = {0.0f, 0.0f};
-
-               for(S32 g = 0; g < editor.category_array.count; ++g){
-                    auto* category = editor.category_array.elements + g;
-                    auto* stamp_array = category->elements + 0;
-
-                    for(S16 s = 0; s < stamp_array->count; s++){
-                         auto* stamp = stamp_array->elements + s;
-                         if(g && (g % ROOM_TILE_SIZE) == 0){
-                              vec.x = 0.0f;
-                              vec.y += TILE_SIZE;
-                         }
-
-                         switch(stamp->type){
-                         default:
-                              break;
-                         case STAMP_TYPE_TILE_ID:
-                              draw_tile_id(stamp->tile_id, vec);
-                              break;
-                         case STAMP_TYPE_TILE_FLAGS:
-                              draw_tile_flags(stamp->tile_flags, vec);
-                              break;
-                         case STAMP_TYPE_BLOCK:
-                         {
-                              Block_t block = block_from_stamp(stamp);
-                              draw_block(&block, vec);
-                         } break;
-                         case STAMP_TYPE_INTERACTIVE:
-                         {
-                              draw_interactive(&stamp->interactive, vec, Coord_t{-1, -1}, &world.tilemap, world.interactive_qt);
-                         } break;
-                         }
-                    }
-
-                    vec.x += TILE_SIZE;
-               }
-
-               glEnd();
-          } break;
-          case EDITOR_MODE_STAMP_SELECT:
-          case EDITOR_MODE_STAMP_HIDE:
-          {
-               glBindTexture(GL_TEXTURE_2D, theme_texture);
-               glBegin(GL_QUADS);
-               glColor3f(1.0f, 1.0f, 1.0f);
-
-               // draw stamp at mouse
-               auto* stamp_array = editor.category_array.elements[editor.category].elements + editor.stamp;
-               Coord_t mouse_coord = mouse_select_coord(mouse_screen);
-
-               for(S16 s = 0; s < stamp_array->count; s++){
-                    auto* stamp = stamp_array->elements + s;
-                    Vec_t stamp_pos = coord_to_screen_position(mouse_coord + stamp->offset);
-                    switch(stamp->type){
-                    default:
-                         break;
-                    case STAMP_TYPE_TILE_ID:
-                         draw_tile_id(stamp->tile_id, stamp_pos);
-                         break;
-                    case STAMP_TYPE_TILE_FLAGS:
-                         draw_tile_flags(stamp->tile_flags, stamp_pos);
-                         break;
-                    case STAMP_TYPE_BLOCK:
-                    {
-                         Block_t block = block_from_stamp(stamp);
-                         draw_block(&block, stamp_pos);
-                    } break;
-                    case STAMP_TYPE_INTERACTIVE:
-                    {
-                         draw_interactive(&stamp->interactive, stamp_pos, Coord_t{-1, -1}, &world.tilemap, world.interactive_qt);
-                    } break;
-                    }
-               }
-
-               if(editor.mode == EDITOR_MODE_STAMP_SELECT){
-                    // draw stamps to select from at the bottom
-                    Vec_t pos = {0.0f, 0.0f};
-                    S16 row_height = 1;
-                    auto* category = editor.category_array.elements + editor.category;
-
-                    for(S32 g = 0; g < category->count; ++g){
-                         stamp_array = category->elements + g;
-                         Coord_t dimensions = stamp_array_dimensions(stamp_array);
-                         if(dimensions.y > row_height) row_height = dimensions.y;
-
-                         for(S32 s = 0; s < stamp_array->count; s++){
-                              auto* stamp = stamp_array->elements + s;
-                              Vec_t stamp_vec = pos + coord_to_vec(stamp->offset);
-
-                              switch(stamp->type){
-                              default:
-                                   break;
-                              case STAMP_TYPE_TILE_ID:
-                                   draw_tile_id(stamp->tile_id, stamp_vec);
-                                   break;
-                              case STAMP_TYPE_TILE_FLAGS:
-                                   draw_tile_flags(stamp->tile_flags, stamp_vec);
-                                   break;
-                              case STAMP_TYPE_BLOCK:
-                              {
-                                   Block_t block = block_from_stamp(stamp);
-                                   draw_block(&block, stamp_vec);
-                              } break;
-                              case STAMP_TYPE_INTERACTIVE:
-                              {
-                                   draw_interactive(&stamp->interactive, stamp_vec, Coord_t{-1, -1}, &world.tilemap, world.interactive_qt);
-                              } break;
-                              }
-                         }
-
-                         pos.x += (dimensions.x * TILE_SIZE);
-                         if(pos.x >= 1.0f){
-                              pos.x = 0.0f;
-                              pos.y += row_height * TILE_SIZE;
-                              row_height = 1;
-                         }
-                    }
-               }
-
-               glEnd();
-          } break;
-          case EDITOR_MODE_CREATE_SELECTION:
-               draw_selection(editor.selection_start, editor.selection_end, screen_camera, 1.0f, 0.0f, 0.0f);
-               break;
-          case EDITOR_MODE_SELECTION_MANIPULATION:
-          {
-               glBindTexture(GL_TEXTURE_2D, theme_texture);
-               glBegin(GL_QUADS);
-               glColor3f(1.0f, 1.0f, 1.0f);
-
-               for(S32 g = 0; g < editor.selection.count; ++g){
-                    auto* stamp = editor.selection.elements + g;
-                    Position_t stamp_pos = coord_to_pos(editor.selection_start + stamp->offset);
-                    Vec_t stamp_vec = pos_to_vec(stamp_pos);
-
-                    switch(stamp->type){
-                    default:
-                         break;
-                    case STAMP_TYPE_TILE_ID:
-                         draw_tile_id(stamp->tile_id, stamp_vec);
-                         break;
-                    case STAMP_TYPE_TILE_FLAGS:
-                         draw_tile_flags(stamp->tile_flags, stamp_vec);
-                         break;
-                    case STAMP_TYPE_BLOCK:
-                    {
-                         Block_t block = block_from_stamp(stamp);
-                         draw_block(&block, stamp_vec);
-                    } break;
-                    case STAMP_TYPE_INTERACTIVE:
-                    {
-                         draw_interactive(&stamp->interactive, stamp_vec, Coord_t{-1, -1}, &world.tilemap, world.interactive_qt);
-                    } break;
-                    }
-               }
-               glEnd();
-
-               Rect_t selection_bounds = editor_selection_bounds(&editor);
-               Coord_t min_coord {selection_bounds.left, selection_bounds.bottom};
-               Coord_t max_coord {selection_bounds.right, selection_bounds.top};
-               draw_selection(min_coord, max_coord, screen_camera, 1.0f, 0.0f, 0.0f);
-          } break;
-          }
-
-          if(editor.mode){
-               glBindTexture(GL_TEXTURE_2D, text_texture);
-               glBegin(GL_QUADS);
-               glColor3f(1.0f, 1.0f, 1.0f);
-
-               auto mouse_coord = pos_to_coord(mouse_world);
-               char buffer[64];
-               snprintf(buffer, 64, "M: %d,%d", mouse_coord.x, mouse_coord.y);
-
-               Vec_t text_pos {0.005f, 0.965f};
-
-               glColor3f(0.0f, 0.0f, 0.0f);
-               draw_text(buffer, text_pos + Vec_t{0.002f, -0.002f});
-
-               glColor3f(1.0f, 1.0f, 1.0f);
-               draw_text(buffer, text_pos);
-
-               Player_t* player = world.players.elements;
-               snprintf(buffer, 64, "P: %d,%d R: %d", player->pos.pixel.x, player->pos.pixel.y, player->rotation);
-               text_pos.y -= 0.045f;
-
-               glColor3f(0.0f, 0.0f, 0.0f);
-               draw_text(buffer, text_pos + Vec_t{0.002f, -0.002f});
-
-               glColor3f(1.0f, 1.0f, 1.0f);
-               draw_text(buffer, text_pos);
-
-               glEnd();
-          }
+          draw_editor(&editor, &world, screen_camera, mouse_screen, theme_texture, text_texture);
 
           if(reset_timer >= 0.0f){
                glBegin(GL_QUADS);
@@ -2822,48 +2492,6 @@ int main(int argc, char** argv){
                draw_text(buffer, text_pos);
 
                glEnd();
-          }
-
-#if 0
-          if(world.players.count >= 1){
-               Player_t* player = world.players.elements + 0;
-
-               glBegin(GL_QUADS);
-
-               if(player_is_teleporting(player, world.interactive_qt)){
-                    glColor3f(0.0f, 1.0f, 0.0f);
-               }else{
-                    glColor3f(1.0f, 0.0f, 0.0f);
-               }
-
-               glVertex2f(0.02, 0.02);
-               glVertex2f(0.02, 0.04);
-               glVertex2f(0.04, 0.04);
-               glVertex2f(0.04, 0.02);
-               glEnd();
-          }
-#endif
-
-#if 0
-          for(S16 i = 0; i < world.blocks.count; i++){
-               auto* block = world.blocks.elements + i;
-               Vec_t screen_pos = pos_to_vec(block->pos);
-
-               Quad_t block_outline_quad = {screen_pos.x, screen_pos.y, screen_pos.x + TILE_SIZE, screen_pos.y + TILE_SIZE};
-
-               if(block_on_ice(block->pos, block->pos_delta, &world.tilemap, world.interactive_qt)){
-                    draw_quad_wireframe(&block_outline_quad, 0.0f, 0.0f, 255.0f);
-               }else{
-                    draw_quad_wireframe(&block_outline_quad, 255.0f, 255.0f, 255.0f);
-               }
-          }
-#endif
-
-          if(demo.mode == DEMO_MODE_PLAY){
-               F32 demo_pct = (F32)(frame_count) / (F32)(demo.last_frame);
-               Quad_t pct_bar_quad = {pct_bar_outline_quad.left, pct_bar_outline_quad.bottom, demo_pct, pct_bar_outline_quad.top};
-               draw_quad_filled(&pct_bar_quad, 255.0f, 255.0f, 255.0f);
-               draw_quad_wireframe(&pct_bar_outline_quad, 255.0f, 255.0f, 255.0f);
           }
 
           SDL_GL_SwapWindow(window);

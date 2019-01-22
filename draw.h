@@ -32,6 +32,10 @@
 #define TEXT_CHAR_TEX_WIDTH 0.01953125f
 #define TEXT_CHAR_TEX_HEIGHT 1.0f
 
+// forward declarations
+struct Editor_t;
+struct World_t;
+
 Vec_t theme_frame(S16 x, S16 y);
 Vec_t arrow_frame(S16 x, S16 y);
 Vec_t player_frame(S16 x, S16 y);
@@ -60,3 +64,5 @@ void draw_quad_filled(const Quad_t* quad, F32 red, F32 green, F32 blue);
 void draw_selection(Coord_t selection_start, Coord_t selection_end, Position_t camera, F32 red, F32 green, F32 blue);
 
 void draw_text(const char* message, Vec_t pos);
+void draw_editor(Editor_t* editor, World_t* world, Position_t screen_camera, Vec_t mouse_screen,
+                 GLuint theme_texture, GLuint text_texture);
