@@ -11,7 +11,6 @@ Entanglement:
   the non-entangled block to accomplish that
 - arrow entanglement
 - arrow kills player
-- assertion when pushing block through portal to entangle the block
 
 Big Features:
 - Block splitting
@@ -1941,7 +1940,9 @@ int main(int argc, char** argv){
                                   block->entangle_index < world.blocks.count){
                               // TODO: do we need to update the block quad tree here?
                               auto block_move_dir = vec_direction(block->pos_delta);
-                              auto block_from_coord = block_get_coord(block) - block_move_dir;
+                              auto block_from_coord = block_get_coord(block);
+                              if(block_move_dir != DIRECTION_COUNT) block_from_coord -= block_move_dir;
+
                               if(block_from_coord == block->clone_start){
                                    // in this instance, despawn the clone
                                    // NOTE: I think this relies on new entangle blocks being
