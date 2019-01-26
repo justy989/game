@@ -97,17 +97,6 @@ bool load_map_number_map(S16 map_number, World_t* world, Undo_t* undo,
      return false;
 }
 
-// TODO: remove this
-Block_t block_from_stamp(Stamp_t* stamp){
-     Block_t block = {};
-     block.element = stamp->block.element;
-     // block.rotation = stamp->block.rotation;
-     block.entangle_index = stamp->block.entangle_index;
-     block.clone_start = Coord_t{};
-     block.clone_id = 0;
-     return block;
-}
-
 void update_light_and_ice_detectors(Interactive_t* interactive, World_t* world)
 {
      switch(interactive->type){
@@ -984,7 +973,7 @@ int main(int argc, char** argv){
                                                   resize(&editor.selection, editor.selection.count + (S16)(1));
                                                   auto* stamp = editor.selection.elements + (editor.selection.count - 1);
                                                   stamp->type = STAMP_TYPE_BLOCK;
-                                                  // stamp->block.rotation = block->rotation;
+                                                  stamp->block.rotation = block->rotation;
                                                   stamp->block.element = block->element;
                                                   stamp->offset = offset;
                                              }
@@ -2216,7 +2205,7 @@ int main(int argc, char** argv){
                          block->accel = block->teleport_accel;
                          block->stop_on_pixel_x = block->teleport_stop_on_pixel_x;
                          block->stop_on_pixel_y = block->teleport_stop_on_pixel_y;
-                         block->rotation = block->teleport_rotation;
+                         block->rotation = (block->rotation + block->teleport_rotation) % static_cast<U8>(DIRECTION_COUNT);
                     }else{
                          final_pos = block->pos + block->pos_delta;
                     }

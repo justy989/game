@@ -184,13 +184,18 @@ bool init(Editor_t* editor){
      tile_flags_category->elements[34].elements[0].tile_flags = TILE_FLAG_RESET_IMMUNE;
 
      auto* block_category = editor->category_array.elements + EDITOR_CATEGORY_BLOCK;
-     init(block_category, 4);
-     for(S16 i = 0; i < block_category->count; i++){
-          init(block_category->elements + i, 1);
-          block_category->elements[i].elements[0].type = STAMP_TYPE_BLOCK;
-          block_category->elements[i].elements[0].block.face = DIRECTION_LEFT;
-          block_category->elements[i].elements[0].block.element = (Element_t)(i);
-          block_category->elements[i].elements[0].block.entangle_index = -1;
+     init(block_category, 16);
+     for(S16 d = 0; d < DIRECTION_COUNT; d++){
+          for(S16 i = 0; i < ELEMENT_COUNT; i++){
+               S16 index = i + (d * ELEMENT_COUNT);
+               init(block_category->elements + index, 1);
+
+               block_category->elements[index].elements[0].type = STAMP_TYPE_BLOCK;
+               block_category->elements[index].elements[0].block.face = DIRECTION_LEFT;
+               block_category->elements[index].elements[0].block.element = (Element_t)(i);
+               block_category->elements[index].elements[0].block.entangle_index = -1;
+               block_category->elements[index].elements[0].block.rotation = d;
+          }
      }
 
      auto* interactive_lever_category = editor->category_array.elements + EDITOR_CATEGORY_INTERACTIVE_LEVER;
@@ -394,7 +399,7 @@ void apply_stamp(Stamp_t* stamp, Coord_t coord, TileMap_t* tilemap, ObjectArray_
           block->vel = vec_zero();
           block->accel = vec_zero();
           block->element = stamp->block.element;
-          // block->rotation = stamp->block.rotation;
+          block->rotation = stamp->block.rotation;
           block->entangle_index = stamp->block.entangle_index;
      } break;
      case STAMP_TYPE_INTERACTIVE:

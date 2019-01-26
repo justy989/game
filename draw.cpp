@@ -517,6 +517,7 @@ static Block_t block_from_stamp(Stamp_t* stamp){
      block.element = stamp->block.element;
      // block.rotation = stamp->block.rotation;
      block.entangle_index = stamp->block.entangle_index;
+     block.rotation = stamp->block.rotation;
      block.clone_start = Coord_t{};
      block.clone_id = 0;
      return block;
