@@ -1804,7 +1804,7 @@ int main(int argc, char** argv){
                                       block->entangle_index >= 0){
                                         entangled_block_pushed = world.blocks.elements + block_pushed->entangle_index;
                                         auto* our_entangled_block = world.blocks.elements + block->entangle_index;
-                                        auto rotations_between = direction_rotations_between(static_cast<Direction_t>(our_entangled_block->rotation), static_cast<Direction_t>(entangled_block_pushed->rotation));
+                                        auto rotations_between = direction_rotations_between(static_cast<Direction_t>(entangled_block_pushed->rotation), static_cast<Direction_t>(our_entangled_block->rotation));
                                         entangled_block_pushed_dir = direction_rotate_clockwise(player->pushing_block_dir, rotations_between);
                                    }
                               }
@@ -1813,7 +1813,6 @@ int main(int argc, char** argv){
                          // this instance of last_block_pushed is to keep the pushing smooth and not have it stop at the tile boundaries
                          if(block != block_pushed && !block_on_ice(block->pos, block->pos_delta, &world.tilemap, world.interactive_qt)){
                               if(block == entangled_block_pushed){
-                                   // TODO: take into account block rotation
                                    DirectionMask_t vel_mask = vec_direction_mask(block->vel);
                                    switch(entangled_block_pushed_dir){
                                    default:
@@ -2186,20 +2185,24 @@ int main(int argc, char** argv){
                     Block_t* block = world.blocks.elements + i;
 
                     if(!block->successfully_moved){
+                         // TODO: its probably not the best thing to stop this in all directions, we probably only
+                         //       want to stop it in the direction that it couldn't resolve collision in
                          block->pos_delta = vec_zero();
                          block->prev_vel = vec_zero();
                          block->vel = vec_zero();
                          block->accel = vec_zero();
                          block->started_on_pixel_x = 0;
                          block->started_on_pixel_y = 0;
-                         block->stop_on_pixel_x = 0;
-                         block->stop_on_pixel_y = 0;
+                         // block->stop_on_pixel_x = 0;
+                         // block->stop_on_pixel_y = 0;
                          block->horizontal_move.state = MOVE_STATE_IDLING;
                          block->horizontal_move.sign = MOVE_SIGN_ZERO;
                          block->horizontal_move.distance = 0;
                          block->vertical_move.state = MOVE_STATE_IDLING;
                          block->vertical_move.sign = MOVE_SIGN_ZERO;
                          block->vertical_move.distance = 0;
+                         block->pos.decimal.x = 0;
+                         block->pos.decimal.y = 0;
                          continue;
                     }
 
@@ -2267,15 +2270,9 @@ int main(int argc, char** argv){
                                    if(pushed && block_to_push->entangle_index >= 0 && block_to_push->entangle_index < world.blocks.count){
                                         player->pushing_block_dir = push_block_dir;
 
-                                        // TODO: take into account block_to_push->face to rotate face
                                         Block_t* entangled_block = world.blocks.elements + block_to_push->entangle_index;
-                                        U8 push_rotation = 0;
-                                        if(block_to_push->rotation){
-                                             push_rotation = block_to_push->rotation;
-                                        }else if(entangled_block->rotation){
-                                             push_rotation = entangled_block->rotation;
-                                        }
-                                        Direction_t rotated_dir = direction_rotate_clockwise(push_block_dir, push_rotation);
+                                        auto rotations_between = direction_rotations_between(static_cast<Direction_t>(entangled_block->rotation), static_cast<Direction_t>(block_to_push->rotation));
+                                        Direction_t rotated_dir = direction_rotate_clockwise(push_block_dir, rotations_between);
                                         block_push(entangled_block, rotated_dir, &world, false);
                                    }
 

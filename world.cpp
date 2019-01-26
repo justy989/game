@@ -811,6 +811,7 @@ bool block_push(Block_t* block, Direction_t direction, World_t* world, bool push
                                                                                world->interactive_qt, &world->tilemap,
                                                                                &collided_block_push_dir);
                if(entangled_collided_block) return false;
+               if(collided_block->rotation != block->rotation) return false; // only when the rotation is equal can we move with the block
                if(block_against_solid_tile(collided_block, direction, &world->tilemap, world->interactive_qt)) return false;
                if(block_against_solid_interactive(collided_block, direction, &world->tilemap, world->interactive_qt)) return false;
           }else{

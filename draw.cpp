@@ -136,8 +136,9 @@ void draw_tile_flags(U16 flags, Vec_t tile_pos){
      }
 }
 
-void draw_block(Block_t* block, Vec_t pos_vec){
-     Vec_t tex_vec = theme_frame(block->rotation, 29);
+void draw_block(Block_t* block, Vec_t pos_vec, U8 portal_rotations){
+     U8 rotation = (block->rotation + portal_rotations) % static_cast<U8>(DIRECTION_COUNT);
+     Vec_t tex_vec = theme_frame(rotation, 29);
      draw_double_theme_frame(pos_vec, tex_vec);
 
      if(block->element == ELEMENT_ONLY_ICED || block->element == ELEMENT_ICE ){
@@ -412,7 +413,7 @@ void draw_solids(Vec_t pos, Interactive_t* interactive, Block_t** blocks, S16 bl
           block_camera_offset.pixel -= HALF_TILE_SIZE_PIXEL;
           block_camera_offset -= screen_camera;
           block_camera_offset.pixel.y += block->pos.z;
-          draw_block(block, pos_to_vec(block_camera_offset));
+          draw_block(block, pos_to_vec(block_camera_offset), portal_rotations);
      }
 
      for(S16 i = 0; i < players->count; i++){
@@ -560,7 +561,7 @@ void draw_editor(Editor_t* editor, World_t* world, Position_t screen_camera, Vec
                     case STAMP_TYPE_BLOCK:
                     {
                          Block_t block = block_from_stamp(stamp);
-                         draw_block(&block, vec);
+                         draw_block(&block, vec, 0);
                     } break;
                     case STAMP_TYPE_INTERACTIVE:
                     {
@@ -600,7 +601,7 @@ void draw_editor(Editor_t* editor, World_t* world, Position_t screen_camera, Vec
                case STAMP_TYPE_BLOCK:
                {
                     Block_t block = block_from_stamp(stamp);
-                    draw_block(&block, stamp_pos);
+                    draw_block(&block, stamp_pos, 0);
                } break;
                case STAMP_TYPE_INTERACTIVE:
                {
@@ -636,7 +637,7 @@ void draw_editor(Editor_t* editor, World_t* world, Position_t screen_camera, Vec
                          case STAMP_TYPE_BLOCK:
                          {
                               Block_t block = block_from_stamp(stamp);
-                              draw_block(&block, stamp_vec);
+                              draw_block(&block, stamp_vec, 0);
                          } break;
                          case STAMP_TYPE_INTERACTIVE:
                          {
@@ -682,7 +683,7 @@ void draw_editor(Editor_t* editor, World_t* world, Position_t screen_camera, Vec
                case STAMP_TYPE_BLOCK:
                {
                     Block_t block = block_from_stamp(stamp);
-                    draw_block(&block, stamp_vec);
+                    draw_block(&block, stamp_vec, 0);
                } break;
                case STAMP_TYPE_INTERACTIVE:
                {
