@@ -1605,10 +1605,18 @@ int main(int argc, char** argv){
 
                               // is the player pushing us ?
                               if(player->prev_pushing_block < 0 ||
-                                 (player->prev_pushing_block != (block - world.blocks.elements) &&
-                                  player->prev_pushing_block != (block->entangle_index))) continue;
+                                 (player->prev_pushing_block != get_block_index(&world, block) &&
+                                  player->prev_pushing_block != block->entangle_index)) continue;
 
-                              switch(player->face){
+                              auto player_face = player->face;
+                              if(player->prev_pushing_block == block->entangle_index){
+                                   // TODO(jtardiff): maybe an accessor where we check if index is valid, return NULL and check null after the call
+                                   Block_t* entangled_block = world.blocks.elements + block->entangle_index;
+                                   auto rotations_between = direction_rotations_between(static_cast<Direction_t>(block->rotation), static_cast<Direction_t>(entangled_block->rotation));
+                                   player_face = direction_rotate_clockwise(player_face, rotations_between);
+                              }
+
+                              switch(player_face){
                               default:
                                    break;
                               case DIRECTION_LEFT:
@@ -1784,9 +1792,12 @@ int main(int argc, char** argv){
                               Player_t* player = world.players.elements + p;
                               if(player->prev_pushing_block >= 0){
                                    block_pushed = world.blocks.elements + player->prev_pushing_block;
-                                   if(block_pushed && block_pushed->entangle_index >= 0 && block_pushed->entangle_index < world.blocks.count){
+                                   if(block_pushed && block_pushed->entangle_index >= 0 && block_pushed->entangle_index < world.blocks.count &&
+                                      block->entangle_index >= 0){
                                         entangled_block_pushed = world.blocks.elements + block_pushed->entangle_index;
-                                        entangled_block_pushed_dir = player->pushing_block_dir;
+                                        auto* our_entangled_block = world.blocks.elements + block->entangle_index;
+                                        auto rotations_between = direction_rotations_between(static_cast<Direction_t>(our_entangled_block->rotation), static_cast<Direction_t>(entangled_block_pushed->rotation));
+                                        entangled_block_pushed_dir = direction_rotate_clockwise(player->pushing_block_dir, rotations_between);
                                    }
                               }
                          }
