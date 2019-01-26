@@ -27,6 +27,8 @@ struct Motion_t{
      Vec_t prev_vel;
      Vec_t vel;
      Vec_t accel;
+
+     // if you add fields to the end of this struct, you need to update MotionComponent_t
 };
 
 struct GridMotion_t : public Motion_t{

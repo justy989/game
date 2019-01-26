@@ -1643,14 +1643,18 @@ int main(int argc, char** argv){
 
                // unbounded collision: this should be exciting
                // we have our initial position and our initial pos_delta, update pos_delta for all players and blocks until nothing is colliding anymore
+               const int max_collision_attempts = 16;
+               int collision_attempts = 0;
                bool collided = true;
-               while(collided){
+               while(collided && collision_attempts < max_collision_attempts){
                     collided = false;
 
                     // do a collision pass on each block
                     S16 update_blocks_count = world.blocks.count;
                     for(S16 i = 0; i < update_blocks_count; i++){
                          Block_t* block = world.blocks.elements + i;
+
+                         block->successfully_moved = true;
 
                          bool stop_on_boundary_x = false;
                          bool stop_on_boundary_y = false;
@@ -1687,6 +1691,8 @@ int main(int argc, char** argv){
                                    if(teleport_result.collided){
                                         collided = true;
 
+                                        block->successfully_moved = false;
+
                                         block->teleport_pos = teleport_result.pos;
                                         block->teleport_pos_delta = teleport_result.pos_delta;
                                         block->teleport_vel = teleport_result.vel;
@@ -1699,6 +1705,8 @@ int main(int argc, char** argv){
 
                               if(result.collided){
                                    collided = true;
+
+                                   block->successfully_moved = false;
 
                                    block->pos = result.pos;
 
@@ -1853,6 +1861,8 @@ int main(int argc, char** argv){
                               if(boundary_x){
                                    collided = true;
 
+                                   block->successfully_moved = false;
+
                                    block->stop_on_pixel_x = boundary_x;
                                    block->accel.x = 0;
                                    block->vel.x = 0;
@@ -1865,6 +1875,8 @@ int main(int argc, char** argv){
                               S16 boundary_y = range_passes_tile_boundary(block->pos.pixel.y, final_pos.pixel.y, block->started_on_pixel_y);
                               if(boundary_y){
                                    collided = true;
+
+                                   block->successfully_moved = false;
 
                                    block->stop_on_pixel_y = boundary_y;
                                    block->accel.y = 0;
@@ -2005,6 +2017,8 @@ int main(int argc, char** argv){
                     for(S16 i = 0; i < update_player_count; i++){
                          Player_t* player = world.players.elements + i;
 
+                         player->successfully_moved = true;
+
                          Coord_t skip_coord[DIRECTION_COUNT];
                          Coord_t player_coord = pos_to_coord(player->pos + player->pos_delta);
 
@@ -2023,14 +2037,20 @@ int main(int argc, char** argv){
                                                                                player->clone_instance, i, player->pushing_block,
                                                                                player->pushing_block_dir, skip_coord, &world);
 
-                              if(teleport_result.collided) collided = true;
+                              if(teleport_result.collided){
+                                   collided = true;
+                                   player->successfully_moved = false;
+                              }
                               if(teleport_result.resetting) resetting = true;
                               player->teleport_pos_delta = teleport_result.pos_delta;
                               player->teleport_pushing_block = teleport_result.pushing_block;
                               player->teleport_pushing_block_dir = teleport_result.pushing_block_dir;
                          }
 
-                         if(result.collided) collided = true;
+                         if(result.collided){
+                              collided = true;
+                              player->successfully_moved = false;
+                         }
                          if(result.resetting) resetting = true;
                          player->pos_delta = result.pos_delta;
                          player->pushing_block = result.pushing_block;
@@ -2125,11 +2145,21 @@ int main(int argc, char** argv){
                               }
                          }
                     }
+
+                    collision_attempts++;
                }
 
                // finalize positions
                for(S16 i = 0; i < world.players.count; i++){
                     auto player = world.players.elements + i;
+
+                    if(!player->successfully_moved){
+                         player->pos_delta = vec_zero();
+                         player->prev_vel = vec_zero();
+                         player->vel = vec_zero();
+                         player->accel = vec_zero();
+                         continue;
+                    }
 
                     if(player->teleport){
                          player->pos = player->teleport_pos + player->teleport_pos_delta;
@@ -2154,6 +2184,24 @@ int main(int argc, char** argv){
 
                for(S16 i = 0; i < world.blocks.count; i++){
                     Block_t* block = world.blocks.elements + i;
+
+                    if(!block->successfully_moved){
+                         block->pos_delta = vec_zero();
+                         block->prev_vel = vec_zero();
+                         block->vel = vec_zero();
+                         block->accel = vec_zero();
+                         block->started_on_pixel_x = 0;
+                         block->started_on_pixel_y = 0;
+                         block->stop_on_pixel_x = 0;
+                         block->stop_on_pixel_y = 0;
+                         block->horizontal_move.state = MOVE_STATE_IDLING;
+                         block->horizontal_move.sign = MOVE_SIGN_ZERO;
+                         block->horizontal_move.distance = 0;
+                         block->vertical_move.state = MOVE_STATE_IDLING;
+                         block->vertical_move.sign = MOVE_SIGN_ZERO;
+                         block->vertical_move.distance = 0;
+                         continue;
+                    }
 
                     Position_t final_pos;
 

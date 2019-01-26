@@ -433,6 +433,8 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
      result.horizontal_move = block_horizontal_move;
      result.vertical_move = block_vertical_move;
 
+     static const S8 max_attempts = 16;
+     S8 attempts = 0;
      for(BlockInsideResult_t block_inside_result = block_inside_another_block(result.pos,
                                                                               result.pos_delta,
                                                                               block_index,
@@ -442,7 +444,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                                                                               world->interactive_qt,
                                                                               &world->tilemap,
                                                                               &world->blocks);
-         block_inside_result.block && blocks_at_collidable_height(result.pos.z, block_inside_result.block->pos.z);
+         block_inside_result.block && blocks_at_collidable_height(result.pos.z, block_inside_result.block->pos.z) && attempts < max_attempts;
          block_inside_result = block_inside_another_block(result.pos,
                                                           result.pos_delta,
                                                           block_index,
@@ -451,7 +453,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                                                           world->block_qt,
                                                           world->interactive_qt,
                                                           &world->tilemap,
-                                                          &world->blocks)){
+                                                          &world->blocks), attempts++){
           result.collided = true;
 
           auto block_pixel = block_center_pixel(result.pos + result.pos_delta);
