@@ -352,3 +352,9 @@ const char* move_sign_to_string(MoveSign_t sign){
 
      return "MOVE_SIGN_UNKNOWN";
 }
+
+void reset_move(Move_t* move){
+     move->state = MOVE_STATE_IDLING;
+     move->sign = MOVE_SIGN_ZERO;
+     move->distance = 0;
+}

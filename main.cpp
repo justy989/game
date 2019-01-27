@@ -44,7 +44,21 @@ NOTES:
 #include "demo.h"
 #include "collision.h"
 #include "world.h"
-#include "editor.h" // TODO: remove
+#include "editor.h"
+
+struct VecMaskCollisionEntry_t{
+     S8 mask;
+
+     // how a and b have to move in order to collide
+
+     // first scenario
+     Direction_t move_a_1;
+     Direction_t move_b_1;
+
+     // second scenario
+     Direction_t move_a_2;
+     Direction_t move_b_2;
+};
 
 FILE* load_demo_number(S32 map_number, const char** demo_filepath){
      char filepath[64] = {};
@@ -143,6 +157,58 @@ void update_light_and_ice_detectors(Interactive_t* interactive, World_t* world)
           }
           break;
      }
+     }
+}
+
+void stop_block_colliding_with_entangled(Block_t* block, Direction_t move_dir_to_stop, CheckBlockCollisionResult_t* result){
+     switch(move_dir_to_stop){
+     default:
+          break;
+     case DIRECTION_LEFT:
+     case DIRECTION_RIGHT:
+          block->pos_delta.x = 0;
+          block->pos_delta.y = result->pos_delta.y;
+          block->vel.x = 0;
+          block->vel.y = result->vel.y;
+          block->accel.x = 0;
+          block->accel.y = result->accel.y;
+
+          block->stop_on_pixel_x = 0;
+          block->stop_on_pixel_y = result->stop_on_pixel_y;
+
+          reset_move(&block->horizontal_move);
+          block->vertical_move = result->vertical_move;
+          break;
+     case DIRECTION_UP:
+     case DIRECTION_DOWN:
+          block->pos_delta.x = result->pos_delta.x;
+          block->pos_delta.y = 0;
+          block->vel.x = result->vel.x;
+          block->vel.y = 0;
+          block->accel.x = result->accel.x;
+          block->accel.y = 0;
+
+          block->stop_on_pixel_x = result->stop_on_pixel_x;
+          block->stop_on_pixel_y = 0;
+
+          block->horizontal_move = result->horizontal_move;
+          reset_move(&block->vertical_move);
+          break;
+     }
+
+     switch(move_dir_to_stop){
+     default:
+          break;
+     case DIRECTION_LEFT:
+          if(block->pos.decimal.x > 0) block->pos.pixel.x += 1;
+     case DIRECTION_RIGHT:
+          block->pos.decimal.x = 0;
+          break;
+     case DIRECTION_DOWN:
+          if(block->pos.decimal.y > 0) block->pos.pixel.y += 1;
+     case DIRECTION_UP:
+          block->pos.decimal.y = 0;
+          break;
      }
 }
 
@@ -1682,7 +1748,6 @@ int main(int argc, char** argv){
 
                                         block->successfully_moved = false;
 
-                                        block->teleport_pos = teleport_result.pos;
                                         block->teleport_pos_delta = teleport_result.pos_delta;
                                         block->teleport_vel = teleport_result.vel;
                                         block->teleport_accel = teleport_result.accel;
@@ -1697,17 +1762,81 @@ int main(int argc, char** argv){
 
                                    block->successfully_moved = false;
 
-                                   block->pos = result.pos;
+                                   // TODO: I don't love indexing the blocks without checking the index is valid first
+                                   if(result.collided_block_index >= 0 && result.collided_block_index == block->entangle_index &&
+                                      block->rotation != world.blocks.elements[block->entangle_index].rotation){
+                                        // TODO: switch to using block_inside_another_block() because that is actually what we care about
+                                        auto* entangled_block = world.blocks.elements + block->entangle_index;
+                                        auto entangle_result = check_block_collision_with_other_blocks(entangled_block->pos,
+                                                                                                       entangled_block->pos_delta,
+                                                                                                       entangled_block->vel,
+                                                                                                       entangled_block->accel,
+                                                                                                       entangled_block->stop_on_pixel_x,
+                                                                                                       entangled_block->stop_on_pixel_y,
+                                                                                                       entangled_block->horizontal_move,
+                                                                                                       entangled_block->vertical_move,
+                                                                                                       block->entangle_index,
+                                                                                                       entangled_block->entangle_index,
+                                                                                                       entangled_block->clone_start.x > 0,
+                                                                                                       &world);
+                                        if(entangle_result.collided){
+                                             // stop the blocks moving toward each other
+                                             static const VecMaskCollisionEntry_t table[] = {
+                                                  {static_cast<S8>(DIRECTION_MASK_RIGHT | DIRECTION_MASK_UP), DIRECTION_LEFT, DIRECTION_UP, DIRECTION_DOWN, DIRECTION_RIGHT},
+                                                  {static_cast<S8>(DIRECTION_MASK_RIGHT | DIRECTION_MASK_DOWN), DIRECTION_RIGHT, DIRECTION_UP, DIRECTION_DOWN, DIRECTION_LEFT},
+                                                  {static_cast<S8>(DIRECTION_MASK_LEFT  | DIRECTION_MASK_UP), DIRECTION_LEFT, DIRECTION_DOWN, DIRECTION_UP, DIRECTION_RIGHT},
+                                                  {static_cast<S8>(DIRECTION_MASK_LEFT  | DIRECTION_MASK_DOWN), DIRECTION_LEFT, DIRECTION_UP, DIRECTION_DOWN, DIRECTION_RIGHT},
+                                                  // TODO: single direction mask things
+                                             };
 
-                                   block->pos_delta = result.pos_delta;
-                                   block->vel = result.vel;
-                                   block->accel = result.accel;
+                                             auto delta_vec = pos_to_vec(block->pos - entangled_block->pos);
+                                             auto delta_mask = vec_direction_mask(delta_vec);
+                                             auto move_mask = vec_direction_mask(block->vel);
+                                             auto entangle_move_mask = vec_direction_mask(entangled_block->vel);
 
-                                   block->stop_on_pixel_x = result.stop_on_pixel_x;
-                                   block->stop_on_pixel_y = result.stop_on_pixel_y;
+                                             Direction_t move_dir_to_stop = DIRECTION_COUNT;
+                                             Direction_t entangle_move_dir_to_stop = DIRECTION_COUNT;
 
-                                   block->horizontal_move = result.horizontal_move;
-                                   block->vertical_move = result.vertical_move;
+                                             for(S8 t = 0; t < (S8)(sizeof(table) / sizeof(table[0])); t++){
+                                                  if(table[t].mask == delta_mask){
+                                                       if(direction_in_mask(move_mask, table[t].move_a_1) &&
+                                                          direction_in_mask(entangle_move_mask, table[t].move_b_1)){
+                                                            move_dir_to_stop = table[t].move_a_1;
+                                                            entangle_move_dir_to_stop = table[t].move_b_1;
+                                                            break;
+                                                       }else if(direction_in_mask(move_mask, table[t].move_b_1) &&
+                                                                direction_in_mask(entangle_move_mask, table[t].move_a_1)){
+                                                            move_dir_to_stop = table[t].move_b_1;
+                                                            entangle_move_dir_to_stop = table[t].move_a_1;
+                                                            break;
+                                                       }else if(direction_in_mask(move_mask, table[t].move_a_2) &&
+                                                                direction_in_mask(entangle_move_mask, table[t].move_b_2)){
+                                                            move_dir_to_stop = table[t].move_b_2;
+                                                            entangle_move_dir_to_stop = table[t].move_b_2;
+                                                            break;
+                                                       }else if(direction_in_mask(move_mask, table[t].move_b_2) &&
+                                                                direction_in_mask(entangle_move_mask, table[t].move_a_2)){
+                                                            move_dir_to_stop = table[t].move_b_2;
+                                                            entangle_move_dir_to_stop = table[t].move_a_2;
+                                                            break;
+                                                       }
+                                                  }
+                                             }
+
+                                             stop_block_colliding_with_entangled(block, move_dir_to_stop, &result);
+                                             stop_block_colliding_with_entangled(entangled_block, entangle_move_dir_to_stop, &entangle_result);
+                                        }
+                                   }else{
+                                        block->pos_delta = result.pos_delta;
+                                        block->vel = result.vel;
+                                        block->accel = result.accel;
+
+                                        block->stop_on_pixel_x = result.stop_on_pixel_x;
+                                        block->stop_on_pixel_y = result.stop_on_pixel_y;
+
+                                        block->horizontal_move = result.horizontal_move;
+                                        block->vertical_move = result.vertical_move;
+                                   }
                               }
                          }
 

@@ -422,7 +422,6 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                                                                     S16 block_entangle_index, bool block_is_cloning, World_t* world){
      CheckBlockCollisionResult_t result {};
 
-     result.pos = block_pos;
      result.pos_delta = block_pos_delta;
      result.vel = block_vel;
      result.accel = block_accel;
@@ -432,10 +431,11 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
 
      result.horizontal_move = block_horizontal_move;
      result.vertical_move = block_vertical_move;
+     result.collided_block_index = -1;
 
      static const S8 max_attempts = 16;
      S8 attempts = 0;
-     for(BlockInsideResult_t block_inside_result = block_inside_another_block(result.pos,
+     for(BlockInsideResult_t block_inside_result = block_inside_another_block(block_pos,
                                                                               result.pos_delta,
                                                                               block_index,
                                                                               block_entangle_index,
@@ -444,8 +444,8 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                                                                               world->interactive_qt,
                                                                               &world->tilemap,
                                                                               &world->blocks);
-         block_inside_result.block && blocks_at_collidable_height(result.pos.z, block_inside_result.block->pos.z) && attempts < max_attempts;
-         block_inside_result = block_inside_another_block(result.pos,
+         block_inside_result.block && blocks_at_collidable_height(block_pos.z, block_inside_result.block->pos.z) && attempts < max_attempts;
+         block_inside_result = block_inside_another_block(block_pos,
                                                           result.pos_delta,
                                                           block_index,
                                                           block_entangle_index,
@@ -455,12 +455,13 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                                                           &world->tilemap,
                                                           &world->blocks), attempts++){
           result.collided = true;
+          result.collided_block_index = get_block_index(world, block_inside_result.block);
 
-          auto block_pixel = block_center_pixel(result.pos + result.pos_delta);
+          auto block_pixel = block_center_pixel(block_pos + result.pos_delta);
           auto quadrant = relative_quadrant(block_pixel, block_inside_result.collision_pos.pixel);
 
           // check if they are on ice before we adjust the position on our block to check
-          bool a_on_ice = block_on_ice(result.pos, result.pos_delta, &world->tilemap,
+          bool a_on_ice = block_on_ice(block_pos, result.pos_delta, &world->tilemap,
                                        world->interactive_qt);
           bool b_on_ice = block_on_ice(block_inside_result.block->pos, block_inside_result.block->pos_delta,
                                        &world->tilemap, world->interactive_qt);
@@ -472,10 +473,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
               block_inside_index = get_block_index(world, block_inside_result.block);
           }
 
-          if(block_inside_index == block_index){
-               // TODO: I don't understand this line
-               result.pos = coord_to_pos(block_get_coord(result.pos));
-          }else{
+          if(block_inside_index != block_index){
                switch(quadrant){
                default:
                     break;
@@ -531,7 +529,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                Direction_t push_dir = DIRECTION_COUNT;
 
                if(block_inside_index == block_index){
-                    Coord_t block_coord = block_get_coord(result.pos);
+                    Coord_t block_coord = block_get_coord(block_pos);
                     Direction_t src_portal_dir = direction_between(block_coord, block_inside_result.src_portal_coord);
                     Direction_t dst_portal_dir = direction_between(block_coord, block_inside_result.dst_portal_coord);
                     DirectionMask_t move_mask = vec_direction_mask(result.vel);

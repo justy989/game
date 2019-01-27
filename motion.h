@@ -82,5 +82,7 @@ float calc_distance_from_derivatives(float v, float a);
 bool operator==(const Move_t& a, const Move_t& b);
 bool operator!=(const Move_t& a, const Move_t& b);
 
+void reset_move(Move_t* move);
+
 const char* move_state_to_string(MoveState_t state);
 const char* move_sign_to_string(MoveSign_t sign);

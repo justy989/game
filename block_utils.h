@@ -18,8 +18,6 @@ struct BlockInsideResult_t{
 struct CheckBlockCollisionResult_t{
      bool collided;
 
-     Position_t pos;
-
      Vec_t pos_delta;
      Vec_t vel;
      Vec_t accel;
@@ -29,6 +27,8 @@ struct CheckBlockCollisionResult_t{
 
      Move_t horizontal_move;
      Move_t vertical_move;
+
+     S16 collided_block_index;
 };
 
 struct BlockCollidesWithItselfResult_t{
