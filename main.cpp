@@ -174,7 +174,7 @@ void stop_block_colliding_with_entangled(Block_t* block, Direction_t move_dir_to
           block->accel.y = result->accel.y;
 
           block->stop_on_pixel_x = 0;
-          block->stop_on_pixel_y = result->stop_on_pixel_y;
+          // block->stop_on_pixel_y = result->stop_on_pixel_y; // ignore collision results's stop_on_pixel_y on purpose
 
           reset_move(&block->horizontal_move);
           block->vertical_move = result->vertical_move;
@@ -188,7 +188,7 @@ void stop_block_colliding_with_entangled(Block_t* block, Direction_t move_dir_to
           block->accel.x = result->accel.x;
           block->accel.y = 0;
 
-          block->stop_on_pixel_x = result->stop_on_pixel_x;
+          // block->stop_on_pixel_x = result->stop_on_pixel_x; // ignore collision results's stop_on_pixel_x on purpose
           block->stop_on_pixel_y = 0;
 
           block->horizontal_move = result->horizontal_move;
@@ -1764,7 +1764,7 @@ int main(int argc, char** argv){
 
                                    // TODO: I don't love indexing the blocks without checking the index is valid first
                                    if(result.collided_block_index >= 0 && result.collided_block_index == block->entangle_index &&
-                                      block->rotation != world.blocks.elements[block->entangle_index].rotation){
+                                      (block->rotation + world.blocks.elements[block->entangle_index].rotation) % 2 == 1){
                                         // TODO: switch to using block_inside_another_block() because that is actually what we care about
                                         auto* entangled_block = world.blocks.elements + block->entangle_index;
                                         auto entangle_result = check_block_collision_with_other_blocks(entangled_block->pos,
@@ -1783,7 +1783,7 @@ int main(int argc, char** argv){
                                              // stop the blocks moving toward each other
                                              static const VecMaskCollisionEntry_t table[] = {
                                                   {static_cast<S8>(DIRECTION_MASK_RIGHT | DIRECTION_MASK_UP), DIRECTION_LEFT, DIRECTION_UP, DIRECTION_DOWN, DIRECTION_RIGHT},
-                                                  {static_cast<S8>(DIRECTION_MASK_RIGHT | DIRECTION_MASK_DOWN), DIRECTION_RIGHT, DIRECTION_UP, DIRECTION_DOWN, DIRECTION_LEFT},
+                                                  {static_cast<S8>(DIRECTION_MASK_RIGHT | DIRECTION_MASK_DOWN), DIRECTION_RIGHT, DIRECTION_DOWN, DIRECTION_UP, DIRECTION_LEFT},
                                                   {static_cast<S8>(DIRECTION_MASK_LEFT  | DIRECTION_MASK_UP), DIRECTION_LEFT, DIRECTION_DOWN, DIRECTION_UP, DIRECTION_RIGHT},
                                                   {static_cast<S8>(DIRECTION_MASK_LEFT  | DIRECTION_MASK_DOWN), DIRECTION_LEFT, DIRECTION_UP, DIRECTION_DOWN, DIRECTION_RIGHT},
                                                   // TODO: single direction mask things
@@ -1811,7 +1811,7 @@ int main(int argc, char** argv){
                                                             break;
                                                        }else if(direction_in_mask(move_mask, table[t].move_a_2) &&
                                                                 direction_in_mask(entangle_move_mask, table[t].move_b_2)){
-                                                            move_dir_to_stop = table[t].move_b_2;
+                                                            move_dir_to_stop = table[t].move_a_2;
                                                             entangle_move_dir_to_stop = table[t].move_b_2;
                                                             break;
                                                        }else if(direction_in_mask(move_mask, table[t].move_b_2) &&
@@ -1825,6 +1825,13 @@ int main(int argc, char** argv){
 
                                              stop_block_colliding_with_entangled(block, move_dir_to_stop, &result);
                                              stop_block_colliding_with_entangled(entangled_block, entangle_move_dir_to_stop, &entangle_result);
+
+                                             for(S16 p = 0; p < world.players.count; p++){
+                                                  auto* player = world.players.elements + p;
+                                                  if(player->prev_pushing_block == i || player->prev_pushing_block == block->entangle_index){
+                                                       player->push_time = 0.0f;
+                                                  }
+                                             }
                                         }
                                    }else{
                                         block->pos_delta = result.pos_delta;
