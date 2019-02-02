@@ -84,7 +84,7 @@ Block_t* block_against_block_in_list(Position_t pos, Vec_t pos_delta, Block_t** 
 
                Pixel_t pixel_to_check = block_pos.pixel + offsets[i];
                if((pixel_to_check.x + TILE_SIZE_IN_PIXELS) == block_to_check_pos.pixel.x &&
-                  pixel_to_check.y >= block_to_check_pos.pixel.y &&
+                  pixel_to_check.y >= (block_to_check_pos.pixel.y - BLOCK_SOLID_SIZE_IN_PIXELS) &&
                   pixel_to_check.y < (block_to_check_pos.pixel.y + TILE_SIZE_IN_PIXELS)){
                     return block;
                }
@@ -99,7 +99,7 @@ Block_t* block_against_block_in_list(Position_t pos, Vec_t pos_delta, Block_t** 
 
                Pixel_t pixel_to_check = block_pos.pixel + offsets[i];
                if(pixel_to_check.x == (block_to_check_pos.pixel.x + TILE_SIZE_IN_PIXELS) &&
-                  pixel_to_check.y >= block_to_check_pos.pixel.y &&
+                  pixel_to_check.y >= (block_to_check_pos.pixel.y - BLOCK_SOLID_SIZE_IN_PIXELS) &&
                   pixel_to_check.y < (block_to_check_pos.pixel.y + TILE_SIZE_IN_PIXELS)){
                     return block;
                }
@@ -114,7 +114,7 @@ Block_t* block_against_block_in_list(Position_t pos, Vec_t pos_delta, Block_t** 
 
                Pixel_t pixel_to_check = block_pos.pixel + offsets[i];
                if((pixel_to_check.y + TILE_SIZE_IN_PIXELS) == block_to_check_pos.pixel.y &&
-                  pixel_to_check.x >= block_to_check_pos.pixel.x &&
+                  pixel_to_check.x >= (block_to_check_pos.pixel.x - BLOCK_SOLID_SIZE_IN_PIXELS) &&
                   pixel_to_check.x < (block_to_check_pos.pixel.x + TILE_SIZE_IN_PIXELS)){
                     return block;
                }
@@ -129,7 +129,7 @@ Block_t* block_against_block_in_list(Position_t pos, Vec_t pos_delta, Block_t** 
 
                Pixel_t pixel_to_check = block_pos.pixel + offsets[i];
                if(pixel_to_check.y == (block_to_check_pos.pixel.y + TILE_SIZE_IN_PIXELS) &&
-                  pixel_to_check.x >= block_to_check_pos.pixel.x &&
+                  pixel_to_check.x >= (block_to_check_pos.pixel.x - BLOCK_SOLID_SIZE_IN_PIXELS) &&
                   pixel_to_check.x < (block_to_check_pos.pixel.x + TILE_SIZE_IN_PIXELS)){
                     return block;
                }

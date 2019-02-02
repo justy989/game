@@ -1835,13 +1835,28 @@ int main(int argc, char** argv){
                                                   }
                                              }
 
-                                             stop_block_colliding_with_entangled(block, move_dir_to_stop, &result);
-                                             stop_block_colliding_with_entangled(entangled_block, entangle_move_dir_to_stop, &entangle_result);
+                                             if(move_dir_to_stop == DIRECTION_COUNT){
+                                                  block->pos_delta = result.pos_delta;
+                                                  block->vel = result.vel;
+                                                  block->accel = result.accel;
 
-                                             for(S16 p = 0; p < world.players.count; p++){
-                                                  auto* player = world.players.elements + p;
-                                                  if(player->prev_pushing_block == i || player->prev_pushing_block == block->entangle_index){
-                                                       player->push_time = 0.0f;
+                                                  block->stop_on_pixel_x = result.stop_on_pixel_x;
+                                                  block->stop_on_pixel_y = result.stop_on_pixel_y;
+
+                                                  block->horizontal_move = result.horizontal_move;
+                                                  block->vertical_move = result.vertical_move;
+                                             }else{
+                                                  LOG("block %d, stop: %s entangled block: %d stop: %s\n",
+                                                      get_block_index(&world, block), direction_to_string(move_dir_to_stop),
+                                                      get_block_index(&world, entangled_block), direction_to_string(entangle_move_dir_to_stop));
+                                                  stop_block_colliding_with_entangled(block, move_dir_to_stop, &result);
+                                                  stop_block_colliding_with_entangled(entangled_block, entangle_move_dir_to_stop, &entangle_result);
+
+                                                  for(S16 p = 0; p < world.players.count; p++){
+                                                       auto* player = world.players.elements + p;
+                                                       if(player->prev_pushing_block == i || player->prev_pushing_block == block->entangle_index){
+                                                            player->push_time = 0.0f;
+                                                       }
                                                   }
                                              }
                                         }
