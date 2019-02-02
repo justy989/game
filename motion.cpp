@@ -358,3 +358,36 @@ void reset_move(Move_t* move){
      move->sign = MOVE_SIGN_ZERO;
      move->distance = 0;
 }
+
+bool grid_motion_moving_in_direction(GridMotion_t* grid_motion, Direction_t direction){
+     switch(direction){
+     default:
+          break;
+     case DIRECTION_LEFT:
+          if(grid_motion->horizontal_move.state > MOVE_STATE_IDLING &&
+             grid_motion->horizontal_move.sign == MOVE_SIGN_NEGATIVE){
+               return true;
+          }
+          break;
+     case DIRECTION_RIGHT:
+          if(grid_motion->horizontal_move.state > MOVE_STATE_IDLING &&
+             grid_motion->horizontal_move.sign == MOVE_SIGN_POSITIVE){
+               return true;
+          }
+          break;
+     case DIRECTION_UP:
+          if(grid_motion->vertical_move.state > MOVE_STATE_IDLING &&
+             grid_motion->vertical_move.sign == MOVE_SIGN_POSITIVE){
+               return true;
+          }
+          break;
+     case DIRECTION_DOWN:
+          if(grid_motion->vertical_move.state > MOVE_STATE_IDLING &&
+             grid_motion->vertical_move.sign == MOVE_SIGN_NEGATIVE){
+               return true;
+          }
+          break;
+     }
+
+     return false;
+}

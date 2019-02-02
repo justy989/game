@@ -1664,9 +1664,11 @@ int main(int argc, char** argv){
                                   player->prev_pushing_block != block->entangle_index)) continue;
 
                               auto player_face = player->face;
+                              bool entangled_block_pushed_by_player = false;
                               if(player->prev_pushing_block == block->entangle_index){
                                    // TODO(jtardiff): maybe an accessor where we check if index is valid, return NULL and check null after the call
                                    Block_t* entangled_block = world.blocks.elements + block->entangle_index;
+                                   entangled_block_pushed_by_player = grid_motion_moving_in_direction(dynamic_cast<GridMotion_t*>(entangled_block), player_face);
                                    auto rotations_between = direction_rotations_between(static_cast<Direction_t>(block->rotation), static_cast<Direction_t>(entangled_block->rotation));
                                    player_face = direction_rotate_clockwise(player_face, rotations_between);
                               }
@@ -1677,10 +1679,20 @@ int main(int argc, char** argv){
                               case DIRECTION_LEFT:
                               case DIRECTION_RIGHT:
                                    coast_horizontal = true;
+                                   if(entangled_block_pushed_by_player &&
+                                      player->push_time > BLOCK_PUSH_TIME &&
+                                      block->horizontal_move.state == MOVE_STATE_IDLING){
+                                        block_push(block, player_face, &world, false);
+                                   }
                                    break;
                               case DIRECTION_UP:
                               case DIRECTION_DOWN:
                                    coast_vertical = true;
+                                   if(entangled_block_pushed_by_player &&
+                                      player->push_time > BLOCK_PUSH_TIME &&
+                                      block->vertical_move.state == MOVE_STATE_IDLING){
+                                        block_push(block, player_face, &world, false);
+                                   }
                                    break;
                               }
                          }
@@ -2392,7 +2404,10 @@ int main(int argc, char** argv){
                                    if(save_push_time <= BLOCK_PUSH_TIME) undo_commit(&undo, &world.players, &world.tilemap, &world.blocks, &world.interactives);
 
                                    bool pushed = block_push(block_to_push, push_block_dir, &world, false);
-                                   if(pushed && block_to_push->entangle_index >= 0 && block_to_push->entangle_index < world.blocks.count){
+
+                                   if(!pushed){
+                                        player->push_time = 0.0f;
+                                   }else if(block_to_push->entangle_index >= 0 && block_to_push->entangle_index < world.blocks.count){
                                         player->pushing_block_dir = push_block_dir;
 
                                         Block_t* entangled_block = world.blocks.elements + block_to_push->entangle_index;

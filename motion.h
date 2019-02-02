@@ -2,6 +2,7 @@
 
 #include "vec.h"
 #include "pixel.h"
+#include "direction.h"
 
 enum MoveState_t{
      MOVE_STATE_IDLING,
@@ -86,3 +87,5 @@ void reset_move(Move_t* move);
 
 const char* move_state_to_string(MoveState_t state);
 const char* move_sign_to_string(MoveSign_t sign);
+
+bool grid_motion_moving_in_direction(GridMotion_t* grid_motion, Direction_t direction);
