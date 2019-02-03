@@ -32,6 +32,8 @@ struct Block_t : public GridMotion_t{
      S8         teleport_rotation;
 
      bool successfully_moved = false;
+     bool coast_horizontal = false;
+     bool coast_vertical = false;
 };
 
 S16 get_object_x(Block_t* block);

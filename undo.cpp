@@ -384,6 +384,7 @@ void undo_revert(Undo_t* undo, ObjectArray_t<Player_t>* players, TileMap_t* tile
                Block_t* block = blocks->elements + diff_header->index;
                *block = {};
                block->pos.pixel = block_entry->pixel;
+               block->pos.decimal = vec_zero();
                block->pos.z = block_entry->z;
                block->element = block_entry->element;
                block->accel = block_entry->accel;
@@ -407,6 +408,7 @@ void undo_revert(Undo_t* undo, ObjectArray_t<Player_t>* players, TileMap_t* tile
                Block_t* block = blocks->elements + diff_header->index;
                *block = {};
                block->pos.pixel = block_entry->pixel;
+               block->pos.decimal = vec_zero();
                block->pos.z = block_entry->z;
                block->element = block_entry->element;
                block->accel = block_entry->accel;

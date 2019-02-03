@@ -1625,35 +1625,35 @@ int main(int argc, char** argv){
                          block->teleport = false;
                     }
 
-                    bool coast_horizontal = false;
-                    bool coast_vertical = false;
+                    block->coast_horizontal = false;
+                    block->coast_vertical = false;
                     if(block->teleport && block_on_ice(block->teleport_pos, block->teleport_pos_delta, &world.tilemap, world.interactive_qt)){
-                         coast_horizontal = true;
-                         coast_vertical = true;
+                         block->coast_horizontal = true;
+                         block->coast_vertical = true;
                     }else if(block_on_ice(block->pos, block->pos_delta, &world.tilemap, world.interactive_qt)){
-                         coast_horizontal = true;
-                         coast_vertical = true;
+                         block->coast_horizontal = true;
+                         block->coast_vertical = true;
                     }else{
                          if(block->horizontal_move.state == MOVE_STATE_STARTING ||
                             block->horizontal_move.state == MOVE_STATE_COASTING){
                               if(block->horizontal_move.sign == MOVE_SIGN_POSITIVE){
-                                   coast_horizontal = (block->prev_push_mask & DIRECTION_MASK_RIGHT);
+                                   block->coast_horizontal = (block->prev_push_mask & DIRECTION_MASK_RIGHT);
                               }else if(block->horizontal_move.sign == MOVE_SIGN_NEGATIVE){
-                                   coast_horizontal = (block->prev_push_mask & DIRECTION_MASK_LEFT);
+                                   block->coast_horizontal = (block->prev_push_mask & DIRECTION_MASK_LEFT);
                               }
                          }
 
                          if(block->vertical_move.state == MOVE_STATE_STARTING ||
                             block->vertical_move.state == MOVE_STATE_COASTING){
                               if(block->vertical_move.sign == MOVE_SIGN_POSITIVE){
-                                   coast_vertical = (block->prev_push_mask & DIRECTION_MASK_UP);
+                                   block->coast_vertical = (block->prev_push_mask & DIRECTION_MASK_UP);
                               }else if(block->vertical_move.sign == MOVE_SIGN_NEGATIVE){
-                                   coast_vertical = (block->prev_push_mask & DIRECTION_MASK_DOWN);
+                                   block->coast_vertical = (block->prev_push_mask & DIRECTION_MASK_DOWN);
                               }
                          }
                     }
 
-                    if(!coast_vertical || !coast_horizontal){
+                    if(!block->coast_vertical || !block->coast_horizontal){
                          // TODO: this logic isn't strictly correct when the block teleports, but I also don't think there is any harm right now?
                          for(S16 p = 0; p < world.players.count; p++){
                               Player_t* player = world.players.elements + p;
@@ -1678,34 +1678,50 @@ int main(int argc, char** argv){
                                    break;
                               case DIRECTION_LEFT:
                               case DIRECTION_RIGHT:
-                                   coast_horizontal = true;
-                                   if(entangled_block_pushed_by_player &&
-                                      player->push_time > BLOCK_PUSH_TIME &&
-                                      block->horizontal_move.state == MOVE_STATE_IDLING){
-                                        block_push(block, player_face, &world, false);
+                                   if(player->prev_pushing_block == block->entangle_index){
+                                        if(entangled_block_pushed_by_player){
+                                             block->coast_horizontal = true;
+
+                                             if(player->push_time > BLOCK_PUSH_TIME &&
+                                                block->horizontal_move.state == MOVE_STATE_IDLING){
+                                                  block_push(block, player_face, &world, false);
+                                             }
+                                        }
+                                   }else{
+                                        block->coast_horizontal = true;
                                    }
                                    break;
                               case DIRECTION_UP:
                               case DIRECTION_DOWN:
-                                   coast_vertical = true;
-                                   if(entangled_block_pushed_by_player &&
-                                      player->push_time > BLOCK_PUSH_TIME &&
-                                      block->vertical_move.state == MOVE_STATE_IDLING){
-                                        block_push(block, player_face, &world, false);
+                                   if(player->prev_pushing_block == block->entangle_index){
+                                        if(entangled_block_pushed_by_player){
+                                             block->coast_vertical = true;
+
+                                             if(player->push_time > BLOCK_PUSH_TIME &&
+                                                block->vertical_move.state == MOVE_STATE_IDLING){
+                                                  block_push(block, player_face, &world, false);
+                                             }
+                                        }
+                                   }else{
+                                        block->coast_vertical = true;
                                    }
                                    break;
                               }
                          }
                     }
+               }
+
+               for(S16 i = 0; i < world.blocks.count; i++){
+                    Block_t* block = world.blocks.elements + i;
 
                     // TODO: creating this potentially big vector could lead to precision issues
                     Vec_t pos_vec = pos_to_vec(block->pos);
 
                     update_motion_grid_aligned(&block->horizontal_move, motion_x_component(block),
-                                               coast_horizontal, dt, BLOCK_ACCEL, BLOCK_ACCEL_DISTANCE, pos_vec.x);
+                                               block->coast_horizontal, dt, BLOCK_ACCEL, BLOCK_ACCEL_DISTANCE, pos_vec.x);
 
                     update_motion_grid_aligned(&block->vertical_move, motion_y_component(block),
-                                               coast_vertical, dt, BLOCK_ACCEL, BLOCK_ACCEL_DISTANCE, pos_vec.y);
+                                               block->coast_vertical, dt, BLOCK_ACCEL, BLOCK_ACCEL_DISTANCE, pos_vec.y);
                }
 
                // unbounded collision: this should be exciting
@@ -1846,9 +1862,6 @@ int main(int argc, char** argv){
                                                   block->horizontal_move = result.horizontal_move;
                                                   block->vertical_move = result.vertical_move;
                                              }else{
-                                                  LOG("block %d, stop: %s entangled block: %d stop: %s\n",
-                                                      get_block_index(&world, block), direction_to_string(move_dir_to_stop),
-                                                      get_block_index(&world, entangled_block), direction_to_string(entangle_move_dir_to_stop));
                                                   stop_block_colliding_with_entangled(block, move_dir_to_stop, &result);
                                                   stop_block_colliding_with_entangled(entangled_block, entangle_move_dir_to_stop, &entangle_result);
 
