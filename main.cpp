@@ -452,11 +452,7 @@ int main(int argc, char** argv){
                std::chrono::duration<double> elapsed_seconds = current_time - last_time;
                dt = (F32)(elapsed_seconds.count());
 
-               if(demo.mode == DEMO_MODE_PLAY){
-                    if(dt < (0.0166666f / demo.dt_scalar)) continue;
-               }else{
-                    if(dt < 0.0166666f) continue; // limit 60 fps
-               }
+               if(dt < 0.0166666f / demo.dt_scalar) continue; // limit 60 fps
           }
 
           last_time = current_time;
@@ -635,18 +631,14 @@ int main(int argc, char** argv){
                          }
                          break;
                     case SDL_SCANCODE_MINUS:
-                         if(demo.mode == DEMO_MODE_PLAY){
-                              if(demo.dt_scalar > 0.1f){
-                                   demo.dt_scalar -= 0.1f;
-                                   LOG("demo dt scalar: %.1f\n", demo.dt_scalar);
-                              }
+                         if(demo.dt_scalar > 0.1f){
+                              demo.dt_scalar -= 0.1f;
+                              LOG("game dt scalar: %.1f\n", demo.dt_scalar);
                          }
                          break;
                     case SDL_SCANCODE_EQUALS:
-                         if(demo.mode == DEMO_MODE_PLAY){
-                              demo.dt_scalar += 0.1f;
-                              LOG("demo dt scalar: %.1f\n", demo.dt_scalar);
-                         }
+                         demo.dt_scalar += 0.1f;
+                         LOG("game dt scalar: %.1f\n", demo.dt_scalar);
                          break;
                     case SDL_SCANCODE_V:
                     {
@@ -1959,6 +1951,7 @@ int main(int argc, char** argv){
                          // used to make sure the pushing is smooth on the entangled block as well
                          Block_t* entangled_block_pushed = nullptr;
                          Direction_t entangled_block_pushed_dir = DIRECTION_COUNT;
+                         Direction_t player_push_dir = DIRECTION_COUNT;
                          Block_t* block_pushed = nullptr;
 
                          for(S16 p = 0; p < world.players.count; p++){
@@ -1970,7 +1963,8 @@ int main(int argc, char** argv){
                                         entangled_block_pushed = world.blocks.elements + block_pushed->entangle_index;
                                         auto* our_entangled_block = world.blocks.elements + block->entangle_index;
                                         auto rotations_between = direction_rotations_between(static_cast<Direction_t>(entangled_block_pushed->rotation), static_cast<Direction_t>(our_entangled_block->rotation));
-                                        entangled_block_pushed_dir = direction_rotate_clockwise(player->pushing_block_dir, rotations_between);
+                                        player_push_dir = player->pushing_block_dir;
+                                        entangled_block_pushed_dir = direction_rotate_clockwise(player_push_dir, rotations_between);
                                    }
                               }
                          }
@@ -1979,37 +1973,46 @@ int main(int argc, char** argv){
                          if(block != block_pushed && !block_on_ice(block->pos, block->pos_delta, &world.tilemap, world.interactive_qt)){
                               if(block == entangled_block_pushed){
                                    DirectionMask_t vel_mask = vec_direction_mask(block->vel);
-                                   switch(entangled_block_pushed_dir){
-                                   default:
-                                        break;
-                                   case DIRECTION_LEFT:
-                                        if(vel_mask & DIRECTION_MASK_RIGHT){
-                                             stop_on_boundary_x = true;
-                                        }else if(vel_mask & DIRECTION_MASK_UP || vel_mask & DIRECTION_MASK_DOWN){
-                                             stop_on_boundary_y = true;
+                                   auto* entangled_block = world.blocks.elements + block->entangle_index;
+                                   DirectionMask_t entangled_vel_mask = vec_direction_mask(entangled_block->vel);
+
+                                   // make sure the play successfully is pushing the entangled block
+                                   if(direction_in_mask(entangled_vel_mask, player_push_dir)){
+                                        switch(entangled_block_pushed_dir){
+                                        default:
+                                             break;
+                                        case DIRECTION_LEFT:
+                                             if(vel_mask & DIRECTION_MASK_RIGHT){
+                                                  stop_on_boundary_x = true;
+                                             }else if(vel_mask & DIRECTION_MASK_UP || vel_mask & DIRECTION_MASK_DOWN){
+                                                  stop_on_boundary_y = true;
+                                             }
+                                             break;
+                                        case DIRECTION_RIGHT:
+                                             if(vel_mask & DIRECTION_MASK_LEFT){
+                                                  stop_on_boundary_x = true;
+                                             }else if(vel_mask & DIRECTION_MASK_UP || vel_mask & DIRECTION_MASK_DOWN){
+                                                  stop_on_boundary_y = true;
+                                             }
+                                             break;
+                                        case DIRECTION_UP:
+                                             if(vel_mask & DIRECTION_MASK_DOWN){
+                                                  stop_on_boundary_y = true;
+                                             }else if(vel_mask & DIRECTION_MASK_LEFT || vel_mask & DIRECTION_MASK_RIGHT){
+                                                  stop_on_boundary_x = true;
+                                             }
+                                             break;
+                                        case DIRECTION_DOWN:
+                                             if(vel_mask & DIRECTION_MASK_UP){
+                                                  stop_on_boundary_y = true;
+                                             }else if(vel_mask & DIRECTION_MASK_LEFT || vel_mask & DIRECTION_MASK_RIGHT){
+                                                  stop_on_boundary_x = true;
+                                             }
+                                             break;
                                         }
-                                        break;
-                                   case DIRECTION_RIGHT:
-                                        if(vel_mask & DIRECTION_MASK_LEFT){
-                                             stop_on_boundary_x = true;
-                                        }else if(vel_mask & DIRECTION_MASK_UP || vel_mask & DIRECTION_MASK_DOWN){
-                                             stop_on_boundary_y = true;
-                                        }
-                                        break;
-                                   case DIRECTION_UP:
-                                        if(vel_mask & DIRECTION_MASK_DOWN){
-                                             stop_on_boundary_y = true;
-                                        }else if(vel_mask & DIRECTION_MASK_LEFT || vel_mask & DIRECTION_MASK_RIGHT){
-                                             stop_on_boundary_x = true;
-                                        }
-                                        break;
-                                   case DIRECTION_DOWN:
-                                        if(vel_mask & DIRECTION_MASK_UP){
-                                             stop_on_boundary_y = true;
-                                        }else if(vel_mask & DIRECTION_MASK_LEFT || vel_mask & DIRECTION_MASK_RIGHT){
-                                             stop_on_boundary_x = true;
-                                        }
-                                        break;
+                                   }else{
+                                        if(block->vel.x != 0) stop_on_boundary_x = true;
+                                        if(block->vel.y != 0) stop_on_boundary_y = true;
                                    }
                               }else{
                                    if(block->vel.x != 0) stop_on_boundary_x = true;
