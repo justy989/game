@@ -210,6 +210,24 @@ void stop_block_colliding_with_entangled(Block_t* block, Direction_t move_dir_to
      }
 }
 
+bool check_direction_from_block_for_adjacent_walls(Block_t* block, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt,
+                                                   Coord_t* skip_coords, Direction_t direction){
+     Pixel_t pixel_a {};
+     Pixel_t pixel_b {};
+     block_adjacent_pixels_to_check(block->pos, block->pos_delta, direction, &pixel_a, &pixel_b);
+     Coord_t coord_a = pixel_to_coord(pixel_a);
+     Coord_t coord_b = pixel_to_coord(pixel_b);
+
+     if(coord_a != skip_coords[direction] && tilemap_is_solid(tilemap, coord_a)){
+          return true;
+     }else if(coord_b != skip_coords[direction] && tilemap_is_solid(tilemap, coord_b)){
+          return true;
+     }
+
+     return quad_tree_interactive_solid_at(interactive_qt, tilemap, coord_a) ||
+            quad_tree_interactive_solid_at(interactive_qt, tilemap, coord_b);
+}
+
 int main(int argc, char** argv){
      const char* load_map_filepath = nullptr;
      bool test = false;
@@ -1821,67 +1839,27 @@ int main(int argc, char** argv){
                          Pixel_t center = block->pos.pixel + HALF_TILE_SIZE_PIXEL;
                          Coord_t coord = pixel_to_coord(center);
 
-                         Coord_t skip_coord[DIRECTION_COUNT];
-                         find_portal_adjacents_to_skip_collision_check(coord, world.interactive_qt, skip_coord);
+                         Coord_t skip_coords[DIRECTION_COUNT];
+                         find_portal_adjacents_to_skip_collision_check(coord, world.interactive_qt, skip_coords);
 
                          // check for adjacent walls
                          if(block->vel.x > 0.0f){
-                              Pixel_t pixel_a {};
-                              Pixel_t pixel_b {};
-                              block_adjacent_pixels_to_check(block->pos, block->pos_delta, DIRECTION_RIGHT, &pixel_a, &pixel_b);
-                              Coord_t coord_a = pixel_to_coord(pixel_a);
-                              Coord_t coord_b = pixel_to_coord(pixel_b);
-                              if(coord_a != skip_coord[DIRECTION_RIGHT] && tilemap_is_solid(&world.tilemap, coord_a)){
+                              if(check_direction_from_block_for_adjacent_walls(block, &world.tilemap, world.interactive_qt, skip_coords, DIRECTION_RIGHT)){
                                    stop_on_boundary_x = true;
-                              }else if(coord_b != skip_coord[DIRECTION_RIGHT] && tilemap_is_solid(&world.tilemap, coord_b)){
-                                   stop_on_boundary_x = true;
-                              }else{
-                                   stop_on_boundary_x = quad_tree_interactive_solid_at(world.interactive_qt, &world.tilemap, coord_a) ||
-                                                        quad_tree_interactive_solid_at(world.interactive_qt, &world.tilemap, coord_b);
                               }
                          }else if(block->vel.x < 0.0f){
-                              Pixel_t pixel_a {};
-                              Pixel_t pixel_b {};
-                              block_adjacent_pixels_to_check(block->pos, block->pos_delta, DIRECTION_LEFT, &pixel_a, &pixel_b);
-                              Coord_t coord_a = pixel_to_coord(pixel_a);
-                              Coord_t coord_b = pixel_to_coord(pixel_b);
-                              if(coord_a != skip_coord[DIRECTION_LEFT] && tilemap_is_solid(&world.tilemap, coord_a)){
+                              if(check_direction_from_block_for_adjacent_walls(block, &world.tilemap, world.interactive_qt, skip_coords, DIRECTION_LEFT)){
                                    stop_on_boundary_x = true;
-                              }else if(coord_b != skip_coord[DIRECTION_LEFT] && tilemap_is_solid(&world.tilemap, coord_b)){
-                                   stop_on_boundary_x = true;
-                              }else{
-                                   stop_on_boundary_x = quad_tree_interactive_solid_at(world.interactive_qt, &world.tilemap, coord_a) ||
-                                                        quad_tree_interactive_solid_at(world.interactive_qt, &world.tilemap, coord_b);
                               }
                          }
 
                          if(block->vel.y > 0.0f){
-                              Pixel_t pixel_a {};
-                              Pixel_t pixel_b {};
-                              block_adjacent_pixels_to_check(block->pos, block->pos_delta, DIRECTION_UP, &pixel_a, &pixel_b);
-                              Coord_t coord_a = pixel_to_coord(pixel_a);
-                              Coord_t coord_b = pixel_to_coord(pixel_b);
-                              if(coord_a != skip_coord[DIRECTION_UP] && tilemap_is_solid(&world.tilemap, coord_a)){
+                              if(check_direction_from_block_for_adjacent_walls(block, &world.tilemap, world.interactive_qt, skip_coords, DIRECTION_UP)){
                                    stop_on_boundary_y = true;
-                              }else if(coord_b != skip_coord[DIRECTION_UP] && tilemap_is_solid(&world.tilemap, coord_b)){
-                                   stop_on_boundary_y = true;
-                              }else{
-                                   stop_on_boundary_y = quad_tree_interactive_solid_at(world.interactive_qt, &world.tilemap, coord_a) ||
-                                                        quad_tree_interactive_solid_at(world.interactive_qt, &world.tilemap, coord_b);
                               }
                          }else if(block->vel.y < 0.0f){
-                              Pixel_t pixel_a {};
-                              Pixel_t pixel_b {};
-                              block_adjacent_pixels_to_check(block->pos, block->pos_delta, DIRECTION_DOWN, &pixel_a, &pixel_b);
-                              Coord_t coord_a = pixel_to_coord(pixel_a);
-                              Coord_t coord_b = pixel_to_coord(pixel_b);
-                              if(coord_a != skip_coord[DIRECTION_DOWN] && tilemap_is_solid(&world.tilemap, coord_a)){
+                              if(check_direction_from_block_for_adjacent_walls(block, &world.tilemap, world.interactive_qt, skip_coords, DIRECTION_DOWN)){
                                    stop_on_boundary_y = true;
-                              }else if(coord_b != skip_coord[DIRECTION_DOWN] && tilemap_is_solid(&world.tilemap, coord_b)){
-                                   stop_on_boundary_y = true;
-                              }else{
-                                   stop_on_boundary_y = quad_tree_interactive_solid_at(world.interactive_qt, &world.tilemap, coord_a) ||
-                                                        quad_tree_interactive_solid_at(world.interactive_qt, &world.tilemap, coord_b);
                               }
                          }
 
@@ -2421,7 +2399,6 @@ int main(int argc, char** argv){
                     reset_timer += dt;
                     if(reset_timer >= RESET_TIME){
                          resetting = false;
-
                          load_map_number_map(map_number, &world, &undo, &player_start, &player_action);
                     }
                }else{
