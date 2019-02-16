@@ -228,6 +228,18 @@ bool check_direction_from_block_for_adjacent_walls(Block_t* block, TileMap_t* ti
             quad_tree_interactive_solid_at(interactive_qt, tilemap, coord_b);
 }
 
+void copy_block_collision_results(Block_t* block, CheckBlockCollisionResult_t* result){
+     block->pos_delta = result->pos_delta;
+     block->vel = result->vel;
+     block->accel = result->accel;
+
+     block->stop_on_pixel_x = result->stop_on_pixel_x;
+     block->stop_on_pixel_y = result->stop_on_pixel_y;
+
+     block->horizontal_move = result->horizontal_move;
+     block->vertical_move = result->vertical_move;
+}
+
 int main(int argc, char** argv){
      const char* load_map_filepath = nullptr;
      bool test = false;
@@ -1800,15 +1812,7 @@ int main(int argc, char** argv){
                                              }
 
                                              if(move_dir_to_stop == DIRECTION_COUNT){
-                                                  block->pos_delta = result.pos_delta;
-                                                  block->vel = result.vel;
-                                                  block->accel = result.accel;
-
-                                                  block->stop_on_pixel_x = result.stop_on_pixel_x;
-                                                  block->stop_on_pixel_y = result.stop_on_pixel_y;
-
-                                                  block->horizontal_move = result.horizontal_move;
-                                                  block->vertical_move = result.vertical_move;
+                                                  copy_block_collision_results(block, &result);
                                              }else{
                                                   stop_block_colliding_with_entangled(block, move_dir_to_stop, &result);
                                                   stop_block_colliding_with_entangled(entangled_block, entangle_move_dir_to_stop, &entangle_result);
@@ -1822,15 +1826,7 @@ int main(int argc, char** argv){
                                              }
                                         }
                                    }else{
-                                        block->pos_delta = result.pos_delta;
-                                        block->vel = result.vel;
-                                        block->accel = result.accel;
-
-                                        block->stop_on_pixel_x = result.stop_on_pixel_x;
-                                        block->stop_on_pixel_y = result.stop_on_pixel_y;
-
-                                        block->horizontal_move = result.horizontal_move;
-                                        block->vertical_move = result.vertical_move;
+                                        copy_block_collision_results(block, &result);
                                    }
                               }
                          }
@@ -2271,22 +2267,7 @@ int main(int argc, char** argv){
                     if(!block->successfully_moved){
                          // TODO: its probably not the best thing to stop this in all directions, we probably only
                          //       want to stop it in the direction that it couldn't resolve collision in
-                         block->pos_delta = vec_zero();
-                         block->prev_vel = vec_zero();
-                         block->vel = vec_zero();
-                         block->accel = vec_zero();
-                         block->started_on_pixel_x = 0;
-                         block->started_on_pixel_y = 0;
-                         // block->stop_on_pixel_x = 0;
-                         // block->stop_on_pixel_y = 0;
-                         block->horizontal_move.state = MOVE_STATE_IDLING;
-                         block->horizontal_move.sign = MOVE_SIGN_ZERO;
-                         block->horizontal_move.distance = 0;
-                         block->vertical_move.state = MOVE_STATE_IDLING;
-                         block->vertical_move.sign = MOVE_SIGN_ZERO;
-                         block->vertical_move.distance = 0;
-                         block->pos.decimal.x = 0;
-                         block->pos.decimal.y = 0;
+                         memset(block, 0, sizeof(GridMotion_t));
                          continue;
                     }
 
