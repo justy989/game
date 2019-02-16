@@ -122,6 +122,8 @@ void undo_snapshot(Undo_t* undo, ObjectArray_t<Player_t>* players, TileMap_t* ti
           undo_block->vel = block->vel;
           undo_block->entangle_index = block->entangle_index;
           undo_block->rotation = block->rotation;
+          undo_block->horizontal_move = block->horizontal_move;
+          undo_block->vertical_move = block->vertical_move;
      }
 
      if(undo->interactives.count != interactives->count){
