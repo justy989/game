@@ -324,12 +324,13 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
      Block_t* collided_blocks[DIRECTION_COUNT] = {};
 
      for(S16 i = 0; i < world->blocks.count; i++){
+          Vec_t result_pos_delta = result.pos_delta;
           Vec_t pos_delta_save = result.pos_delta;
 
           bool collided_with_block = false;
           Block_t* block = world->blocks.elements + i;
           Position_t block_pos = block->pos + block->pos_delta;
-          position_collide_with_rect(player_pos, block_pos, TILE_SIZE, &result.pos_delta, &collided_with_block);
+          position_collide_with_rect(player_pos, block_pos, TILE_SIZE, &result_pos_delta, &collided_with_block);
           if(collided_with_block) result.collided = true;
 
           U8 collision_portal_rotations = 0;
@@ -355,7 +356,7 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
 
                                    Position_t portal_pos = coord_to_pos_at_tile_center(portal_exits.directions[d].coords[p]) + final_coord_offset -
                                                            pixel_to_pos(HALF_TILE_SIZE_PIXEL);
-                                   position_collide_with_rect(player_pos, portal_pos, TILE_SIZE, &result.pos_delta, &collided_with_block);
+                                   position_collide_with_rect(player_pos, portal_pos, TILE_SIZE, &result_pos_delta, &collided_with_block);
 
                                    if(collided_with_block){
                                         result.collided = true;
@@ -370,7 +371,7 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
           }
 
           if(collided_with_block){
-               Vec_t pos_delta_diff = result.pos_delta - pos_delta_save;
+               Vec_t pos_delta_diff = result_pos_delta - pos_delta_save;
                collided_block_delta = vec_rotate_quadrants_clockwise(pos_delta_diff, (U8)(4) - collision_portal_rotations);
                auto collided_block_dir = relative_quadrant(player_pos.pixel, block_pos.pixel + HALF_TILE_SIZE_PIXEL);
                auto collided_block = world->blocks.elements + i;
@@ -379,52 +380,120 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                     // this stops the block when it moves into the player
                     Vec_t rotated_accel = vec_rotate_quadrants_clockwise(collided_block->accel, collision_portal_rotations);
                     Vec_t rotated_vel = vec_rotate_quadrants_clockwise(collided_block->vel, collision_portal_rotations);
+                    bool even_rotations = (collision_portal_rotations % 2) == 0;
 
                     switch(collided_block_dir){
                     default:
                          break;
                     case DIRECTION_LEFT:
                          if(rotated_vel.x > 0.0f){
-                              collided_block->pos -= collided_block_delta;
-                              collided_block->horizontal_move.state = MOVE_STATE_IDLING;
-                              result.pos_delta -= pos_delta_diff;
+                              if(result.pos_delta.x < 0.0f){
+                                   result.pos_delta = result_pos_delta;
+
+                                   if(even_rotations){
+                                        collided_block->pos_delta.x = 0.0;
+                                   }else{
+                                        collided_block->pos_delta.y = 0.0;
+                                   }
+                              }else{
+                                   collided_block->pos_delta -= collided_block_delta;
+                              }
+
+                              if(even_rotations){
+                                   collided_block->horizontal_move.state = MOVE_STATE_IDLING;
+                              }else{
+                                   collided_block->vertical_move.state = MOVE_STATE_IDLING;
+                              }
+
                               rotated_accel.x = 0.0f;
                               rotated_vel.x = 0.0f;
                               collided_block->accel = vec_rotate_quadrants_counter_clockwise(rotated_accel, collision_portal_rotations);
                               collided_block->vel = vec_rotate_quadrants_counter_clockwise(rotated_vel, collision_portal_rotations);
+                         } else {
+                              result.pos_delta = result_pos_delta;
                          }
                          break;
                     case DIRECTION_RIGHT:
                          if(rotated_vel.x < 0.0f){
-                              collided_block->pos -= collided_block_delta;
-                              collided_block->horizontal_move.state = MOVE_STATE_IDLING;
-                              result.pos_delta -= pos_delta_diff;
+                              if(result.pos_delta.x > 0.0f){
+                                   result.pos_delta = result_pos_delta;
+
+                                   if(even_rotations){
+                                        collided_block->pos_delta.x = 0.0;
+                                   }else{
+                                        collided_block->pos_delta.y = 0.0;
+                                   }
+                              }else{
+                                   collided_block->pos -= collided_block_delta;
+                              }
+
+                              if(even_rotations){
+                                   collided_block->horizontal_move.state = MOVE_STATE_IDLING;
+                              }else{
+                                   collided_block->vertical_move.state = MOVE_STATE_IDLING;
+                              }
                               rotated_accel.x = 0.0f;
                               rotated_vel.x = 0.0f;
                               collided_block->accel = vec_rotate_quadrants_counter_clockwise(rotated_accel, collision_portal_rotations);
                               collided_block->vel = vec_rotate_quadrants_counter_clockwise(rotated_vel, collision_portal_rotations);
+                         }else{
+                              result.pos_delta = result_pos_delta;
                          }
                          break;
                     case DIRECTION_UP:
                          if(rotated_vel.y < 0.0f){
-                              collided_block->pos -= collided_block_delta;
-                              collided_block->vertical_move.state = MOVE_STATE_IDLING;
-                              result.pos_delta -= pos_delta_diff;
+                              if(result.pos_delta.y > 0.0f){
+                                   result.pos_delta.y = result_pos_delta.y;
+
+                                   if(even_rotations){
+                                        collided_block->pos_delta.y = 0.0;
+                                   }else{
+                                        collided_block->pos_delta.x = 0.0;
+                                   }
+                              }else{
+                                   collided_block->pos -= collided_block_delta;
+                              }
+
+                              if(even_rotations){
+                                   collided_block->vertical_move.state = MOVE_STATE_IDLING;
+                              }else{
+                                   collided_block->horizontal_move.state = MOVE_STATE_IDLING;
+                              }
+
                               rotated_accel.y = 0.0f;
                               rotated_vel.y = 0.0f;
                               collided_block->accel = vec_rotate_quadrants_counter_clockwise(rotated_accel, collision_portal_rotations);
                               collided_block->vel = vec_rotate_quadrants_counter_clockwise(rotated_vel, collision_portal_rotations);
+                         } else {
+                              result.pos_delta = result_pos_delta;
                          }
                          break;
                     case DIRECTION_DOWN:
                          if(rotated_vel.y > 0.0f){
-                              collided_block->pos -= collided_block_delta;
-                              collided_block->vertical_move.state = MOVE_STATE_IDLING;
-                              result.pos_delta -= pos_delta_diff;
+                              if(result.pos_delta.y < 0.0f){
+                                   result.pos_delta.y = result_pos_delta.y;
+
+                                   if(even_rotations){
+                                        collided_block->pos_delta.y = 0.0;
+                                   }else{
+                                        collided_block->pos_delta.x = 0.0;
+                                   }
+                              }else{
+                                   collided_block->pos -= collided_block_delta;
+                              }
+
+                              if(even_rotations){
+                                   collided_block->vertical_move.state = MOVE_STATE_IDLING;
+                              }else{
+                                   collided_block->horizontal_move.state = MOVE_STATE_IDLING;
+                              }
+
                               rotated_accel.y = 0.0f;
                               rotated_vel.y = 0.0f;
                               collided_block->accel = vec_rotate_quadrants_counter_clockwise(rotated_accel, collision_portal_rotations);
                               collided_block->vel = vec_rotate_quadrants_counter_clockwise(rotated_vel, collision_portal_rotations);
+                         } else {
+                              result.pos_delta = result_pos_delta;
                          }
                          break;
                     }
