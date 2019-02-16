@@ -79,6 +79,7 @@ struct Editor_t{
 
 bool init(Editor_t* editor);
 void sort_selection(Editor_t* editor);
+void move_selection(Editor_t* editor, Direction_t direction);
 void destroy(Editor_t* editor);
 
 Coord_t stamp_array_dimensions(ObjectArray_t<Stamp_t>* object_array);

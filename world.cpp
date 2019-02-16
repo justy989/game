@@ -36,7 +36,7 @@ bool load_map_number(S32 map_number, Coord_t* player_start, World_t* world){
      return load_map(filepath, player_start, &world->tilemap, &world->blocks, &world->interactives);
 }
 
-void setup_map(Coord_t player_start, World_t* world, Undo_t* undo){
+void reset_map(Coord_t player_start, World_t* world, Undo_t* undo){
      destroy(&world->players);
      init(&world->players, 1);
      Player_t* player = world->players.elements;
@@ -1257,4 +1257,66 @@ S16 get_block_index(World_t* world, Block_t* block){
     S16 index = block - world->blocks.elements;
     assert(index >= 0 && index <= world->blocks.count);
     return index;
+}
+
+bool setup_default_room(World_t* world){
+     init(&world->tilemap, ROOM_TILE_SIZE, ROOM_TILE_SIZE);
+
+     for(S16 i = 0; i < world->tilemap.width; i++){
+          world->tilemap.tiles[0][i].id = 33;
+          world->tilemap.tiles[1][i].id = 17;
+          world->tilemap.tiles[world->tilemap.height - 1][i].id = 16;
+          world->tilemap.tiles[world->tilemap.height - 2][i].id = 32;
+     }
+
+     for(S16 i = 0; i < world->tilemap.height; i++){
+          world->tilemap.tiles[i][0].id = 18;
+          world->tilemap.tiles[i][1].id = 19;
+          world->tilemap.tiles[i][world->tilemap.width - 2].id = 34;
+          world->tilemap.tiles[i][world->tilemap.height - 1].id = 35;
+     }
+
+     world->tilemap.tiles[0][0].id = 36;
+     world->tilemap.tiles[0][1].id = 37;
+     world->tilemap.tiles[1][0].id = 20;
+     world->tilemap.tiles[1][1].id = 21;
+
+     world->tilemap.tiles[16][0].id = 22;
+     world->tilemap.tiles[16][1].id = 23;
+     world->tilemap.tiles[15][0].id = 38;
+     world->tilemap.tiles[15][1].id = 39;
+
+     world->tilemap.tiles[15][15].id = 40;
+     world->tilemap.tiles[15][16].id = 41;
+     world->tilemap.tiles[16][15].id = 24;
+     world->tilemap.tiles[16][16].id = 25;
+
+     world->tilemap.tiles[0][15].id = 42;
+     world->tilemap.tiles[0][16].id = 43;
+     world->tilemap.tiles[1][15].id = 26;
+     world->tilemap.tiles[1][16].id = 27;
+
+     if(!init(&world->interactives, 1)){
+          return false;
+     }
+
+     world->interactives.elements[0].coord.x = -1;
+     world->interactives.elements[0].coord.y = -1;
+
+     if(!init(&world->blocks, 1)){
+          return false;
+     }
+
+     world->blocks.elements[0].pos = coord_to_pos(Coord_t{-1, -1});
+
+     return true;
+}
+
+void reset_tilemap_light(World_t* world){
+     // TODO: this will need to be optimized when the map is much bigger
+     for(S16 j = 0; j < world->tilemap.height; j++){
+          for(S16 i = 0; i < world->tilemap.width; i++){
+               world->tilemap.tiles[j][i].light = BASE_LIGHT;
+          }
+     }
 }

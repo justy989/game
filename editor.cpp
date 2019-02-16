@@ -336,6 +336,29 @@ void sort_selection(Editor_t* editor){
      if(editor->selection_start.y > editor->selection_end.y) SWAP(editor->selection_start.y, editor->selection_end.y);
 }
 
+void move_selection(Editor_t* editor, Direction_t direction){
+     switch(direction){
+     default:
+          break;
+     case DIRECTION_LEFT:
+          editor->selection_start.x--;
+          editor->selection_end.x--;
+          break;
+     case DIRECTION_RIGHT:
+          editor->selection_start.x++;
+          editor->selection_end.x++;
+          break;
+     case DIRECTION_UP:
+          editor->selection_start.y++;
+          editor->selection_end.y++;
+          break;
+     case DIRECTION_DOWN:
+          editor->selection_start.y--;
+          editor->selection_end.y--;
+          break;
+     }
+}
+
 void destroy(Editor_t* editor){
      for(S16 i = 0; i < editor->category_array.count; i++){
           for(int j = 0; j < editor->category_array.elements[i].count; j++){

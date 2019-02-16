@@ -44,7 +44,7 @@ struct MovePlayerThroughWorldResult_t{
 };
 
 bool load_map_number(S32 map_number, Coord_t* player_start, World_t* world);
-void setup_map(Coord_t player_start, World_t* world, Undo_t* undo);
+void reset_map(Coord_t player_start, World_t* world, Undo_t* undo);
 
 void activate(World_t* world, Coord_t coord);
 
@@ -69,3 +69,5 @@ void describe_coord(Coord_t coord, World_t* world);
 bool test_map_end_state(World_t* world, Demo_t* demo);
 
 S16 get_block_index(World_t* world, Block_t* block);
+bool setup_default_room(World_t* world);
+void reset_tilemap_light(World_t* world);

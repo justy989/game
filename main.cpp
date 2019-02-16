@@ -103,7 +103,7 @@ bool load_map_number_demo(Demo_t* demo, S16 map_number, S64* frame_count){
 bool load_map_number_map(S16 map_number, World_t* world, Undo_t* undo,
                          Coord_t* player_start, PlayerAction_t* player_action){
      if(load_map_number(map_number, player_start, world)){
-          setup_map(*player_start, world, undo);
+          reset_map(*player_start, world, undo);
           *player_action = {};
           return true;
      }
@@ -174,7 +174,6 @@ void stop_block_colliding_with_entangled(Block_t* block, Direction_t move_dir_to
           block->accel.y = result->accel.y;
 
           block->stop_on_pixel_x = 0;
-          // block->stop_on_pixel_y = result->stop_on_pixel_y; // ignore collision results's stop_on_pixel_y on purpose
 
           reset_move(&block->horizontal_move);
           block->vertical_move = result->vertical_move;
@@ -188,7 +187,6 @@ void stop_block_colliding_with_entangled(Block_t* block, Direction_t move_dir_to
           block->accel.x = result->accel.x;
           block->accel.y = 0;
 
-          // block->stop_on_pixel_x = result->stop_on_pixel_x; // ignore collision results's stop_on_pixel_x on purpose
           block->stop_on_pixel_y = 0;
 
           block->horizontal_move = result->horizontal_move;
@@ -391,54 +389,10 @@ int main(int argc, char** argv){
                cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
           }
      }else{
-          init(&world.tilemap, ROOM_TILE_SIZE, ROOM_TILE_SIZE);
-
-          for(S16 i = 0; i < world.tilemap.width; i++){
-               world.tilemap.tiles[0][i].id = 33;
-               world.tilemap.tiles[1][i].id = 17;
-               world.tilemap.tiles[world.tilemap.height - 1][i].id = 16;
-               world.tilemap.tiles[world.tilemap.height - 2][i].id = 32;
-          }
-
-          for(S16 i = 0; i < world.tilemap.height; i++){
-               world.tilemap.tiles[i][0].id = 18;
-               world.tilemap.tiles[i][1].id = 19;
-               world.tilemap.tiles[i][world.tilemap.width - 2].id = 34;
-               world.tilemap.tiles[i][world.tilemap.height - 1].id = 35;
-          }
-
-          world.tilemap.tiles[0][0].id = 36;
-          world.tilemap.tiles[0][1].id = 37;
-          world.tilemap.tiles[1][0].id = 20;
-          world.tilemap.tiles[1][1].id = 21;
-
-          world.tilemap.tiles[16][0].id = 22;
-          world.tilemap.tiles[16][1].id = 23;
-          world.tilemap.tiles[15][0].id = 38;
-          world.tilemap.tiles[15][1].id = 39;
-
-          world.tilemap.tiles[15][15].id = 40;
-          world.tilemap.tiles[15][16].id = 41;
-          world.tilemap.tiles[16][15].id = 24;
-          world.tilemap.tiles[16][16].id = 25;
-
-          world.tilemap.tiles[0][15].id = 42;
-          world.tilemap.tiles[0][16].id = 43;
-          world.tilemap.tiles[1][15].id = 26;
-          world.tilemap.tiles[1][16].id = 27;
-          if(!init(&world.interactives, 1)){
-               return 1;
-          }
-          world.interactives.elements[0].coord.x = -1;
-          world.interactives.elements[0].coord.y = -1;
-
-          if(!init(&world.blocks, 1)){
-               return 1;
-          }
-          world.blocks.elements[0].pos = coord_to_pos(Coord_t{-1, -1});
+          setup_default_room(&world);
      }
 
-     setup_map(player_start, &world, &undo);
+     reset_map(player_start, &world, &undo);
      init(&editor);
 
      F32 dt = 0.0f;
@@ -519,8 +473,7 @@ int main(int argc, char** argv){
                     case SDL_SCANCODE_LEFT:
                     case SDL_SCANCODE_A:
                          if(editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
-                              editor.selection_start.x--;
-                              editor.selection_end.x--;
+                              move_selection(&editor, DIRECTION_LEFT);
                          }else if(demo.mode == DEMO_MODE_PLAY){
                               if(frame_count > 0 && demo.seek_frame < 0){
                                    demo.seek_frame = frame_count - 1;
@@ -528,7 +481,7 @@ int main(int argc, char** argv){
                                    // TODO: compress with same comment elsewhere in this file
                                    fetch_cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
 
-                                   setup_map(player_start, &world, &undo);
+                                   reset_map(player_start, &world, &undo);
 
                                    // reset some vars
                                    player_action = {};
@@ -544,8 +497,7 @@ int main(int argc, char** argv){
                     case SDL_SCANCODE_RIGHT:
                     case SDL_SCANCODE_D:
                          if(editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
-                              editor.selection_start.x++;
-                              editor.selection_end.x++;
+                              move_selection(&editor, DIRECTION_RIGHT);
                          }else if(demo.mode == DEMO_MODE_PLAY){
                               if(demo.seek_frame < 0){
                                    demo.seek_frame = frame_count + 1;
@@ -558,8 +510,7 @@ int main(int argc, char** argv){
                     case SDL_SCANCODE_UP:
                     case SDL_SCANCODE_W:
                          if(editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
-                              editor.selection_start.y++;
-                              editor.selection_end.y++;
+                              move_selection(&editor, DIRECTION_UP);
                          }else if(!resetting){
                               player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_UP_START,
                                                     demo.mode, demo.file, frame_count);
@@ -568,8 +519,7 @@ int main(int argc, char** argv){
                     case SDL_SCANCODE_DOWN:
                     case SDL_SCANCODE_S:
                          if(editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
-                              editor.selection_start.y--;
-                              editor.selection_end.y--;
+                              move_selection(&editor, DIRECTION_DOWN);
                          }else if(!resetting){
                               player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_DOWN_START,
                                                     demo.mode, demo.file, frame_count);
@@ -641,11 +591,12 @@ int main(int argc, char** argv){
                          LOG("game dt scalar: %.1f\n", demo.dt_scalar);
                          break;
                     case SDL_SCANCODE_V:
-                    {
-                         char filepath[64];
-                         snprintf(filepath, 64, "content/%03d.bm", map_number);
-                         save_map(filepath, player_start, &world.tilemap, &world.blocks, &world.interactives);
-                    } break;
+                         if(editor.mode != EDITOR_MODE_OFF){
+                              char filepath[64];
+                              snprintf(filepath, 64, "content/%03d.bm", map_number);
+                              save_map(filepath, player_start, &world.tilemap, &world.blocks, &world.interactives);
+                         }
+                         break;
                     case SDL_SCANCODE_U:
                          if(!resetting){
                               player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_UNDO,
@@ -887,7 +838,7 @@ int main(int argc, char** argv){
                                              // TODO: compress with same comment elsewhere in this file
                                              fetch_cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
 
-                                             setup_map(player_start, &world, &undo);
+                                             reset_map(player_start, &world, &undo);
 
                                              // reset some vars
                                              player_action = {};
@@ -1066,7 +1017,7 @@ int main(int argc, char** argv){
                               // TODO: compress with same comment elsewhere in this file
                               fetch_cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
 
-                              setup_map(player_start, &world, &undo);
+                              reset_map(player_start, &world, &undo);
 
                               // reset some vars
                               player_action = {};
@@ -1082,13 +1033,7 @@ int main(int argc, char** argv){
           }
 
           if(!demo.paused || demo.seek_frame >= 0){
-               // reset base light
-               // TODO: this will need to be optimized when the map is much bigger
-               for(S16 j = 0; j < world.tilemap.height; j++){
-                    for(S16 i = 0; i < world.tilemap.width; i++){
-                         world.tilemap.tiles[j][i].light = BASE_LIGHT;
-                    }
-               }
+               reset_tilemap_light(&world);
 
                // update interactives
                for(S16 i = 0; i < world.interactives.count; i++){
@@ -1111,11 +1056,7 @@ int main(int argc, char** argv){
                               Tile_t* tile = tilemap_get_tile(&world.tilemap, interactive->coord);
                               if(tile){
                                    if(!tile_is_iced(tile)){
-                                        Pixel_t center = coord_to_pixel(interactive->coord) + HALF_TILE_SIZE_PIXEL;
-                                        Rect_t rect = {(S16)(center.x - DOUBLE_TILE_SIZE_IN_PIXELS),
-                                                       (S16)(center.y - DOUBLE_TILE_SIZE_IN_PIXELS),
-                                                       (S16)(center.x + DOUBLE_TILE_SIZE_IN_PIXELS),
-                                                       (S16)(center.y + DOUBLE_TILE_SIZE_IN_PIXELS)};
+                                        Rect_t rect = rect_to_check_surrounding_blocks(coord_to_pixel_at_center(interactive->coord));
 
                                         S16 block_count = 0;
                                         Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
@@ -1123,9 +1064,9 @@ int main(int argc, char** argv){
 
                                         for(S16 b = 0; b < block_count; b++){
                                              Coord_t bottom_left = pixel_to_coord(blocks[b]->pos.pixel);
-                                             Coord_t bottom_right = pixel_to_coord(blocks[b]->pos.pixel + Pixel_t{BLOCK_SOLID_SIZE_IN_PIXELS, 0});
-                                             Coord_t top_left = pixel_to_coord(blocks[b]->pos.pixel + Pixel_t{0, BLOCK_SOLID_SIZE_IN_PIXELS});
-                                             Coord_t top_right = pixel_to_coord(blocks[b]->pos.pixel + Pixel_t{BLOCK_SOLID_SIZE_IN_PIXELS, BLOCK_SOLID_SIZE_IN_PIXELS});
+                                             Coord_t bottom_right = pixel_to_coord(block_bottom_right_pixel(blocks[b]->pos.pixel));
+                                             Coord_t top_left = pixel_to_coord(block_top_left_pixel(blocks[b]->pos.pixel));
+                                             Coord_t top_right = pixel_to_coord(block_top_right_pixel(blocks[b]->pos.pixel));
                                              if(interactive->coord == bottom_left ||
                                                 interactive->coord == bottom_right ||
                                                 interactive->coord == top_left ||
@@ -1208,10 +1149,7 @@ int main(int argc, char** argv){
                     arrow->vel *= arrow_friction;
                     Coord_t post_move_coord = pixel_to_coord(arrow->pos.pixel);
 
-                    Rect_t coord_rect {(S16)(arrow->pos.pixel.x - TILE_SIZE_IN_PIXELS),
-                                       (S16)(arrow->pos.pixel.y - TILE_SIZE_IN_PIXELS),
-                                       (S16)(arrow->pos.pixel.x + TILE_SIZE_IN_PIXELS),
-                                       (S16)(arrow->pos.pixel.y + TILE_SIZE_IN_PIXELS)};
+                    Rect_t coord_rect = rect_surrounding_coord(post_move_coord);
 
                     S16 block_count = 0;
                     Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
