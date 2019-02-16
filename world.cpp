@@ -382,6 +382,32 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                     Vec_t rotated_vel = vec_rotate_quadrants_clockwise(collided_block->vel, collision_portal_rotations);
                     bool even_rotations = (collision_portal_rotations % 2) == 0;
 
+                    auto stop_block_horizontally = [](Block_t* collided_block, bool even_rotations, Vec_t rotated_vel, Vec_t rotated_accel, U8 collision_portal_rotations){
+                         if(even_rotations){
+                              collided_block->horizontal_move.state = MOVE_STATE_IDLING;
+                         }else{
+                              collided_block->vertical_move.state = MOVE_STATE_IDLING;
+                         }
+
+                         rotated_accel.x = 0.0f;
+                         rotated_vel.x = 0.0f;
+                         collided_block->accel = vec_rotate_quadrants_counter_clockwise(rotated_accel, collision_portal_rotations);
+                         collided_block->vel = vec_rotate_quadrants_counter_clockwise(rotated_vel, collision_portal_rotations);
+                    };
+
+                    auto stop_block_vertically = [](Block_t* collided_block, bool even_rotations, Vec_t rotated_vel, Vec_t rotated_accel, U8 collision_portal_rotations){
+                         if(even_rotations){
+                              collided_block->vertical_move.state = MOVE_STATE_IDLING;
+                         }else{
+                              collided_block->horizontal_move.state = MOVE_STATE_IDLING;
+                         }
+
+                         rotated_accel.y = 0.0f;
+                         rotated_vel.y = 0.0f;
+                         collided_block->accel = vec_rotate_quadrants_counter_clockwise(rotated_accel, collision_portal_rotations);
+                         collided_block->vel = vec_rotate_quadrants_counter_clockwise(rotated_vel, collision_portal_rotations);
+                    };
+
                     switch(collided_block_dir){
                     default:
                          break;
@@ -399,16 +425,7 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                                    collided_block->pos_delta -= collided_block_delta;
                               }
 
-                              if(even_rotations){
-                                   collided_block->horizontal_move.state = MOVE_STATE_IDLING;
-                              }else{
-                                   collided_block->vertical_move.state = MOVE_STATE_IDLING;
-                              }
-
-                              rotated_accel.x = 0.0f;
-                              rotated_vel.x = 0.0f;
-                              collided_block->accel = vec_rotate_quadrants_counter_clockwise(rotated_accel, collision_portal_rotations);
-                              collided_block->vel = vec_rotate_quadrants_counter_clockwise(rotated_vel, collision_portal_rotations);
+                              stop_block_horizontally(collided_block, even_rotations, rotated_vel, rotated_accel, collision_portal_rotations);
                          } else {
                               result.pos_delta = result_pos_delta;
                          }
@@ -427,15 +444,7 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                                    collided_block->pos -= collided_block_delta;
                               }
 
-                              if(even_rotations){
-                                   collided_block->horizontal_move.state = MOVE_STATE_IDLING;
-                              }else{
-                                   collided_block->vertical_move.state = MOVE_STATE_IDLING;
-                              }
-                              rotated_accel.x = 0.0f;
-                              rotated_vel.x = 0.0f;
-                              collided_block->accel = vec_rotate_quadrants_counter_clockwise(rotated_accel, collision_portal_rotations);
-                              collided_block->vel = vec_rotate_quadrants_counter_clockwise(rotated_vel, collision_portal_rotations);
+                              stop_block_horizontally(collided_block, even_rotations, rotated_vel, rotated_accel, collision_portal_rotations);
                          }else{
                               result.pos_delta = result_pos_delta;
                          }
@@ -454,16 +463,7 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                                    collided_block->pos -= collided_block_delta;
                               }
 
-                              if(even_rotations){
-                                   collided_block->vertical_move.state = MOVE_STATE_IDLING;
-                              }else{
-                                   collided_block->horizontal_move.state = MOVE_STATE_IDLING;
-                              }
-
-                              rotated_accel.y = 0.0f;
-                              rotated_vel.y = 0.0f;
-                              collided_block->accel = vec_rotate_quadrants_counter_clockwise(rotated_accel, collision_portal_rotations);
-                              collided_block->vel = vec_rotate_quadrants_counter_clockwise(rotated_vel, collision_portal_rotations);
+                              stop_block_vertically(collided_block, even_rotations, rotated_vel, rotated_accel, collision_portal_rotations);
                          } else {
                               result.pos_delta = result_pos_delta;
                          }
@@ -482,16 +482,7 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                                    collided_block->pos -= collided_block_delta;
                               }
 
-                              if(even_rotations){
-                                   collided_block->vertical_move.state = MOVE_STATE_IDLING;
-                              }else{
-                                   collided_block->horizontal_move.state = MOVE_STATE_IDLING;
-                              }
-
-                              rotated_accel.y = 0.0f;
-                              rotated_vel.y = 0.0f;
-                              collided_block->accel = vec_rotate_quadrants_counter_clockwise(rotated_accel, collision_portal_rotations);
-                              collided_block->vel = vec_rotate_quadrants_counter_clockwise(rotated_vel, collision_portal_rotations);
+                              stop_block_vertically(collided_block, even_rotations, rotated_vel, rotated_accel, collision_portal_rotations);
                          } else {
                               result.pos_delta = result_pos_delta;
                          }
@@ -804,8 +795,8 @@ static void impact_ice(Coord_t center, S16 radius, World_t* world, bool teleport
                          }
                     }else{
                          if(interactive){
-                              // TODO: switch
-                              if(interactive->type == INTERACTIVE_TYPE_POPUP){
+                              switch(interactive->type){
+                              case INTERACTIVE_TYPE_POPUP:
                                    if(interactive->popup.lift.ticks == 1){
                                         if(spread_the_ice){
                                              interactive->popup.iced = false;
@@ -816,9 +807,10 @@ static void impact_ice(Coord_t center, S16 radius, World_t* world, bool teleport
                                    }else{
                                         interactive->popup.iced = spread_the_ice;
                                    }
-                              }else if(interactive->type == INTERACTIVE_TYPE_PRESSURE_PLATE ||
-                                       interactive->type == INTERACTIVE_TYPE_ICE_DETECTOR ||
-                                       interactive->type == INTERACTIVE_TYPE_LIGHT_DETECTOR){
+                                   break;
+                              case INTERACTIVE_TYPE_PRESSURE_PLATE:
+                              case INTERACTIVE_TYPE_ICE_DETECTOR:
+                              case INTERACTIVE_TYPE_LIGHT_DETECTOR:
                                    if(spread_the_ice){
                                         tile->flags |= TILE_FLAG_ICED;
                                    }else{
@@ -827,6 +819,9 @@ static void impact_ice(Coord_t center, S16 radius, World_t* world, bool teleport
                                              interactive->pressure_plate.iced_under = false;
                                         }
                                    }
+                                   break;
+                              default:
+                                   break;
                               }
                          }else{
                               if(spread_the_ice){
