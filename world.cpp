@@ -408,19 +408,31 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                          collided_block->vel = vec_rotate_quadrants_counter_clockwise(rotated_vel, collision_portal_rotations);
                     };
 
+                    auto stop_player_moving_into_block = [](MovePlayerThroughWorldResult_t* result, Block_t* collided_block, Vec_t result_pos_delta, bool even_rotations, bool horizontal){
+                         result->pos_delta = result_pos_delta;
+
+                         if(horizontal){
+                              if(even_rotations){
+                                   collided_block->pos_delta.x = 0.0;
+                              }else{
+                                   collided_block->pos_delta.y = 0.0;
+                              }
+                         }else{
+                              if(even_rotations){
+                                   collided_block->pos_delta.y = 0.0;
+                              }else{
+                                   collided_block->pos_delta.x = 0.0;
+                              }
+                         }
+                    };
+
                     switch(collided_block_dir){
                     default:
                          break;
                     case DIRECTION_LEFT:
                          if(rotated_vel.x > 0.0f){
                               if(result.pos_delta.x < 0.0f){
-                                   result.pos_delta = result_pos_delta;
-
-                                   if(even_rotations){
-                                        collided_block->pos_delta.x = 0.0;
-                                   }else{
-                                        collided_block->pos_delta.y = 0.0;
-                                   }
+                                   stop_player_moving_into_block(&result, collided_block, result_pos_delta, even_rotations, true);
                               }else{
                                    collided_block->pos_delta -= collided_block_delta;
                               }
@@ -433,13 +445,7 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                     case DIRECTION_RIGHT:
                          if(rotated_vel.x < 0.0f){
                               if(result.pos_delta.x > 0.0f){
-                                   result.pos_delta = result_pos_delta;
-
-                                   if(even_rotations){
-                                        collided_block->pos_delta.x = 0.0;
-                                   }else{
-                                        collided_block->pos_delta.y = 0.0;
-                                   }
+                                   stop_player_moving_into_block(&result, collided_block, result_pos_delta, even_rotations, true);
                               }else{
                                    collided_block->pos -= collided_block_delta;
                               }
@@ -452,13 +458,7 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                     case DIRECTION_UP:
                          if(rotated_vel.y < 0.0f){
                               if(result.pos_delta.y > 0.0f){
-                                   result.pos_delta.y = result_pos_delta.y;
-
-                                   if(even_rotations){
-                                        collided_block->pos_delta.y = 0.0;
-                                   }else{
-                                        collided_block->pos_delta.x = 0.0;
-                                   }
+                                   stop_player_moving_into_block(&result, collided_block, result_pos_delta, even_rotations, false);
                               }else{
                                    collided_block->pos -= collided_block_delta;
                               }
@@ -471,13 +471,7 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                     case DIRECTION_DOWN:
                          if(rotated_vel.y > 0.0f){
                               if(result.pos_delta.y < 0.0f){
-                                   result.pos_delta.y = result_pos_delta.y;
-
-                                   if(even_rotations){
-                                        collided_block->pos_delta.y = 0.0;
-                                   }else{
-                                        collided_block->pos_delta.x = 0.0;
-                                   }
+                                   stop_player_moving_into_block(&result, collided_block, result_pos_delta, even_rotations, false);
                               }else{
                                    collided_block->pos -= collided_block_delta;
                               }
