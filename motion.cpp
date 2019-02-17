@@ -2,6 +2,7 @@
 #include "defines.h"
 #include "position.h"
 #include "log.h"
+#include "utils.h"
 
 #include <math.h>
 
@@ -164,21 +165,6 @@ void update_motion_free_form(Move_t* move, MotionComponent_t* motion, bool posit
           }
           break;
      }
-}
-
-static S16 closest_grid_center_pixel(S16 grid_width, S16 v){
-     S16 lower_index = v / grid_width;
-     S16 upper_index = lower_index + 1;
-
-     S16 lower_bound = grid_width * lower_index;
-     S16 upper_bound = grid_width * upper_index;
-
-     S16 lower_diff = v - lower_bound;
-     S16 upper_diff = upper_bound - v;
-
-     if(lower_diff < upper_diff) return lower_bound;
-
-     return upper_bound;
 }
 
 void update_motion_grid_aligned(Move_t* move, MotionComponent_t* motion, bool coast, float dt, float accel,

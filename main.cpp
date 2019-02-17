@@ -45,6 +45,7 @@ NOTES:
 #include "collision.h"
 #include "world.h"
 #include "editor.h"
+#include "utils.h"
 
 struct VecMaskCollisionEntry_t{
      S8 mask;
@@ -173,6 +174,9 @@ void stop_block_colliding_with_entangled(Block_t* block, Direction_t move_dir_to
           block->accel.x = 0;
           block->accel.y = result->accel.y;
 
+          block->pos.pixel.x = closest_grid_center_pixel(TILE_SIZE_IN_PIXELS, block->pos.pixel.x);
+          block->pos.decimal.x = 0;
+
           block->stop_on_pixel_x = 0;
 
           reset_move(&block->horizontal_move);
@@ -186,6 +190,9 @@ void stop_block_colliding_with_entangled(Block_t* block, Direction_t move_dir_to
           block->vel.y = 0;
           block->accel.x = result->accel.x;
           block->accel.y = 0;
+
+          block->pos.pixel.y = closest_grid_center_pixel(TILE_SIZE_IN_PIXELS, block->pos.pixel.y);
+          block->pos.decimal.y = 0;
 
           block->stop_on_pixel_y = 0;
 

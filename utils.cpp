@@ -277,3 +277,18 @@ bool vec_in_quad(const Quad_t* q, Vec_t v){
      return (v.x >= q->left && v.x <= q->right &&
              v.y >= q->bottom && v.y <= q->top);
 }
+
+S16 closest_grid_center_pixel(S16 grid_width, S16 v){
+     S16 lower_index = v / grid_width;
+     S16 upper_index = lower_index + 1;
+
+     S16 lower_bound = grid_width * lower_index;
+     S16 upper_bound = grid_width * upper_index;
+
+     S16 lower_diff = v - lower_bound;
+     S16 upper_diff = upper_bound - v;
+
+     if(lower_diff < upper_diff) return lower_bound;
+
+     return upper_bound;
+}
