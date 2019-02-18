@@ -56,3 +56,6 @@ Rect_t block_get_rect(Block_t* block);
 Pixel_t block_bottom_right_pixel(Pixel_t block);
 Pixel_t block_top_left_pixel(Pixel_t block);
 Pixel_t block_top_right_pixel(Pixel_t block);
+
+void block_stop_horizontally(Block_t* block);
+void block_stop_vertically(Block_t* block);

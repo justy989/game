@@ -884,6 +884,39 @@ bool block_push(Block_t* block, Direction_t direction, World_t* world, bool push
      if(block_against_solid_tile(block, direction, &world->tilemap, world->interactive_qt)) return false;
      if(block_against_solid_interactive(block, direction, &world->tilemap, world->interactive_qt)) return false;
 
+     // if are sliding on ice and are pushed in the opposite direction then stop
+     if(block_on_ice(block->pos, block->pos_delta, &world->tilemap, world->interactive_qt)){
+          switch(direction){
+          default:
+               break;
+          case DIRECTION_LEFT:
+          case DIRECTION_RIGHT:
+          {
+               Vec_t horizontal_vel = {block->vel.x, 0};
+               auto moving_dir = vec_direction(horizontal_vel);
+
+               if(direction_opposite(moving_dir) == direction){
+                    block_stop_horizontally(block);
+                    return true;
+               }
+               break;
+          }
+               break;
+          case DIRECTION_UP:
+          case DIRECTION_DOWN:
+          {
+               Vec_t vertical_vel = {0, block->vel.y};
+               auto moving_dir = vec_direction(vertical_vel);
+
+               if(direction_opposite(moving_dir) == direction){
+                    block_stop_vertically(block);
+                    return true;
+               }
+               break;
+          }
+          }
+     }
+
      switch(direction){
      default:
           break;

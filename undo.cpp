@@ -369,6 +369,7 @@ void undo_revert(Undo_t* undo, ObjectArray_t<Player_t>* players, TileMap_t* tile
                player->pos.pixel = player_entry->pixel;
                player->pos.z = player_entry->z;
                player->face = player_entry->face;
+               player->has_bow = true;
           } break;
           case UNDO_DIFF_TYPE_TILE_FLAGS:
           {

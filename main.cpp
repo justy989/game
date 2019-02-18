@@ -2677,7 +2677,7 @@ int main(int argc, char** argv){
 
           glEnd();
 
-#if 0
+#if 1
           // light
           glBindTexture(GL_TEXTURE_2D, 0);
           glBegin(GL_QUADS);

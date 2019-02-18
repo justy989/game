@@ -74,3 +74,23 @@ Pixel_t block_top_right_pixel(Pixel_t block_pixel){
      return Pixel_t{(S16)(block_pixel.x + BLOCK_SOLID_SIZE_IN_PIXELS),
                     (S16)(block_pixel.y + BLOCK_SOLID_SIZE_IN_PIXELS)};
 }
+
+void block_stop_horizontally(Block_t* block){
+     block->horizontal_move.state = MOVE_STATE_IDLING;
+     block->horizontal_move.sign = MOVE_SIGN_ZERO;
+     block->horizontal_move.distance = 0;
+     block->pos_delta.x = 0;
+     block->vel.x = 0;
+     block->prev_vel.x = 0;
+     block->accel.x = 0;
+}
+
+void block_stop_vertically(Block_t* block){
+     block->vertical_move.state = MOVE_STATE_IDLING;
+     block->vertical_move.sign = MOVE_SIGN_ZERO;
+     block->vertical_move.distance = 0;
+     block->pos_delta.y = 0;
+     block->vel.y = 0;
+     block->prev_vel.y = 0;
+     block->accel.y = 0;
+}
