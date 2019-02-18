@@ -20,6 +20,7 @@ struct Player_t : public Motion_t {
      Vec_t       teleport_pos_delta;
      S16         teleport_pushing_block;
      Direction_t teleport_pushing_block_dir;
+     S8          teleport_pushing_block_rotation;
      U8          teleport_rotation;
      Direction_t teleport_face;
 
@@ -44,6 +45,7 @@ struct Player_t : public Motion_t {
      S16         pushing_block = -1;
      S16         prev_pushing_block = -1;
      Direction_t pushing_block_dir = DIRECTION_COUNT; // we would use face but the pushing can be through rotated portal
+     S8          pushing_block_rotation = 0;
 
      bool successfully_moved = false;
 };

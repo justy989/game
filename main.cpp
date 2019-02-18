@@ -12,6 +12,10 @@ Entanglement:
 - arrow entanglement
 - arrow kills player
 
+Current 2 problems:
+- in this situation of entangled blocks [^][<], if you push the left block up 2 squares the right block should move after the left one gets out of the way
+- when a block teleports itself to a grid center, it can trap the player in the right circumstances, not sure how to reproduce
+
 Big Features:
 - Block splitting
 - Bring block ice collision to the masses
@@ -1435,8 +1439,14 @@ int main(int argc, char** argv){
                for(S16 i = 0; i < world.players.count; i++){
                     Player_t* player = world.players.elements + i;
 
-                    player->prev_pushing_block = player->pushing_block;
+                    auto pushing_block_dir = direction_rotate_clockwise(player->pushing_block_dir, player->pushing_block_rotation);
+                    if(player->pushing_block >= 0 && player->face == pushing_block_dir){
+                         player->prev_pushing_block = player->pushing_block;
+                    }else{
+                         player->prev_pushing_block = -1;
+                    }
                     player->pushing_block = -1;
+
                     player->teleport_pushing_block = -1;
 
                     player->prev_vel = player->vel;
@@ -1592,87 +1602,94 @@ int main(int argc, char** argv){
                          block->teleport = false;
                     }
 
-                    block->coast_horizontal = false;
-                    block->coast_vertical = false;
-                    if(block->teleport && block_on_ice(block->teleport_pos, block->teleport_pos_delta, &world.tilemap, world.interactive_qt)){
-                         block->coast_horizontal = true;
-                         block->coast_vertical = true;
-                    }else if(block_on_ice(block->pos, block->pos_delta, &world.tilemap, world.interactive_qt)){
-                         block->coast_horizontal = true;
-                         block->coast_vertical = true;
-                    }else{
-                         if(block->horizontal_move.state == MOVE_STATE_STARTING ||
-                            block->horizontal_move.state == MOVE_STATE_COASTING){
-                              if(block->horizontal_move.sign == MOVE_SIGN_POSITIVE){
-                                   block->coast_horizontal = (block->prev_push_mask & DIRECTION_MASK_RIGHT);
-                              }else if(block->horizontal_move.sign == MOVE_SIGN_NEGATIVE){
-                                   block->coast_horizontal = (block->prev_push_mask & DIRECTION_MASK_LEFT);
+                    block->coast_horizontal = BLOCK_COAST_NONE;
+                    block->coast_vertical = BLOCK_COAST_NONE;
+               }
+
+               // do multiple passes here so that entangled blocks know for sure if their entangled counterparts are coasting and index order doesn't matter
+               for(S16 j = 0; j < 2; j++){
+                    for(S16 i = 0; i < world.blocks.count; i++){
+                         Block_t* block = world.blocks.elements + i;
+
+                         if(block->teleport && block_on_ice(block->teleport_pos, block->teleport_pos_delta, &world.tilemap, world.interactive_qt)){
+                              block->coast_horizontal = BLOCK_COAST_ICE;
+                              block->coast_vertical = BLOCK_COAST_ICE;
+                         }else if(block_on_ice(block->pos, block->pos_delta, &world.tilemap, world.interactive_qt)){
+                              block->coast_horizontal = BLOCK_COAST_ICE;
+                              block->coast_vertical = BLOCK_COAST_ICE;
+                         }else{
+                              if(block->horizontal_move.state == MOVE_STATE_STARTING ||
+                                 block->horizontal_move.state == MOVE_STATE_COASTING){
+                                   if(block->horizontal_move.sign == MOVE_SIGN_POSITIVE){
+                                        if(block->prev_push_mask & DIRECTION_MASK_RIGHT){
+                                             block->coast_horizontal = BLOCK_COAST_PLAYER;
+                                        }
+                                   }else if(block->horizontal_move.sign == MOVE_SIGN_NEGATIVE){
+                                        if(block->prev_push_mask & DIRECTION_MASK_LEFT){
+                                             block->coast_horizontal = BLOCK_COAST_PLAYER;
+                                        }
+                                   }
+                              }
+
+                              if(block->vertical_move.state == MOVE_STATE_STARTING ||
+                                 block->vertical_move.state == MOVE_STATE_COASTING){
+                                   if(block->vertical_move.sign == MOVE_SIGN_POSITIVE){
+                                        if(block->prev_push_mask & DIRECTION_MASK_UP){
+                                             block->coast_vertical = BLOCK_COAST_PLAYER;
+                                        }
+                                   }else if(block->vertical_move.sign == MOVE_SIGN_NEGATIVE){
+                                        if(block->prev_push_mask & DIRECTION_MASK_DOWN){
+                                             block->coast_vertical = BLOCK_COAST_PLAYER;
+                                        }
+                                   }
                               }
                          }
 
-                         if(block->vertical_move.state == MOVE_STATE_STARTING ||
-                            block->vertical_move.state == MOVE_STATE_COASTING){
-                              if(block->vertical_move.sign == MOVE_SIGN_POSITIVE){
-                                   block->coast_vertical = (block->prev_push_mask & DIRECTION_MASK_UP);
-                              }else if(block->vertical_move.sign == MOVE_SIGN_NEGATIVE){
-                                   block->coast_vertical = (block->prev_push_mask & DIRECTION_MASK_DOWN);
-                              }
-                         }
-                    }
+                         if(block->coast_vertical == BLOCK_COAST_NONE || block->coast_horizontal == BLOCK_COAST_NONE ){
+                              // TODO: this logic isn't strictly correct when the block teleports, but I also don't think there is any harm right now?
+                              for(S16 p = 0; p < world.players.count; p++){
+                                   Player_t* player = world.players.elements + p;
 
-                    if(!block->coast_vertical || !block->coast_horizontal){
-                         // TODO: this logic isn't strictly correct when the block teleports, but I also don't think there is any harm right now?
-                         for(S16 p = 0; p < world.players.count; p++){
-                              Player_t* player = world.players.elements + p;
+                                   // is the player pushing us ?
+                                   if(player->prev_pushing_block < 0 ||
+                                      (player->prev_pushing_block != get_block_index(&world, block) &&
+                                       player->prev_pushing_block != block->entangle_index)) continue;
 
-                              // is the player pushing us ?
-                              if(player->prev_pushing_block < 0 ||
-                                 (player->prev_pushing_block != get_block_index(&world, block) &&
-                                  player->prev_pushing_block != block->entangle_index)) continue;
-
-                              auto player_face = player->face;
-                              bool entangled_block_pushed_by_player = false;
-                              if(player->prev_pushing_block == block->entangle_index){
-                                   // TODO(jtardiff): maybe an accessor where we check if index is valid, return NULL and check null after the call
-                                   Block_t* entangled_block = world.blocks.elements + block->entangle_index;
-                                   entangled_block_pushed_by_player = grid_motion_moving_in_direction(dynamic_cast<GridMotion_t*>(entangled_block), player_face);
-                                   auto rotations_between = direction_rotations_between(static_cast<Direction_t>(block->rotation), static_cast<Direction_t>(entangled_block->rotation));
-                                   player_face = direction_rotate_clockwise(player_face, rotations_between);
-                              }
-
-                              switch(player_face){
-                              default:
-                                   break;
-                              case DIRECTION_LEFT:
-                              case DIRECTION_RIGHT:
                                    if(player->prev_pushing_block == block->entangle_index){
-                                        if(entangled_block_pushed_by_player){
-                                             block->coast_horizontal = true;
+                                        // TODO(jtardiff): maybe an accessor where we check if index is valid, return NULL and check null after the call
+                                        Block_t* entangled_block = world.blocks.elements + block->entangle_index;
 
-                                             if(player->push_time > BLOCK_PUSH_TIME &&
-                                                block->horizontal_move.state == MOVE_STATE_IDLING){
-                                                  block_push(block, player_face, &world, false);
+                                        auto rotations_between = direction_rotations_between(static_cast<Direction_t>(block->rotation), static_cast<Direction_t>(entangled_block->rotation));
+
+                                        if(entangled_block->coast_horizontal == BLOCK_COAST_PLAYER){
+                                             if(rotations_between % 2 == 0){
+                                                  block->coast_horizontal = BLOCK_COAST_PLAYER;
+                                             }else{
+                                                  block->coast_vertical = BLOCK_COAST_PLAYER;
+                                             }
+                                        }
+
+                                        if(entangled_block->coast_vertical == BLOCK_COAST_PLAYER){
+                                             if(rotations_between % 2 == 0){
+                                                  block->coast_vertical = BLOCK_COAST_PLAYER;
+                                             }else{
+                                                  block->coast_horizontal = BLOCK_COAST_PLAYER;
                                              }
                                         }
                                    }else{
-                                        block->coast_horizontal = true;
-                                   }
-                                   break;
-                              case DIRECTION_UP:
-                              case DIRECTION_DOWN:
-                                   if(player->prev_pushing_block == block->entangle_index){
-                                        if(entangled_block_pushed_by_player){
-                                             block->coast_vertical = true;
-
-                                             if(player->push_time > BLOCK_PUSH_TIME &&
-                                                block->vertical_move.state == MOVE_STATE_IDLING){
-                                                  block_push(block, player_face, &world, false);
-                                             }
+                                        switch(player->face){
+                                        default:
+                                             break;
+                                        case DIRECTION_LEFT:
+                                        case DIRECTION_RIGHT:
+                                             block->coast_horizontal = BLOCK_COAST_PLAYER;
+                                             break;
+                                        case DIRECTION_UP:
+                                        case DIRECTION_DOWN:
+                                             block->coast_vertical = BLOCK_COAST_PLAYER;
+                                             break;
                                         }
-                                   }else{
-                                        block->coast_vertical = true;
                                    }
-                                   break;
                               }
                          }
                     }
@@ -1685,10 +1702,12 @@ int main(int argc, char** argv){
                     Vec_t pos_vec = pos_to_vec(block->pos);
 
                     update_motion_grid_aligned(&block->horizontal_move, motion_x_component(block),
-                                               block->coast_horizontal, dt, BLOCK_ACCEL, BLOCK_ACCEL_DISTANCE, pos_vec.x);
+                                               block->coast_horizontal != BLOCK_COAST_NONE, dt, BLOCK_ACCEL,
+                                               BLOCK_ACCEL_DISTANCE, pos_vec.x);
 
                     update_motion_grid_aligned(&block->vertical_move, motion_y_component(block),
-                                               block->coast_vertical, dt, BLOCK_ACCEL, BLOCK_ACCEL_DISTANCE, pos_vec.y);
+                                               block->coast_vertical != BLOCK_COAST_NONE, dt, BLOCK_ACCEL,
+                                               BLOCK_ACCEL_DISTANCE, pos_vec.y);
                }
 
                // unbounded collision: this should be exciting
@@ -1868,36 +1887,32 @@ int main(int argc, char** argv){
 
                          // TODO: I think we may want to keep track of more of these and resolve multiple directions as well?
                          // used to make sure the pushing is smooth on the entangled block as well
-                         Block_t* entangled_block_pushed = nullptr;
-                         Direction_t entangled_block_pushed_dir = DIRECTION_COUNT;
-                         Direction_t player_push_dir = DIRECTION_COUNT;
-                         Block_t* block_pushed = nullptr;
+                         S8 rotations_between = 0;
+                         Block_t* entangled_block = nullptr;
+                         if(block->entangle_index >= 0){
+                              entangled_block = world.blocks.elements + block->entangle_index;
+                              rotations_between = direction_rotations_between(static_cast<Direction_t>(block->rotation), static_cast<Direction_t>(entangled_block->rotation));
+                         }
 
+                         // TODO: we need to maintain a list of these blocks pushed i guess in the future
+                         Block_t* block_pushed = nullptr;
                          for(S16 p = 0; p < world.players.count; p++){
                               Player_t* player = world.players.elements + p;
                               if(player->prev_pushing_block >= 0){
                                    block_pushed = world.blocks.elements + player->prev_pushing_block;
-                                   if(block_pushed && block_pushed->entangle_index >= 0 && block_pushed->entangle_index < world.blocks.count &&
-                                      block->entangle_index >= 0){
-                                        entangled_block_pushed = world.blocks.elements + block_pushed->entangle_index;
-                                        auto* our_entangled_block = world.blocks.elements + block->entangle_index;
-                                        auto rotations_between = direction_rotations_between(static_cast<Direction_t>(entangled_block_pushed->rotation), static_cast<Direction_t>(our_entangled_block->rotation));
-                                        player_push_dir = player->pushing_block_dir;
-                                        entangled_block_pushed_dir = direction_rotate_clockwise(player_push_dir, rotations_between);
-                                   }
                               }
                          }
 
                          // this instance of last_block_pushed is to keep the pushing smooth and not have it stop at the tile boundaries
                          if(block != block_pushed && !block_on_ice(block->pos, block->pos_delta, &world.tilemap, world.interactive_qt)){
-                              if(block == entangled_block_pushed){
-                                   DirectionMask_t vel_mask = vec_direction_mask(block->vel);
-                                   auto* entangled_block = world.blocks.elements + block->entangle_index;
-                                   DirectionMask_t entangled_vel_mask = vec_direction_mask(entangled_block->vel);
-
-                                   // make sure the play successfully is pushing the entangled block
-                                   if(direction_in_mask(entangled_vel_mask, player_push_dir)){
-                                        switch(entangled_block_pushed_dir){
+                              if(block_pushed && block_pushed == entangled_block){
+                                   if(entangled_block->coast_horizontal == BLOCK_COAST_PLAYER){
+                                        auto vel_mask = vec_direction_mask(block->vel);
+                                        Vec_t entangled_vel {entangled_block->vel.x, 0};
+                                        Direction_t entangled_move_dir = vec_direction(entangled_vel);
+                                        Direction_t move_dir = direction_rotate_clockwise(entangled_move_dir, rotations_between);
+                                        // TODO: compress this code with the duplicate code below
+                                        switch(move_dir){
                                         default:
                                              break;
                                         case DIRECTION_LEFT:
@@ -1929,13 +1944,54 @@ int main(int argc, char** argv){
                                              }
                                              break;
                                         }
-                                   }else{
-                                        if(block->vel.x != 0) stop_on_boundary_x = true;
-                                        if(block->vel.y != 0) stop_on_boundary_y = true;
+                                   }
+
+                                   if(entangled_block->coast_vertical == BLOCK_COAST_PLAYER){
+                                        auto vel_mask = vec_direction_mask(block->vel);
+                                        Vec_t entangled_vel {0, entangled_block->vel.y};
+                                        Direction_t entangled_move_dir = vec_direction(entangled_vel);
+                                        Direction_t move_dir = direction_rotate_clockwise(entangled_move_dir, rotations_between);
+                                        switch(move_dir){
+                                        default:
+                                             break;
+                                        case DIRECTION_LEFT:
+                                             if(vel_mask & DIRECTION_MASK_RIGHT){
+                                                  stop_on_boundary_x = true;
+                                             }else if(vel_mask & DIRECTION_MASK_UP || vel_mask & DIRECTION_MASK_DOWN){
+                                                  stop_on_boundary_y = true;
+                                             }
+                                             break;
+                                        case DIRECTION_RIGHT:
+                                             if(vel_mask & DIRECTION_MASK_LEFT){
+                                                  stop_on_boundary_x = true;
+                                             }else if(vel_mask & DIRECTION_MASK_UP || vel_mask & DIRECTION_MASK_DOWN){
+                                                  stop_on_boundary_y = true;
+                                             }
+                                             break;
+                                        case DIRECTION_UP:
+                                             if(vel_mask & DIRECTION_MASK_DOWN){
+                                                  stop_on_boundary_y = true;
+                                             }else if(vel_mask & DIRECTION_MASK_LEFT || vel_mask & DIRECTION_MASK_RIGHT){
+                                                  stop_on_boundary_x = true;
+                                             }
+                                             break;
+                                        case DIRECTION_DOWN:
+                                             if(vel_mask & DIRECTION_MASK_UP){
+                                                  stop_on_boundary_y = true;
+                                             }else if(vel_mask & DIRECTION_MASK_LEFT || vel_mask & DIRECTION_MASK_RIGHT){
+                                                  stop_on_boundary_x = true;
+                                             }
+                                             break;
+                                        }
                                    }
                               }else{
-                                   if(block->vel.x != 0) stop_on_boundary_x = true;
-                                   if(block->vel.y != 0) stop_on_boundary_y = true;
+                                   if(block->vel.x != 0){
+                                        stop_on_boundary_x = true;
+                                   }
+
+                                   if(block->vel.y != 0){
+                                        stop_on_boundary_y = true;
+                                   }
                               }
                          }
 
@@ -2029,7 +2085,7 @@ int main(int argc, char** argv){
                                                   block = world.blocks.elements + old_block_index;
                                                   block->clone_start = portal->coord;
 
-                                                  Block_t* entangled_block = world.blocks.elements + new_block_index;
+                                                  entangled_block = world.blocks.elements + new_block_index;
 
                                                   *entangled_block = *block;
                                                   entangled_block->clone_id = clone_id;
@@ -2080,7 +2136,7 @@ int main(int argc, char** argv){
                                    assert(block->entangle_index >= 0);
 
                                    // great news everyone, the clone was a success
-                                   Block_t* entangled_block = world.blocks.elements + block->entangle_index;
+                                   entangled_block = world.blocks.elements + block->entangle_index;
 
                                    block->clone_id = 0;
                                    entangled_block->clone_id = 0;
@@ -2112,7 +2168,8 @@ int main(int argc, char** argv){
 
                          auto result = move_player_through_world(player->pos, player->vel, player->pos_delta, player->face,
                                                                  player->clone_instance, i, player->pushing_block,
-                                                                 player->pushing_block_dir, skip_coord, &world);
+                                                                 player->pushing_block_dir, player->pushing_block_rotation,
+                                                                 skip_coord, &world);
 
                          if(player->teleport){
                               Coord_t teleport_player_coord = pos_to_coord(player->teleport_pos + player->teleport_pos_delta);
@@ -2121,7 +2178,7 @@ int main(int argc, char** argv){
 
                               auto teleport_result = move_player_through_world(player->teleport_pos, player->vel, player->teleport_pos_delta, player->teleport_face,
                                                                                player->clone_instance, i, player->pushing_block,
-                                                                               player->pushing_block_dir, skip_coord, &world);
+                                                                               player->pushing_block_dir, player->pushing_block_rotation, skip_coord, &world);
 
                               if(teleport_result.collided){
                                    collided = true;
@@ -2131,6 +2188,7 @@ int main(int argc, char** argv){
                               player->teleport_pos_delta = teleport_result.pos_delta;
                               player->teleport_pushing_block = teleport_result.pushing_block;
                               player->teleport_pushing_block_dir = teleport_result.pushing_block_dir;
+                              player->teleport_pushing_block_rotation = teleport_result.pushing_block_rotation;
                          }
 
                          if(result.collided){
@@ -2141,6 +2199,7 @@ int main(int argc, char** argv){
                          player->pos_delta = result.pos_delta;
                          player->pushing_block = result.pushing_block;
                          player->pushing_block_dir = result.pushing_block_dir;
+                         player->pushing_block_rotation = result.pushing_block_rotation;
 
                          auto* portal = player_is_teleporting(player, world.interactive_qt);
 
@@ -2256,6 +2315,7 @@ int main(int argc, char** argv){
                          player->accel = vec_rotate_quadrants_clockwise(player->accel, player->teleport_rotation);
                          player->pushing_block = player->teleport_pushing_block;
                          player->pushing_block_dir = player->teleport_pushing_block_dir;
+                         player->pushing_block_rotation = player->teleport_pushing_block_rotation;
 
                          if(i != 0) player->rotation = (player->rotation + player->teleport_rotation) % DIRECTION_COUNT;
 

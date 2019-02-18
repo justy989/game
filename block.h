@@ -8,6 +8,12 @@
 #include "coord.h"
 #include "rect.h"
 
+enum BlockCoast_t{
+     BLOCK_COAST_NONE,
+     BLOCK_COAST_ICE,
+     BLOCK_COAST_PLAYER,
+};
+
 struct Block_t : public GridMotion_t{
      Position_t      pos;
      Element_t       element;
@@ -32,8 +38,8 @@ struct Block_t : public GridMotion_t{
      S8         teleport_rotation;
 
      bool successfully_moved = false;
-     bool coast_horizontal = false;
-     bool coast_vertical = false;
+     BlockCoast_t coast_horizontal = BLOCK_COAST_NONE;
+     BlockCoast_t coast_vertical = BLOCK_COAST_NONE;
 };
 
 S16 get_object_x(Block_t* block);

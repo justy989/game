@@ -298,12 +298,14 @@ void activate(World_t* world, Coord_t coord){
 MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, Vec_t player_vel, Vec_t player_pos_delta,
                                                          Direction_t player_face, S8 player_clone_instance, S16 player_index,
                                                          S16 player_pushing_block, Direction_t player_pushing_block_dir,
+                                                         S8 player_pushing_block_rotation,
                                                          Coord_t* skip_coord, World_t* world){
      MovePlayerThroughWorldResult_t result = {};
 
      result.pos_delta = player_pos_delta;
      result.pushing_block = player_pushing_block;
      result.pushing_block_dir = player_pushing_block_dir;
+     result.pushing_block_rotation = player_pushing_block_rotation;
 
      // figure out tiles that are close by
      Position_t final_player_pos = player_pos + result.pos_delta;
@@ -477,7 +479,7 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                               }
 
                               stop_block_vertically(collided_block, even_rotations, rotated_vel, rotated_accel, collision_portal_rotations);
-                         } else {
+                         }else{
                               result.pos_delta = result_pos_delta;
                          }
                          break;
@@ -490,10 +492,12 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                     if(result.pushing_block < 0){ // also check that the player is actually pushing against the block
                          result.pushing_block = i;
                          result.pushing_block_dir = rotated_player_face;
+                         result.pushing_block_rotation = collision_portal_rotations;
                     }else{
                          // stop the player from pushing 2 blocks at once
                          result.pushing_block = -1;
                          result.pushing_block_dir = DIRECTION_COUNT;
+                         result.pushing_block_rotation = 0;
                     }
                }
 
