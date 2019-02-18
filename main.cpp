@@ -1669,8 +1669,10 @@ int main(int argc, char** argv){
                                                      block->horizontal_move.state == MOVE_STATE_IDLING){
                                                        Vec_t block_horizontal_vel = {entangled_block->vel.x, 0};
                                                        auto block_move_dir = vec_direction(block_horizontal_vel);
-                                                       auto direction_to_push = direction_rotate_clockwise(block_move_dir, rotations_between);
-                                                       block_push(block, direction_to_push, &world, false);
+                                                       if(block_move_dir != DIRECTION_COUNT){
+                                                            auto direction_to_push = direction_rotate_clockwise(block_move_dir, rotations_between);
+                                                            block_push(block, direction_to_push, &world, false);
+                                                       }
                                                   }
                                              }else{
                                                   block->coast_vertical = BLOCK_COAST_PLAYER;
@@ -1679,8 +1681,10 @@ int main(int argc, char** argv){
                                                      block->vertical_move.state == MOVE_STATE_IDLING){
                                                        Vec_t block_horizontal_vel = {entangled_block->vel.x, 0};
                                                        auto block_move_dir = vec_direction(block_horizontal_vel);
-                                                       auto direction_to_push = direction_rotate_clockwise(block_move_dir, rotations_between);
-                                                       block_push(block, direction_to_push, &world, false);
+                                                       if(block_move_dir != DIRECTION_COUNT){
+                                                            auto direction_to_push = direction_rotate_clockwise(block_move_dir, rotations_between);
+                                                            block_push(block, direction_to_push, &world, false);
+                                                       }
                                                   }
                                              }
                                         }
@@ -1693,8 +1697,10 @@ int main(int argc, char** argv){
                                                      block->vertical_move.state == MOVE_STATE_IDLING){
                                                        Vec_t block_vertical_vel = {0, entangled_block->vel.y};
                                                        auto block_move_dir = vec_direction(block_vertical_vel);
-                                                       auto direction_to_push = direction_rotate_clockwise(block_move_dir, rotations_between);
-                                                       block_push(block, direction_to_push, &world, false);
+                                                       if(block_move_dir != DIRECTION_COUNT){
+                                                            auto direction_to_push = direction_rotate_clockwise(block_move_dir, rotations_between);
+                                                            block_push(block, direction_to_push, &world, false);
+                                                       }
                                                   }
                                              }else{
                                                   block->coast_horizontal = BLOCK_COAST_PLAYER;
@@ -1703,8 +1709,10 @@ int main(int argc, char** argv){
                                                      block->horizontal_move.state == MOVE_STATE_IDLING){
                                                        Vec_t block_vertical_vel = {0, entangled_block->vel.y};
                                                        auto block_move_dir = vec_direction(block_vertical_vel);
-                                                       auto direction_to_push = direction_rotate_clockwise(block_move_dir, rotations_between);
-                                                       block_push(block, direction_to_push, &world, false);
+                                                       if(block_move_dir != DIRECTION_COUNT){
+                                                            auto direction_to_push = direction_rotate_clockwise(block_move_dir, rotations_between);
+                                                            block_push(block, direction_to_push, &world, false);
+                                                       }
                                                   }
                                              }
                                         }
@@ -1714,12 +1722,23 @@ int main(int argc, char** argv){
                                              break;
                                         case DIRECTION_LEFT:
                                         case DIRECTION_RIGHT:
-                                             block->coast_horizontal = BLOCK_COAST_PLAYER;
+                                        {
+                                             // only coast the block is actually moving
+                                             Vec_t block_horizontal_vel = {block->vel.x, 0};
+                                             if(player->face == vec_direction(block_horizontal_vel)){
+                                                  block->coast_horizontal = BLOCK_COAST_PLAYER;
+                                             }
                                              break;
+                                        }
                                         case DIRECTION_UP:
                                         case DIRECTION_DOWN:
-                                             block->coast_vertical = BLOCK_COAST_PLAYER;
+                                        {
+                                             Vec_t block_vertical_vel = {0, block->vel.y};
+                                             if(player->face == vec_direction(block_vertical_vel)){
+                                                  block->coast_vertical = BLOCK_COAST_PLAYER;
+                                             }
                                              break;
+                                        }
                                         }
                                    }
                               }
@@ -2658,7 +2677,7 @@ int main(int argc, char** argv){
 
           glEnd();
 
-#if 1
+#if 0
           // light
           glBindTexture(GL_TEXTURE_2D, 0);
           glBegin(GL_QUADS);
