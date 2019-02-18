@@ -12,8 +12,7 @@ Entanglement:
 - arrow entanglement
 - arrow kills player
 
-Current 2 problems:
-- in this situation of entangled blocks [^][<], if you push the left block up 2 squares the right block should move after the left one gets out of the way
+Current problem:
 - when a block teleports itself to a grid center, it can trap the player in the right circumstances, not sure how to reproduce
 
 Big Features:
@@ -1664,16 +1663,49 @@ int main(int argc, char** argv){
                                         if(entangled_block->coast_horizontal == BLOCK_COAST_PLAYER){
                                              if(rotations_between % 2 == 0){
                                                   block->coast_horizontal = BLOCK_COAST_PLAYER;
+
+                                                  // TODO: compress this code with the 3 instances below it
+                                                  if(player->push_time > BLOCK_PUSH_TIME &&
+                                                     block->horizontal_move.state == MOVE_STATE_IDLING){
+                                                       Vec_t block_horizontal_vel = {entangled_block->vel.x, 0};
+                                                       auto block_move_dir = vec_direction(block_horizontal_vel);
+                                                       auto direction_to_push = direction_rotate_clockwise(block_move_dir, rotations_between);
+                                                       block_push(block, direction_to_push, &world, false);
+                                                  }
                                              }else{
                                                   block->coast_vertical = BLOCK_COAST_PLAYER;
+
+                                                  if(player->push_time > BLOCK_PUSH_TIME &&
+                                                     block->vertical_move.state == MOVE_STATE_IDLING){
+                                                       Vec_t block_horizontal_vel = {entangled_block->vel.x, 0};
+                                                       auto block_move_dir = vec_direction(block_horizontal_vel);
+                                                       auto direction_to_push = direction_rotate_clockwise(block_move_dir, rotations_between);
+                                                       block_push(block, direction_to_push, &world, false);
+                                                  }
                                              }
                                         }
 
                                         if(entangled_block->coast_vertical == BLOCK_COAST_PLAYER){
                                              if(rotations_between % 2 == 0){
                                                   block->coast_vertical = BLOCK_COAST_PLAYER;
+
+                                                  if(player->push_time > BLOCK_PUSH_TIME &&
+                                                     block->vertical_move.state == MOVE_STATE_IDLING){
+                                                       Vec_t block_vertical_vel = {0, entangled_block->vel.y};
+                                                       auto block_move_dir = vec_direction(block_vertical_vel);
+                                                       auto direction_to_push = direction_rotate_clockwise(block_move_dir, rotations_between);
+                                                       block_push(block, direction_to_push, &world, false);
+                                                  }
                                              }else{
                                                   block->coast_horizontal = BLOCK_COAST_PLAYER;
+
+                                                  if(player->push_time > BLOCK_PUSH_TIME &&
+                                                     block->horizontal_move.state == MOVE_STATE_IDLING){
+                                                       Vec_t block_vertical_vel = {0, entangled_block->vel.y};
+                                                       auto block_move_dir = vec_direction(block_vertical_vel);
+                                                       auto direction_to_push = direction_rotate_clockwise(block_move_dir, rotations_between);
+                                                       block_push(block, direction_to_push, &world, false);
+                                                  }
                                              }
                                         }
                                    }else{
