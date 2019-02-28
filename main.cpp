@@ -1957,12 +1957,26 @@ int main(int argc, char** argv){
                          // this instance of last_block_pushed is to keep the pushing smooth and not have it stop at the tile boundaries
                          if(block != block_pushed && !block_on_ice(block->pos, block->pos_delta, &world.tilemap, world.interactive_qt)){
                               if(block_pushed && block_pushed == entangled_block){
-                                   if(entangled_block->coast_horizontal == BLOCK_COAST_PLAYER){
+                                   auto coast_horizontal = entangled_block->coast_horizontal;
+                                   auto coast_vertical = entangled_block->coast_vertical;
+
+                                   // swap horizontal and vertical for odd rotations
+                                   if((rotations_between % 2) == 1){
+                                        coast_horizontal = entangled_block->coast_vertical;
+                                        coast_vertical = entangled_block->coast_horizontal;
+                                   }
+
+                                   if(coast_horizontal == BLOCK_COAST_PLAYER){
                                         auto vel_mask = vec_direction_mask(block->vel);
                                         Vec_t entangled_vel {entangled_block->vel.x, 0};
+
+                                        // swap x and y if rotations between is odd
+                                        if((rotations_between % 2) == 1) entangled_vel = Vec_t{0, entangled_block->vel.y};
+
                                         Direction_t entangled_move_dir = vec_direction(entangled_vel);
                                         Direction_t move_dir = direction_rotate_clockwise(entangled_move_dir, rotations_between);
-                                        // TODO: compress this code with the duplicate code below
+
+                                        // TODO: compress this code with the duplicate code below if it matches?
                                         switch(move_dir){
                                         default:
                                              break;
@@ -1995,13 +2009,22 @@ int main(int argc, char** argv){
                                              }
                                              break;
                                         }
+                                   }else{
+                                        if(block->vel.x != 0){
+                                             stop_on_boundary_x = true;
+                                        }
                                    }
 
-                                   if(entangled_block->coast_vertical == BLOCK_COAST_PLAYER){
+                                   if(coast_vertical == BLOCK_COAST_PLAYER){
                                         auto vel_mask = vec_direction_mask(block->vel);
                                         Vec_t entangled_vel {0, entangled_block->vel.y};
+
+                                        // swap x and y if rotations between is odd
+                                        if((rotations_between % 2) == 1) entangled_vel = Vec_t{entangled_block->vel.x, 0};
+
                                         Direction_t entangled_move_dir = vec_direction(entangled_vel);
                                         Direction_t move_dir = direction_rotate_clockwise(entangled_move_dir, rotations_between);
+
                                         switch(move_dir){
                                         default:
                                              break;
@@ -2034,15 +2057,12 @@ int main(int argc, char** argv){
                                              }
                                              break;
                                         }
+                                   }else{
+                                        if(block->vel.y != 0) stop_on_boundary_y = true;
                                    }
                               }else{
-                                   if(block->vel.x != 0){
-                                        stop_on_boundary_x = true;
-                                   }
-
-                                   if(block->vel.y != 0){
-                                        stop_on_boundary_y = true;
-                                   }
+                                   if(block->vel.x != 0) stop_on_boundary_x = true;
+                                   if(block->vel.y != 0) stop_on_boundary_y = true;
                               }
                          }
 
