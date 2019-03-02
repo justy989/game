@@ -2475,11 +2475,7 @@ int main(int argc, char** argv){
                                         player->push_time = 0.0f;
                                    }else if(block_to_push->entangle_index >= 0 && block_to_push->entangle_index < world.blocks.count){
                                         player->pushing_block_dir = push_block_dir;
-
-                                        Block_t* entangled_block = world.blocks.elements + block_to_push->entangle_index;
-                                        auto rotations_between = direction_rotations_between(static_cast<Direction_t>(entangled_block->rotation), static_cast<Direction_t>(block_to_push->rotation));
-                                        Direction_t rotated_dir = direction_rotate_clockwise(push_block_dir, rotations_between);
-                                        block_push(entangled_block, rotated_dir, &world, false);
+                                        push_entangled_block(block_to_push, &world, push_block_dir, false);
                                    }
 
                                    if(block_to_push->pos.z > 0) player->push_time = -0.5f; // TODO: wtf is this line?

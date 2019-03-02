@@ -866,7 +866,9 @@ bool block_push(Block_t* block, Direction_t direction, World_t* world, bool push
           if(collided_block == block){
                // pass, this happens in a corner portal!
           }else if(pushed_by_ice && block_on_ice(collided_block->pos, collided_block->pos_delta, &world->tilemap, world->interactive_qt)){
-               return block_push(collided_block, collided_block_push_dir, world, pushed_by_ice, instant_vel);
+               bool pushed = block_push(collided_block, collided_block_push_dir, world, pushed_by_ice, instant_vel);
+               if(pushed) push_entangled_block(collided_block, world, collided_block_push_dir, pushed_by_ice, instant_vel);
+               return pushed;
           }else if(block->entangle_index == (collided_block - world->blocks.elements)){
                // if block is entangled with the block it collides with, check if the entangled block can move, this is kind of duplicate work
                Block_t* entangled_collided_block = block_against_another_block(collided_block->pos, collided_block->pos_delta, direction, world->block_qt,
@@ -925,6 +927,8 @@ bool block_push(Block_t* block, Direction_t direction, World_t* world, bool push
                block->horizontal_move.sign = MOVE_SIGN_NEGATIVE;
                if(pushed_by_ice){
                     block->horizontal_move.state = MOVE_STATE_COASTING;
+                    // the velocity may be going the wrong way, but we can fix it here
+                    if(instant_vel > 0) instant_vel = -instant_vel;
                     block->vel.x = instant_vel;
                }else{
                     block->horizontal_move.state = MOVE_STATE_STARTING;
@@ -938,6 +942,7 @@ bool block_push(Block_t* block, Direction_t direction, World_t* world, bool push
                block->horizontal_move.sign = MOVE_SIGN_POSITIVE;
                if(pushed_by_ice){
                     block->horizontal_move.state = MOVE_STATE_COASTING;
+                    if(instant_vel < 0) instant_vel = -instant_vel;
                     block->vel.x = instant_vel;
                }else{
                     block->horizontal_move.state = MOVE_STATE_STARTING;
@@ -951,6 +956,7 @@ bool block_push(Block_t* block, Direction_t direction, World_t* world, bool push
                block->vertical_move.sign = MOVE_SIGN_NEGATIVE;
                if(pushed_by_ice){
                     block->vertical_move.state = MOVE_STATE_COASTING;
+                    if(instant_vel > 0) instant_vel = -instant_vel;
                     block->vel.y = instant_vel;
                }else{
                     block->vertical_move.state = MOVE_STATE_STARTING;
@@ -964,6 +970,7 @@ bool block_push(Block_t* block, Direction_t direction, World_t* world, bool push
                block->vertical_move.sign = MOVE_SIGN_POSITIVE;
                if(pushed_by_ice){
                     block->vertical_move.state = MOVE_STATE_COASTING;
+                    if(instant_vel < 0) instant_vel = -instant_vel;
                     block->vel.y = instant_vel;
                }else{
                     block->vertical_move.state = MOVE_STATE_STARTING;

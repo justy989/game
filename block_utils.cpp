@@ -607,7 +607,9 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
 
                if(push){
                     F32 instant_vel = direction_is_horizontal(push_dir) ? save_vel.x : save_vel.y;
-                    block_push(block_inside_result.block, push_dir, world, true, instant_vel);
+                    if(block_push(block_inside_result.block, push_dir, world, true, instant_vel)){
+                         push_entangled_block(block_inside_result.block, world, push_dir, true, instant_vel);
+                    }
                }
           }
 
@@ -677,4 +679,11 @@ Interactive_t* block_is_teleporting(Block_t* block, QuadTreeNode_t<Interactive_t
      }
 
      return nullptr;
+}
+
+void push_entangled_block(Block_t* block, World_t* world, Direction_t push_dir, bool pushed_by_ice, F32 instant_vel){
+     Block_t* entangled_block = world->blocks.elements + block->entangle_index;
+     auto rotations_between = direction_rotations_between(static_cast<Direction_t>(entangled_block->rotation), static_cast<Direction_t>(block->rotation));
+     Direction_t rotated_dir = direction_rotate_clockwise(push_dir, rotations_between);
+     block_push(entangled_block, rotated_dir, world, pushed_by_ice, instant_vel);
 }
