@@ -29,7 +29,7 @@ struct Player_t : public Motion_t {
 
      F32         push_time = 0.0f;
      S8          walk_frame = 0;
-     S8          walk_frame_delta = 0;
+     S8          walk_frame_delta = 1;
      F32         walk_frame_time = 0.0;
 
      bool        has_bow = false;

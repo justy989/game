@@ -1828,10 +1828,13 @@ int main(int argc, char** argv){
                                    block->successfully_moved = false;
 
                                    // TODO: I don't love indexing the blocks without checking the index is valid first
+                                   auto* entangled_block = world.blocks.elements + block->entangle_index;
+
                                    if(result.collided_block_index >= 0 && result.collided_block_index == block->entangle_index &&
-                                      (block->rotation + world.blocks.elements[block->entangle_index].rotation) % 2 == 1){
+                                      (block->rotation + entangled_block->rotation) % 2 == 1 &&
+                                      !(block_on_ice(block->pos, block->pos_delta, &world.tilemap, world.interactive_qt) &&
+                                        block_on_ice(entangled_block->pos, entangled_block->pos_delta, &world.tilemap, world.interactive_qt))){
                                         // TODO: switch to using block_inside_another_block() because that is actually what we care about
-                                        auto* entangled_block = world.blocks.elements + block->entangle_index;
                                         auto entangle_result = check_block_collision_with_other_blocks(entangled_block->pos,
                                                                                                        entangled_block->pos_delta,
                                                                                                        entangled_block->vel,
