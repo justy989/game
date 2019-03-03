@@ -609,6 +609,27 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                     F32 instant_vel = direction_is_horizontal(push_dir) ? save_vel.x : save_vel.y;
                     if(block_push(block_inside_result.block, push_dir, world, true, instant_vel)){
                          push_entangled_block(block_inside_result.block, world, push_dir, true, instant_vel);
+                         if(block_inside_result.block->entangle_index == block_index){
+                              Block_t* block = world->blocks.elements + block_index;
+                              auto rotations_between = direction_rotations_between(static_cast<Direction_t>(block_inside_result.block->rotation), static_cast<Direction_t>(block->rotation));
+                              if(rotations_between % 2 == 0){
+                                   if(direction_is_horizontal(push_dir)){
+                                        result.vel.x = block->vel.x;
+                                        result.horizontal_move = block->horizontal_move;
+                                   }else{
+                                        result.vel.y = block->vel.y;
+                                        result.vertical_move = block->vertical_move;
+                                   }
+                              }else{
+                                   if(direction_is_horizontal(push_dir)){
+                                        result.vel.y = block->vel.y;
+                                        result.vertical_move = block->vertical_move;
+                                   }else{
+                                        result.vel.x = block->vel.x;
+                                        result.horizontal_move = block->horizontal_move;
+                                   }
+                              }
+                         }
                     }
                }
           }
