@@ -1602,6 +1602,10 @@ int main(int argc, char** argv){
                                    block->prev_push_mask = direction_mask_rotate_clockwise(block->prev_push_mask);
                               }
                          }
+
+                         block->teleport_horizontal_move = block->horizontal_move;
+                         block->teleport_vertical_move = block->vertical_move;
+
                     }else{
                          block->teleport = false;
                     }
