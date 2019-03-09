@@ -1875,29 +1875,29 @@ int main(int argc, char** argv){
                                                   auto entangle_move_mask = vec_direction_mask(entangled_block->pos_delta);
 
                                                   Direction_t move_dir_to_stop = DIRECTION_COUNT;
-                                                  Direction_t entangle_move_dir_to_stop = DIRECTION_COUNT;
+                                                  Direction_t entangled_move_dir_to_stop = DIRECTION_COUNT;
 
                                                   for(S8 t = 0; t < (S8)(sizeof(table) / sizeof(table[0])); t++){
                                                        if(table[t].mask == delta_mask){
                                                             if(direction_in_mask(move_mask, table[t].move_a_1) &&
                                                                direction_in_mask(entangle_move_mask, table[t].move_b_1)){
                                                                  move_dir_to_stop = table[t].move_a_1;
-                                                                 entangle_move_dir_to_stop = table[t].move_b_1;
+                                                                 entangled_move_dir_to_stop = table[t].move_b_1;
                                                                  break;
                                                             }else if(direction_in_mask(move_mask, table[t].move_b_1) &&
                                                                      direction_in_mask(entangle_move_mask, table[t].move_a_1)){
                                                                  move_dir_to_stop = table[t].move_b_1;
-                                                                 entangle_move_dir_to_stop = table[t].move_a_1;
+                                                                 entangled_move_dir_to_stop = table[t].move_a_1;
                                                                  break;
                                                             }else if(direction_in_mask(move_mask, table[t].move_a_2) &&
                                                                      direction_in_mask(entangle_move_mask, table[t].move_b_2)){
                                                                  move_dir_to_stop = table[t].move_a_2;
-                                                                 entangle_move_dir_to_stop = table[t].move_b_2;
+                                                                 entangled_move_dir_to_stop = table[t].move_b_2;
                                                                  break;
                                                             }else if(direction_in_mask(move_mask, table[t].move_b_2) &&
                                                                      direction_in_mask(entangle_move_mask, table[t].move_a_2)){
                                                                  move_dir_to_stop = table[t].move_b_2;
-                                                                 entangle_move_dir_to_stop = table[t].move_a_2;
+                                                                 entangled_move_dir_to_stop = table[t].move_a_2;
                                                                  break;
                                                             }
                                                        }
@@ -1906,13 +1906,76 @@ int main(int argc, char** argv){
                                                   if(move_dir_to_stop == DIRECTION_COUNT){
                                                        copy_block_collision_results(block, &result);
                                                   }else{
-                                                       stop_block_colliding_with_entangled(block, move_dir_to_stop, &result);
-                                                       stop_block_colliding_with_entangled(entangled_block, entangle_move_dir_to_stop, &entangle_result);
+                                                       if(block_on_ice(block->pos, block->pos_delta, &world.tilemap, world.interactive_qt) &&
+                                                          block_on_ice(entangled_block->pos, entangled_block->pos_delta, &world.tilemap, world.interactive_qt)){
 
-                                                       for(S16 p = 0; p < world.players.count; p++){
-                                                            auto* player = world.players.elements + p;
-                                                            if(player->prev_pushing_block == i || player->prev_pushing_block == block->entangle_index){
-                                                                 player->push_time = 0.0f;
+                                                            F32 block_instant_vel = 0;
+                                                            F32 entangled_block_instant_vel = 0;
+
+                                                            switch(move_dir_to_stop){
+                                                            default:
+                                                                 break;
+                                                            case DIRECTION_LEFT:
+                                                            case DIRECTION_RIGHT:
+                                                                 block_instant_vel = block->vel.x;
+                                                                 break;
+                                                            case DIRECTION_UP:
+                                                            case DIRECTION_DOWN:
+                                                                 block_instant_vel = block->vel.y;
+                                                                 break;
+                                                            }
+
+                                                            switch(entangled_move_dir_to_stop){
+                                                            default:
+                                                                 break;
+                                                            case DIRECTION_LEFT:
+                                                            case DIRECTION_RIGHT:
+                                                                 entangled_block_instant_vel = entangled_block->vel.x;
+                                                                 break;
+                                                            case DIRECTION_UP:
+                                                            case DIRECTION_DOWN:
+                                                                 entangled_block_instant_vel = entangled_block->vel.y;
+                                                                 break;
+                                                            }
+
+                                                            if(block_push(block, entangled_move_dir_to_stop, &world, true, entangled_block_instant_vel)){
+                                                                 switch(entangled_move_dir_to_stop){
+                                                                 default:
+                                                                      break;
+                                                                 case DIRECTION_LEFT:
+                                                                 case DIRECTION_RIGHT:
+                                                                      block->pos_delta.x = entangled_block_instant_vel * dt;
+                                                                      break;
+                                                                 case DIRECTION_UP:
+                                                                 case DIRECTION_DOWN:
+                                                                      block->pos_delta.y = entangled_block_instant_vel * dt;
+                                                                      break;
+                                                                 }
+                                                            }
+                                                            if(block_push(entangled_block, move_dir_to_stop, &world, true, block_instant_vel)){
+                                                                 switch(move_dir_to_stop){
+                                                                 default:
+                                                                      break;
+                                                                 case DIRECTION_LEFT:
+                                                                 case DIRECTION_RIGHT:
+                                                                      entangled_block->pos_delta.x = block_instant_vel * dt;
+                                                                      break;
+                                                                 case DIRECTION_UP:
+                                                                 case DIRECTION_DOWN:
+                                                                      entangled_block->pos_delta.y = block_instant_vel * dt;
+                                                                      break;
+                                                                 }
+                                                            }
+                                                       }else{
+                                                            stop_block_colliding_with_entangled(block, move_dir_to_stop, &result);
+                                                            stop_block_colliding_with_entangled(entangled_block, entangled_move_dir_to_stop, &entangle_result);
+
+                                                            // TODO: compress this code, it's definitely used elsewhere
+                                                            for(S16 p = 0; p < world.players.count; p++){
+                                                                 auto* player = world.players.elements + p;
+                                                                 if(player->prev_pushing_block == i || player->prev_pushing_block == block->entangle_index){
+                                                                      player->push_time = 0.0f;
+                                                                 }
                                                             }
                                                        }
                                                   }

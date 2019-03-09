@@ -472,6 +472,18 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
               block_inside_index = get_block_index(world, block_inside_result.block);
           }
 
+          if(result.collided_block_index == block_entangle_index){
+               auto* block = world->blocks.elements + block_index;
+               auto* entangled_block = world->blocks.elements + block_entangle_index;
+               auto pos_diff = pos_to_vec(block->pos - entangled_block->pos);
+
+               // if positions are diagonal to each other and the rotation between them is odd, check if we are moving into each other
+               if(fabs(pos_diff.x) == fabs(pos_diff.y) && (block->rotation + entangled_block->rotation) % 2 == 1){
+                    // just gtfo if this happens, we handle this case outside this function
+                    break;
+               }
+          }
+
           if(block_inside_index != block_index){
                switch(quadrant){
                default:
@@ -568,6 +580,12 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                          resolve_result.accel = resolve_result.accel;
                     }
                }else{
+                    if(!direction_in_mask(vec_direction_mask(block_pos_delta), quadrant)){
+                         // although we collided, the other block is colliding into us, so let that block resolve this mess
+                         result.collided = false;
+                         break;
+                    }
+
                     push_dir = direction_rotate_clockwise(quadrant, block_inside_result.portal_rotations);
 
                     // blocks heading towards each other will stop
@@ -615,18 +633,6 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                          }
                          break;
                     }
-
-                    if(result.collided_block_index == block_entangle_index){
-                         auto* block = world->blocks.elements + block_index;
-                         auto* entangled_block = world->blocks.elements + block_entangle_index;
-                         auto pos_diff = pos_to_vec(block->pos - entangled_block->pos);
-
-                         // if positions are diagonal to each other and the rotation between them is odd, check if we are moving into each other
-                         if(fabs(pos_diff.x) == fabs(pos_diff.y) && (block->rotation + entangled_block->rotation) % 2 == 1){
-                              push = false;
-                         }
-                    }
-
                }
 
                if(push){
