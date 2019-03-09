@@ -217,10 +217,9 @@ Block_t* block_inside_block_list(Position_t block_to_check_pos, Vec_t block_to_c
                                  S16 block_to_check_index, S16 block_to_check_entangle_index, bool block_to_check_cloning,
                                  Block_t** blocks, S16 block_count, ObjectArray_t<Block_t>* blocks_array,
                                  Position_t* collided_with, Pixel_t* portal_offsets){
-     auto check_pos = block_to_check_pos + block_to_check_pos_delta;
-     Rect_t rect = {check_pos.pixel.x, check_pos.pixel.y,
-                    (S16)(check_pos.pixel.x + BLOCK_SOLID_SIZE_IN_PIXELS),
-                    (S16)(check_pos.pixel.y + BLOCK_SOLID_SIZE_IN_PIXELS)};
+     auto block_pos = block_to_check_pos + block_to_check_pos_delta;
+
+     Quad_t quad = {0, 0, BLOCK_SOLID_SIZE, BLOCK_SOLID_SIZE};
 
      Block_t* entangled_block = nullptr;
      if(block_to_check_entangle_index >= 0){
@@ -234,14 +233,13 @@ Block_t* block_inside_block_list(Position_t block_to_check_pos, Vec_t block_to_c
           if(block == entangled_block && block_to_check_cloning) continue;
           if(block_to_check_index == (block - blocks_array->elements)) continue;
 
-          auto block_pos = block->pos + block->pos_delta;
+          auto check_block_pos = block->pos + block->pos_delta;
+          auto check_pos = check_block_pos - block_pos;
+          auto check_vec = pos_to_vec(check_pos);
 
-          Pixel_t pixel_to_check = block_pos.pixel + portal_offsets[i];
+          Quad_t quad_to_check = {check_vec.x, check_vec.y, check_vec.x + BLOCK_SOLID_SIZE, check_vec.y + BLOCK_SOLID_SIZE};
 
-          if(pixel_in_rect(pixel_to_check, rect) ||
-             pixel_in_rect(block_top_left_pixel(pixel_to_check), rect) ||
-             pixel_in_rect(block_top_right_pixel(pixel_to_check), rect) ||
-             pixel_in_rect(block_bottom_right_pixel(pixel_to_check), rect)){
+          if(quad_in_quad(&quad, &quad_to_check)){
                *collided_with = block_get_center(block);
                collided_with->pixel += portal_offsets[i];
                g_collided_with_pixel = collided_with->pixel;
@@ -569,36 +567,49 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                          resolve_result.accel = resolve_result.accel;
                     }
                }else{
+
                     push_dir = direction_rotate_clockwise(quadrant, block_inside_result.portal_rotations);
 
                     switch(push_dir){
                     default:
                          break;
                     case DIRECTION_LEFT:
-                         if(block_inside_result.block->accel.x > 0){
+                         if(block_inside_result.block->vel.x > 0){
+                              block_inside_result.block->stop_on_pixel_x = closest_pixel(block_inside_result.block->pos.pixel.x, block_inside_result.block->pos.decimal.x);
                               block_inside_result.block->accel.x = 0.0f;
                               block_inside_result.block->vel.x = 0.0f;
+                              block_inside_result.block->horizontal_move.state = MOVE_STATE_IDLING;
+                              block_inside_result.block->horizontal_move.sign = MOVE_SIGN_ZERO;
                               push = false;
                          }
                          break;
                     case DIRECTION_RIGHT:
-                         if(block_inside_result.block->accel.x < 0){
+                         if(block_inside_result.block->vel.x < 0){
+                              block_inside_result.block->stop_on_pixel_x = closest_pixel(block_inside_result.block->pos.pixel.x, block_inside_result.block->pos.decimal.x);
                               block_inside_result.block->accel.x = 0.0f;
                               block_inside_result.block->vel.x = 0.0f;
+                              block_inside_result.block->horizontal_move.state = MOVE_STATE_IDLING;
+                              block_inside_result.block->horizontal_move.sign = MOVE_SIGN_ZERO;
                               push = false;
                          }
                          break;
                     case DIRECTION_DOWN:
-                         if(block_inside_result.block->accel.y > 0){
+                         if(block_inside_result.block->vel.y > 0){
+                              block_inside_result.block->stop_on_pixel_y = closest_pixel(block_inside_result.block->pos.pixel.y, block_inside_result.block->pos.decimal.y);
                               block_inside_result.block->accel.y = 0.0f;
                               block_inside_result.block->vel.y = 0.0f;
+                              block_inside_result.block->vertical_move.state = MOVE_STATE_IDLING;
+                              block_inside_result.block->vertical_move.sign = MOVE_SIGN_ZERO;
                               push = false;
                          }
                          break;
                     case DIRECTION_UP:
-                         if(block_inside_result.block->accel.y < 0){
+                         if(block_inside_result.block->vel.y < 0){
+                              block_inside_result.block->stop_on_pixel_y = closest_pixel(block_inside_result.block->pos.pixel.y, block_inside_result.block->pos.decimal.y);
                               block_inside_result.block->accel.y = 0.0f;
                               block_inside_result.block->vel.y = 0.0f;
+                              block_inside_result.block->vertical_move.state = MOVE_STATE_IDLING;
+                              block_inside_result.block->vertical_move.sign = MOVE_SIGN_ZERO;
                               push = false;
                          }
                          break;

@@ -177,9 +177,6 @@ void stop_block_colliding_with_entangled(Block_t* block, Direction_t move_dir_to
           block->accel.x = 0;
           block->accel.y = result->accel.y;
 
-          block->pos.pixel.x = closest_grid_center_pixel(TILE_SIZE_IN_PIXELS, block->pos.pixel.x);
-          block->pos.decimal.x = 0;
-
           block->stop_on_pixel_x = 0;
 
           reset_move(&block->horizontal_move);
@@ -193,9 +190,6 @@ void stop_block_colliding_with_entangled(Block_t* block, Direction_t move_dir_to
           block->vel.y = 0;
           block->accel.x = result->accel.x;
           block->accel.y = 0;
-
-          block->pos.pixel.y = closest_grid_center_pixel(TILE_SIZE_IN_PIXELS, block->pos.pixel.y);
-          block->pos.decimal.y = 0;
 
           block->stop_on_pixel_y = 0;
 
@@ -257,6 +251,7 @@ int main(int argc, char** argv){
      bool show_suite = false;
      S16 map_number = 0;
      S16 first_map_number = 0;
+     S16 first_frame = 0;
 
      Demo_t demo {};
 
@@ -287,6 +282,10 @@ int main(int argc, char** argv){
                if(next >= argc) continue;
                map_number = (S16)(atoi(argv[next]));
                first_map_number = map_number;
+          }else if(strcmp(argv[i], "-frame") == 0){
+               int next = i + 1;
+               if(next >= argc) continue;
+               first_frame = (S16)(atoi(argv[next]));
           }else if(strcmp(argv[i], "-speed") == 0){
                int next = i + 1;
                if(next >= argc) continue;
@@ -299,8 +298,9 @@ int main(int argc, char** argv){
                printf("  -test                   validate the map state is correct after playing a demo\n");
                printf("  -suite                  run map/demo combos in succession validating map state after each headless\n");
                printf("  -show                   use in combination with -suite to run with a head\n");
-               printf("  -map    <number>        load a map by number\n");
-               printf("  -speed  <value>         when replaying a demo, specify how fast/slow to replay where 1.0 is realtime\n");
+               printf("  -map    <integer>        load a map by number\n");
+               printf("  -speed  <decimal>        when replaying a demo, specify how fast/slow to replay where 1.0 is realtime\n");
+               printf("  -frame  <integer>        which frame to play to automatically before drawing\n");
                printf("  -h this help.\n");
                return 0;
           }
@@ -427,6 +427,11 @@ int main(int argc, char** argv){
 
           if(demo.mode == DEMO_MODE_PLAY){
                cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
+          }
+
+          if(first_frame > 0 && first_frame < demo.last_frame){
+               demo.seek_frame = first_frame;
+               demo.paused = true;
           }
      }else{
           setup_default_room(&world);
@@ -1819,6 +1824,9 @@ int main(int argc, char** argv){
 
                                         block->teleport_stop_on_pixel_x = teleport_result.stop_on_pixel_x;
                                         block->teleport_stop_on_pixel_y = teleport_result.stop_on_pixel_y;
+
+                                        block->teleport_horizontal_move = teleport_result.horizontal_move;
+                                        block->teleport_vertical_move = teleport_result.vertical_move;
                                    }
                               }
 
@@ -1827,83 +1835,88 @@ int main(int argc, char** argv){
 
                                    block->successfully_moved = false;
 
-                                   // TODO: I don't love indexing the blocks without checking the index is valid first
-                                   auto* entangled_block = world.blocks.elements + block->entangle_index;
+                                   if(result.collided_block_index >= 0 && result.collided_block_index == block->entangle_index){
+                                        // TODO: I don't love indexing the blocks without checking the index is valid first
+                                        auto* entangled_block = world.blocks.elements + block->entangle_index;
+                                        // auto block_pos = block->pos + block->pos_delta;
+                                        // auto entangled_block_pos = entangled_block->pos + entangled_block->pos_delta;
+                                        auto pos_diff = pos_to_vec(block->pos - entangled_block->pos);
 
-                                   if(result.collided_block_index >= 0 && result.collided_block_index == block->entangle_index &&
-                                      (block->rotation + entangled_block->rotation) % 2 == 1 &&
-                                      !(block_on_ice(block->pos, block->pos_delta, &world.tilemap, world.interactive_qt) &&
-                                        block_on_ice(entangled_block->pos, entangled_block->pos_delta, &world.tilemap, world.interactive_qt))){
-                                        // TODO: switch to using block_inside_another_block() because that is actually what we care about
-                                        auto entangle_result = check_block_collision_with_other_blocks(entangled_block->pos,
-                                                                                                       entangled_block->pos_delta,
-                                                                                                       entangled_block->vel,
-                                                                                                       entangled_block->accel,
-                                                                                                       entangled_block->stop_on_pixel_x,
-                                                                                                       entangled_block->stop_on_pixel_y,
-                                                                                                       entangled_block->horizontal_move,
-                                                                                                       entangled_block->vertical_move,
-                                                                                                       block->entangle_index,
-                                                                                                       entangled_block->entangle_index,
-                                                                                                       entangled_block->clone_start.x > 0,
-                                                                                                       &world);
-                                        if(entangle_result.collided){
-                                             // stop the blocks moving toward each other
-                                             static const VecMaskCollisionEntry_t table[] = {
-                                                  {static_cast<S8>(DIRECTION_MASK_RIGHT | DIRECTION_MASK_UP), DIRECTION_LEFT, DIRECTION_UP, DIRECTION_DOWN, DIRECTION_RIGHT},
-                                                  {static_cast<S8>(DIRECTION_MASK_RIGHT | DIRECTION_MASK_DOWN), DIRECTION_RIGHT, DIRECTION_DOWN, DIRECTION_UP, DIRECTION_LEFT},
-                                                  {static_cast<S8>(DIRECTION_MASK_LEFT  | DIRECTION_MASK_UP), DIRECTION_LEFT, DIRECTION_DOWN, DIRECTION_UP, DIRECTION_RIGHT},
-                                                  {static_cast<S8>(DIRECTION_MASK_LEFT  | DIRECTION_MASK_DOWN), DIRECTION_LEFT, DIRECTION_UP, DIRECTION_DOWN, DIRECTION_RIGHT},
-                                                  // TODO: single direction mask things
-                                             };
+                                        // if positions are diagonal to each other and the rotation between them is odd, check if we are moving into each other
+                                        if(fabs(pos_diff.x) == fabs(pos_diff.y) && (block->rotation + entangled_block->rotation) % 2 == 1){
+                                             // TODO: switch to using block_inside_another_block() because that is actually what we care about
+                                             auto entangle_result = check_block_collision_with_other_blocks(entangled_block->pos,
+                                                                                                            entangled_block->pos_delta,
+                                                                                                            entangled_block->vel,
+                                                                                                            entangled_block->accel,
+                                                                                                            entangled_block->stop_on_pixel_x,
+                                                                                                            entangled_block->stop_on_pixel_y,
+                                                                                                            entangled_block->horizontal_move,
+                                                                                                            entangled_block->vertical_move,
+                                                                                                            block->entangle_index,
+                                                                                                            entangled_block->entangle_index,
+                                                                                                            entangled_block->clone_start.x > 0,
+                                                                                                            &world);
+                                             if(entangle_result.collided){
+                                                  // stop the blocks moving toward each other
+                                                  static const VecMaskCollisionEntry_t table[] = {
+                                                       {static_cast<S8>(DIRECTION_MASK_RIGHT | DIRECTION_MASK_UP), DIRECTION_LEFT, DIRECTION_UP, DIRECTION_DOWN, DIRECTION_RIGHT},
+                                                       {static_cast<S8>(DIRECTION_MASK_RIGHT | DIRECTION_MASK_DOWN), DIRECTION_RIGHT, DIRECTION_DOWN, DIRECTION_UP, DIRECTION_LEFT},
+                                                       {static_cast<S8>(DIRECTION_MASK_LEFT  | DIRECTION_MASK_UP), DIRECTION_LEFT, DIRECTION_DOWN, DIRECTION_UP, DIRECTION_RIGHT},
+                                                       {static_cast<S8>(DIRECTION_MASK_LEFT  | DIRECTION_MASK_DOWN), DIRECTION_LEFT, DIRECTION_UP, DIRECTION_DOWN, DIRECTION_RIGHT},
+                                                       // TODO: single direction mask things
+                                                  };
 
-                                             auto delta_vec = pos_to_vec(block->pos - entangled_block->pos);
-                                             auto delta_mask = vec_direction_mask(delta_vec);
-                                             auto move_mask = vec_direction_mask(block->vel);
-                                             auto entangle_move_mask = vec_direction_mask(entangled_block->vel);
+                                                  auto delta_vec = pos_to_vec(block->pos - entangled_block->pos);
+                                                  auto delta_mask = vec_direction_mask(delta_vec);
+                                                  auto move_mask = vec_direction_mask(block->pos_delta);
+                                                  auto entangle_move_mask = vec_direction_mask(entangled_block->pos_delta);
 
-                                             Direction_t move_dir_to_stop = DIRECTION_COUNT;
-                                             Direction_t entangle_move_dir_to_stop = DIRECTION_COUNT;
+                                                  Direction_t move_dir_to_stop = DIRECTION_COUNT;
+                                                  Direction_t entangle_move_dir_to_stop = DIRECTION_COUNT;
 
-                                             for(S8 t = 0; t < (S8)(sizeof(table) / sizeof(table[0])); t++){
-                                                  if(table[t].mask == delta_mask){
-                                                       if(direction_in_mask(move_mask, table[t].move_a_1) &&
-                                                          direction_in_mask(entangle_move_mask, table[t].move_b_1)){
-                                                            move_dir_to_stop = table[t].move_a_1;
-                                                            entangle_move_dir_to_stop = table[t].move_b_1;
-                                                            break;
-                                                       }else if(direction_in_mask(move_mask, table[t].move_b_1) &&
-                                                                direction_in_mask(entangle_move_mask, table[t].move_a_1)){
-                                                            move_dir_to_stop = table[t].move_b_1;
-                                                            entangle_move_dir_to_stop = table[t].move_a_1;
-                                                            break;
-                                                       }else if(direction_in_mask(move_mask, table[t].move_a_2) &&
-                                                                direction_in_mask(entangle_move_mask, table[t].move_b_2)){
-                                                            move_dir_to_stop = table[t].move_a_2;
-                                                            entangle_move_dir_to_stop = table[t].move_b_2;
-                                                            break;
-                                                       }else if(direction_in_mask(move_mask, table[t].move_b_2) &&
-                                                                direction_in_mask(entangle_move_mask, table[t].move_a_2)){
-                                                            move_dir_to_stop = table[t].move_b_2;
-                                                            entangle_move_dir_to_stop = table[t].move_a_2;
-                                                            break;
+                                                  for(S8 t = 0; t < (S8)(sizeof(table) / sizeof(table[0])); t++){
+                                                       if(table[t].mask == delta_mask){
+                                                            if(direction_in_mask(move_mask, table[t].move_a_1) &&
+                                                               direction_in_mask(entangle_move_mask, table[t].move_b_1)){
+                                                                 move_dir_to_stop = table[t].move_a_1;
+                                                                 entangle_move_dir_to_stop = table[t].move_b_1;
+                                                                 break;
+                                                            }else if(direction_in_mask(move_mask, table[t].move_b_1) &&
+                                                                     direction_in_mask(entangle_move_mask, table[t].move_a_1)){
+                                                                 move_dir_to_stop = table[t].move_b_1;
+                                                                 entangle_move_dir_to_stop = table[t].move_a_1;
+                                                                 break;
+                                                            }else if(direction_in_mask(move_mask, table[t].move_a_2) &&
+                                                                     direction_in_mask(entangle_move_mask, table[t].move_b_2)){
+                                                                 move_dir_to_stop = table[t].move_a_2;
+                                                                 entangle_move_dir_to_stop = table[t].move_b_2;
+                                                                 break;
+                                                            }else if(direction_in_mask(move_mask, table[t].move_b_2) &&
+                                                                     direction_in_mask(entangle_move_mask, table[t].move_a_2)){
+                                                                 move_dir_to_stop = table[t].move_b_2;
+                                                                 entangle_move_dir_to_stop = table[t].move_a_2;
+                                                                 break;
+                                                            }
+                                                       }
+                                                  }
+
+                                                  if(move_dir_to_stop == DIRECTION_COUNT){
+                                                       copy_block_collision_results(block, &result);
+                                                  }else{
+                                                       stop_block_colliding_with_entangled(block, move_dir_to_stop, &result);
+                                                       stop_block_colliding_with_entangled(entangled_block, entangle_move_dir_to_stop, &entangle_result);
+
+                                                       for(S16 p = 0; p < world.players.count; p++){
+                                                            auto* player = world.players.elements + p;
+                                                            if(player->prev_pushing_block == i || player->prev_pushing_block == block->entangle_index){
+                                                                 player->push_time = 0.0f;
+                                                            }
                                                        }
                                                   }
                                              }
-
-                                             if(move_dir_to_stop == DIRECTION_COUNT){
-                                                  copy_block_collision_results(block, &result);
-                                             }else{
-                                                  stop_block_colliding_with_entangled(block, move_dir_to_stop, &result);
-                                                  stop_block_colliding_with_entangled(entangled_block, entangle_move_dir_to_stop, &entangle_result);
-
-                                                  for(S16 p = 0; p < world.players.count; p++){
-                                                       auto* player = world.players.elements + p;
-                                                       if(player->prev_pushing_block == i || player->prev_pushing_block == block->entangle_index){
-                                                            player->push_time = 0.0f;
-                                                       }
-                                                  }
-                                             }
+                                        }else{
+                                             copy_block_collision_results(block, &result);
                                         }
                                    }else{
                                         copy_block_collision_results(block, &result);
@@ -2423,6 +2436,8 @@ int main(int argc, char** argv){
                          block->stop_on_pixel_x = block->teleport_stop_on_pixel_x;
                          block->stop_on_pixel_y = block->teleport_stop_on_pixel_y;
                          block->rotation = (block->rotation + block->teleport_rotation) % static_cast<U8>(DIRECTION_COUNT);
+                         block->horizontal_move = block->teleport_horizontal_move;
+                         block->vertical_move = block->teleport_vertical_move;
                     }else{
                          final_pos = block->pos + block->pos_delta;
                     }
