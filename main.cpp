@@ -1842,8 +1842,6 @@ int main(int argc, char** argv){
                                    if(result.collided_block_index >= 0 && result.collided_block_index == block->entangle_index){
                                         // TODO: I don't love indexing the blocks without checking the index is valid first
                                         auto* entangled_block = world.blocks.elements + block->entangle_index;
-                                        // auto block_pos = block->pos + block->pos_delta;
-                                        // auto entangled_block_pos = entangled_block->pos + entangled_block->pos_delta;
                                         auto pos_diff = pos_to_vec(block->pos - entangled_block->pos);
 
                                         // if positions are diagonal to each other and the rotation between them is odd, check if we are moving into each other
