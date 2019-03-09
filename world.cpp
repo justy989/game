@@ -860,7 +860,7 @@ void melt_ice(Coord_t center, S16 radius, World_t* world, bool teleported){
 
 bool block_push(Block_t* block, Direction_t direction, World_t* world, bool pushed_by_ice, F32 instant_vel){
      Direction_t collided_block_push_dir = DIRECTION_COUNT;
-     Block_t* collided_block = block_against_another_block(block->pos, block->pos_delta, direction, world->block_qt, world->interactive_qt,
+     Block_t* collided_block = block_against_another_block(block->pos, direction, world->block_qt, world->interactive_qt,
                                                            &world->tilemap, &collided_block_push_dir);
      if(collided_block){
           if(collided_block == block){
@@ -872,7 +872,7 @@ bool block_push(Block_t* block, Direction_t direction, World_t* world, bool push
                return false;
           }else if(block->entangle_index == (collided_block - world->blocks.elements)){
                // if block is entangled with the block it collides with, check if the entangled block can move, this is kind of duplicate work
-               Block_t* entangled_collided_block = block_against_another_block(collided_block->pos, collided_block->pos_delta, direction, world->block_qt,
+               Block_t* entangled_collided_block = block_against_another_block(collided_block->pos, direction, world->block_qt,
                                                                                world->interactive_qt, &world->tilemap,
                                                                                &collided_block_push_dir);
                if(entangled_collided_block) return false;

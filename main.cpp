@@ -1914,6 +1914,8 @@ int main(int argc, char** argv){
                                                   }else{
                                                        if(block_on_ice(block->pos, block->pos_delta, &world.tilemap, world.interactive_qt) &&
                                                           block_on_ice(entangled_block->pos, entangled_block->pos_delta, &world.tilemap, world.interactive_qt)){
+                                                            // TODO: handle this case for blocks not entangled on ice
+                                                            // handle pushing blocks diagonally
 
                                                             F32 block_instant_vel = 0;
                                                             F32 entangled_block_instant_vel = 0;

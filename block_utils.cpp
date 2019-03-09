@@ -69,9 +69,7 @@ bool block_adjacent_pixels_to_check(Position_t pos, Vec_t pos_delta, Direction_t
      return false;
 }
 
-Block_t* block_against_block_in_list(Position_t pos, Vec_t pos_delta, Block_t** blocks, S16 block_count, Direction_t direction, Pixel_t* offsets){
-     auto block_to_check_pos = pos + pos_delta;
-
+Block_t* block_against_block_in_list(Position_t pos, Block_t** blocks, S16 block_count, Direction_t direction, Pixel_t* offsets){
      // TODO: account for block width/height
      switch(direction){
      default:
@@ -84,9 +82,9 @@ Block_t* block_against_block_in_list(Position_t pos, Vec_t pos_delta, Block_t** 
                auto block_pos = block->pos + block->pos_delta;
 
                Pixel_t pixel_to_check = block_pos.pixel + offsets[i];
-               if((pixel_to_check.x + TILE_SIZE_IN_PIXELS) == block_to_check_pos.pixel.x &&
-                  pixel_to_check.y >= (block_to_check_pos.pixel.y - BLOCK_SOLID_SIZE_IN_PIXELS) &&
-                  pixel_to_check.y < (block_to_check_pos.pixel.y + TILE_SIZE_IN_PIXELS)){
+               if((pixel_to_check.x + TILE_SIZE_IN_PIXELS) == pos.pixel.x &&
+                  pixel_to_check.y >= (pos.pixel.y - BLOCK_SOLID_SIZE_IN_PIXELS) &&
+                  pixel_to_check.y < (pos.pixel.y + TILE_SIZE_IN_PIXELS)){
                     return block;
                }
           }
@@ -99,9 +97,9 @@ Block_t* block_against_block_in_list(Position_t pos, Vec_t pos_delta, Block_t** 
                auto block_pos = block->pos + block->pos_delta;
 
                Pixel_t pixel_to_check = block_pos.pixel + offsets[i];
-               if(pixel_to_check.x == (block_to_check_pos.pixel.x + TILE_SIZE_IN_PIXELS) &&
-                  pixel_to_check.y >= (block_to_check_pos.pixel.y - BLOCK_SOLID_SIZE_IN_PIXELS) &&
-                  pixel_to_check.y < (block_to_check_pos.pixel.y + TILE_SIZE_IN_PIXELS)){
+               if(pixel_to_check.x == (pos.pixel.x + TILE_SIZE_IN_PIXELS) &&
+                  pixel_to_check.y >= (pos.pixel.y - BLOCK_SOLID_SIZE_IN_PIXELS) &&
+                  pixel_to_check.y < (pos.pixel.y + TILE_SIZE_IN_PIXELS)){
                     return block;
                }
           }
@@ -114,9 +112,9 @@ Block_t* block_against_block_in_list(Position_t pos, Vec_t pos_delta, Block_t** 
                auto block_pos = block->pos + block->pos_delta;
 
                Pixel_t pixel_to_check = block_pos.pixel + offsets[i];
-               if((pixel_to_check.y + TILE_SIZE_IN_PIXELS) == block_to_check_pos.pixel.y &&
-                  pixel_to_check.x >= (block_to_check_pos.pixel.x - BLOCK_SOLID_SIZE_IN_PIXELS) &&
-                  pixel_to_check.x < (block_to_check_pos.pixel.x + TILE_SIZE_IN_PIXELS)){
+               if((pixel_to_check.y + TILE_SIZE_IN_PIXELS) == pos.pixel.y &&
+                  pixel_to_check.x >= (pos.pixel.x - BLOCK_SOLID_SIZE_IN_PIXELS) &&
+                  pixel_to_check.x < (pos.pixel.x + TILE_SIZE_IN_PIXELS)){
                     return block;
                }
           }
@@ -129,9 +127,9 @@ Block_t* block_against_block_in_list(Position_t pos, Vec_t pos_delta, Block_t** 
                auto block_pos = block->pos + block->pos_delta;
 
                Pixel_t pixel_to_check = block_pos.pixel + offsets[i];
-               if(pixel_to_check.y == (block_to_check_pos.pixel.y + TILE_SIZE_IN_PIXELS) &&
-                  pixel_to_check.x >= (block_to_check_pos.pixel.x - BLOCK_SOLID_SIZE_IN_PIXELS) &&
-                  pixel_to_check.x < (block_to_check_pos.pixel.x + TILE_SIZE_IN_PIXELS)){
+               if(pixel_to_check.y == (pos.pixel.y + TILE_SIZE_IN_PIXELS) &&
+                  pixel_to_check.x >= (pos.pixel.x - BLOCK_SOLID_SIZE_IN_PIXELS) &&
+                  pixel_to_check.x < (pos.pixel.x + TILE_SIZE_IN_PIXELS)){
                     return block;
                }
           }
@@ -141,7 +139,7 @@ Block_t* block_against_block_in_list(Position_t pos, Vec_t pos_delta, Block_t** 
      return nullptr;
 }
 
-Block_t* block_against_another_block(Position_t pos, Vec_t pos_delta, Direction_t direction, QuadTreeNode_t<Block_t>* block_quad_tree,
+Block_t* block_against_another_block(Position_t pos, Direction_t direction, QuadTreeNode_t<Block_t>* block_quad_tree,
                                      QuadTreeNode_t<Interactive_t>* interactive_quad_tree, TileMap_t* tilemap, Direction_t* push_dir){
      auto block_center = block_get_center(pos);
      Rect_t rect = rect_to_check_surrounding_blocks(block_center.pixel);
@@ -153,7 +151,7 @@ Block_t* block_against_another_block(Position_t pos, Vec_t pos_delta, Direction_
      Pixel_t portal_offsets[BLOCK_QUAD_TREE_MAX_QUERY];
      memset(portal_offsets, 0, sizeof(portal_offsets));
 
-     Block_t* collided_block = block_against_block_in_list(pos, pos_delta, blocks, block_count, direction, portal_offsets);
+     Block_t* collided_block = block_against_block_in_list(pos, blocks, block_count, direction, portal_offsets);
      if(collided_block){
           *push_dir = direction;
           return collided_block;
@@ -179,7 +177,7 @@ Block_t* block_against_another_block(Position_t pos, Vec_t pos_delta, Direction_
                               search_portal_destination_for_blocks(block_quad_tree, interactive->portal.face, (Direction_t)(d), src_coord,
                                                                    dst_coord, blocks, &block_count, portal_offsets);
 
-                              collided_block = block_against_block_in_list(pos, pos_delta, blocks, block_count, direction, portal_offsets);
+                              collided_block = block_against_block_in_list(pos, blocks, block_count, direction, portal_offsets);
                               if(collided_block){
                                    U8 rotations = portal_rotations_between(interactive->portal.face, (Direction_t)(d));
                                    *push_dir = direction_rotate_clockwise(direction, rotations);
@@ -498,6 +496,8 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                     if(direction_in_mask(collided_block_move_mask, quadrant)){
                          // if the block is moving in the direction we collided, just move right up against it
                          // TODO: set the decimal portion so we are right up against the block
+                         // TODO: this case probably means if they are both on ice they want to start moving as a
+                         //       group at a speed in the middle of both of their original speeds?
                          block->pos.pixel.x = block_inside_result.collision_pos.pixel.x + HALF_TILE_SIZE_IN_PIXELS;
                          block->pos.decimal.x = 0;
                          block->vel.x = block_inside_result.block->vel.x;
