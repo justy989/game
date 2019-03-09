@@ -485,45 +485,78 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
           }
 
           if(block_inside_index != block_index){
+               auto* block = world->blocks.elements + block_index;
+               auto collided_block_move_mask = vec_direction_mask(block_inside_result.block->vel);
+
                switch(quadrant){
                default:
                     break;
                case DIRECTION_LEFT:
                {
                     // TODO: compress these cases
-                    result.stop_on_pixel_x = block_inside_result.collision_pos.pixel.x + HALF_TILE_SIZE_IN_PIXELS;
 
-                    result.pos_delta.x = 0;
-                    result.vel.x = 0.0f;
-                    result.accel.x = 0.0f;
-                    result.horizontal_move.state = MOVE_STATE_IDLING;
+                    if(direction_in_mask(collided_block_move_mask, quadrant)){
+                         // if the block is moving in the direction we collided, just move right up against it
+                         // TODO: set the decimal portion so we are right up against the block
+                         block->pos.pixel.x = block_inside_result.collision_pos.pixel.x + HALF_TILE_SIZE_IN_PIXELS;
+                         block->pos.decimal.x = 0;
+                         block->vel.x = block_inside_result.block->vel.x;
+                         block->pos_delta.x = 0;
+                    }else{
+                         result.stop_on_pixel_x = block_inside_result.collision_pos.pixel.x + HALF_TILE_SIZE_IN_PIXELS;
+                         result.pos_delta.x = 0;
+                         result.vel.x = 0.0f;
+                         result.accel.x = 0.0f;
+                         result.horizontal_move.state = MOVE_STATE_IDLING;
+                    }
                } break;
                case DIRECTION_RIGHT:
                {
-                    result.stop_on_pixel_x = (block_inside_result.collision_pos.pixel.x - HALF_TILE_SIZE_IN_PIXELS) - TILE_SIZE_IN_PIXELS;
+                    if(direction_in_mask(collided_block_move_mask, quadrant)){
+                         block->pos.pixel.x = (block_inside_result.collision_pos.pixel.x - HALF_TILE_SIZE_IN_PIXELS) - TILE_SIZE_IN_PIXELS;
+                         block->pos.decimal.x = 0;
+                         block->vel.x = block_inside_result.block->vel.x;
+                         block->pos_delta.x = 0;
+                    }else{
+                         result.stop_on_pixel_x = (block_inside_result.collision_pos.pixel.x - HALF_TILE_SIZE_IN_PIXELS) - TILE_SIZE_IN_PIXELS;
 
-                    result.pos_delta.x = 0;
-                    result.vel.x = 0.0f;
-                    result.accel.x = 0.0f;
-                    result.horizontal_move.state = MOVE_STATE_IDLING;
+                         result.pos_delta.x = 0;
+                         result.vel.x = 0.0f;
+                         result.accel.x = 0.0f;
+                         result.horizontal_move.state = MOVE_STATE_IDLING;
+                    }
                } break;
                case DIRECTION_DOWN:
                {
-                    result.stop_on_pixel_y = block_inside_result.collision_pos.pixel.y + HALF_TILE_SIZE_IN_PIXELS;
+                    if(direction_in_mask(collided_block_move_mask, quadrant)){
+                         block->pos.pixel.y = block_inside_result.collision_pos.pixel.y + HALF_TILE_SIZE_IN_PIXELS;
+                         block->pos.decimal.y = 0;
+                         block->vel.y = block_inside_result.block->vel.y;
+                         block->pos_delta.y = 0;
+                    }else{
+                         result.stop_on_pixel_y = block_inside_result.collision_pos.pixel.y + HALF_TILE_SIZE_IN_PIXELS;
 
-                    result.pos_delta.y = 0;
-                    result.vel.y = 0.0f;
-                    result.accel.y = 0.0f;
-                    result.vertical_move.state = MOVE_STATE_IDLING;
+                         result.pos_delta.y = 0;
+                         result.vel.y = 0.0f;
+                         result.accel.y = 0.0f;
+                         result.vertical_move.state = MOVE_STATE_IDLING;
+                    }
                } break;
                case DIRECTION_UP:
                {
-                    result.stop_on_pixel_y = (block_inside_result.collision_pos.pixel.y - HALF_TILE_SIZE_IN_PIXELS) - TILE_SIZE_IN_PIXELS;
+                    if(direction_in_mask(collided_block_move_mask, quadrant)){
+                         block->pos.pixel.y = (block_inside_result.collision_pos.pixel.y - HALF_TILE_SIZE_IN_PIXELS) - TILE_SIZE_IN_PIXELS;
+                         block->pos.decimal.y = 0;
+                         block->vel.y = block_inside_result.block->vel.y;
+                         block->pos_delta.y = 0;
+                    }else{
+                         result.stop_on_pixel_y = (block_inside_result.collision_pos.pixel.y - HALF_TILE_SIZE_IN_PIXELS) - TILE_SIZE_IN_PIXELS;
 
-                    result.pos_delta.y = 0;
-                    result.vel.y = 0.0f;
-                    result.accel.y = 0.0f;
-                    result.vertical_move.state = MOVE_STATE_IDLING;
+                         result.pos_delta.y = 0;
+                         result.vel.y = 0.0f;
+                         result.accel.y = 0.0f;
+                         result.vertical_move.state = MOVE_STATE_IDLING;
+                    }
                } break;
                }
           }

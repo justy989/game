@@ -50,6 +50,8 @@ NOTES:
 #include "editor.h"
 #include "utils.h"
 
+#define DEBUG_FILE 0
+
 struct VecMaskCollisionEntry_t{
      S8 mask;
 
@@ -439,6 +441,10 @@ int main(int argc, char** argv){
 
      reset_map(player_start, &world, &undo);
      init(&editor);
+
+#if DEBUG_FILE
+     FILE* debug_file = fopen("debug.txt", "w");
+#endif
 
      F32 dt = 0.0f;
 
@@ -2525,6 +2531,19 @@ int main(int argc, char** argv){
                          block->pos.pixel.y = final_pos.pixel.y;
                          block->pos.decimal.y = final_pos.decimal.y;
                     }
+
+#if DEBUG_FILE
+                    if(i == 1){
+                         fprintf(debug_file, "%ld 1 hm %s %s %f vm %s %s %f\n", frame_count,
+                                 move_state_to_string(block->horizontal_move.state), move_sign_to_string(block->horizontal_move.sign), block->horizontal_move.distance,
+                                 move_state_to_string(block->vertical_move.state), move_sign_to_string(block->vertical_move.sign), block->vertical_move.distance);
+                    }else if(i == 2){
+                         fprintf(debug_file, "    2 hm %s %s %f vm %s %s %f\n",
+                                 move_state_to_string(block->horizontal_move.state), move_sign_to_string(block->horizontal_move.sign), block->horizontal_move.distance,
+                                 move_state_to_string(block->vertical_move.state), move_sign_to_string(block->vertical_move.sign), block->vertical_move.distance);
+                         fflush(debug_file);
+                    }
+#endif
                }
 
                // have player push block
@@ -2886,6 +2905,10 @@ int main(int argc, char** argv){
           SDL_DestroyWindow(window);
           SDL_Quit();
      }
+
+#if DEBUG_FILE
+     fclose(debug_file);
+#endif
 
      Log_t::destroy();
      return 0;
