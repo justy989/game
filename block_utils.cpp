@@ -454,12 +454,13 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
           result.collided = true;
           result.collided_block_index = get_block_index(world, block_inside_result.block);
 
-          auto block_pixel = block_center_pixel(block_pos + result.pos_delta);
-          auto quadrant = relative_quadrant(block_pixel, block_inside_result.collision_pos.pixel);
+          auto move_direction = move_direction_between(block_get_center(block_pos) + result.pos_delta, block_inside_result.collision_pos);
+          Direction_t first_direction;
+          Direction_t second_direction;
+          move_direction_to_directions(move_direction, &first_direction, &second_direction);
 
           // check if they are on ice before we adjust the position on our block to check
-          bool a_on_ice = block_on_ice(block_pos, result.pos_delta, &world->tilemap,
-                                       world->interactive_qt);
+          bool a_on_ice = block_on_ice(block_pos, result.pos_delta, &world->tilemap, world->interactive_qt);
           bool b_on_ice = block_on_ice(block_inside_result.block->pos, block_inside_result.block->pos_delta,
                                        &world->tilemap, world->interactive_qt);
 
@@ -486,14 +487,14 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                auto* block = world->blocks.elements + block_index;
                auto collided_block_move_mask = vec_direction_mask(block_inside_result.block->vel);
 
-               switch(quadrant){
+               switch(first_direction){
                default:
                     break;
                case DIRECTION_LEFT:
                {
                     // TODO: compress these cases
 
-                    if(direction_in_mask(collided_block_move_mask, quadrant)){
+                    if(direction_in_mask(collided_block_move_mask, first_direction)){
                          // if the block is moving in the direction we collided, just move right up against it
                          // TODO: set the decimal portion so we are right up against the block
                          // TODO: this case probably means if they are both on ice they want to start moving as a
@@ -512,7 +513,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                } break;
                case DIRECTION_RIGHT:
                {
-                    if(direction_in_mask(collided_block_move_mask, quadrant)){
+                    if(direction_in_mask(collided_block_move_mask, first_direction)){
                          block->pos.pixel.x = (block_inside_result.collision_pos.pixel.x - HALF_TILE_SIZE_IN_PIXELS) - TILE_SIZE_IN_PIXELS;
                          block->pos.decimal.x = 0;
                          block->vel.x = block_inside_result.block->vel.x;
@@ -528,7 +529,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                } break;
                case DIRECTION_DOWN:
                {
-                    if(direction_in_mask(collided_block_move_mask, quadrant)){
+                    if(direction_in_mask(collided_block_move_mask, first_direction)){
                          block->pos.pixel.y = block_inside_result.collision_pos.pixel.y + HALF_TILE_SIZE_IN_PIXELS;
                          block->pos.decimal.y = 0;
                          block->vel.y = block_inside_result.block->vel.y;
@@ -544,7 +545,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                } break;
                case DIRECTION_UP:
                {
-                    if(direction_in_mask(collided_block_move_mask, quadrant)){
+                    if(direction_in_mask(collided_block_move_mask, first_direction)){
                          block->pos.pixel.y = (block_inside_result.collision_pos.pixel.y - HALF_TILE_SIZE_IN_PIXELS) - TILE_SIZE_IN_PIXELS;
                          block->pos.decimal.y = 0;
                          block->vel.y = block_inside_result.block->vel.y;
@@ -563,7 +564,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
 
           for(S16 i = 0; i < world->players.count; i++){
                Player_t* player = world->players.elements + i;
-               if(player->pushing_block == block_index && quadrant == player->face){
+               if(player->pushing_block == block_index && first_direction == player->face){
                     player->push_time = 0.0f;
                }
           }
@@ -613,13 +614,13 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                          resolve_result.accel = resolve_result.accel;
                     }
                }else{
-                    if(!direction_in_mask(vec_direction_mask(block_pos_delta), quadrant)){
+                    if(!direction_in_mask(vec_direction_mask(block_pos_delta), first_direction)){
                          // although we collided, the other block is colliding into us, so let that block resolve this mess
                          result.collided = false;
                          break;
                     }
 
-                    push_dir = direction_rotate_clockwise(quadrant, block_inside_result.portal_rotations);
+                    push_dir = direction_rotate_clockwise(first_direction, block_inside_result.portal_rotations);
 
                     // blocks heading towards each other will stop
                     switch(push_dir){
@@ -766,6 +767,7 @@ Interactive_t* block_is_teleporting(Block_t* block, QuadTreeNode_t<Interactive_t
 }
 
 void push_entangled_block(Block_t* block, World_t* world, Direction_t push_dir, bool pushed_by_ice, F32 instant_vel){
+     if(block->entangle_index < 0) return;
      Block_t* entangled_block = world->blocks.elements + block->entangle_index;
      auto rotations_between = direction_rotations_between(static_cast<Direction_t>(entangled_block->rotation), static_cast<Direction_t>(block->rotation));
      Direction_t rotated_dir = direction_rotate_clockwise(push_dir, rotations_between);

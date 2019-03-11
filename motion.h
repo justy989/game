@@ -1,7 +1,6 @@
 #pragma once
 
-#include "vec.h"
-#include "pixel.h"
+#include "position.h"
 #include "direction.h"
 
 enum MoveState_t{
@@ -15,6 +14,18 @@ enum MoveSign_t{
      MOVE_SIGN_ZERO,
      MOVE_SIGN_POSITIVE,
      MOVE_SIGN_NEGATIVE,
+};
+
+enum MoveDirection_t :U8{
+     MOVE_DIRECTION_LEFT = 0,
+     MOVE_DIRECTION_UP = 1,
+     MOVE_DIRECTION_RIGHT = 2,
+     MOVE_DIRECTION_DOWN = 3,
+     MOVE_DIRECTION_LEFT_UP = 4,
+     MOVE_DIRECTION_RIGHT_UP = 5,
+     MOVE_DIRECTION_LEFT_DOWN = 6,
+     MOVE_DIRECTION_RIGHT_DOWN = 7,
+     MOVE_DIRECTION_COUNT = 8,
 };
 
 struct Move_t{
@@ -89,3 +100,6 @@ const char* move_state_to_string(MoveState_t state);
 const char* move_sign_to_string(MoveSign_t sign);
 
 bool grid_motion_moving_in_direction(GridMotion_t* grid_motion, Direction_t direction);
+
+MoveDirection_t move_direction_between(Position_t a, Position_t b);
+void move_direction_to_directions(MoveDirection_t move_direction, Direction_t* a, Direction_t* b);

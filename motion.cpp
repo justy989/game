@@ -1,8 +1,8 @@
 #include "motion.h"
 #include "defines.h"
-#include "position.h"
 #include "log.h"
 #include "utils.h"
+#include "conversion.h"
 
 #include <math.h>
 
@@ -376,4 +376,79 @@ bool grid_motion_moving_in_direction(GridMotion_t* grid_motion, Direction_t dire
      }
 
      return false;
+}
+
+MoveDirection_t move_direction_between(Position_t a, Position_t b){
+     auto diff = pos_to_vec(b - a);
+     auto abs_diff_x = abs(diff.x);
+     auto abs_diff_y = abs(diff.y);
+
+     if(abs_diff_x > abs_diff_y){
+          if(diff.x > 0){
+               return MOVE_DIRECTION_RIGHT;
+          }
+
+          return MOVE_DIRECTION_LEFT;
+     }else if(abs_diff_x == abs_diff_y){
+          if(diff.x < 0){
+               if(diff.y < 0){
+                    return MOVE_DIRECTION_LEFT_DOWN;
+               }
+
+               return MOVE_DIRECTION_LEFT_UP;
+          }
+
+          if(diff.y < 0){
+               return MOVE_DIRECTION_RIGHT_DOWN;
+          }
+
+          return MOVE_DIRECTION_RIGHT_UP;
+     }
+
+     if(diff.y > 0){
+          return MOVE_DIRECTION_UP;
+     }
+
+     return MOVE_DIRECTION_DOWN;
+}
+
+void move_direction_to_directions(MoveDirection_t move_direction, Direction_t* a, Direction_t* b){
+     switch(move_direction){
+     default:
+          *a = DIRECTION_COUNT;
+          *b = DIRECTION_COUNT;
+          break;
+     case MOVE_DIRECTION_LEFT:
+          *a = DIRECTION_LEFT;
+          *b = DIRECTION_COUNT;
+          break;
+     case MOVE_DIRECTION_UP:
+          *a = DIRECTION_UP;
+          *b = DIRECTION_COUNT;
+          break;
+     case MOVE_DIRECTION_RIGHT:
+          *a = DIRECTION_RIGHT;
+          *b = DIRECTION_COUNT;
+          break;
+     case MOVE_DIRECTION_DOWN:
+          *a = DIRECTION_DOWN;
+          *b = DIRECTION_COUNT;
+          break;
+     case MOVE_DIRECTION_LEFT_UP:
+          *a = DIRECTION_LEFT;
+          *b = DIRECTION_UP;
+          break;
+     case MOVE_DIRECTION_RIGHT_UP:
+          *a = DIRECTION_RIGHT;
+          *b = DIRECTION_UP;
+          break;
+     case MOVE_DIRECTION_LEFT_DOWN:
+          *a = DIRECTION_LEFT;
+          *b = DIRECTION_DOWN;
+          break;
+     case MOVE_DIRECTION_RIGHT_DOWN:
+          *a = DIRECTION_RIGHT;
+          *b = DIRECTION_DOWN;
+          break;
+     }
 }
