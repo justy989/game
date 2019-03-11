@@ -63,6 +63,7 @@ void illuminate(Coord_t coord, U8 value, World_t* world, Coord_t from_portal = C
 void spread_ice(Coord_t center, S16 radius, World_t* world, bool teleported = false);
 void melt_ice(Coord_t center, S16 radius, World_t* world, bool teleported = false);
 
+bool block_push(Block_t* block, MoveDirection_t move_direction, World_t* world, bool pushed_by_ice, F32 instant_vel = 0);
 bool block_push(Block_t* block, Direction_t direction, World_t* world, bool pushed_by_ice, F32 instant_vel = 0);
 bool reset_players(ObjectArray_t<Player_t>* players);
 

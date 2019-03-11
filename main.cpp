@@ -1953,10 +1953,12 @@ int main(int argc, char** argv){
                                                                  case DIRECTION_LEFT:
                                                                  case DIRECTION_RIGHT:
                                                                       block->pos_delta.x = entangled_block_instant_vel * dt;
+                                                                      block->pos.decimal.x = block->pos.decimal.y;
                                                                       break;
                                                                  case DIRECTION_UP:
                                                                  case DIRECTION_DOWN:
                                                                       block->pos_delta.y = entangled_block_instant_vel * dt;
+                                                                      block->pos.decimal.y = block->pos.decimal.x;
                                                                       break;
                                                                  }
                                                             }
@@ -1967,10 +1969,12 @@ int main(int argc, char** argv){
                                                                  case DIRECTION_LEFT:
                                                                  case DIRECTION_RIGHT:
                                                                       entangled_block->pos_delta.x = block_instant_vel * dt;
+                                                                      entangled_block->pos.decimal.x = entangled_block->pos.decimal.y;
                                                                       break;
                                                                  case DIRECTION_UP:
                                                                  case DIRECTION_DOWN:
                                                                       entangled_block->pos_delta.y = block_instant_vel * dt;
+                                                                      entangled_block->pos.decimal.y = entangled_block->pos.decimal.x;
                                                                       break;
                                                                  }
                                                             }

@@ -382,14 +382,9 @@ MoveDirection_t move_direction_between(Position_t a, Position_t b){
      auto diff = pos_to_vec(b - a);
      auto abs_diff_x = abs(diff.x);
      auto abs_diff_y = abs(diff.y);
+     auto xy_diff = abs(abs_diff_x - abs_diff_y);
 
-     if(abs_diff_x > abs_diff_y){
-          if(diff.x > 0){
-               return MOVE_DIRECTION_RIGHT;
-          }
-
-          return MOVE_DIRECTION_LEFT;
-     }else if(abs_diff_x == abs_diff_y){
+     if(xy_diff < PIXEL_SIZE){
           if(diff.x < 0){
                if(diff.y < 0){
                     return MOVE_DIRECTION_LEFT_DOWN;
@@ -403,6 +398,12 @@ MoveDirection_t move_direction_between(Position_t a, Position_t b){
           }
 
           return MOVE_DIRECTION_RIGHT_UP;
+     }else if(abs_diff_x > abs_diff_y){
+          if(diff.x > 0){
+               return MOVE_DIRECTION_RIGHT;
+          }
+
+          return MOVE_DIRECTION_LEFT;
      }
 
      if(diff.y > 0){
@@ -451,4 +452,31 @@ void move_direction_to_directions(MoveDirection_t move_direction, Direction_t* a
           *b = DIRECTION_DOWN;
           break;
      }
+}
+
+const char* move_direction_to_string(MoveDirection_t move_direction){
+     switch(move_direction){
+     case MOVE_DIRECTION_LEFT:
+          return "MOVE_DIRECTION_LEFT";
+     case MOVE_DIRECTION_UP:
+          return "MOVE_DIRECTION_UP";
+     case MOVE_DIRECTION_RIGHT:
+          return "MOVE_DIRECTION_RIGHT";
+     case MOVE_DIRECTION_DOWN:
+          return "MOVE_DIRECTION_DOWN";
+     case MOVE_DIRECTION_LEFT_UP:
+          return "MOVE_DIRECTION_LEFT_UP";
+     case MOVE_DIRECTION_RIGHT_UP:
+          return "MOVE_DIRECTION_RIGHT_UP";
+     case MOVE_DIRECTION_LEFT_DOWN:
+          return "MOVE_DIRECTION_LEFT_DOWN";
+     case MOVE_DIRECTION_RIGHT_DOWN:
+          return "MOVE_DIRECTION_RIGHT_DOWN";
+     case MOVE_DIRECTION_COUNT:
+          return "MOVE_DIRECTION_COUNT";
+     default:
+          break;
+     }
+
+     return "MOVE_DIRECTION_COUNT";
 }

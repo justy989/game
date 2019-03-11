@@ -858,6 +858,17 @@ void melt_ice(Coord_t center, S16 radius, World_t* world, bool teleported){
      impact_ice(center, radius, world, teleported, false);
 }
 
+bool block_push(Block_t* block, MoveDirection_t move_direction, World_t* world, bool pushed_by_ice, F32 instant_vel){
+     Direction_t first;
+     Direction_t second;
+     move_direction_to_directions(move_direction, &first, &second);
+
+     bool a = block_push(block, first, world, pushed_by_ice, instant_vel);
+     bool b = block_push(block, second, world, pushed_by_ice, instant_vel);
+
+     return a || b;
+}
+
 bool block_push(Block_t* block, Direction_t direction, World_t* world, bool pushed_by_ice, F32 instant_vel){
      Direction_t collided_block_push_dir = DIRECTION_COUNT;
      Block_t* collided_block = block_against_another_block(block->pos, direction, world->block_qt, world->interactive_qt,

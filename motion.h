@@ -101,5 +101,6 @@ const char* move_sign_to_string(MoveSign_t sign);
 
 bool grid_motion_moving_in_direction(GridMotion_t* grid_motion, Direction_t direction);
 
+const char* move_direction_to_string(MoveDirection_t move_direction);
 MoveDirection_t move_direction_between(Position_t a, Position_t b);
 void move_direction_to_directions(MoveDirection_t move_direction, Direction_t* a, Direction_t* b);
