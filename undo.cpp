@@ -139,10 +139,20 @@ void undo_commit(Undo_t* undo, ObjectArray_t<Player_t>* players, TileMap_t* tile
                  ObjectArray_t<Interactive_t>* interactives, bool ignore_moving_stuff){
      U32 diff_count = 0;
 
-     // don't save undo if any blocks are moving
+     // don't save undo if any blocks are moving, or doors are opening
      if(!ignore_moving_stuff){
           for(S16 i = 0; i < blocks->count; i++){
                if(blocks->elements[i].vel.x != 0.0f || blocks->elements[i].vel.y != 0.0f) return;
+          }
+
+          for(S16 i = 0; i < interactives->count; i++){
+               auto* interactive = interactives->elements + i;
+               if(interactive->type != INTERACTIVE_TYPE_DOOR) continue;
+               if(interactive->door.lift.up){
+                    if(interactive->door.lift.ticks < DOOR_MAX_HEIGHT) return;
+               }else{
+                    if(interactive->door.lift.ticks > 0) return;
+               }
           }
      }
 
