@@ -1,5 +1,6 @@
 #include "undo.h"
 #include "log.h"
+#include "defines.h"
 
 #include <assert.h>
 #include <string.h>
@@ -147,11 +148,18 @@ void undo_commit(Undo_t* undo, ObjectArray_t<Player_t>* players, TileMap_t* tile
 
           for(S16 i = 0; i < interactives->count; i++){
                auto* interactive = interactives->elements + i;
-               if(interactive->type != INTERACTIVE_TYPE_DOOR) continue;
-               if(interactive->door.lift.up){
-                    if(interactive->door.lift.ticks < DOOR_MAX_HEIGHT) return;
-               }else{
-                    if(interactive->door.lift.ticks > 0) return;
+               if(interactive->type == INTERACTIVE_TYPE_DOOR){
+                    if(interactive->door.lift.up){
+                         if(interactive->door.lift.ticks < DOOR_MAX_HEIGHT) return;
+                    }else{
+                         if(interactive->door.lift.ticks > 0) return;
+                    }
+               }else if(interactive->type == INTERACTIVE_TYPE_POPUP){
+                    if(interactive->popup.lift.up){
+                         if(interactive->popup.lift.ticks < (HEIGHT_INTERVAL + 1)) return;
+                    }else{
+                         if(interactive->popup.lift.ticks > 1) return;
+                    }
                }
           }
      }
