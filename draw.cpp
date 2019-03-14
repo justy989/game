@@ -442,6 +442,7 @@ void draw_solids(Vec_t pos, Interactive_t* interactive, Block_t** blocks, S16 bl
           }
           Vec_t tex_vec = player_frame(player->walk_frame, player_frame_y);
           pos_vec.y += (5.0f * PIXEL_SIZE);
+          pos_vec.y += ((float)(player->pos.z) * PIXEL_SIZE);
 
           glEnd();
           glBindTexture(GL_TEXTURE_2D, player_texture);
@@ -720,7 +721,7 @@ void draw_editor(Editor_t* editor, World_t* world, Position_t screen_camera, Vec
           draw_text(buffer, text_pos);
 
           Player_t* player = world->players.elements;
-          snprintf(buffer, 64, "P: %d,%d R: %d", player->pos.pixel.x, player->pos.pixel.y, player->rotation);
+          snprintf(buffer, 64, "P: %d,%d,%d R: %d", player->pos.pixel.x, player->pos.pixel.y, player->pos.z, player->rotation);
           text_pos.y -= 0.045f;
 
           glColor3f(0.0f, 0.0f, 0.0f);

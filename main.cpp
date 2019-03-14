@@ -246,6 +246,17 @@ void copy_block_collision_results(Block_t* block, CheckBlockCollisionResult_t* r
      block->vertical_move = result->vertical_move;
 }
 
+int block_height_comparer(const void* a, const void* b){
+    Block_t* real_a = *(Block_t**)(a);
+    Block_t* real_b = *(Block_t**)(b);
+
+    return real_a->pos.z > real_b->pos.z;
+}
+
+void sort_blocks_by_height(Block_t** blocks, S16 block_count){
+    qsort(blocks, block_count, sizeof(*blocks), block_height_comparer);
+}
+
 int main(int argc, char** argv){
      const char* load_map_filepath = nullptr;
      bool test = false;
@@ -1091,6 +1102,14 @@ int main(int argc, char** argv){
                     Interactive_t* interactive = world.interactives.elements + i;
                     if(interactive->type == INTERACTIVE_TYPE_POPUP){
                          lift_update(&interactive->popup.lift, POPUP_TICK_DELAY, dt, 1, HEIGHT_INTERVAL + 1);
+
+                         for(S16 p = 0; p < world.players.count; p++){
+                              auto* player = world.players.elements + p;
+                              Coord_t player_coord = pos_to_coord(player->pos);
+                              if(interactive->coord == player_coord && interactive->popup.lift.ticks == player->pos.z + 2){
+                                  player->pos.z++;
+                              }
+                         }
                     }else if(interactive->type == INTERACTIVE_TYPE_DOOR){
                          lift_update(&interactive->door.lift, POPUP_TICK_DELAY, dt, 0, DOOR_MAX_HEIGHT);
                     }else if(interactive->type == INTERACTIVE_TYPE_PRESSURE_PLATE){
@@ -1439,6 +1458,33 @@ int main(int argc, char** argv){
                                    player->walk_frame_time = 0.0f;
                               }
                          }
+                    }
+
+                    bool held_up = false;
+
+                    auto player_coord = pos_to_coord(player->pos);
+                    Interactive_t* interactive = quad_tree_interactive_find_at(world.interactive_qt, player_coord);
+                    if(interactive && interactive->type == INTERACTIVE_TYPE_POPUP &&
+                       interactive->popup.lift.ticks == player->pos.z + 1){
+                        held_up = true;
+                    }
+
+                    Rect_t coord_rect = rect_surrounding_coord(player_coord);
+
+                    S16 block_count = 0;
+                    Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
+
+                    quad_tree_find_in(world.block_qt, coord_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
+                    for(S16 b = 0; b < block_count; b++){
+                        auto block_rect = block_get_rect(blocks[b]);
+                        if(pixel_in_rect(player->pos.pixel, block_rect) && blocks[b]->pos.z == player->pos.z - HEIGHT_INTERVAL){
+                            held_up = true;
+                            break;
+                        }
+                    }
+
+                    if(!held_up && player->pos.z > 0){
+                        player->pos.z--;
                     }
                }
 
@@ -2708,6 +2754,8 @@ int main(int argc, char** argv){
                                         draw_players[p] = (pixel_distance_between(portal_center_pixel, world.players.elements[p].pos.pixel) <= 20);
                                    }
 
+                                   sort_blocks_by_height(blocks, block_count);
+
                                    draw_solids(tile_pos, portal_interactive, blocks, block_count, &world.players, draw_players,
                                                screen_camera, theme_texture, player_texture, portal_coord, coord,
                                                portal_rotations, &world.tilemap, world.interactive_qt);
@@ -2746,6 +2794,8 @@ int main(int argc, char** argv){
                     quad_tree_find_in(world.block_qt, coord_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
 
                     Interactive_t* interactive = quad_tree_find_at(world.interactive_qt, x, y);
+
+                    sort_blocks_by_height(blocks, block_count);
 
                     draw_solids(tile_pos, interactive, blocks, block_count, &world.players, draw_players, screen_camera,
                                 theme_texture, player_texture, coord, Coord_t{-1, -1}, 0, &world.tilemap, world.interactive_qt);

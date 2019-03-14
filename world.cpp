@@ -331,6 +331,11 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
 
           bool collided_with_block = false;
           Block_t* block = world->blocks.elements + i;
+
+          // check if the block is in our player's height range
+          if(block->pos.z <= player_pos.z - HEIGHT_INTERVAL ||
+             block->pos.z >= player_pos.z + (HEIGHT_INTERVAL * 2)) continue;
+
           Position_t block_pos = block->pos + block->pos_delta;
           position_collide_with_rect(player_pos, block_pos, TILE_SIZE, &result_pos_delta, &collided_with_block);
           if(collided_with_block) result.collided = true;
@@ -384,46 +389,46 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                     Vec_t rotated_vel = vec_rotate_quadrants_clockwise(collided_block->vel, collision_portal_rotations);
                     bool even_rotations = (collision_portal_rotations % 2) == 0;
 
-                    auto stop_block_horizontally = [](Block_t* collided_block, bool even_rotations, Vec_t rotated_vel, Vec_t rotated_accel, U8 collision_portal_rotations){
-                         if(even_rotations){
-                              collided_block->horizontal_move.state = MOVE_STATE_IDLING;
+                    auto stop_block_horizontally = [](Block_t* b, bool has_even_rotations, Vec_t rot_vel, Vec_t rot_accel, U8 rotations){
+                         if(has_even_rotations){
+                              b->horizontal_move.state = MOVE_STATE_IDLING;
                          }else{
-                              collided_block->vertical_move.state = MOVE_STATE_IDLING;
+                              b->vertical_move.state = MOVE_STATE_IDLING;
                          }
 
-                         rotated_accel.x = 0.0f;
-                         rotated_vel.x = 0.0f;
-                         collided_block->accel = vec_rotate_quadrants_counter_clockwise(rotated_accel, collision_portal_rotations);
-                         collided_block->vel = vec_rotate_quadrants_counter_clockwise(rotated_vel, collision_portal_rotations);
+                         rot_accel.x = 0.0f;
+                         rot_vel.x = 0.0f;
+                         b->accel = vec_rotate_quadrants_counter_clockwise(rot_accel, rotations);
+                         b->vel = vec_rotate_quadrants_counter_clockwise(rot_vel, rotations);
                     };
 
-                    auto stop_block_vertically = [](Block_t* collided_block, bool even_rotations, Vec_t rotated_vel, Vec_t rotated_accel, U8 collision_portal_rotations){
-                         if(even_rotations){
-                              collided_block->vertical_move.state = MOVE_STATE_IDLING;
+                    auto stop_block_vertically = [](Block_t* b, bool has_even_rotations, Vec_t rot_vel, Vec_t rot_accel, U8 rotations){
+                         if(has_even_rotations){
+                              b->vertical_move.state = MOVE_STATE_IDLING;
                          }else{
-                              collided_block->horizontal_move.state = MOVE_STATE_IDLING;
+                              b->horizontal_move.state = MOVE_STATE_IDLING;
                          }
 
-                         rotated_accel.y = 0.0f;
-                         rotated_vel.y = 0.0f;
-                         collided_block->accel = vec_rotate_quadrants_counter_clockwise(rotated_accel, collision_portal_rotations);
-                         collided_block->vel = vec_rotate_quadrants_counter_clockwise(rotated_vel, collision_portal_rotations);
+                         rot_accel.y = 0.0f;
+                         rot_vel.y = 0.0f;
+                         b->accel = vec_rotate_quadrants_counter_clockwise(rot_accel, rotations);
+                         b->vel = vec_rotate_quadrants_counter_clockwise(rot_vel, rotations);
                     };
 
-                    auto stop_player_moving_into_block = [](MovePlayerThroughWorldResult_t* result, Block_t* collided_block, Vec_t result_pos_delta, bool even_rotations, bool horizontal){
-                         result->pos_delta = result_pos_delta;
+                    auto stop_player_moving_into_block = [](MovePlayerThroughWorldResult_t* res, Block_t* b, Vec_t resulting_pos_delta, bool has_even_rotations, bool is_horizontal){
+                         res->pos_delta = resulting_pos_delta;
 
-                         if(horizontal){
-                              if(even_rotations){
-                                   collided_block->pos_delta.x = 0.0;
+                         if(is_horizontal){
+                              if(has_even_rotations){
+                                   b->pos_delta.x = 0.0;
                               }else{
-                                   collided_block->pos_delta.y = 0.0;
+                                   b->pos_delta.y = 0.0;
                               }
                          }else{
-                              if(even_rotations){
-                                   collided_block->pos_delta.y = 0.0;
+                              if(has_even_rotations){
+                                   b->pos_delta.y = 0.0;
                               }else{
-                                   collided_block->pos_delta.x = 0.0;
+                                   b->pos_delta.x = 0.0;
                               }
                          }
                     };
@@ -536,6 +541,10 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
 
                Interactive_t* interactive = quad_tree_interactive_solid_at(world->interactive_qt, &world->tilemap, coord);
                if(interactive){
+                    // skip popups at the same level or lower than us
+                    if(interactive->type == INTERACTIVE_TYPE_POPUP &&
+                       interactive->popup.lift.ticks - 1 <= player_pos.z) continue;
+
                     bool collided = false;
                     position_slide_against_rect(player_pos, coord, PLAYER_RADIUS, &result.pos_delta, &collided);
                     if(collided && !result.collided){

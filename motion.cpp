@@ -380,9 +380,9 @@ bool grid_motion_moving_in_direction(GridMotion_t* grid_motion, Direction_t dire
 
 MoveDirection_t move_direction_between(Position_t a, Position_t b){
      auto diff = pos_to_vec(b - a);
-     auto abs_diff_x = abs(diff.x);
-     auto abs_diff_y = abs(diff.y);
-     auto xy_diff = abs(abs_diff_x - abs_diff_y);
+     auto abs_diff_x = fabs(diff.x);
+     auto abs_diff_y = fabs(diff.y);
+     auto xy_diff = fabs(abs_diff_x - abs_diff_y);
 
      if(xy_diff < PIXEL_SIZE){
           if(diff.x < 0){
