@@ -230,8 +230,26 @@ bool check_direction_from_block_for_adjacent_walls(Block_t* block, TileMap_t* ti
           return true;
      }
 
-     return quad_tree_interactive_solid_at(interactive_qt, tilemap, coord_a) ||
-            quad_tree_interactive_solid_at(interactive_qt, tilemap, coord_b);
+     Interactive_t* a = quad_tree_interactive_solid_at(interactive_qt, tilemap, coord_a);
+     Interactive_t* b = quad_tree_interactive_solid_at(interactive_qt, tilemap, coord_b);
+
+     if(a){
+          if(a->type == INTERACTIVE_TYPE_POPUP &&
+             (a->popup.lift.ticks - 1) <= block->pos.z){
+          }else{
+               return true;
+          }
+     }
+
+     if(b){
+          if(b->type == INTERACTIVE_TYPE_POPUP &&
+             (b->popup.lift.ticks - 1) <= block->pos.z){
+          }else{
+               return true;
+          }
+     }
+
+     return false;
 }
 
 void copy_block_collision_results(Block_t* block, CheckBlockCollisionResult_t* result){
