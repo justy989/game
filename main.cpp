@@ -1125,7 +1125,7 @@ int main(int argc, char** argv){
                for(S16 i = 0; i < world.interactives.count; i++){
                     Interactive_t* interactive = world.interactives.elements + i;
                     if(interactive->type == INTERACTIVE_TYPE_POPUP){
-                         lift_update(&interactive->popup.lift, POPUP_TICK_DELAY, dt, 1, HEIGHT_INTERVAL + 1);
+                         lift_update(&interactive->popup.lift, POPUP_TICK_DELAY, dt, 1, POPUP_MAX_LIFT_TICKS);
 
                          for(S16 p = 0; p < world.players.count; p++){
                               auto* player = world.players.elements + p;
@@ -2874,7 +2874,7 @@ int main(int argc, char** argv){
 
           glEnd();
 
-#if 0
+#if 1
           // light
           glBindTexture(GL_TEXTURE_2D, 0);
           glBegin(GL_QUADS);

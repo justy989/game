@@ -13,6 +13,7 @@ struct Lift_t{
 void lift_update(Lift_t* lift, float tick_delay, float dt, S8 min_tick, S8 max_tick);
 
 #define POPUP_TICK_DELAY 0.1f
+#define POPUP_MAX_LIFT_TICKS (HEIGHT_INTERVAL + 1)
 
 enum InteractiveType_t{
      INTERACTIVE_TYPE_NONE,

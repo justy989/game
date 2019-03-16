@@ -716,10 +716,6 @@ static void illuminate_line(Coord_t start, Coord_t end, U8 value, World_t* world
 
           Block_t* block = nullptr;
           if(coords[i] != start){
-               if(tile_is_solid(tile)){
-                    break;
-               }
-
                S16 px = coords[i].x * TILE_SIZE_IN_PIXELS;
                S16 py = coords[i].y * TILE_SIZE_IN_PIXELS;
                Rect_t coord_rect {px, py, (S16)(px + TILE_SIZE_IN_PIXELS), (S16)(py + TILE_SIZE_IN_PIXELS)};
@@ -737,7 +733,17 @@ static void illuminate_line(Coord_t start, Coord_t end, U8 value, World_t* world
           }
 
           if(tile->light < new_value) tile->light = new_value;
+
           if(block) break;
+          if(tile_is_solid(tile)){
+               break;
+          }
+
+          // TODO: probably handle doors too?
+          Interactive_t* interactive = quad_tree_interactive_find_at(world->interactive_qt, coords[i]);
+          if(interactive && interactive->type == INTERACTIVE_TYPE_POPUP && interactive->popup.lift.ticks == (POPUP_MAX_LIFT_TICKS / 2)){
+               break;
+          }
      }
 }
 
