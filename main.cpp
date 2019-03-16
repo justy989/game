@@ -2272,17 +2272,10 @@ int main(int argc, char** argv){
                               auto* interactive = quad_tree_interactive_find_at(world.interactive_qt, rect_coords[c]);
                               if(interactive){
                                    if(interactive->type == INTERACTIVE_TYPE_POPUP){
-                                        if(!pushed_up && block->pos.z == interactive->popup.lift.ticks - 2){
+                                        if(!pushed_up && (block->pos.z == interactive->popup.lift.ticks - 2)){
                                              block->pos.z++;
                                              held_up = true;
                                              pushed_up = true;
-                                        }else if(!held_up && block->pos.z > (interactive->popup.lift.ticks - 1)){
-                                             block->fall_time += dt;
-                                             if(block->fall_time >= FALL_TIME){
-                                                  block->fall_time -= FALL_TIME;
-                                                  block->pos.z--;
-                                             }
-                                             held_up = true;
                                         }else if(!held_up && block->pos.z == (interactive->popup.lift.ticks - 1)){
                                              held_up = true;
                                         }
