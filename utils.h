@@ -53,3 +53,5 @@ Vec_t mass_move(Vec_t* vel, Vec_t accel, F32 dt);
 
 S16 closest_grid_center_pixel(S16 grid_width, S16 v);
 S16 closest_pixel(S16 pixel, F32 decimal);
+
+void get_rect_coords(Rect_t rect, Coord_t* coords);

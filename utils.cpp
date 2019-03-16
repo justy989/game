@@ -300,3 +300,10 @@ S16 closest_pixel(S16 pixel, F32 decimal){
 
      return pixel;
 }
+
+void get_rect_coords(Rect_t rect, Coord_t* coords){
+     coords[0] = pixel_to_coord(Pixel_t{rect.left, rect.bottom});
+     coords[1] = pixel_to_coord(Pixel_t{rect.left, rect.top});
+     coords[2] = pixel_to_coord(Pixel_t{rect.right, rect.bottom});
+     coords[3] = pixel_to_coord(Pixel_t{rect.right, rect.top});
+}

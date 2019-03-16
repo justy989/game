@@ -12,8 +12,14 @@ Entanglement:
 - arrow entanglement
 - arrow kills player
 
-Current problem:
-- when a block teleports itself to a grid center, it can trap the player in the right circumstances, not sure how to reproduce
+Current bugs:
+- pushing an entangled block into an it's entangler (when they don't initially start next to each other) all in open spacce, causes the block we collided with to end up out of the grid
+- an entangled block pushing into the player up against a wall stops the player from moving at all
+- messing around with rotated entangled blocks, we've hit problems blocks get slighly off grid somehow, need to reproduce
+
+Current Design issues:
+- it is important for the player to force a rotated entangled block to not move when we push the other block. To do this we have to wedge ourself against it before pushing the block we want.
+  if you forget to do this the block will be slightly off grid which isn't great
 
 Big Features:
 - Block splitting
@@ -2259,21 +2265,27 @@ int main(int argc, char** argv){
                          held_up = block_held_up_by_another_block(block, world.block_qt);
 
                          // TODO: should we care about the decimal component of the position ?
-                         auto* interactive = quad_tree_interactive_find_at(world.interactive_qt, coord);
-                         if(interactive){
-                              if(interactive->type == INTERACTIVE_TYPE_POPUP){
-                                   if(block->pos.z == interactive->popup.lift.ticks - 2){
-                                        block->pos.z++;
-                                        held_up = true;
-                                   }else if(block->pos.z > (interactive->popup.lift.ticks - 1)){
-                                        block->fall_time += dt;
-                                        if(block->fall_time >= FALL_TIME){
-                                             block->fall_time -= FALL_TIME;
-                                             block->pos.z--;
+                         Coord_t rect_coords[4];
+                         bool pushed_up = false;
+                         get_rect_coords(block_get_rect(block), rect_coords);
+                         for(S8 c = 0; c < 4; c++){
+                              auto* interactive = quad_tree_interactive_find_at(world.interactive_qt, rect_coords[c]);
+                              if(interactive){
+                                   if(interactive->type == INTERACTIVE_TYPE_POPUP){
+                                        if(!pushed_up && block->pos.z == interactive->popup.lift.ticks - 2){
+                                             block->pos.z++;
+                                             held_up = true;
+                                             pushed_up = true;
+                                        }else if(!held_up && block->pos.z > (interactive->popup.lift.ticks - 1)){
+                                             block->fall_time += dt;
+                                             if(block->fall_time >= FALL_TIME){
+                                                  block->fall_time -= FALL_TIME;
+                                                  block->pos.z--;
+                                             }
+                                             held_up = true;
+                                        }else if(!held_up && block->pos.z == (interactive->popup.lift.ticks - 1)){
+                                             held_up = true;
                                         }
-                                        held_up = true;
-                                   }else if(block->pos.z == (interactive->popup.lift.ticks - 1)){
-                                        held_up = true;
                                    }
                               }
                          }
@@ -2869,7 +2881,7 @@ int main(int argc, char** argv){
 
           glEnd();
 
-#if 1
+#if 0
           // light
           glBindTexture(GL_TEXTURE_2D, 0);
           glBegin(GL_QUADS);
