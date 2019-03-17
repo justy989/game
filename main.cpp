@@ -34,6 +34,7 @@ NOTES:
 #include <chrono>
 #include <cfloat>
 #include <cassert>
+#include <thread>
 
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_opengl.h>
@@ -490,9 +491,15 @@ int main(int argc, char** argv){
           if((!suite || show_suite) && demo.seek_frame < 0){
                current_time = std::chrono::system_clock::now();
                std::chrono::duration<double> elapsed_seconds = current_time - last_time;
+               auto elapsed_milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(current_time - last_time);
                dt = (F32)(elapsed_seconds.count());
 
-               if(dt < 0.0166666f / demo.dt_scalar) continue; // limit 60 fps
+               if(dt < 0.0166666f / demo.dt_scalar){
+                    if(elapsed_milliseconds.count() < 16){
+                         std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                    }
+                    continue; // limit 60 fps
+               }
           }
 
           last_time = current_time;

@@ -732,16 +732,17 @@ static void illuminate_line(Coord_t start, Coord_t end, U8 value, World_t* world
                }
           }
 
-          if(tile->light < new_value) tile->light = new_value;
-
-          if(block) break;
-          if(tile_is_solid(tile)){
+          if(coords[i] != start && tile_is_solid(tile)){
                break;
           }
 
+          if(tile->light < new_value) tile->light = new_value;
+
+          if(block) break;
+
           // TODO: probably handle doors too?
           Interactive_t* interactive = quad_tree_interactive_find_at(world->interactive_qt, coords[i]);
-          if(interactive && interactive->type == INTERACTIVE_TYPE_POPUP && interactive->popup.lift.ticks == (POPUP_MAX_LIFT_TICKS / 2)){
+          if(interactive && interactive->type == INTERACTIVE_TYPE_POPUP && interactive->popup.lift.ticks >= (POPUP_MAX_LIFT_TICKS / 2)){
                break;
           }
      }
