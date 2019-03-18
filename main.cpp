@@ -1370,6 +1370,8 @@ int main(int argc, char** argv){
                for(S16 i = 0; i < world.players.count; i++){
                     Player_t* player = world.players.elements + i;
 
+                    player->stopping_block_from = DIRECTION_COUNT;
+
                     for(int d = 0; d < 4; d++){
                          if(player_action.move[d]){
                               Direction_t rot_dir = direction_rotate_clockwise((Direction_t)(d), player->move_rotation[d]);
@@ -1652,8 +1654,8 @@ int main(int argc, char** argv){
 
                     block->prev_vel = block->vel;
 
-                    block->accel.x = calc_accel_component_move(block->horizontal_move, BLOCK_ACCEL);
-                    block->accel.y = calc_accel_component_move(block->vertical_move, BLOCK_ACCEL);
+                    block->accel.x = calc_accel_component_move(block->horizontal_move, block->accel_magnitudes.x);
+                    block->accel.y = calc_accel_component_move(block->vertical_move, block->accel_magnitudes.y);
 
                     block->pos_delta.x = calc_position_motion(block->vel.x, block->accel.x, dt);
                     block->vel.x = calc_velocity_motion(block->vel.x, block->accel.x, dt);
@@ -1845,11 +1847,11 @@ int main(int argc, char** argv){
                     Vec_t pos_vec = pos_to_vec(block->pos);
 
                     update_motion_grid_aligned(&block->horizontal_move, motion_x_component(block),
-                                               block->coast_horizontal != BLOCK_COAST_NONE, dt, BLOCK_ACCEL,
+                                               block->coast_horizontal != BLOCK_COAST_NONE, dt, block->accel.x,
                                                BLOCK_ACCEL_DISTANCE, pos_vec.x);
 
                     update_motion_grid_aligned(&block->vertical_move, motion_y_component(block),
-                                               block->coast_vertical != BLOCK_COAST_NONE, dt, BLOCK_ACCEL,
+                                               block->coast_vertical != BLOCK_COAST_NONE, dt, block->accel.y,
                                                BLOCK_ACCEL_DISTANCE, pos_vec.y);
                }
 
@@ -1871,6 +1873,18 @@ int main(int argc, char** argv){
                          bool stop_on_boundary_x = false;
                          bool stop_on_boundary_y = false;
                          bool held_up = false;
+
+                         // if we are being stopped by the player and have moved more than the player radius (which is
+                         // a check to ensure we don't stop a block instantaneously) then stop on the coordinate boundaries
+                         if(block->stopped_by_player_horizontal &&
+                            block->horizontal_move.distance > PLAYER_RADIUS){
+                              stop_on_boundary_x = true;
+                         }
+
+                         if(block->stopped_by_player_vertical &&
+                            block->vertical_move.distance > PLAYER_RADIUS){
+                              stop_on_boundary_y = true;
+                         }
 
                          if(block->pos_delta.x != 0.0f || block->pos_delta.y != 0.0f){
                               auto result = check_block_collision_with_other_blocks(block->pos,
@@ -2600,6 +2614,8 @@ int main(int argc, char** argv){
                          block->pos.pixel.x = block->stop_on_pixel_x;
                          block->pos.decimal.x = 0;
                          block->stop_on_pixel_x = 0;
+
+                         block->stopped_by_player_horizontal = false;
                     }else{
                          block->pos.pixel.x = final_pos.pixel.x;
                          block->pos.decimal.x = final_pos.decimal.x;
@@ -2609,6 +2625,8 @@ int main(int argc, char** argv){
                          block->pos.pixel.y = block->stop_on_pixel_y;
                          block->pos.decimal.y = 0;
                          block->stop_on_pixel_y = 0;
+
+                         block->stopped_by_player_vertical = false;
                     }else{
                          block->pos.pixel.y = final_pos.pixel.y;
                          block->pos.decimal.y = final_pos.decimal.y;

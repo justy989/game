@@ -47,5 +47,7 @@ struct Player_t : public Motion_t {
      Direction_t pushing_block_dir = DIRECTION_COUNT; // we would use face but the pushing can be through rotated portal
      S8          pushing_block_rotation = 0;
 
+     Direction_t stopping_block_from = DIRECTION_COUNT;
+
      bool successfully_moved = false;
 };

@@ -40,6 +40,10 @@ struct Block_t : public GridMotion_t{
      bool successfully_moved = false;
      BlockCoast_t coast_horizontal = BLOCK_COAST_NONE;
      BlockCoast_t coast_vertical = BLOCK_COAST_NONE;
+     bool stopped_by_player_horizontal = false;
+     bool stopped_by_player_vertical = false;
+
+     Vec_t accel_magnitudes;
 };
 
 S16 get_object_x(Block_t* block);

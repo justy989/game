@@ -430,7 +430,13 @@ void draw_solids(Vec_t pos, Interactive_t* interactive, Block_t** blocks, S16 bl
           }
 
           S8 player_frame_y = direction_rotate_clockwise(player->face, portal_rotations);
-          if(player->pushing_block >= 0) player_frame_y += 4;
+          if(player->pushing_block >= 0){
+              player_frame_y += 4;
+          }else if(player->stopping_block_from < DIRECTION_COUNT){
+               player_frame_y = direction_rotate_clockwise(player->stopping_block_from, portal_rotations);
+               player_frame_y += 4;
+          }
+
           if(player->has_bow){
                player_frame_y += 8;
                if(player->bow_draw_time > (PLAYER_BOW_DRAW_DELAY / 2.0f)){
