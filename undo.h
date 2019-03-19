@@ -20,6 +20,7 @@ struct UndoBlock_t{
 
 struct UndoPlayer_t{
      Pixel_t pixel;
+     Vec_t decimal;
      S8 z;
      Direction_t face;
 };
