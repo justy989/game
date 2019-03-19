@@ -985,6 +985,12 @@ bool block_push(Block_t* block, Direction_t direction, World_t* world, bool push
 
      if(block_against_solid_tile(block, direction, &world->tilemap, world->interactive_qt)) return false;
      if(block_against_solid_interactive(block, direction, &world->tilemap, world->interactive_qt)) return false;
+     auto* player = block_against_player(block, direction, &world->players);
+     if(player){
+          player->stopping_block_from = direction_opposite(direction);
+          player->stopping_block_from_time = PLAYER_STOP_IDLE_BLOCK_TIMER;
+          return false;
+     }
 
      // if are sliding on ice and are pushed in the opposite direction then stop
      if(block_on_ice(block->pos, block->pos_delta, &world->tilemap, world->interactive_qt)){

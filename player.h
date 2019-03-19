@@ -4,6 +4,7 @@
 #include "motion.h"
 #include "coord.h"
 #include "direction.h"
+#include "rect.h"
 
 #define PLAYER_RADIUS_IN_SUB_PIXELS 3.5f
 #define PLAYER_RADIUS (PLAYER_RADIUS_IN_SUB_PIXELS / 272.0f)
@@ -11,6 +12,7 @@
 #define PLAYER_WALK_DELAY 0.15f
 #define PLAYER_IDLE_SPEED 0.0025f
 #define PLAYER_BOW_DRAW_DELAY 0.3f
+#define PLAYER_STOP_IDLE_BLOCK_TIMER 0.2f
 
 struct Player_t : public Motion_t {
      Position_t  pos;
@@ -48,6 +50,10 @@ struct Player_t : public Motion_t {
      S8          pushing_block_rotation = 0;
 
      Direction_t stopping_block_from = DIRECTION_COUNT;
+     F32         stopping_block_from_time = 0.0;
 
      bool successfully_moved = false;
 };
+
+// rough estimate since player is 3.5 pixels radius
+Rect_t get_player_rect(Player_t* player);

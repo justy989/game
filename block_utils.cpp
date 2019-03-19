@@ -373,6 +373,25 @@ Tile_t* block_against_solid_tile(Block_t* block_to_check, Direction_t direction,
      return nullptr;
 }
 
+Player_t* block_against_player(Block_t* block, Direction_t direction, ObjectArray_t<Player_t>* players){
+     Pixel_t pixel_a {};
+     Pixel_t pixel_b {};
+
+     if(!block_adjacent_pixels_to_check(block->pos, block->pos_delta, direction, &pixel_a, &pixel_b)){
+          return nullptr;
+     }
+
+     for(S16 i = 0; i < players->count; i++){
+          auto* player = players->elements + i;
+          auto player_rect = get_player_rect(player);
+          if(pixel_in_rect(pixel_a, player_rect) || pixel_in_rect(pixel_b, player_rect)){
+               return player;
+          }
+     }
+
+     return nullptr;
+}
+
 Block_t* block_held_up_by_another_block(Block_t* block_to_check, QuadTreeNode_t<Block_t>* block_quad_tree){
      // TODO: need more complicated function to detect this
      auto block_to_check_pos = block_to_check->pos + block_to_check->pos_delta;

@@ -50,6 +50,7 @@ BlockInsideResult_t block_inside_another_block(Block_t* block_to_check, QuadTree
                                                ObjectArray_t<Block_t>* block_array);
 Tile_t* block_against_solid_tile(Block_t* block_to_check, Direction_t direction, TileMap_t* tilemap,
                                  QuadTreeNode_t<Interactive_t>* interactive_quad_tree);
+Player_t* block_against_player(Block_t* block_to_check, Direction_t direction, ObjectArray_t<Player_t>* players);
 
 Block_t* block_held_up_by_another_block(Block_t* block_to_check, QuadTreeNode_t<Block_t>* block_quad_tree);
 

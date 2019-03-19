@@ -1370,8 +1370,6 @@ int main(int argc, char** argv){
                for(S16 i = 0; i < world.players.count; i++){
                     Player_t* player = world.players.elements + i;
 
-                    player->stopping_block_from = DIRECTION_COUNT;
-
                     for(int d = 0; d < 4; d++){
                          if(player_action.move[d]){
                               Direction_t rot_dir = direction_rotate_clockwise((Direction_t)(d), player->move_rotation[d]);
@@ -1641,6 +1639,16 @@ int main(int argc, char** argv){
                          // if we collide enough to reduce our pos_delta, we could have previously teleported and are no
                          // longer teleporting in the same frame.
                          player->teleport = false;
+                    }
+
+                    if(player->stopping_block_from_time > 0){
+                         player->stopping_block_from_time -= dt;
+                         if(player->stopping_block_from_time < 0){
+                              player->stopping_block_from_time = 0;
+                              player->stopping_block_from = DIRECTION_COUNT;
+                         }
+                    }else{
+                         player->stopping_block_from = DIRECTION_COUNT;
                     }
                }
 
