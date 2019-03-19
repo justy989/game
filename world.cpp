@@ -346,6 +346,50 @@ F32 slow_block_toward_gridlock(Position_t block_pos, Vec_t block_vel, bool horiz
      return fabs(block_vel.y / (time - 0.01666667)); // adjust by one tick since we missed this update
 }
 
+bool player_against_block(Player_t* player, Direction_t direction, QuadTreeNode_t<Block_t>* block_qt){
+     auto player_rect = get_player_rect(player);
+     auto check_rect = rect_surrounding_adjacent_coords(pos_to_coord(player->pos));
+
+     Pixel_t pixel_a;
+     Pixel_t pixel_b;
+
+     switch(direction){
+     case DIRECTION_LEFT:
+          pixel_a = Pixel_t{static_cast<S16>(player_rect.left - 1), player_rect.bottom};
+          pixel_b = Pixel_t{static_cast<S16>(player_rect.left - 1), player_rect.top};
+          break;
+     case DIRECTION_RIGHT:
+          pixel_a = Pixel_t{static_cast<S16>(player_rect.right + 1), player_rect.bottom};
+          pixel_b = Pixel_t{static_cast<S16>(player_rect.right + 1), player_rect.top};
+          break;
+     case DIRECTION_UP:
+          pixel_a = Pixel_t{player_rect.left, static_cast<S16>(player_rect.top + 1)};
+          pixel_b = Pixel_t{player_rect.right, static_cast<S16>(player_rect.top + 1)};
+          break;
+     case DIRECTION_DOWN:
+          pixel_a = Pixel_t{player_rect.left, static_cast<S16>(player_rect.bottom - 1)};
+          pixel_b = Pixel_t{player_rect.right, static_cast<S16>(player_rect.bottom - 1)};
+          break;
+     default:
+          return false;
+     }
+
+     S16 block_count = 0;
+     Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
+     quad_tree_find_in(block_qt, check_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
+
+     for(S16 i = 0; i < block_count; i++){
+          Block_t* block = blocks[i];
+          Rect_t block_rect = block_get_rect(block);
+
+          if(pixel_in_rect(pixel_b, block_rect) || pixel_in_rect(pixel_b, block_rect)){
+               return true;
+          }
+     }
+
+     return false;
+}
+
 MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, Vec_t player_vel, Vec_t player_pos_delta,
                                                          Direction_t player_face, S8 player_clone_instance, S16 player_index,
                                                          S16 player_pushing_block, Direction_t player_pushing_block_dir,
@@ -441,6 +485,8 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
 
                     auto* player = world->players.elements + player_index;
 
+                    // TODO: definitely heavily condense this
+
                     switch(collided_block_dir){
                     default:
                          break;
@@ -448,25 +494,41 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                          if(rotated_vel.x > 0.0f){
                               result.pos_delta.x = 0;
 
-                              auto new_pos = collided_block->pos + Vec_t{TILE_SIZE + PLAYER_RADIUS, 0};
-                              player->pos.pixel.x = new_pos.pixel.x;
-                              player->pos.decimal.x = new_pos.decimal.x;
-
-                              player->stopping_block_from = collided_block_dir;
-
-                              if(even_rotations){
-                                   collided_block->stopped_by_player_horizontal = true;
-                                   if(collided_block->horizontal_move.state != MOVE_STATE_STOPPING){
-                                        collided_block->accel_magnitudes.x = slow_block_toward_gridlock(collided_block->pos, collided_block->vel, true, true);
-                                        collided_block->horizontal_move.state = MOVE_STATE_STOPPING;
-                                        collided_block->horizontal_move.distance = 0;
+                              if(player_against_block(player, direction_opposite(collided_block_dir), world->block_qt)){
+                                   if(even_rotations){
+                                        reset_move(&collided_block->horizontal_move);
+                                        collided_block->vel.x = 0;
+                                        collided_block->accel.x = 0;
+                                        collided_block->pos.pixel.x = (player->pos.pixel.x - 5) - BLOCK_SOLID_SIZE_IN_PIXELS;
+                                        collided_block->pos.decimal.x = 0;
+                                   }else{
+                                        reset_move(&collided_block->vertical_move);
+                                        collided_block->vel.y = 0;
+                                        collided_block->accel.y = 0;
+                                        collided_block->pos.decimal.y = 0;
+                                        collided_block->pos.pixel.y = (player->pos.pixel.y + 5);
                                    }
                               }else{
-                                   collided_block->stopped_by_player_vertical = true;
-                                   if(collided_block->vertical_move.state != MOVE_STATE_STOPPING){
-                                        collided_block->accel_magnitudes.y = slow_block_toward_gridlock(collided_block->pos, collided_block->vel, false, true);
-                                        collided_block->vertical_move.state = MOVE_STATE_STOPPING;
-                                        collided_block->vertical_move.distance = 0;
+                                   auto new_pos = collided_block->pos + Vec_t{TILE_SIZE + PLAYER_RADIUS, 0};
+                                   player->pos.pixel.x = new_pos.pixel.x;
+                                   player->pos.decimal.x = new_pos.decimal.x;
+
+                                   player->stopping_block_from = collided_block_dir;
+
+                                   if(even_rotations){
+                                        collided_block->stopped_by_player_horizontal = true;
+                                        if(collided_block->horizontal_move.state != MOVE_STATE_STOPPING){
+                                             collided_block->accel_magnitudes.x = slow_block_toward_gridlock(collided_block->pos, collided_block->vel, true, true);
+                                             collided_block->horizontal_move.state = MOVE_STATE_STOPPING;
+                                             collided_block->horizontal_move.distance = 0;
+                                        }
+                                   }else{
+                                        collided_block->stopped_by_player_vertical = true;
+                                        if(collided_block->vertical_move.state != MOVE_STATE_STOPPING){
+                                             collided_block->accel_magnitudes.y = slow_block_toward_gridlock(collided_block->pos, collided_block->vel, false, true);
+                                             collided_block->vertical_move.state = MOVE_STATE_STOPPING;
+                                             collided_block->vertical_move.distance = 0;
+                                        }
                                    }
                               }
                          }else{
@@ -477,25 +539,41 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                          if(rotated_vel.x < 0.0f){
                               result.pos_delta.x = 0;
 
-                              auto new_pos = collided_block->pos - Vec_t{PLAYER_RADIUS, 0};
-                              player->pos.pixel.x = new_pos.pixel.x;
-                              player->pos.decimal.x = new_pos.decimal.x;
-
-                              player->stopping_block_from = collided_block_dir;
-
-                              if(even_rotations){
-                                   collided_block->stopped_by_player_horizontal = true;
-                                   if(collided_block->horizontal_move.state != MOVE_STATE_STOPPING){
-                                        collided_block->accel_magnitudes.x = slow_block_toward_gridlock(collided_block->pos, collided_block->vel, true, false);
-                                        collided_block->horizontal_move.state = MOVE_STATE_STOPPING;
-                                        collided_block->horizontal_move.distance = 0;
+                              if(player_against_block(player, direction_opposite(collided_block_dir), world->block_qt)){
+                                   if(even_rotations){
+                                        reset_move(&collided_block->horizontal_move);
+                                        collided_block->vel.x = 0;
+                                        collided_block->accel.x = 0;
+                                        collided_block->pos.decimal.x = 0;
+                                        collided_block->pos.pixel.x = (player->pos.pixel.x + 5);
+                                   }else{
+                                        reset_move(&collided_block->vertical_move);
+                                        collided_block->vel.y = 0;
+                                        collided_block->accel.y = 0;
+                                        collided_block->pos.decimal.y = 0;
+                                        collided_block->pos.pixel.y = (player->pos.pixel.y + 5);
                                    }
                               }else{
-                                   collided_block->stopped_by_player_vertical = true;
-                                   if(collided_block->vertical_move.state != MOVE_STATE_STOPPING){
-                                        collided_block->accel_magnitudes.y = slow_block_toward_gridlock(collided_block->pos, collided_block->vel, false, false);
-                                        collided_block->vertical_move.state = MOVE_STATE_STOPPING;
-                                        collided_block->vertical_move.distance = 0;
+                                   auto new_pos = collided_block->pos - Vec_t{PLAYER_RADIUS, 0};
+                                   player->pos.pixel.x = new_pos.pixel.x;
+                                   player->pos.decimal.x = new_pos.decimal.x;
+
+                                   player->stopping_block_from = collided_block_dir;
+
+                                   if(even_rotations){
+                                        collided_block->stopped_by_player_horizontal = true;
+                                        if(collided_block->horizontal_move.state != MOVE_STATE_STOPPING){
+                                             collided_block->accel_magnitudes.x = slow_block_toward_gridlock(collided_block->pos, collided_block->vel, true, false);
+                                             collided_block->horizontal_move.state = MOVE_STATE_STOPPING;
+                                             collided_block->horizontal_move.distance = 0;
+                                        }
+                                   }else{
+                                        collided_block->stopped_by_player_vertical = true;
+                                        if(collided_block->vertical_move.state != MOVE_STATE_STOPPING){
+                                             collided_block->accel_magnitudes.y = slow_block_toward_gridlock(collided_block->pos, collided_block->vel, false, false);
+                                             collided_block->vertical_move.state = MOVE_STATE_STOPPING;
+                                             collided_block->vertical_move.distance = 0;
+                                        }
                                    }
                               }
                          }else{
@@ -506,28 +584,44 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                          if(rotated_vel.y < 0.0f){
                               result.pos_delta.y = 0;
 
-                              auto new_pos = collided_block->pos - Vec_t{0, PLAYER_RADIUS};
-                              player->pos.pixel.y = new_pos.pixel.y;
-                              player->pos.decimal.y = new_pos.decimal.y;
-
-                              player->stopping_block_from = collided_block_dir;
-
-                              if(even_rotations){
-                                   collided_block->stopped_by_player_vertical = true;
-                                   if(collided_block->vertical_move.state != MOVE_STATE_STOPPING){
-                                        collided_block->accel_magnitudes.y = slow_block_toward_gridlock(collided_block->pos, collided_block->vel, false, false);
-                                        collided_block->vertical_move.state = MOVE_STATE_STOPPING;
-                                        collided_block->vertical_move.distance = 0;
+                              if(player_against_block(player, direction_opposite(collided_block_dir), world->block_qt)){
+                                   if(even_rotations){
+                                        reset_move(&collided_block->vertical_move);
+                                        collided_block->vel.y = 0;
+                                        collided_block->accel.y = 0;
+                                        collided_block->pos.decimal.y = 0;
+                                        collided_block->pos.pixel.y = (player->pos.pixel.y + 5);
+                                   }else{
+                                        reset_move(&collided_block->horizontal_move);
+                                        collided_block->vel.x = 0;
+                                        collided_block->accel.x = 0;
+                                        collided_block->pos.decimal.x = 0;
+                                        collided_block->pos.pixel.x = (player->pos.pixel.x + 5);
                                    }
                               }else{
-                                   collided_block->stopped_by_player_horizontal = true;
-                                   if(collided_block->horizontal_move.state != MOVE_STATE_STOPPING){
-                                        collided_block->accel_magnitudes.x = slow_block_toward_gridlock(collided_block->pos, collided_block->vel, true, false);
-                                        collided_block->horizontal_move.state = MOVE_STATE_STOPPING;
-                                        collided_block->horizontal_move.distance = 0;
+                                   auto new_pos = collided_block->pos - Vec_t{0, PLAYER_RADIUS};
+                                   player->pos.pixel.y = new_pos.pixel.y;
+                                   player->pos.decimal.y = new_pos.decimal.y;
+
+                                   player->stopping_block_from = collided_block_dir;
+
+                                   if(even_rotations){
+                                        collided_block->stopped_by_player_vertical = true;
+                                        if(collided_block->vertical_move.state != MOVE_STATE_STOPPING){
+                                             collided_block->accel_magnitudes.y = slow_block_toward_gridlock(collided_block->pos, collided_block->vel, false, false);
+                                             collided_block->vertical_move.state = MOVE_STATE_STOPPING;
+                                             collided_block->vertical_move.distance = 0;
+                                        }
+                                   }else{
+                                        collided_block->stopped_by_player_horizontal = true;
+                                        if(collided_block->horizontal_move.state != MOVE_STATE_STOPPING){
+                                             collided_block->accel_magnitudes.x = slow_block_toward_gridlock(collided_block->pos, collided_block->vel, true, false);
+                                             collided_block->horizontal_move.state = MOVE_STATE_STOPPING;
+                                             collided_block->horizontal_move.distance = 0;
+                                        }
                                    }
                               }
-                         } else {
+                         }else{
                               result.pos_delta = result_pos_delta;
                          }
                          break;
@@ -535,25 +629,41 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                          if(rotated_vel.y > 0.0f){
                               result.pos_delta.y = 0;
 
-                              auto new_pos = collided_block->pos + Vec_t{0, TILE_SIZE + PLAYER_RADIUS};
-                              player->pos.pixel.y = new_pos.pixel.y;
-                              player->pos.decimal.y = new_pos.decimal.y;
-
-                              player->stopping_block_from = collided_block_dir;
-
-                              if(even_rotations){
-                                   collided_block->stopped_by_player_vertical = true;
-                                   if(collided_block->vertical_move.state != MOVE_STATE_STOPPING){
-                                        collided_block->accel_magnitudes.y = slow_block_toward_gridlock(collided_block->pos, collided_block->vel, false, true);
-                                        collided_block->vertical_move.state = MOVE_STATE_STOPPING;
-                                        collided_block->vertical_move.distance = 0;
+                              if(player_against_block(player, direction_opposite(collided_block_dir), world->block_qt)){
+                                   if(even_rotations){
+                                        reset_move(&collided_block->vertical_move);
+                                        collided_block->vel.y = 0;
+                                        collided_block->accel.y = 0;
+                                        collided_block->pos.decimal.y = 0;
+                                        collided_block->pos.pixel.y = (player->pos.pixel.y - 5) - BLOCK_SOLID_SIZE_IN_PIXELS;
+                                   }else{
+                                        reset_move(&collided_block->horizontal_move);
+                                        collided_block->vel.x = 0;
+                                        collided_block->accel.x = 0;
+                                        collided_block->pos.decimal.x = 0;
+                                        collided_block->pos.pixel.x = (player->pos.pixel.x + 5);
                                    }
                               }else{
-                                   collided_block->stopped_by_player_horizontal = true;
-                                   if(collided_block->horizontal_move.state != MOVE_STATE_STOPPING){
-                                        collided_block->accel_magnitudes.x = slow_block_toward_gridlock(collided_block->pos, collided_block->vel, true, true);
-                                        collided_block->horizontal_move.state = MOVE_STATE_STOPPING;
-                                        collided_block->horizontal_move.distance = 0;
+                                   auto new_pos = collided_block->pos + Vec_t{0, TILE_SIZE + PLAYER_RADIUS};
+                                   player->pos.pixel.y = new_pos.pixel.y;
+                                   player->pos.decimal.y = new_pos.decimal.y;
+
+                                   player->stopping_block_from = collided_block_dir;
+
+                                   if(even_rotations){
+                                        collided_block->stopped_by_player_vertical = true;
+                                        if(collided_block->vertical_move.state != MOVE_STATE_STOPPING){
+                                             collided_block->accel_magnitudes.y = slow_block_toward_gridlock(collided_block->pos, collided_block->vel, false, true);
+                                             collided_block->vertical_move.state = MOVE_STATE_STOPPING;
+                                             collided_block->vertical_move.distance = 0;
+                                        }
+                                   }else{
+                                        collided_block->stopped_by_player_horizontal = true;
+                                        if(collided_block->horizontal_move.state != MOVE_STATE_STOPPING){
+                                             collided_block->accel_magnitudes.x = slow_block_toward_gridlock(collided_block->pos, collided_block->vel, true, true);
+                                             collided_block->horizontal_move.state = MOVE_STATE_STOPPING;
+                                             collided_block->horizontal_move.distance = 0;
+                                        }
                                    }
                               }
                          }else{
