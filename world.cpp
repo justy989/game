@@ -346,6 +346,29 @@ F32 slow_block_toward_gridlock(Position_t block_pos, Vec_t block_vel, bool horiz
      return fabs(block_vel.y / (time - 0.01666667)); // adjust by one tick since we missed this update
 }
 
+void get_rect_adjacent_pixels(Rect_t rect, Direction_t direction, Pixel_t* pixel_a, Pixel_t* pixel_b){
+     switch(direction){
+     case DIRECTION_LEFT:
+          *pixel_a = Pixel_t{static_cast<S16>(rect.left - 1), rect.bottom};
+          *pixel_b = Pixel_t{static_cast<S16>(rect.left - 1), rect.top};
+          break;
+     case DIRECTION_RIGHT:
+          *pixel_a = Pixel_t{static_cast<S16>(rect.right + 1), rect.bottom};
+          *pixel_b = Pixel_t{static_cast<S16>(rect.right + 1), rect.top};
+          break;
+     case DIRECTION_UP:
+          *pixel_a = Pixel_t{rect.left, static_cast<S16>(rect.top + 1)};
+          *pixel_b = Pixel_t{rect.right, static_cast<S16>(rect.top + 1)};
+          break;
+     case DIRECTION_DOWN:
+          *pixel_a = Pixel_t{rect.left, static_cast<S16>(rect.bottom - 1)};
+          *pixel_b = Pixel_t{rect.right, static_cast<S16>(rect.bottom - 1)};
+          break;
+     default:
+          break;
+     }
+}
+
 Block_t* player_against_block(Player_t* player, Direction_t direction, QuadTreeNode_t<Block_t>* block_qt){
      auto player_rect = get_player_rect(player);
      auto check_rect = rect_surrounding_adjacent_coords(pos_to_coord(player->pos));
@@ -353,26 +376,7 @@ Block_t* player_against_block(Player_t* player, Direction_t direction, QuadTreeN
      Pixel_t pixel_a;
      Pixel_t pixel_b;
 
-     switch(direction){
-     case DIRECTION_LEFT:
-          pixel_a = Pixel_t{static_cast<S16>(player_rect.left - 1), player_rect.bottom};
-          pixel_b = Pixel_t{static_cast<S16>(player_rect.left - 1), player_rect.top};
-          break;
-     case DIRECTION_RIGHT:
-          pixel_a = Pixel_t{static_cast<S16>(player_rect.right + 1), player_rect.bottom};
-          pixel_b = Pixel_t{static_cast<S16>(player_rect.right + 1), player_rect.top};
-          break;
-     case DIRECTION_UP:
-          pixel_a = Pixel_t{player_rect.left, static_cast<S16>(player_rect.top + 1)};
-          pixel_b = Pixel_t{player_rect.right, static_cast<S16>(player_rect.top + 1)};
-          break;
-     case DIRECTION_DOWN:
-          pixel_a = Pixel_t{player_rect.left, static_cast<S16>(player_rect.bottom - 1)};
-          pixel_b = Pixel_t{player_rect.right, static_cast<S16>(player_rect.bottom - 1)};
-          break;
-     default:
-          return nullptr;
-     }
+     get_rect_adjacent_pixels(player_rect, direction, &pixel_a, &pixel_b);
 
      S16 block_count = 0;
      Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
@@ -388,6 +392,39 @@ Block_t* player_against_block(Player_t* player, Direction_t direction, QuadTreeN
      }
 
      return nullptr;
+}
+
+bool player_against_solid_tile(Player_t* player, Direction_t direction, TileMap_t* tilemap){
+     auto player_rect = get_player_rect(player);
+
+     Pixel_t pixel_a;
+     Pixel_t pixel_b;
+
+     get_rect_adjacent_pixels(player_rect, direction, &pixel_a, &pixel_b);
+
+     if(tilemap_is_solid(tilemap, pixel_to_coord(pixel_a))) return true;
+     if(tilemap_is_solid(tilemap, pixel_to_coord(pixel_b))) return true;
+
+     return false;
+}
+
+bool player_against_solid_interactive(Player_t* player, Direction_t direction, QuadTreeNode_t<Interactive_t>* interactive_qt){
+     auto player_rect = get_player_rect(player);
+
+     Pixel_t pixel_a;
+     Pixel_t pixel_b;
+
+     get_rect_adjacent_pixels(player_rect, direction, &pixel_a, &pixel_b);
+
+     Coord_t coord = pixel_to_coord(pixel_a);
+     Interactive_t* interactive = quad_tree_find_at(interactive_qt, coord.x, coord.y);
+     if(interactive && interactive_is_solid(interactive)) return true;
+
+     coord = pixel_to_coord(pixel_b);
+     interactive = quad_tree_find_at(interactive_qt, coord.x, coord.y);
+     if(interactive && interactive_is_solid(interactive)) return true;
+
+     return false;
 }
 
 MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, Vec_t player_vel, Vec_t player_pos_delta,
@@ -494,12 +531,21 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                          if(rotated_vel.x > 0.0f){
                               result.pos_delta.x = 0;
 
+                              bool would_squish = false;
                               Block_t* squished_block = player_against_block(player, direction_opposite(collided_block_dir), world->block_qt);
+                              would_squish = squished_block && squished_block->vel.x < collided_block->vel.x;
+
+                              if(!would_squish){
+                                   would_squish = player_against_solid_tile(player, direction_opposite(collided_block_dir), &world->tilemap);
+                              }
+                              if(!would_squish){
+                                   would_squish = player_against_solid_interactive(player, direction_opposite(collided_block_dir), world->interactive_qt);
+                              }
 
                               // only squish if the block we would be squished against is moving slower, do we stop the block we collided with
 
                               // TODO: handle rotations
-                              if(squished_block && squished_block->vel.x < collided_block->vel.x){
+                              if(would_squish){
                                    reset_move(&collided_block->horizontal_move);
                                    collided_block->pos_delta.x = 0;
                                    collided_block->vel.x = 0;
@@ -537,9 +583,18 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                          if(rotated_vel.x < 0.0f){
                               result.pos_delta.x = 0;
 
+                              bool would_squish = false;
                               Block_t* squished_block = player_against_block(player, direction_opposite(collided_block_dir), world->block_qt);
+                              would_squish = squished_block && squished_block->vel.x > collided_block->vel.x;
 
-                              if(squished_block && squished_block->vel.x > collided_block->vel.x){
+                              if(!would_squish){
+                                   would_squish = player_against_solid_tile(player, direction_opposite(collided_block_dir), &world->tilemap);
+                              }
+                              if(!would_squish){
+                                   would_squish = player_against_solid_interactive(player, direction_opposite(collided_block_dir), world->interactive_qt);
+                              }
+
+                              if(would_squish){
                                    reset_move(&collided_block->horizontal_move);
                                    collided_block->pos_delta.x = 0;
                                    collided_block->vel.x = 0;
@@ -577,9 +632,17 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                          if(rotated_vel.y < 0.0f){
                               result.pos_delta.y = 0;
 
+                              bool would_squish = false;
                               Block_t* squished_block = player_against_block(player, direction_opposite(collided_block_dir), world->block_qt);
+                              would_squish = squished_block && squished_block->vel.y > collided_block->vel.y;
+                              if(!would_squish){
+                                   would_squish = player_against_solid_tile(player, direction_opposite(collided_block_dir), &world->tilemap);
+                              }
+                              if(!would_squish){
+                                   would_squish = player_against_solid_interactive(player, direction_opposite(collided_block_dir), world->interactive_qt);
+                              }
 
-                              if(squished_block && squished_block->vel.y > collided_block->vel.y){
+                              if(would_squish){
                                    reset_move(&collided_block->vertical_move);
                                    collided_block->pos_delta.y = 0;
                                    collided_block->vel.y = 0;
@@ -617,9 +680,17 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                          if(rotated_vel.y > 0.0f){
                               result.pos_delta.y = 0;
 
+                              bool would_squish = false;
                               Block_t* squished_block = player_against_block(player, direction_opposite(collided_block_dir), world->block_qt);
+                              would_squish = squished_block && squished_block->vel.y < collided_block->vel.y;
+                              if(!would_squish){
+                                   would_squish = player_against_solid_tile(player, direction_opposite(collided_block_dir), &world->tilemap);
+                              }
+                              if(!would_squish){
+                                   would_squish = player_against_solid_interactive(player, direction_opposite(collided_block_dir), world->interactive_qt);
+                              }
 
-                              if(squished_block && squished_block->vel.y < collided_block->vel.y){
+                              if(would_squish){
                                    reset_move(&collided_block->vertical_move);
                                    collided_block->pos_delta.y = 0;
                                    collided_block->vel.y = 0;
