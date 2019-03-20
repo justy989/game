@@ -2613,6 +2613,12 @@ int main(int argc, char** argv){
                          block->rotation = (block->rotation + block->teleport_rotation) % static_cast<U8>(DIRECTION_COUNT);
                          block->horizontal_move = block->teleport_horizontal_move;
                          block->vertical_move = block->teleport_vertical_move;
+
+                         if(block->rotation % 2 != 0){
+                              F32 tmp = block->accel_magnitudes.x;
+                              block->accel_magnitudes.x = block->accel_magnitudes.y;
+                              block->accel_magnitudes.y = tmp;
+                         }
                     }else{
                          final_pos = block->pos + block->pos_delta;
                     }
@@ -2641,12 +2647,9 @@ int main(int argc, char** argv){
                     }
 
 #if DEBUG_FILE
-                    if(i == 1){
-                         fprintf(debug_file, "%ld 1 hm %s %s %f vm %s %s %f\n", frame_count,
-                                 move_state_to_string(block->horizontal_move.state), move_sign_to_string(block->horizontal_move.sign), block->horizontal_move.distance,
-                                 move_state_to_string(block->vertical_move.state), move_sign_to_string(block->vertical_move.sign), block->vertical_move.distance);
-                    }else if(i == 2){
-                         fprintf(debug_file, "    2 hm %s %s %f vm %s %s %f\n",
+                    if(i == 2){
+                         fprintf(debug_file, "%ld %d %d %f %f hm %s %s %f vm %s %s %f\n", frame_count,
+                                 block->pos.pixel.x, block->pos.pixel.y, block->pos.decimal.x, block->pos.decimal.y,
                                  move_state_to_string(block->horizontal_move.state), move_sign_to_string(block->horizontal_move.sign), block->horizontal_move.distance,
                                  move_state_to_string(block->vertical_move.state), move_sign_to_string(block->vertical_move.sign), block->vertical_move.distance);
                          fflush(debug_file);

@@ -347,22 +347,24 @@ F32 slow_block_toward_gridlock(Position_t block_pos, Vec_t block_vel, bool horiz
 }
 
 void get_rect_adjacent_pixels(Rect_t rect, Direction_t direction, Pixel_t* pixel_a, Pixel_t* pixel_b){
+     // the offsets are because the player rect is not exactly the right size so for each direction we'd like to use samples
+     // that are more representative of the direction
      switch(direction){
      case DIRECTION_LEFT:
-          *pixel_a = Pixel_t{static_cast<S16>(rect.left - 1), rect.bottom};
-          *pixel_b = Pixel_t{static_cast<S16>(rect.left - 1), rect.top};
+          *pixel_a = Pixel_t{static_cast<S16>(rect.left - 1), static_cast<S16>(rect.bottom + 1)};
+          *pixel_b = Pixel_t{static_cast<S16>(rect.left - 1), static_cast<S16>(rect.top - 1)};
           break;
      case DIRECTION_RIGHT:
-          *pixel_a = Pixel_t{static_cast<S16>(rect.right + 1), rect.bottom};
-          *pixel_b = Pixel_t{static_cast<S16>(rect.right + 1), rect.top};
+          *pixel_a = Pixel_t{static_cast<S16>(rect.right + 1), static_cast<S16>(rect.bottom + 1)};
+          *pixel_b = Pixel_t{static_cast<S16>(rect.right + 1), static_cast<S16>(rect.top - 1)};
           break;
      case DIRECTION_UP:
-          *pixel_a = Pixel_t{rect.left, static_cast<S16>(rect.top + 1)};
-          *pixel_b = Pixel_t{rect.right, static_cast<S16>(rect.top + 1)};
+          *pixel_a = Pixel_t{static_cast<S16>(rect.left + 1), static_cast<S16>(rect.top + 1)};
+          *pixel_b = Pixel_t{static_cast<S16>(rect.right - 1), static_cast<S16>(rect.top + 1)};
           break;
      case DIRECTION_DOWN:
-          *pixel_a = Pixel_t{rect.left, static_cast<S16>(rect.bottom - 1)};
-          *pixel_b = Pixel_t{rect.right, static_cast<S16>(rect.bottom - 1)};
+          *pixel_a = Pixel_t{static_cast<S16>(rect.left + 1), static_cast<S16>(rect.bottom - 1)};
+          *pixel_b = Pixel_t{static_cast<S16>(rect.right - 1), static_cast<S16>(rect.bottom - 1)};
           break;
      default:
           break;
