@@ -295,8 +295,15 @@ void activate(World_t* world, Coord_t coord){
      toggle_electricity(&world->tilemap, world->interactive_qt, coord, DIRECTION_DOWN, false, false);
 }
 
-F32 slow_block_toward_gridlock(Position_t block_pos, Vec_t block_vel, bool horizontal, bool negative){
-     auto stop_coord = pos_to_coord(block_pos);
+void slow_block_toward_gridlock(Block_t* block,  bool horizontal, bool negative){
+     Move_t* move = horizontal ? &block->horizontal_move : &block->vertical_move;
+
+     if(move->state == MOVE_STATE_STOPPING) return;
+
+     move->state = MOVE_STATE_STOPPING;
+     move->distance = 0;
+
+     auto stop_coord = pos_to_coord(block->pos);
      if(negative){
           if(horizontal){
                stop_coord.x++;
@@ -306,7 +313,7 @@ F32 slow_block_toward_gridlock(Position_t block_pos, Vec_t block_vel, bool horiz
      }
 
      auto stop_position = coord_to_pos(stop_coord);
-     Vec_t distance_to_stop = pos_to_vec(stop_position - block_pos);
+     Vec_t distance_to_stop = pos_to_vec(stop_position - block->pos);
 
      if(horizontal){
           // if we are too close to the tile boundary, have the block move to the next grid square, this is a design choice
@@ -317,7 +324,7 @@ F32 slow_block_toward_gridlock(Position_t block_pos, Vec_t block_vel, bool horiz
                     stop_coord.x--;
                }
                stop_position = coord_to_pos(stop_coord);
-               distance_to_stop = pos_to_vec(stop_position - block_pos);
+               distance_to_stop = pos_to_vec(stop_position - block->pos);
           }
      }else{
           if(fabs(distance_to_stop.y) <= PLAYER_RADIUS){
@@ -327,7 +334,7 @@ F32 slow_block_toward_gridlock(Position_t block_pos, Vec_t block_vel, bool horiz
                     stop_coord.y--;
                }
                stop_position = coord_to_pos(stop_coord);
-               distance_to_stop = pos_to_vec(stop_position - block_pos);
+               distance_to_stop = pos_to_vec(stop_position - block->pos);
           }
      }
 
@@ -338,12 +345,14 @@ F32 slow_block_toward_gridlock(Position_t block_pos, Vec_t block_vel, bool horiz
      // (d - vt) / 1/2t^2 = a
 
      if(horizontal){
-          F32 time = distance_to_stop.x / (0.5f * block_vel.x);
-          return fabs(block_vel.x / (time - 0.01666667)); // adjust by one tick since we missed this update
+          F32 time = distance_to_stop.x / (0.5f * block->vel.x);
+          block->stopped_by_player_horizontal = true;
+          block->accel_magnitudes.x = fabs(block->vel.x / (time - 0.01666667)); // adjust by one tick since we missed this update
+     }else{
+          F32 time = distance_to_stop.y / (0.5f * block->vel.y);
+          block->stopped_by_player_vertical = true;
+          block->accel_magnitudes.y = fabs(block->vel.y / (time - 0.01666667)); // adjust by one tick since we missed this update
      }
-
-     F32 time = distance_to_stop.y / (0.5f * block_vel.y);
-     return fabs(block_vel.y / (time - 0.01666667)); // adjust by one tick since we missed this update
 }
 
 Block_t* player_against_block(Player_t* player, Direction_t direction, QuadTreeNode_t<Block_t>* block_qt){
@@ -496,6 +505,13 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
 
                     // TODO: definitely heavily condense this
 
+                    bool entangled_rotations_even = true;
+                    Block_t* collided_entangled_block = nullptr;
+                    if(collided_block->entangle_index >= 0){
+                         collided_entangled_block = world->blocks.elements + collided_block->entangle_index;
+                         entangled_rotations_even = ((collided_entangled_block->rotation + collided_block->rotation) % 2) == 0;
+                    }
+
                     switch(collided_block_dir){
                     default:
                          break;
@@ -532,18 +548,24 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                                    player->stopping_block_from = collided_block_dir;
 
                                    if(even_rotations){
-                                        collided_block->stopped_by_player_horizontal = true;
-                                        if(collided_block->horizontal_move.state != MOVE_STATE_STOPPING){
-                                             collided_block->accel_magnitudes.x = slow_block_toward_gridlock(collided_block->pos, collided_block->vel, true, true);
-                                             collided_block->horizontal_move.state = MOVE_STATE_STOPPING;
-                                             collided_block->horizontal_move.distance = 0;
+                                        slow_block_toward_gridlock(collided_block, true, true);
+
+                                        if(collided_entangled_block){
+                                             if(entangled_rotations_even){
+                                                  slow_block_toward_gridlock(collided_entangled_block, true, true);
+                                             }else{
+                                                  slow_block_toward_gridlock(collided_entangled_block, false, true);
+                                             }
                                         }
                                    }else{
-                                        collided_block->stopped_by_player_vertical = true;
-                                        if(collided_block->vertical_move.state != MOVE_STATE_STOPPING){
-                                             collided_block->accel_magnitudes.y = slow_block_toward_gridlock(collided_block->pos, collided_block->vel, false, true);
-                                             collided_block->vertical_move.state = MOVE_STATE_STOPPING;
-                                             collided_block->vertical_move.distance = 0;
+                                        slow_block_toward_gridlock(collided_block, false, true);
+
+                                        if(collided_entangled_block){
+                                             if(entangled_rotations_even){
+                                                  slow_block_toward_gridlock(collided_entangled_block, false, true);
+                                             }else{
+                                                  slow_block_toward_gridlock(collided_entangled_block, true, true);
+                                             }
                                         }
                                    }
                               }
@@ -581,18 +603,24 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                                    player->stopping_block_from = collided_block_dir;
 
                                    if(even_rotations){
-                                        collided_block->stopped_by_player_horizontal = true;
-                                        if(collided_block->horizontal_move.state != MOVE_STATE_STOPPING){
-                                             collided_block->accel_magnitudes.x = slow_block_toward_gridlock(collided_block->pos, collided_block->vel, true, false);
-                                             collided_block->horizontal_move.state = MOVE_STATE_STOPPING;
-                                             collided_block->horizontal_move.distance = 0;
+                                        slow_block_toward_gridlock(collided_block, true, false);
+
+                                        if(collided_entangled_block){
+                                             if(entangled_rotations_even){
+                                                  slow_block_toward_gridlock(collided_entangled_block, true, false);
+                                             }else{
+                                                  slow_block_toward_gridlock(collided_entangled_block, false, false);
+                                             }
                                         }
                                    }else{
-                                        collided_block->stopped_by_player_vertical = true;
-                                        if(collided_block->vertical_move.state != MOVE_STATE_STOPPING){
-                                             collided_block->accel_magnitudes.y = slow_block_toward_gridlock(collided_block->pos, collided_block->vel, false, false);
-                                             collided_block->vertical_move.state = MOVE_STATE_STOPPING;
-                                             collided_block->vertical_move.distance = 0;
+                                        slow_block_toward_gridlock(collided_block, false, false);
+
+                                        if(collided_entangled_block){
+                                             if(entangled_rotations_even){
+                                                  slow_block_toward_gridlock(collided_entangled_block, false, false);
+                                             }else{
+                                                  slow_block_toward_gridlock(collided_entangled_block, true, false);
+                                             }
                                         }
                                    }
                               }
@@ -629,18 +657,23 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                                    player->stopping_block_from = collided_block_dir;
 
                                    if(even_rotations){
-                                        collided_block->stopped_by_player_vertical = true;
-                                        if(collided_block->vertical_move.state != MOVE_STATE_STOPPING){
-                                             collided_block->accel_magnitudes.y = slow_block_toward_gridlock(collided_block->pos, collided_block->vel, false, false);
-                                             collided_block->vertical_move.state = MOVE_STATE_STOPPING;
-                                             collided_block->vertical_move.distance = 0;
+                                        slow_block_toward_gridlock(collided_block, false, false);
+
+                                        if(collided_entangled_block){
+                                             if(entangled_rotations_even){
+                                                  slow_block_toward_gridlock(collided_entangled_block, false, false);
+                                             }else{
+                                                  slow_block_toward_gridlock(collided_entangled_block, true, false);
+                                             }
                                         }
                                    }else{
-                                        collided_block->stopped_by_player_horizontal = true;
-                                        if(collided_block->horizontal_move.state != MOVE_STATE_STOPPING){
-                                             collided_block->accel_magnitudes.x = slow_block_toward_gridlock(collided_block->pos, collided_block->vel, true, false);
-                                             collided_block->horizontal_move.state = MOVE_STATE_STOPPING;
-                                             collided_block->horizontal_move.distance = 0;
+                                        slow_block_toward_gridlock(collided_block, true, false);
+                                        if(collided_entangled_block){
+                                             if(entangled_rotations_even){
+                                                  slow_block_toward_gridlock(collided_entangled_block, true, false);
+                                             }else{
+                                                  slow_block_toward_gridlock(collided_entangled_block, false, false);
+                                             }
                                         }
                                    }
                               }
@@ -677,18 +710,25 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                                    player->stopping_block_from = collided_block_dir;
 
                                    if(even_rotations){
-                                        collided_block->stopped_by_player_vertical = true;
-                                        if(collided_block->vertical_move.state != MOVE_STATE_STOPPING){
-                                             collided_block->accel_magnitudes.y = slow_block_toward_gridlock(collided_block->pos, collided_block->vel, false, true);
-                                             collided_block->vertical_move.state = MOVE_STATE_STOPPING;
-                                             collided_block->vertical_move.distance = 0;
+                                        slow_block_toward_gridlock(collided_block, false, true);
+
+                                        if(collided_entangled_block){
+                                             if(entangled_rotations_even){
+                                                  slow_block_toward_gridlock(collided_entangled_block, false, true);
+                                             }else{
+                                                  slow_block_toward_gridlock(collided_entangled_block, true, true);
+                                             }
                                         }
                                    }else{
                                         collided_block->stopped_by_player_horizontal = true;
-                                        if(collided_block->horizontal_move.state != MOVE_STATE_STOPPING){
-                                             collided_block->accel_magnitudes.x = slow_block_toward_gridlock(collided_block->pos, collided_block->vel, true, true);
-                                             collided_block->horizontal_move.state = MOVE_STATE_STOPPING;
-                                             collided_block->horizontal_move.distance = 0;
+                                        slow_block_toward_gridlock(collided_block, true, true);
+
+                                        if(collided_entangled_block){
+                                             if(entangled_rotations_even){
+                                                  slow_block_toward_gridlock(collided_entangled_block, true, true);
+                                             }else{
+                                                  slow_block_toward_gridlock(collided_entangled_block, false, true);
+                                             }
                                         }
                                    }
                               }
