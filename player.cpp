@@ -1,15 +1,28 @@
 #include "player.h"
+#include "defines.h"
 
-Rect_t get_player_rect(Player_t* player){
+void get_player_adjacent_positions(Player_t* player, Direction_t direction, Position_t* a, Position_t* b){
+     *a = player->pos;
+     *b = player->pos;
 
-     S16 over_radius = static_cast<S16>(PLAYER_RADIUS_IN_SUB_PIXELS) + 1;
-
-     Rect_t result;
-
-     result.left = player->pos.pixel.x - over_radius;
-     result.bottom = player->pos.pixel.y - over_radius;
-     result.right = player->pos.pixel.x + over_radius;
-     result.top = player->pos.pixel.y + over_radius;
-
-     return result;
-}
+     switch(direction){
+     case DIRECTION_LEFT:
+          *a += Vec_t{-(PLAYER_RADIUS + PIXEL_SIZE), -PLAYER_RADIUS};
+          *b += Vec_t{-(PLAYER_RADIUS + PIXEL_SIZE), PLAYER_RADIUS};
+          break;
+     case DIRECTION_RIGHT:
+          *a += Vec_t{PLAYER_RADIUS + PIXEL_SIZE, -PLAYER_RADIUS};
+          *b += Vec_t{PLAYER_RADIUS + PIXEL_SIZE, PLAYER_RADIUS};
+          break;
+     case DIRECTION_UP:
+          *a += Vec_t{-PLAYER_RADIUS, PLAYER_RADIUS + PIXEL_SIZE};
+          *b += Vec_t{PLAYER_RADIUS,  PLAYER_RADIUS + PIXEL_SIZE};
+          break;
+     case DIRECTION_DOWN:
+          *a += Vec_t{-PLAYER_RADIUS, -(PLAYER_RADIUS + PIXEL_SIZE)};
+          *b += Vec_t{PLAYER_RADIUS,  -(PLAYER_RADIUS + PIXEL_SIZE)};
+          break;
+     default:
+          break;
+     }
+ }

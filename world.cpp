@@ -346,39 +346,13 @@ F32 slow_block_toward_gridlock(Position_t block_pos, Vec_t block_vel, bool horiz
      return fabs(block_vel.y / (time - 0.01666667)); // adjust by one tick since we missed this update
 }
 
-void get_rect_adjacent_pixels(Rect_t rect, Direction_t direction, Pixel_t* pixel_a, Pixel_t* pixel_b){
-     // the offsets are because the player rect is not exactly the right size so for each direction we'd like to use samples
-     // that are more representative of the direction
-     switch(direction){
-     case DIRECTION_LEFT:
-          *pixel_a = Pixel_t{static_cast<S16>(rect.left - 1), static_cast<S16>(rect.bottom + 1)};
-          *pixel_b = Pixel_t{static_cast<S16>(rect.left - 1), static_cast<S16>(rect.top - 1)};
-          break;
-     case DIRECTION_RIGHT:
-          *pixel_a = Pixel_t{static_cast<S16>(rect.right + 1), static_cast<S16>(rect.bottom + 1)};
-          *pixel_b = Pixel_t{static_cast<S16>(rect.right + 1), static_cast<S16>(rect.top - 1)};
-          break;
-     case DIRECTION_UP:
-          *pixel_a = Pixel_t{static_cast<S16>(rect.left + 1), static_cast<S16>(rect.top + 1)};
-          *pixel_b = Pixel_t{static_cast<S16>(rect.right - 1), static_cast<S16>(rect.top + 1)};
-          break;
-     case DIRECTION_DOWN:
-          *pixel_a = Pixel_t{static_cast<S16>(rect.left + 1), static_cast<S16>(rect.bottom - 1)};
-          *pixel_b = Pixel_t{static_cast<S16>(rect.right - 1), static_cast<S16>(rect.bottom - 1)};
-          break;
-     default:
-          break;
-     }
-}
-
 Block_t* player_against_block(Player_t* player, Direction_t direction, QuadTreeNode_t<Block_t>* block_qt){
-     auto player_rect = get_player_rect(player);
      auto check_rect = rect_surrounding_adjacent_coords(pos_to_coord(player->pos));
 
-     Pixel_t pixel_a;
-     Pixel_t pixel_b;
+     Position_t pos_a;
+     Position_t pos_b;
 
-     get_rect_adjacent_pixels(player_rect, direction, &pixel_a, &pixel_b);
+     get_player_adjacent_positions(player, direction, &pos_a, &pos_b);
 
      S16 block_count = 0;
      Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
@@ -388,7 +362,7 @@ Block_t* player_against_block(Player_t* player, Direction_t direction, QuadTreeN
           Block_t* block = blocks[i];
           Rect_t block_rect = block_get_rect(block);
 
-          if(pixel_in_rect(pixel_b, block_rect) || pixel_in_rect(pixel_b, block_rect)){
+          if(pixel_in_rect(pos_a.pixel, block_rect) || pixel_in_rect(pos_b.pixel, block_rect)){
                return block;
           }
      }
@@ -397,32 +371,28 @@ Block_t* player_against_block(Player_t* player, Direction_t direction, QuadTreeN
 }
 
 bool player_against_solid_tile(Player_t* player, Direction_t direction, TileMap_t* tilemap){
-     auto player_rect = get_player_rect(player);
+     Position_t pos_a;
+     Position_t pos_b;
 
-     Pixel_t pixel_a;
-     Pixel_t pixel_b;
+     get_player_adjacent_positions(player, direction, &pos_a, &pos_b);
 
-     get_rect_adjacent_pixels(player_rect, direction, &pixel_a, &pixel_b);
-
-     if(tilemap_is_solid(tilemap, pixel_to_coord(pixel_a))) return true;
-     if(tilemap_is_solid(tilemap, pixel_to_coord(pixel_b))) return true;
+     if(tilemap_is_solid(tilemap, pixel_to_coord(pos_a.pixel))) return true;
+     if(tilemap_is_solid(tilemap, pixel_to_coord(pos_b.pixel))) return true;
 
      return false;
 }
 
 bool player_against_solid_interactive(Player_t* player, Direction_t direction, QuadTreeNode_t<Interactive_t>* interactive_qt){
-     auto player_rect = get_player_rect(player);
+     Position_t pos_a;
+     Position_t pos_b;
 
-     Pixel_t pixel_a;
-     Pixel_t pixel_b;
+     get_player_adjacent_positions(player, direction, &pos_a, &pos_b);
 
-     get_rect_adjacent_pixels(player_rect, direction, &pixel_a, &pixel_b);
-
-     Coord_t coord = pixel_to_coord(pixel_a);
+     Coord_t coord = pixel_to_coord(pos_a.pixel);
      Interactive_t* interactive = quad_tree_find_at(interactive_qt, coord.x, coord.y);
      if(interactive && interactive_is_solid(interactive)) return true;
 
-     coord = pixel_to_coord(pixel_b);
+     coord = pixel_to_coord(pos_b.pixel);
      interactive = quad_tree_find_at(interactive_qt, coord.x, coord.y);
      if(interactive && interactive_is_solid(interactive)) return true;
 

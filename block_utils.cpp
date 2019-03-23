@@ -374,17 +374,29 @@ Tile_t* block_against_solid_tile(Block_t* block_to_check, Direction_t direction,
 }
 
 Player_t* block_against_player(Block_t* block, Direction_t direction, ObjectArray_t<Player_t>* players){
-     Pixel_t pixel_a {};
-     Pixel_t pixel_b {};
+     auto block_rect = block_get_rect(block);
 
-     if(!block_adjacent_pixels_to_check(block->pos, block->pos_delta, direction, &pixel_a, &pixel_b)){
-          return nullptr;
+     // extend the block rect to give the player some room
+     switch(direction){
+     default:
+          break;
+     case DIRECTION_LEFT:
+          block_rect.left -= HALF_TILE_SIZE_IN_PIXELS;
+          break;
+     case DIRECTION_UP:
+          block_rect.top += HALF_TILE_SIZE_IN_PIXELS;
+          break;
+     case DIRECTION_RIGHT:
+          block_rect.right += HALF_TILE_SIZE_IN_PIXELS;
+          break;
+     case DIRECTION_DOWN:
+          block_rect.bottom -= HALF_TILE_SIZE_IN_PIXELS;
+          break;
      }
 
      for(S16 i = 0; i < players->count; i++){
           auto* player = players->elements + i;
-          auto player_rect = get_player_rect(player);
-          if(pixel_in_rect(pixel_a, player_rect) || pixel_in_rect(pixel_b, player_rect)){
+          if(pixel_in_rect(player->pos.pixel, block_rect)){
                return player;
           }
      }
