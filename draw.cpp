@@ -446,6 +446,7 @@ void draw_solids(Vec_t pos, Interactive_t* interactive, Block_t** blocks, S16 bl
                     }
                }
           }
+
           Vec_t tex_vec = player_frame(player->walk_frame, player_frame_y);
           pos_vec.y += (5.0f * PIXEL_SIZE);
           pos_vec.y += ((float)(player->pos.z) * PIXEL_SIZE);
@@ -453,6 +454,21 @@ void draw_solids(Vec_t pos, Interactive_t* interactive, Block_t** blocks, S16 bl
           glEnd();
           glBindTexture(GL_TEXTURE_2D, player_texture);
           glBegin(GL_QUADS);
+
+          Vec_t shadow_vec = player_frame(3, 0);
+
+          // draw shadow
+          glColor4f(1.0f, 1.0f, 1.0f, 0.15f);
+          glTexCoord2f(shadow_vec.x, shadow_vec.y);
+          glVertex2f(pos_vec.x - HALF_TILE_SIZE, pos_vec.y - HALF_TILE_SIZE);
+          glTexCoord2f(shadow_vec.x, shadow_vec.y + PLAYER_FRAME_HEIGHT);
+          glVertex2f(pos_vec.x - HALF_TILE_SIZE, pos_vec.y + HALF_TILE_SIZE);
+          glTexCoord2f(shadow_vec.x + PLAYER_FRAME_WIDTH, shadow_vec.y + PLAYER_FRAME_HEIGHT);
+          glVertex2f(pos_vec.x + HALF_TILE_SIZE, pos_vec.y + HALF_TILE_SIZE);
+          glTexCoord2f(shadow_vec.x + PLAYER_FRAME_WIDTH, shadow_vec.y);
+          glVertex2f(pos_vec.x + HALF_TILE_SIZE, pos_vec.y - HALF_TILE_SIZE);
+
+          // draw player
           glColor3f(1.0f, 1.0f, 1.0f);
           glTexCoord2f(tex_vec.x, tex_vec.y);
           glVertex2f(pos_vec.x - HALF_TILE_SIZE, pos_vec.y - HALF_TILE_SIZE);
@@ -462,6 +478,7 @@ void draw_solids(Vec_t pos, Interactive_t* interactive, Block_t** blocks, S16 bl
           glVertex2f(pos_vec.x + HALF_TILE_SIZE, pos_vec.y + HALF_TILE_SIZE);
           glTexCoord2f(tex_vec.x + PLAYER_FRAME_WIDTH, tex_vec.y);
           glVertex2f(pos_vec.x + HALF_TILE_SIZE, pos_vec.y - HALF_TILE_SIZE);
+
           glEnd();
 
           glBindTexture(GL_TEXTURE_2D, theme_texture);
