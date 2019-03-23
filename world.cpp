@@ -295,7 +295,9 @@ void activate(World_t* world, Coord_t coord){
      toggle_electricity(&world->tilemap, world->interactive_qt, coord, DIRECTION_DOWN, false, false);
 }
 
-void slow_block_toward_gridlock(Block_t* block,  bool horizontal, bool negative){
+void slow_block_toward_gridlock(World_t* world, Block_t* block, bool horizontal, bool negative){
+     if(!block_on_ice(block->pos, block->pos_delta, &world->tilemap, world->interactive_qt)) return;
+
      Move_t* move = horizontal ? &block->horizontal_move : &block->vertical_move;
 
      if(move->state == MOVE_STATE_STOPPING) return;
@@ -535,6 +537,8 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                               // TODO: handle rotations
                               if(would_squish){
                                    reset_move(&collided_block->horizontal_move);
+
+                                   // TODO: enforce the same behavior on entangled blocks
                                    collided_block->pos_delta.x = 0;
                                    collided_block->vel.x = 0;
                                    collided_block->accel.x = 0;
@@ -548,23 +552,23 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                                    player->stopping_block_from = collided_block_dir;
 
                                    if(even_rotations){
-                                        slow_block_toward_gridlock(collided_block, true, true);
+                                        slow_block_toward_gridlock(world, collided_block, true, true);
 
                                         if(collided_entangled_block){
                                              if(entangled_rotations_even){
-                                                  slow_block_toward_gridlock(collided_entangled_block, true, true);
+                                                  slow_block_toward_gridlock(world, collided_entangled_block, true, true);
                                              }else{
-                                                  slow_block_toward_gridlock(collided_entangled_block, false, true);
+                                                  slow_block_toward_gridlock(world, collided_entangled_block, false, true);
                                              }
                                         }
                                    }else{
-                                        slow_block_toward_gridlock(collided_block, false, true);
+                                        slow_block_toward_gridlock(world, collided_block, false, true);
 
                                         if(collided_entangled_block){
                                              if(entangled_rotations_even){
-                                                  slow_block_toward_gridlock(collided_entangled_block, false, true);
+                                                  slow_block_toward_gridlock(world, collided_entangled_block, false, true);
                                              }else{
-                                                  slow_block_toward_gridlock(collided_entangled_block, true, true);
+                                                  slow_block_toward_gridlock(world, collided_entangled_block, true, true);
                                              }
                                         }
                                    }
@@ -603,23 +607,23 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                                    player->stopping_block_from = collided_block_dir;
 
                                    if(even_rotations){
-                                        slow_block_toward_gridlock(collided_block, true, false);
+                                        slow_block_toward_gridlock(world, collided_block, true, false);
 
                                         if(collided_entangled_block){
                                              if(entangled_rotations_even){
-                                                  slow_block_toward_gridlock(collided_entangled_block, true, false);
+                                                  slow_block_toward_gridlock(world, collided_entangled_block, true, false);
                                              }else{
-                                                  slow_block_toward_gridlock(collided_entangled_block, false, false);
+                                                  slow_block_toward_gridlock(world, collided_entangled_block, false, false);
                                              }
                                         }
                                    }else{
-                                        slow_block_toward_gridlock(collided_block, false, false);
+                                        slow_block_toward_gridlock(world, collided_block, false, false);
 
                                         if(collided_entangled_block){
                                              if(entangled_rotations_even){
-                                                  slow_block_toward_gridlock(collided_entangled_block, false, false);
+                                                  slow_block_toward_gridlock(world, collided_entangled_block, false, false);
                                              }else{
-                                                  slow_block_toward_gridlock(collided_entangled_block, true, false);
+                                                  slow_block_toward_gridlock(world, collided_entangled_block, true, false);
                                              }
                                         }
                                    }
@@ -657,22 +661,22 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                                    player->stopping_block_from = collided_block_dir;
 
                                    if(even_rotations){
-                                        slow_block_toward_gridlock(collided_block, false, false);
+                                        slow_block_toward_gridlock(world, collided_block, false, false);
 
                                         if(collided_entangled_block){
                                              if(entangled_rotations_even){
-                                                  slow_block_toward_gridlock(collided_entangled_block, false, false);
+                                                  slow_block_toward_gridlock(world, collided_entangled_block, false, false);
                                              }else{
-                                                  slow_block_toward_gridlock(collided_entangled_block, true, false);
+                                                  slow_block_toward_gridlock(world, collided_entangled_block, true, false);
                                              }
                                         }
                                    }else{
-                                        slow_block_toward_gridlock(collided_block, true, false);
+                                        slow_block_toward_gridlock(world, collided_block, true, false);
                                         if(collided_entangled_block){
                                              if(entangled_rotations_even){
-                                                  slow_block_toward_gridlock(collided_entangled_block, true, false);
+                                                  slow_block_toward_gridlock(world, collided_entangled_block, true, false);
                                              }else{
-                                                  slow_block_toward_gridlock(collided_entangled_block, false, false);
+                                                  slow_block_toward_gridlock(world, collided_entangled_block, false, false);
                                              }
                                         }
                                    }
@@ -710,24 +714,24 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                                    player->stopping_block_from = collided_block_dir;
 
                                    if(even_rotations){
-                                        slow_block_toward_gridlock(collided_block, false, true);
+                                        slow_block_toward_gridlock(world, collided_block, false, true);
 
                                         if(collided_entangled_block){
                                              if(entangled_rotations_even){
-                                                  slow_block_toward_gridlock(collided_entangled_block, false, true);
+                                                  slow_block_toward_gridlock(world, collided_entangled_block, false, true);
                                              }else{
-                                                  slow_block_toward_gridlock(collided_entangled_block, true, true);
+                                                  slow_block_toward_gridlock(world, collided_entangled_block, true, true);
                                              }
                                         }
                                    }else{
                                         collided_block->stopped_by_player_horizontal = true;
-                                        slow_block_toward_gridlock(collided_block, true, true);
+                                        slow_block_toward_gridlock(world, collided_block, true, true);
 
                                         if(collided_entangled_block){
                                              if(entangled_rotations_even){
-                                                  slow_block_toward_gridlock(collided_entangled_block, true, true);
+                                                  slow_block_toward_gridlock(world, collided_entangled_block, true, true);
                                              }else{
-                                                  slow_block_toward_gridlock(collided_entangled_block, false, true);
+                                                  slow_block_toward_gridlock(world, collided_entangled_block, false, true);
                                              }
                                         }
                                    }
