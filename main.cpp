@@ -336,9 +336,9 @@ int main(int argc, char** argv){
                printf("  -test                   validate the map state is correct after playing a demo\n");
                printf("  -suite                  run map/demo combos in succession validating map state after each headless\n");
                printf("  -show                   use in combination with -suite to run with a head\n");
-               printf("  -map    <integer>        load a map by number\n");
-               printf("  -speed  <decimal>        when replaying a demo, specify how fast/slow to replay where 1.0 is realtime\n");
-               printf("  -frame  <integer>        which frame to play to automatically before drawing\n");
+               printf("  -map    <integer>       load a map by number\n");
+               printf("  -speed  <decimal>       when replaying a demo, specify how fast/slow to replay where 1.0 is realtime\n");
+               printf("  -frame  <integer>       which frame to play to automatically before drawing\n");
                printf("  -h this help.\n");
                return 0;
           }
