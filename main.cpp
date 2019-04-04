@@ -1746,7 +1746,7 @@ int main(int argc, char** argv){
                               }
                          }
 
-                         if(block->coast_vertical == BLOCK_COAST_NONE || block->coast_horizontal == BLOCK_COAST_NONE ){
+                         if(block->coast_vertical <= BLOCK_COAST_ICE  || block->coast_horizontal <= BLOCK_COAST_ICE){
                               // TODO: this logic isn't strictly correct when the block teleports, but I also don't think there is any harm right now?
                               for(S16 p = 0; p < world.players.count; p++){
                                    Player_t* player = world.players.elements + p;
@@ -1762,13 +1762,12 @@ int main(int argc, char** argv){
 
                                         auto rotations_between = direction_rotations_between(static_cast<Direction_t>(block->rotation), static_cast<Direction_t>(entangled_block->rotation));
 
-                                        if(entangled_block->coast_horizontal == BLOCK_COAST_PLAYER){
+                                        if(entangled_block->coast_horizontal > BLOCK_COAST_NONE){
                                              if(rotations_between % 2 == 0){
-                                                  block->coast_horizontal = BLOCK_COAST_PLAYER;
+                                                  block->coast_horizontal = entangled_block->coast_horizontal;
 
                                                   // TODO: compress this code with the 3 instances below it
-                                                  if(player->push_time > BLOCK_PUSH_TIME &&
-                                                     block->horizontal_move.state == MOVE_STATE_IDLING){
+                                                  if(block->horizontal_move.state == MOVE_STATE_IDLING && player->push_time > BLOCK_PUSH_TIME){
                                                        Vec_t block_horizontal_vel = {entangled_block->vel.x, 0};
                                                        auto block_move_dir = vec_direction(block_horizontal_vel);
                                                        if(block_move_dir != DIRECTION_COUNT){
@@ -1777,10 +1776,9 @@ int main(int argc, char** argv){
                                                        }
                                                   }
                                              }else{
-                                                  block->coast_vertical = BLOCK_COAST_PLAYER;
+                                                  block->coast_vertical = entangled_block->coast_horizontal;
 
-                                                  if(player->push_time > BLOCK_PUSH_TIME &&
-                                                     block->vertical_move.state == MOVE_STATE_IDLING){
+                                                  if(block->vertical_move.state == MOVE_STATE_IDLING && player->push_time > BLOCK_PUSH_TIME){
                                                        Vec_t block_horizontal_vel = {entangled_block->vel.x, 0};
                                                        auto block_move_dir = vec_direction(block_horizontal_vel);
                                                        if(block_move_dir != DIRECTION_COUNT){
@@ -1791,12 +1789,11 @@ int main(int argc, char** argv){
                                              }
                                         }
 
-                                        if(entangled_block->coast_vertical == BLOCK_COAST_PLAYER){
+                                        if(entangled_block->coast_vertical > BLOCK_COAST_NONE){
                                              if(rotations_between % 2 == 0){
-                                                  block->coast_vertical = BLOCK_COAST_PLAYER;
+                                                  block->coast_vertical = entangled_block->coast_vertical;
 
-                                                  if(player->push_time > BLOCK_PUSH_TIME &&
-                                                     block->vertical_move.state == MOVE_STATE_IDLING){
+                                                  if(block->vertical_move.state == MOVE_STATE_IDLING && player->push_time > BLOCK_PUSH_TIME){
                                                        Vec_t block_vertical_vel = {0, entangled_block->vel.y};
                                                        auto block_move_dir = vec_direction(block_vertical_vel);
                                                        if(block_move_dir != DIRECTION_COUNT){
@@ -1805,10 +1802,9 @@ int main(int argc, char** argv){
                                                        }
                                                   }
                                              }else{
-                                                  block->coast_horizontal = BLOCK_COAST_PLAYER;
+                                                  block->coast_horizontal = entangled_block->coast_vertical;
 
-                                                  if(player->push_time > BLOCK_PUSH_TIME &&
-                                                     block->horizontal_move.state == MOVE_STATE_IDLING){
+                                                  if(block->horizontal_move.state == MOVE_STATE_IDLING && player->push_time > BLOCK_PUSH_TIME){
                                                        Vec_t block_vertical_vel = {0, entangled_block->vel.y};
                                                        auto block_move_dir = vec_direction(block_vertical_vel);
                                                        if(block_move_dir != DIRECTION_COUNT){

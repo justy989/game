@@ -63,3 +63,5 @@ Pixel_t block_top_right_pixel(Pixel_t block);
 
 void block_stop_horizontally(Block_t* block);
 void block_stop_vertically(Block_t* block);
+
+const char* block_coast_to_string(BlockCoast_t coast);

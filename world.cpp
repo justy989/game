@@ -1175,6 +1175,15 @@ void describe_block(World_t* world, Block_t* block){
          block->entangle_index, block->clone_id);
      LOG(" hmove: %s %s %f\n", move_state_to_string(block->horizontal_move.state), move_sign_to_string(block->horizontal_move.sign), block->horizontal_move.distance);
      LOG(" vmove: %s %s %f\n", move_state_to_string(block->vertical_move.state), move_sign_to_string(block->vertical_move.sign), block->vertical_move.distance);
+     LOG(" hcoast: %s vcoast: %s\n", block_coast_to_string(block->coast_horizontal), block_coast_to_string(block->coast_vertical));
+     LOG("\n");
+}
+
+void describe_player(Player_t* player, World_t* world){
+     S16 index = player - world->players.elements;
+     LOG("Player %d: pixel: %d, %d, decimal %f, %f, face: %s push_block: %d, prev_push_block: %d\n", index,
+         player->pos.pixel.x, player->pos.pixel.y, player->pos.decimal.x, player->pos.decimal.y,
+         direction_to_string(player->face), player->pushing_block, player->prev_pushing_block);
      LOG("\n");
 }
 
@@ -1275,14 +1284,16 @@ void describe_coord(Coord_t coord, World_t* world){
      quad_tree_find_in(world->block_qt, coord_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
      for(S16 i = 0; i < block_count; i++){
           auto* block = blocks[i];
-          LOG("block %ld: pixel %d, %d, decimal: %f, %f, rot: %d, element: %s, entangle: %d, clone id: %d\n",
-              block - world->blocks.elements, block->pos.pixel.x, block->pos.pixel.y,
-              block->pos.decimal.x, block->pos.decimal.y,
-              block->rotation, element_to_string(block->element),
-              block->entangle_index, block->clone_id);
-          LOG(" hmove: %s %s %f\n", move_state_to_string(block->horizontal_move.state), move_sign_to_string(block->horizontal_move.sign), block->horizontal_move.distance);
-          LOG(" vmove: %s %s %f\n", move_state_to_string(block->vertical_move.state), move_sign_to_string(block->vertical_move.sign), block->vertical_move.distance);
-          LOG("\n");
+          describe_block(world, block);
+     }
+
+     for(S16 i = 0; i < world->players.count; i++){
+          auto* player = world->players.elements + i;
+          auto player_coord = pos_to_coord(player->pos);
+
+          if(player_coord == coord){
+               describe_player(player, world);
+          }
      }
 }
 

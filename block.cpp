@@ -94,3 +94,16 @@ void block_stop_vertically(Block_t* block){
      block->prev_vel.y = 0;
      block->accel.y = 0;
 }
+
+const char* block_coast_to_string(BlockCoast_t coast){
+     switch(coast){
+     case BLOCK_COAST_NONE:
+          return "BLOCK_COAST_NONE";
+     case BLOCK_COAST_ICE:
+          return "BLOCK_COAST_ICE";
+     case BLOCK_COAST_PLAYER:
+          return "BLOCK_COAST_PLAYER";
+     }
+
+     return "BLOCK_COAST_UNKNOWN";
+}
