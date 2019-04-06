@@ -13,6 +13,8 @@ Entanglement:
 - arrow kills player
 
 Current bugs:
+- a block on the tile outside a portal pushed into the portal to clone, the clone has weird behavior and ends up on the portal block
+- when pushing a block through a portal that turns off, the block keeps going
 
 Current Design issues:
 - it is important for the player to force a rotated entangled block to not move when we push the other block. To do this we have to wedge ourself against it before pushing the block we want.
