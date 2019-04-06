@@ -1070,7 +1070,7 @@ bool block_push(Block_t* block, Direction_t direction, World_t* world, bool push
                auto moving_dir = vec_direction(horizontal_vel);
 
                if(direction_opposite(moving_dir) == direction){
-                    block_stop_horizontally(block);
+                    slow_block_toward_gridlock(world, block, true, (direction == DIRECTION_LEFT));
                     return true;
                }
                break;
@@ -1083,7 +1083,7 @@ bool block_push(Block_t* block, Direction_t direction, World_t* world, bool push
                auto moving_dir = vec_direction(vertical_vel);
 
                if(direction_opposite(moving_dir) == direction){
-                    block_stop_vertically(block);
+                    slow_block_toward_gridlock(world, block, false, (direction == DIRECTION_DOWN));
                     return true;
                }
                break;
