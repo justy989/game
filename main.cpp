@@ -1912,7 +1912,6 @@ int main(int argc, char** argv){
                                                                                     block->horizontal_move,
                                                                                     block->vertical_move,
                                                                                     i,
-                                                                                    block->entangle_index,
                                                                                     block->clone_start.x > 0,
                                                                                     &world);
 
@@ -1926,7 +1925,6 @@ int main(int argc, char** argv){
                                                                                                   block->horizontal_move,
                                                                                                   block->vertical_move,
                                                                                                   i,
-                                                                                                  block->entangle_index,
                                                                                                   block->clone_start.x > 0,
                                                                                                   &world);
                                    // TODO: find the closer collision between the regular collided result and the teleported collided result
@@ -1952,9 +1950,9 @@ int main(int argc, char** argv){
 
                                    block->successfully_moved = false;
 
-                                   if(result.collided_block_index >= 0 && result.collided_block_index == block->entangle_index){
+                                   if(result.collided_block_index >= 0 && blocks_are_entangled(result.collided_block_index, i, &world.blocks)){
                                         // TODO: I don't love indexing the blocks without checking the index is valid first
-                                        auto* entangled_block = world.blocks.elements + block->entangle_index;
+                                        auto* entangled_block = world.blocks.elements + result.collided_block_index;
                                         auto pos_diff = pos_to_vec(block->pos - entangled_block->pos);
 
                                         // if positions are diagonal to each other and the rotation between them is odd, check if we are moving into each other
@@ -1969,7 +1967,6 @@ int main(int argc, char** argv){
                                                                                                             entangled_block->horizontal_move,
                                                                                                             entangled_block->vertical_move,
                                                                                                             block->entangle_index,
-                                                                                                            entangled_block->entangle_index,
                                                                                                             entangled_block->clone_start.x > 0,
                                                                                                             &world);
                                              if(entangle_result.collided){

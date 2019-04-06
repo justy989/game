@@ -1035,7 +1035,7 @@ bool block_push(Block_t* block, Direction_t direction, World_t* world, bool push
                     push_entangled_block(collided_block, world, collided_block_push_dir, pushed_by_ice, instant_vel);
                }
                return false;
-          }else if(block->entangle_index == (collided_block - world->blocks.elements)){
+          }else if(blocks_are_entangled(collided_block, block, &world->blocks)){
                // if block is entangled with the block it collides with, check if the entangled block can move, this is kind of duplicate work
                Block_t* entangled_collided_block = block_against_another_block(collided_block->pos, direction, world->block_qt,
                                                                                world->interactive_qt, &world->tilemap,

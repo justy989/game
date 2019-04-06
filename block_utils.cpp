@@ -236,6 +236,14 @@ bool blocks_are_entangled(Block_t* a, Block_t* b, ObjectArray_t<Block_t>* blocks
      return false;
 }
 
+bool blocks_are_entangled(S16 a_index, S16 b_index, ObjectArray_t<Block_t>* blocks_array){
+     if(a_index >= blocks_array->count || b_index >= blocks_array->count) return false;
+
+     Block_t* a = blocks_array->elements + a_index;
+     Block_t* b = blocks_array->elements + b_index;
+     return blocks_are_entangled(a, b, blocks_array);
+}
+
 Block_t* block_inside_block_list(Position_t block_to_check_pos, Vec_t block_to_check_pos_delta,
                                  S16 block_to_check_index, bool block_to_check_cloning,
                                  Block_t** blocks, S16 block_count, ObjectArray_t<Block_t>* blocks_array,
@@ -464,12 +472,10 @@ bool block_on_ice(Position_t pos, Vec_t pos_delta, TileMap_t* tilemap, QuadTreeN
      return false;
 }
 
-
-
 CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t block_pos, Vec_t block_pos_delta, Vec_t block_vel,
                                                                     Vec_t block_accel, S16 block_stop_on_pixel_x, S16 block_stop_on_pixel_y,
                                                                     Move_t block_horizontal_move, Move_t block_vertical_move, S16 block_index,
-                                                                    S16 block_entangle_index, bool block_is_cloning, World_t* world){
+                                                                    bool block_is_cloning, World_t* world){
      CheckBlockCollisionResult_t result {};
 
      result.pos_delta = block_pos_delta;
@@ -526,9 +532,9 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
               block_inside_index = get_block_index(world, block_inside_result.block);
           }
 
-          if(result.collided_block_index == block_entangle_index){
+          if(blocks_are_entangled(result.collided_block_index, block_index, &world->blocks)){
                auto* block = world->blocks.elements + block_index;
-               auto* entangled_block = world->blocks.elements + block_entangle_index;
+               auto* entangled_block = world->blocks.elements + result.collided_block_index;
                auto pos_diff = pos_to_vec(block->pos - entangled_block->pos);
 
                // if positions are diagonal to each other and the rotation between them is odd, check if we are moving into each other
@@ -767,7 +773,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                     F32 instant_vel = direction_is_horizontal(first_direction) ? save_vel.x : save_vel.y;
                     if(block_push(block_inside_result.block, first_direction, world, true, instant_vel)){
                          push_entangled_block(block_inside_result.block, world, first_direction, true, instant_vel);
-                         if(block_inside_result.block->entangle_index == block_index){
+                         if(blocks_are_entangled(block_inside_result.block - world->blocks.elements, block_index, &world->blocks)){
                               Block_t* block = world->blocks.elements + block_index;
                               auto rotations_between = direction_rotations_between(static_cast<Direction_t>(block_inside_result.block->rotation), static_cast<Direction_t>(block->rotation));
                               if(rotations_between % 2 == 0){
@@ -794,7 +800,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                          instant_vel = direction_is_horizontal(second_direction) ? save_vel.x : save_vel.y;
                          if(block_push(block_inside_result.block, second_direction, world, true, instant_vel)){
                               push_entangled_block(block_inside_result.block, world, second_direction, true, instant_vel);
-                              if(block_inside_result.block->entangle_index == block_index){
+                              if(blocks_are_entangled(block_inside_result.block - world->blocks.elements, block_index, &world->blocks)){
                                    Block_t* block = world->blocks.elements + block_index;
                                    auto rotations_between = direction_rotations_between(static_cast<Direction_t>(block_inside_result.block->rotation), static_cast<Direction_t>(block->rotation));
                                    if(rotations_between % 2 == 0){
