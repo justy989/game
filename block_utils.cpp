@@ -224,24 +224,35 @@ Interactive_t* block_against_solid_interactive(Block_t* block_to_check, Directio
      return nullptr;
 }
 
+bool blocks_are_entangled(Block_t* a, Block_t* b, ObjectArray_t<Block_t>* blocks_array)
+{
+     S16 a_index = a - blocks_array->elements;
+     S16 entangle_index = a->entangle_index;
+     while(entangle_index != a_index && entangle_index >= 0){
+          Block_t* entangled_block = blocks_array->elements + entangle_index;
+          if(entangled_block == b) return true;
+          entangle_index = entangled_block->entangle_index;
+     }
+     return false;
+}
+
 Block_t* block_inside_block_list(Position_t block_to_check_pos, Vec_t block_to_check_pos_delta,
-                                 S16 block_to_check_index, S16 block_to_check_entangle_index, bool block_to_check_cloning,
+                                 S16 block_to_check_index, bool block_to_check_cloning,
                                  Block_t** blocks, S16 block_count, ObjectArray_t<Block_t>* blocks_array,
                                  Position_t* collided_with, Pixel_t* portal_offsets){
      auto block_pos = block_to_check_pos + block_to_check_pos_delta;
 
      Quad_t quad = {0, 0, BLOCK_SOLID_SIZE, BLOCK_SOLID_SIZE};
 
-     Block_t* entangled_block = nullptr;
-     if(block_to_check_entangle_index >= 0){
-          entangled_block = blocks_array->elements + block_to_check_entangle_index;
-     }
-
      for(S16 i = 0; i < block_count; i++){
           Block_t* block = blocks[i];
 
-          // don't collide with blocks that are cloning
-          if(block == entangled_block && block_to_check_cloning) continue;
+          // don't collide with blocks that are cloning with our block to check
+          if(block_to_check_cloning){
+               Block_t* block_to_check = blocks_array->elements + block_to_check_index;
+               if(blocks_are_entangled(block_to_check, block, blocks_array) && block->clone_start.x != 0) continue;
+          }
+
           if(block_to_check_index == (block - blocks_array->elements)) continue;
 
           auto check_block_pos = block->pos + block->pos_delta;
@@ -262,8 +273,7 @@ Block_t* block_inside_block_list(Position_t block_to_check_pos, Vec_t block_to_c
 }
 
 BlockInsideResult_t block_inside_another_block(Position_t block_to_check_pos, Vec_t block_to_check_pos_delta, S16 block_to_check_index,
-                                               S16 block_to_check_entangle_index, bool block_to_check_cloning,
-                                               QuadTreeNode_t<Block_t>* block_quad_tree,
+                                               bool block_to_check_cloning, QuadTreeNode_t<Block_t>* block_quad_tree,
                                                QuadTreeNode_t<Interactive_t>* interactive_quad_tree, TileMap_t* tilemap,
                                                ObjectArray_t<Block_t>* block_array){
      BlockInsideResult_t result = {};
@@ -280,7 +290,7 @@ BlockInsideResult_t block_inside_another_block(Position_t block_to_check_pos, Ve
      memset(portal_offsets, 0, sizeof(portal_offsets));
 
      Block_t* collided_block = block_inside_block_list(block_to_check_pos, block_to_check_pos_delta,
-                                                       block_to_check_index, block_to_check_entangle_index,
+                                                       block_to_check_index,
                                                        block_to_check_cloning, blocks, block_count,
                                                        block_array, &result.collision_pos, portal_offsets);
      if(collided_block){
@@ -309,7 +319,7 @@ BlockInsideResult_t block_inside_another_block(Position_t block_to_check_pos, Ve
                                                                    dst_coord, blocks, &block_count, portal_offsets);
 
                               collided_block = block_inside_block_list(block_to_check_pos, block_to_check_pos_delta,
-                                                                       block_to_check_index, block_to_check_entangle_index,
+                                                                       block_to_check_index,
                                                                        block_to_check_cloning, blocks, block_count,
                                                                        block_array, &result.collision_pos, portal_offsets);
                               if(collided_block){
@@ -478,7 +488,6 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
      for(BlockInsideResult_t block_inside_result = block_inside_another_block(block_pos,
                                                                               result.pos_delta,
                                                                               block_index,
-                                                                              block_entangle_index,
                                                                               block_is_cloning,
                                                                               world->block_qt,
                                                                               world->interactive_qt,
@@ -488,7 +497,6 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
          block_inside_result = block_inside_another_block(block_pos,
                                                           result.pos_delta,
                                                           block_index,
-                                                          block_entangle_index,
                                                           block_is_cloning,
                                                           world->block_qt,
                                                           world->interactive_qt,
@@ -882,8 +890,14 @@ Interactive_t* block_is_teleporting(Block_t* block, QuadTreeNode_t<Interactive_t
 
 void push_entangled_block(Block_t* block, World_t* world, Direction_t push_dir, bool pushed_by_ice, F32 instant_vel){
      if(block->entangle_index < 0) return;
-     Block_t* entangled_block = world->blocks.elements + block->entangle_index;
-     auto rotations_between = direction_rotations_between(static_cast<Direction_t>(entangled_block->rotation), static_cast<Direction_t>(block->rotation));
-     Direction_t rotated_dir = direction_rotate_clockwise(push_dir, rotations_between);
-     block_push(entangled_block, rotated_dir, world, pushed_by_ice, instant_vel);
+
+     S16 block_index = block - world->blocks.elements;
+     S16 entangle_index = block->entangle_index;
+     while(entangle_index != block_index && entangle_index >= 0){
+          Block_t* entangled_block = world->blocks.elements + entangle_index;
+          auto rotations_between = direction_rotations_between(static_cast<Direction_t>(entangled_block->rotation), static_cast<Direction_t>(block->rotation));
+          Direction_t rotated_dir = direction_rotate_clockwise(push_dir, rotations_between);
+          block_push(entangled_block, rotated_dir, world, pushed_by_ice, instant_vel);
+          entangle_index = entangled_block->entangle_index;
+     }
 }

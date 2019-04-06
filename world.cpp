@@ -1179,7 +1179,7 @@ void describe_block(World_t* world, Block_t* block){
      LOG("\n");
 }
 
-void describe_player(Player_t* player, World_t* world){
+void describe_player(World_t* world, Player_t* player){
      S16 index = player - world->players.elements;
      LOG("Player %d: pixel: %d, %d, decimal %f, %f, face: %s push_block: %d, prev_push_block: %d\n", index,
          player->pos.pixel.x, player->pos.pixel.y, player->pos.decimal.x, player->pos.decimal.y,
@@ -1292,7 +1292,7 @@ void describe_coord(Coord_t coord, World_t* world){
           auto player_coord = pos_to_coord(player->pos);
 
           if(player_coord == coord){
-               describe_player(player, world);
+               describe_player(world, player);
           }
      }
 }

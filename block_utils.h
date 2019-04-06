@@ -71,5 +71,6 @@ void search_portal_destination_for_blocks(QuadTreeNode_t<Block_t>* block_quad_tr
 Interactive_t* block_is_teleporting(Block_t* block, QuadTreeNode_t<Interactive_t>* interactive_qt);
 
 void push_entangled_block(Block_t* block, World_t* world, Direction_t push_dir, bool pushed_by_ice, F32 instant_vel = 0);
+bool blocks_are_entangled(Block_t* a, Block_t* b, ObjectArray_t<Block_t>* block_array);
 
 extern Pixel_t g_collided_with_pixel;

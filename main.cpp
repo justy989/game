@@ -13,18 +13,17 @@ Entanglement:
 - arrow kills player
 
 Current bugs:
-- pushing an entangled block into an it's entangler (when they don't initially start next to each other) all in open spacce, causes the block we collided with to end up out of the grid
-- an entangled block pushing into the player up against a wall stops the player from moving at all
-- messing around with rotated entangled blocks, we've hit problems blocks get slighly off grid somehow, need to reproduce
 
 Current Design issues:
 - it is important for the player to force a rotated entangled block to not move when we push the other block. To do this we have to wedge ourself against it before pushing the block we want.
   if you forget to do this the block will be slightly off grid which isn't great
 
 Big Features:
+- Multiple block entangling (kinda big)
+- Multiple player entangling
+- 3D
 - Block splitting
 - Bring block ice collision to the masses
-- 3D
 
 NOTES:
 - Only 2 blocks high can go through portals
@@ -755,6 +754,17 @@ int main(int argc, char** argv){
                                    Player_t* new_player = world.players.elements + new_index;
                                    *new_player = world.players.elements[0];
                                    new_player->pos = pixel_to_pos(pixel);
+                              }
+                         }
+                         break;
+                    case SDL_SCANCODE_0:
+                         if(editor.mode == EDITOR_MODE_CATEGORY_SELECT){
+                              for(S16 i = 0; i < world.players.count; i++){
+                                   describe_player(&world, world.players.elements + i);
+                              }
+
+                              for(S16 i = 0; i < world.blocks.count; i++){
+                                   describe_block(&world, world.blocks.elements + i);
                               }
                          }
                          break;
@@ -2335,10 +2345,6 @@ int main(int argc, char** argv){
                                              S16 old_block_index = (S16)(block - world.blocks.elements);
 
                                              if(resize(&world.blocks, world.blocks.count + (S16)(1))){
-                                                  // update quad tree now that we have resized the world
-                                                  quad_tree_free(world.block_qt);
-                                                  world.block_qt = quad_tree_build(&world.blocks);
-
                                                   // a resize will kill our block ptr, so we gotta update it
                                                   block = world.blocks.elements + old_block_index;
                                                   block->clone_start = portal->coord;
@@ -2349,8 +2355,17 @@ int main(int argc, char** argv){
                                                   entangled_block->clone_id = clone_id;
 
                                                   // the magic
-                                                  entangled_block->entangle_index = old_block_index;
+                                                  if(block->entangle_index == -1){
+                                                       entangled_block->entangle_index = old_block_index;
+                                                  }else{
+                                                       entangled_block->entangle_index = block->entangle_index;
+                                                  }
+
                                                   block->entangle_index = new_block_index;
+
+                                                  // update quad tree now that we have resized the world
+                                                  quad_tree_free(world.block_qt);
+                                                  world.block_qt = quad_tree_build(&world.blocks);
                                              }
                                         }
 
@@ -2394,11 +2409,21 @@ int main(int argc, char** argv){
                                    assert(block->entangle_index >= 0);
 
                                    // great news everyone, the clone was a success
-                                   entangled_block = world.blocks.elements + block->entangle_index;
 
+                                   // find the block(s) we were cloning
+                                   S16 entangle_index = block->entangle_index;
+                                   while(entangle_index != i && entangle_index != -1){
+                                        entangled_block = world.blocks.elements + entangle_index;
+                                        if(entangled_block->clone_start.x != 0){
+                                             entangled_block->clone_id = 0;
+                                             entangled_block->clone_start = Coord_t{};
+                                        }
+
+                                        entangle_index = entangled_block->entangle_index;
+                                   }
+
+                                   // we reset clone_start down a little further
                                    block->clone_id = 0;
-                                   entangled_block->clone_id = 0;
-                                   entangled_block->clone_start = Coord_t{};
 
                                    // turn off the circuit
                                    activate(&world, block->clone_start);
@@ -2406,6 +2431,7 @@ int main(int argc, char** argv){
                                    if(is_active_portal(src_portal)){
                                         src_portal->portal.on = false;
                                    }
+
                               }
 
                               block->clone_start = Coord_t{};
