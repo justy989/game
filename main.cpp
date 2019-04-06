@@ -22,11 +22,10 @@ Big Features:
 - Multiple block entangling (kinda big)
 - Multiple player entangling
 - 3D
+     - note: only 2 blocks high can go through portals
+     - shadows and slightly discolored blocks should help with visualizations
 - Block splitting
 - Bring block ice collision to the masses
-
-NOTES:
-- Only 2 blocks high can go through portals
 */
 
 #include <iostream>
@@ -1285,8 +1284,13 @@ int main(int argc, char** argv){
                                         if(arrow_element){
                                              blocks[b]->element = transition_element(blocks[b]->element, arrow_element);
                                              if(blocks[b]->entangle_index >= 0 && blocks[b]->entangle_index < world.blocks.count){
-                                                  Block_t* entangled_block = world.blocks.elements + blocks[b]->entangle_index;
-                                                  entangled_block->element = transition_element(entangled_block->element, arrow_element);
+                                                  S16 original_index = blocks[b] - world.blocks.elements;
+                                                  S16 entangle_index = blocks[b]->entangle_index;
+                                                  while(entangle_index != original_index && entangle_index >= 0){
+                                                       Block_t* entangled_block = world.blocks.elements + entangle_index;
+                                                       entangled_block->element = transition_element(entangled_block->element, arrow_element);
+                                                       entangle_index = entangled_block->entangle_index;
+                                                  }
                                              }
                                         }
                                    }
@@ -1762,13 +1766,35 @@ int main(int argc, char** argv){
                                    Player_t* player = world.players.elements + p;
 
                                    // is the player pushing us ?
-                                   if(player->prev_pushing_block < 0 ||
-                                      (player->prev_pushing_block != get_block_index(&world, block) &&
-                                       player->prev_pushing_block != block->entangle_index)) continue;
+                                   if(player->prev_pushing_block < 0) continue;
 
-                                   if(player->prev_pushing_block == block->entangle_index){
-                                        // TODO(jtardiff): maybe an accessor where we check if index is valid, return NULL and check null after the call
-                                        Block_t* entangled_block = world.blocks.elements + block->entangle_index;
+                                   Block_t* player_prev_pushing_block = world.blocks.elements + player->prev_pushing_block;
+                                   if(player_prev_pushing_block == block){
+                                        switch(player->face){
+                                        default:
+                                             break;
+                                        case DIRECTION_LEFT:
+                                        case DIRECTION_RIGHT:
+                                        {
+                                             // only coast the block is actually moving
+                                             Vec_t block_horizontal_vel = {block->vel.x, 0};
+                                             if(player->face == vec_direction(block_horizontal_vel)){
+                                                  block->coast_horizontal = BLOCK_COAST_PLAYER;
+                                             }
+                                             break;
+                                        }
+                                        case DIRECTION_UP:
+                                        case DIRECTION_DOWN:
+                                        {
+                                             Vec_t block_vertical_vel = {0, block->vel.y};
+                                             if(player->face == vec_direction(block_vertical_vel)){
+                                                  block->coast_vertical = BLOCK_COAST_PLAYER;
+                                             }
+                                             break;
+                                        }
+                                        }
+                                   }else if(blocks_are_entangled(block, player_prev_pushing_block, &world.blocks)){
+                                        Block_t* entangled_block = player_prev_pushing_block;
 
                                         auto rotations_between = direction_rotations_between(static_cast<Direction_t>(block->rotation), static_cast<Direction_t>(entangled_block->rotation));
 
@@ -1823,30 +1849,6 @@ int main(int argc, char** argv){
                                                        }
                                                   }
                                              }
-                                        }
-                                   }else{
-                                        switch(player->face){
-                                        default:
-                                             break;
-                                        case DIRECTION_LEFT:
-                                        case DIRECTION_RIGHT:
-                                        {
-                                             // only coast the block is actually moving
-                                             Vec_t block_horizontal_vel = {block->vel.x, 0};
-                                             if(player->face == vec_direction(block_horizontal_vel)){
-                                                  block->coast_horizontal = BLOCK_COAST_PLAYER;
-                                             }
-                                             break;
-                                        }
-                                        case DIRECTION_UP:
-                                        case DIRECTION_DOWN:
-                                        {
-                                             Vec_t block_vertical_vel = {0, block->vel.y};
-                                             if(player->face == vec_direction(block_vertical_vel)){
-                                                  block->coast_vertical = BLOCK_COAST_PLAYER;
-                                             }
-                                             break;
-                                        }
                                         }
                                    }
                               }
@@ -2134,15 +2136,6 @@ int main(int argc, char** argv){
                               }
                          }
 
-                         // TODO: I think we may want to keep track of more of these and resolve multiple directions as well?
-                         // used to make sure the pushing is smooth on the entangled block as well
-                         S8 rotations_between = 0;
-                         Block_t* entangled_block = nullptr;
-                         if(block->entangle_index >= 0){
-                              entangled_block = world.blocks.elements + block->entangle_index;
-                              rotations_between = direction_rotations_between(static_cast<Direction_t>(block->rotation), static_cast<Direction_t>(entangled_block->rotation));
-                         }
-
                          // TODO: we need to maintain a list of these blocks pushed i guess in the future
                          Block_t* block_pushed = nullptr;
                          for(S16 p = 0; p < world.players.count; p++){
@@ -2154,7 +2147,12 @@ int main(int argc, char** argv){
 
                          // this instance of last_block_pushed is to keep the pushing smooth and not have it stop at the tile boundaries
                          if(block != block_pushed && !block_on_ice(block->pos, block->pos_delta, &world.tilemap, world.interactive_qt)){
-                              if(block_pushed && block_pushed == entangled_block){
+                              if(block_pushed && blocks_are_entangled(block_pushed, block, &world.blocks)){
+                                   Block_t* entangled_block = block_pushed;
+
+                                   S8 rotations_between = 0;
+                                   rotations_between = direction_rotations_between(static_cast<Direction_t>(block->rotation), static_cast<Direction_t>(entangled_block->rotation));
+
                                    auto coast_horizontal = entangled_block->coast_horizontal;
                                    auto coast_vertical = entangled_block->coast_vertical;
 
@@ -2349,7 +2347,7 @@ int main(int argc, char** argv){
                                                   block = world.blocks.elements + old_block_index;
                                                   block->clone_start = portal->coord;
 
-                                                  entangled_block = world.blocks.elements + new_block_index;
+                                                  Block_t* entangled_block = world.blocks.elements + new_block_index;
 
                                                   *entangled_block = *block;
                                                   entangled_block->clone_id = clone_id;
@@ -2413,7 +2411,7 @@ int main(int argc, char** argv){
                                    // find the block(s) we were cloning
                                    S16 entangle_index = block->entangle_index;
                                    while(entangle_index != i && entangle_index != -1){
-                                        entangled_block = world.blocks.elements + entangle_index;
+                                        Block_t* entangled_block = world.blocks.elements + entangle_index;
                                         if(entangled_block->clone_start.x != 0){
                                              entangled_block->clone_id = 0;
                                              entangled_block->clone_start = Coord_t{};
