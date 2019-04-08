@@ -107,3 +107,7 @@ const char* block_coast_to_string(BlockCoast_t coast){
 
      return "BLOCK_COAST_UNKNOWN";
 }
+
+S8 blocks_rotations_between(Block_t* a, Block_t* b){
+     return direction_rotations_between(static_cast<Direction_t>(a->rotation), static_cast<Direction_t>(b->rotation));
+}

@@ -1049,6 +1049,12 @@ bool block_push(Block_t* block, Direction_t direction, World_t* world, bool push
           }
      }
 
+     if(!pushed_by_ice){
+          collided_block = rotated_entangled_blocks_against_centroid(block, direction, world->block_qt,
+                                                                     &world->blocks, world->interactive_qt, &world->tilemap);
+          if(collided_block) return false;
+     }
+
      if(block_against_solid_tile(block, direction, &world->tilemap, world->interactive_qt)) return false;
      if(block_against_solid_interactive(block, direction, &world->tilemap, world->interactive_qt)) return false;
      auto* player = block_against_player(block, direction, &world->players);

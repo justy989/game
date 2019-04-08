@@ -4,13 +4,12 @@ http://www.simonstalenhag.se/
 -Shane Hendrixson
 
 TODO:
-Entanglement:
+Entanglement Puzzles:
 - entangle puzzle where there is a line of pressure plates against the wall with a line of popups on the other side that would
   trap an entangled block if it got to close, stopping the player from using walls to get blocks closer
 - entangle puzzle with an extra non-entangled block where you don't want one of the entangled blocks to move, and you use
   the non-entangled block to accomplish that
-- arrow entanglement
-- arrow kills player
+- rotated entangled puzzles where the centroid is on a portal destination coord
 
 Current bugs:
 - a block on the tile outside a portal pushed into the portal to clone, the clone has weird behavior and ends up on the portal block
@@ -28,8 +27,11 @@ Big Features:
 - 3D
      - note: only 2 blocks high can go through portals
      - shadows and slightly discolored blocks should help with visualizations
+- arrow kills player
+- arrow entanglement
 - Block splitting
 - Bring block ice collision to the masses
+
 */
 
 #include <iostream>
@@ -1800,7 +1802,7 @@ int main(int argc, char** argv){
                                    }else if(blocks_are_entangled(block, player_prev_pushing_block, &world.blocks)){
                                         Block_t* entangled_block = player_prev_pushing_block;
 
-                                        auto rotations_between = direction_rotations_between(static_cast<Direction_t>(block->rotation), static_cast<Direction_t>(entangled_block->rotation));
+                                        auto rotations_between = blocks_rotations_between(block, entangled_block);
 
                                         if(entangled_block->coast_horizontal > BLOCK_COAST_NONE){
                                              if(rotations_between % 2 == 0){
@@ -2151,8 +2153,7 @@ int main(int argc, char** argv){
                               if(block_pushed && blocks_are_entangled(block_pushed, block, &world.blocks)){
                                    Block_t* entangled_block = block_pushed;
 
-                                   S8 rotations_between = 0;
-                                   rotations_between = direction_rotations_between(static_cast<Direction_t>(block->rotation), static_cast<Direction_t>(entangled_block->rotation));
+                                   S8 rotations_between = blocks_rotations_between(block, entangled_block);
 
                                    auto coast_horizontal = entangled_block->coast_horizontal;
                                    auto coast_vertical = entangled_block->coast_vertical;

@@ -65,3 +65,5 @@ void block_stop_horizontally(Block_t* block);
 void block_stop_vertically(Block_t* block);
 
 const char* block_coast_to_string(BlockCoast_t coast);
+
+S8 blocks_rotations_between(Block_t* a, Block_t* b);

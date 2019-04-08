@@ -192,6 +192,41 @@ Block_t* block_against_another_block(Position_t pos, Direction_t direction, Quad
      return nullptr;
 }
 
+Block_t* rotated_entangled_blocks_against_centroid(Block_t* block, Direction_t direction, QuadTreeNode_t<Block_t>* block_quad_tree,
+                                                   ObjectArray_t<Block_t>* blocks_array, QuadTreeNode_t<Interactive_t>* interactive_quad_tree,
+                                                   TileMap_t* tilemap){
+#if 1
+     (void)(block);
+     (void)(direction);
+     (void)(block_quad_tree);
+     (void)(blocks_array);
+     (void)(interactive_quad_tree);
+     (void)(tilemap);
+#else
+     auto block_center = block_get_center(block);
+     Rect_t rect = rect_to_check_surrounding_blocks(block_center.pixel);
+
+     S16 block_count = 0;
+     Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
+     quad_tree_find_in(block_quad_tree, rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
+
+     for(S16 i = 0; i < block_count; i++){
+          Block_t* check_block = blocks[i];
+          if(!blocks_are_entangled(block, check_block, blocks_array)) continue;
+
+          switch(direction){
+
+          }
+     }
+
+     // TODO: handle portals here
+     (void)(interactive_quad_tree);
+     (void)(tilemap);
+#endif
+
+     return nullptr;
+}
+
 Interactive_t* block_against_solid_interactive(Block_t* block_to_check, Direction_t direction,
                                                TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree){
      Pixel_t pixel_a;
