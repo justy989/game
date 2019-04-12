@@ -195,14 +195,6 @@ Block_t* block_against_another_block(Position_t pos, Direction_t direction, Quad
 Block_t* rotated_entangled_blocks_against_centroid(Block_t* block, Direction_t direction, QuadTreeNode_t<Block_t>* block_quad_tree,
                                                    ObjectArray_t<Block_t>* blocks_array, QuadTreeNode_t<Interactive_t>* interactive_quad_tree,
                                                    TileMap_t* tilemap){
-#if 1
-     (void)(block);
-     (void)(direction);
-     (void)(block_quad_tree);
-     (void)(blocks_array);
-     (void)(interactive_quad_tree);
-     (void)(tilemap);
-#else
      auto block_center = block_get_center(block);
      Rect_t rect = rect_to_check_surrounding_blocks(block_center.pixel);
 
@@ -214,15 +206,60 @@ Block_t* rotated_entangled_blocks_against_centroid(Block_t* block, Direction_t d
           Block_t* check_block = blocks[i];
           if(!blocks_are_entangled(block, check_block, blocks_array)) continue;
 
-          switch(direction){
+          auto check_block_rect = block_get_rect(check_block);
+          S8 rotations_between = blocks_rotations_between(block, check_block);
 
+          Pixel_t check_pixel = {-1, -1};
+
+          switch(direction){
+          default:
+               break;
+          case DIRECTION_LEFT:
+               if(rotations_between == 1){
+                    check_pixel.x = block->pos.pixel.x - 1;
+                    check_pixel.y = block->pos.pixel.y + TILE_SIZE_IN_PIXELS;
+               }else if(rotations_between == 3){
+                    check_pixel.x = block->pos.pixel.x - 1;
+                    check_pixel.y = block->pos.pixel.y - 1;
+               }
+               break;
+          case DIRECTION_UP:
+               if(rotations_between == 1){
+                    check_pixel.x = block->pos.pixel.x + TILE_SIZE_IN_PIXELS;
+                    check_pixel.y = block->pos.pixel.y + TILE_SIZE_IN_PIXELS;
+               }else if(rotations_between == 3){
+                    check_pixel.x = block->pos.pixel.x - 1;
+                    check_pixel.y = block->pos.pixel.y + TILE_SIZE_IN_PIXELS;
+               }
+               break;
+          case DIRECTION_RIGHT:
+               if(rotations_between == 1){
+                    check_pixel.x = block->pos.pixel.x + TILE_SIZE_IN_PIXELS;
+                    check_pixel.y = block->pos.pixel.y - 1;
+               }else if(rotations_between == 3){
+                    check_pixel.x = block->pos.pixel.x + TILE_SIZE_IN_PIXELS;
+                    check_pixel.y = block->pos.pixel.y + TILE_SIZE_IN_PIXELS;
+               }
+               break;
+          case DIRECTION_DOWN:
+               if(rotations_between == 1){
+                    check_pixel.x = block->pos.pixel.x - 1;
+                    check_pixel.y = block->pos.pixel.y - 1;
+               }else if(rotations_between == 3){
+                    check_pixel.x = block->pos.pixel.x + TILE_SIZE_IN_PIXELS;
+                    check_pixel.y = block->pos.pixel.y - 1;
+               }
+               break;
+          }
+
+          if(pixel_in_rect(check_pixel, check_block_rect)){
+               return check_block;
           }
      }
 
      // TODO: handle portals here
      (void)(interactive_quad_tree);
      (void)(tilemap);
-#endif
 
      return nullptr;
 }
