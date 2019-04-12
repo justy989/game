@@ -193,8 +193,7 @@ Block_t* block_against_another_block(Position_t pos, Direction_t direction, Quad
 }
 
 Block_t* rotated_entangled_blocks_against_centroid(Block_t* block, Direction_t direction, QuadTreeNode_t<Block_t>* block_quad_tree,
-                                                   ObjectArray_t<Block_t>* blocks_array, QuadTreeNode_t<Interactive_t>* interactive_quad_tree,
-                                                   TileMap_t* tilemap){
+                                                   ObjectArray_t<Block_t>* blocks_array){
      auto block_center = block_get_center(block);
      Rect_t rect = rect_to_check_surrounding_blocks(block_center.pixel);
 
@@ -256,10 +255,6 @@ Block_t* rotated_entangled_blocks_against_centroid(Block_t* block, Direction_t d
                return check_block;
           }
      }
-
-     // TODO: handle portals here
-     (void)(interactive_quad_tree);
-     (void)(tilemap);
 
      return nullptr;
 }
