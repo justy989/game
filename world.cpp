@@ -1050,7 +1050,8 @@ bool block_push(Block_t* block, Direction_t direction, World_t* world, bool push
      }
 
      if(!pushed_by_ice){
-          collided_block = rotated_entangled_blocks_against_centroid(block, direction, world->block_qt, &world->blocks);
+          collided_block = rotated_entangled_blocks_against_centroid(block, direction, world->block_qt, &world->blocks,
+                                                                     world->interactive_qt, &world->tilemap);
           if(collided_block) return false;
      }
 
