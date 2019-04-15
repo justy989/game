@@ -28,6 +28,7 @@ struct CheckBlockCollisionResult_t{
      Move_t horizontal_move;
      Move_t vertical_move;
 
+     Position_t collided_pos;
      S16 collided_block_index;
 };
 

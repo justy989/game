@@ -1959,7 +1959,12 @@ int main(int argc, char** argv){
                                    if(result.collided_block_index >= 0 && blocks_are_entangled(result.collided_block_index, i, &world.blocks)){
                                         // TODO: I don't love indexing the blocks without checking the index is valid first
                                         auto* entangled_block = world.blocks.elements + result.collided_block_index;
-                                        auto pos_diff = pos_to_vec(block->pos - entangled_block->pos);
+
+                                        // the entangled block pos might be faked due to portals, so use the resulting collision pos instead of the actual position
+                                        auto entangled_block_pos = result.collided_pos;
+                                        entangled_block_pos.pixel -= HALF_TILE_SIZE_PIXEL;
+
+                                        auto pos_diff = pos_to_vec(block->pos - entangled_block_pos);
 
                                         // if positions are diagonal to each other and the rotation between them is odd, check if we are moving into each other
                                         if(fabs(pos_diff.x) == fabs(pos_diff.y) && (block->rotation + entangled_block->rotation) % 2 == 1){
@@ -1987,7 +1992,7 @@ int main(int argc, char** argv){
 
                                                   // TODO: figure out if we are colliding through a portal or not
 
-                                                  auto delta_vec = pos_to_vec(block->pos - entangled_block->pos);
+                                                  auto delta_vec = pos_to_vec(block->pos - entangled_block_pos);
                                                   auto delta_mask = vec_direction_mask(delta_vec);
                                                   auto move_mask = vec_direction_mask(block->pos_delta);
                                                   auto entangle_move_mask = vec_direction_mask(entangled_block->pos_delta);

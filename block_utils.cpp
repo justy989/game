@@ -653,6 +653,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                                                           &world->blocks), attempts++){
           result.collided = true;
           result.collided_block_index = get_block_index(world, block_inside_result.block);
+          result.collided_pos = block_inside_result.collision_pos;
 
           auto moved_block_pos = block_get_center(block_pos);
           auto move_direction = move_direction_between(moved_block_pos, block_inside_result.collision_pos);
