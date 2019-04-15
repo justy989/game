@@ -1985,6 +1985,8 @@ int main(int argc, char** argv){
                                                        // TODO: single direction mask things
                                                   };
 
+                                                  // TODO: figure out if we are colliding through a portal or not
+
                                                   auto delta_vec = pos_to_vec(block->pos - entangled_block->pos);
                                                   auto delta_mask = vec_direction_mask(delta_vec);
                                                   auto move_mask = vec_direction_mask(block->pos_delta);

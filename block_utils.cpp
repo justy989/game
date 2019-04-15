@@ -388,7 +388,7 @@ Block_t* block_inside_block_list(Position_t block_to_check_pos, Vec_t block_to_c
                                  S16 block_to_check_index, bool block_to_check_cloning,
                                  Block_t** blocks, S16 block_count, ObjectArray_t<Block_t>* blocks_array,
                                  Position_t* collided_with, Pixel_t* portal_offsets){
-     auto block_pos = block_to_check_pos + block_to_check_pos_delta;
+     auto final_block_to_check_pos = block_to_check_pos + block_to_check_pos_delta;
 
      Quad_t quad = {0, 0, BLOCK_SOLID_SIZE, BLOCK_SOLID_SIZE};
 
@@ -403,9 +403,12 @@ Block_t* block_inside_block_list(Position_t block_to_check_pos, Vec_t block_to_c
 
           if(block_to_check_index == (block - blocks_array->elements)) continue;
 
-          auto check_block_pos = block->pos + block->pos_delta;
-          auto check_pos = check_block_pos - block_pos;
-          auto check_vec = pos_to_vec(check_pos);
+          auto final_block_pos = block->pos;
+          final_block_pos.pixel += portal_offsets[i];
+          final_block_pos += block->pos_delta;
+
+          auto pos_diff = final_block_pos - final_block_to_check_pos;
+          auto check_vec = pos_to_vec(pos_diff);
 
           Quad_t quad_to_check = {check_vec.x, check_vec.y, check_vec.x + BLOCK_SOLID_SIZE, check_vec.y + BLOCK_SOLID_SIZE};
 
@@ -1006,8 +1009,8 @@ void search_portal_destination_for_blocks(QuadTreeNode_t<Block_t>* block_quad_tr
      quad_tree_find_in(block_quad_tree, rect, blocks, block_count, BLOCK_QUAD_TREE_MAX_QUERY);
 
      for(S8 o = 0; o < *block_count; o++){
-          Pixel_t offset = block_center_pixel(blocks[o]) - dst_center_pixel;
-          Pixel_t src_fake_pixel = src_portal_center_pixel + pixel_rotate_quadrants_clockwise(offset, rotations_between_portals);
+          Pixel_t dst_offset = block_center_pixel(blocks[o]) - dst_center_pixel;
+          Pixel_t src_fake_pixel = src_portal_center_pixel + pixel_rotate_quadrants_clockwise(dst_offset, rotations_between_portals);
           offsets[o] = src_fake_pixel - block_center_pixel(blocks[o]);
      }
 }
