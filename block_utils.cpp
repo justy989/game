@@ -414,8 +414,8 @@ Block_t* block_inside_block_list(Position_t block_to_check_pos, Vec_t block_to_c
           Quad_t quad_to_check = {check_vec.x, check_vec.y, check_vec.x + BLOCK_SOLID_SIZE, check_vec.y + BLOCK_SOLID_SIZE};
 
           if(quad_in_quad(&quad, &quad_to_check)){
-               *collided_with = block_get_center(block);
-               collided_with->pixel += portal_offsets[i];
+               *collided_with = final_block_pos;
+               collided_with->pixel += HALF_TILE_SIZE_PIXEL;
                return block;
           }
      }
@@ -659,11 +659,10 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
           result.collided_pos = block_inside_result.collision_pos;
           result.collided_portal_rotations = block_inside_result.portal_rotations;
 
+          auto collided_block_center = block_get_center(block_inside_result.block);
+
           auto moved_block_pos = block_get_center(block_pos);
           auto move_direction = move_direction_between(moved_block_pos, block_inside_result.collision_pos);
-          // LOG("collision move_direction: %s bp %d %d %f %f cp %d %d %f %f\n", move_direction_to_string(move_direction),
-          //     moved_block_pos.pixel.x, moved_block_pos.pixel.y, moved_block_pos.decimal.x, moved_block_pos.decimal.y,
-          //     block_inside_result.collision_pos.pixel.x, block_inside_result.collision_pos.pixel.y, block_inside_result.collision_pos.decimal.x, block_inside_result.collision_pos.decimal.y);
           Direction_t first_direction;
           Direction_t second_direction;
           move_direction_to_directions(move_direction, &first_direction, &second_direction);
@@ -708,10 +707,10 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                     default:
                          break;
                     case DIRECTION_LEFT:
-                         result.stop_on_pixel_x = block_inside_result.collision_pos.pixel.x + HALF_TILE_SIZE_IN_PIXELS;
+                         result.stop_on_pixel_x = collided_block_center.pixel.x + HALF_TILE_SIZE_IN_PIXELS;
                          break;
                     case DIRECTION_RIGHT:
-                         result.stop_on_pixel_x = (block_inside_result.collision_pos.pixel.x - HALF_TILE_SIZE_IN_PIXELS) - TILE_SIZE_IN_PIXELS;
+                         result.stop_on_pixel_x = (collided_block_center.pixel.x - HALF_TILE_SIZE_IN_PIXELS) - TILE_SIZE_IN_PIXELS;
                          break;
                     }
 
@@ -719,10 +718,10 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                     default:
                          break;
                     case DIRECTION_DOWN:
-                         result.stop_on_pixel_y = block_inside_result.collision_pos.pixel.y + HALF_TILE_SIZE_IN_PIXELS;
+                         result.stop_on_pixel_y = collided_block_center.pixel.y + HALF_TILE_SIZE_IN_PIXELS;
                          break;
                     case DIRECTION_UP:
-                         result.stop_on_pixel_y = (block_inside_result.collision_pos.pixel.y - HALF_TILE_SIZE_IN_PIXELS) - TILE_SIZE_IN_PIXELS;
+                         result.stop_on_pixel_y = (collided_block_center.pixel.y - HALF_TILE_SIZE_IN_PIXELS) - TILE_SIZE_IN_PIXELS;
                          break;
                     }
 
@@ -745,12 +744,12 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                          // TODO: set the decimal portion so we are right up against the block
                          // TODO: this case probably means if they are both on ice they want to start moving as a
                          //       group at a speed in the middle of both of their original speeds?
-                         block->pos.pixel.x = block_inside_result.collision_pos.pixel.x + HALF_TILE_SIZE_IN_PIXELS;
+                         block->pos.pixel.x = collided_block_center.pixel.x + HALF_TILE_SIZE_IN_PIXELS;
                          block->pos.decimal.x = 0;
                          block->vel.x = block_inside_result.block->vel.x;
                          block->pos_delta.x = 0;
                     }else{
-                         result.stop_on_pixel_x = block_inside_result.collision_pos.pixel.x + HALF_TILE_SIZE_IN_PIXELS;
+                         result.stop_on_pixel_x = collided_block_center.pixel.x + HALF_TILE_SIZE_IN_PIXELS;
                          result.pos_delta.x = 0;
                          result.vel.x = 0.0f;
                          result.accel.x = 0.0f;
@@ -760,12 +759,12 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                case MOVE_DIRECTION_RIGHT:
                {
                     if(direction_in_mask(collided_block_move_mask, first_direction)){
-                         block->pos.pixel.x = (block_inside_result.collision_pos.pixel.x - HALF_TILE_SIZE_IN_PIXELS) - TILE_SIZE_IN_PIXELS;
+                         block->pos.pixel.x = (collided_block_center.pixel.x - HALF_TILE_SIZE_IN_PIXELS) - TILE_SIZE_IN_PIXELS;
                          block->pos.decimal.x = 0;
                          block->vel.x = block_inside_result.block->vel.x;
                          block->pos_delta.x = 0;
                     }else{
-                         result.stop_on_pixel_x = (block_inside_result.collision_pos.pixel.x - HALF_TILE_SIZE_IN_PIXELS) - TILE_SIZE_IN_PIXELS;
+                         result.stop_on_pixel_x = (collided_block_center.pixel.x - HALF_TILE_SIZE_IN_PIXELS) - TILE_SIZE_IN_PIXELS;
 
                          result.pos_delta.x = 0;
                          result.vel.x = 0.0f;
@@ -776,12 +775,12 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                case MOVE_DIRECTION_DOWN:
                {
                     if(direction_in_mask(collided_block_move_mask, first_direction)){
-                         block->pos.pixel.y = block_inside_result.collision_pos.pixel.y + HALF_TILE_SIZE_IN_PIXELS;
+                         block->pos.pixel.y = collided_block_center.pixel.y + HALF_TILE_SIZE_IN_PIXELS;
                          block->pos.decimal.y = 0;
                          block->vel.y = block_inside_result.block->vel.y;
                          block->pos_delta.y = 0;
                     }else{
-                         result.stop_on_pixel_y = block_inside_result.collision_pos.pixel.y + HALF_TILE_SIZE_IN_PIXELS;
+                         result.stop_on_pixel_y = collided_block_center.pixel.y + HALF_TILE_SIZE_IN_PIXELS;
 
                          result.pos_delta.y = 0;
                          result.vel.y = 0.0f;
@@ -792,12 +791,12 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                case MOVE_DIRECTION_UP:
                {
                     if(direction_in_mask(collided_block_move_mask, first_direction)){
-                         block->pos.pixel.y = (block_inside_result.collision_pos.pixel.y - HALF_TILE_SIZE_IN_PIXELS) - TILE_SIZE_IN_PIXELS;
+                         block->pos.pixel.y = (collided_block_center.pixel.y - HALF_TILE_SIZE_IN_PIXELS) - TILE_SIZE_IN_PIXELS;
                          block->pos.decimal.y = 0;
                          block->vel.y = block_inside_result.block->vel.y;
                          block->pos_delta.y = 0;
                     }else{
-                         result.stop_on_pixel_y = (block_inside_result.collision_pos.pixel.y - HALF_TILE_SIZE_IN_PIXELS) - TILE_SIZE_IN_PIXELS;
+                         result.stop_on_pixel_y = (collided_block_center.pixel.y - HALF_TILE_SIZE_IN_PIXELS) - TILE_SIZE_IN_PIXELS;
 
                          result.pos_delta.y = 0;
                          result.vel.y = 0.0f;

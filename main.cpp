@@ -1908,10 +1908,6 @@ int main(int argc, char** argv){
                               stop_on_boundary_y = true;
                          }
 
-                         if(i == 3 && frame_count == 404){
-                              LOG("I SEE U\n");
-                         }
-
                          if(block->pos_delta.x != 0.0f || block->pos_delta.y != 0.0f){
                               auto result = check_block_collision_with_other_blocks(block->pos,
                                                                                     block->pos_delta,
@@ -1966,14 +1962,19 @@ int main(int argc, char** argv){
 
                                         // the entangled block pos might be faked due to portals, so use the resulting collision pos instead of the actual position
                                         auto entangled_block_pos = result.collided_pos;
+
+                                        // the result collided position is the center of the block, so handle this
                                         entangled_block_pos.pixel -= HALF_TILE_SIZE_PIXEL;
 
-                                        auto pos_diff = pos_to_vec(block->pos - entangled_block_pos);
+                                        auto final_block_pos = block->pos + block->pos_delta;
+                                        auto pos_diff = pos_to_vec(final_block_pos - entangled_block_pos);
 
                                         U8 total_rotations = (block->rotation + entangled_block->rotation + result.collided_portal_rotations) % (S8)(DIRECTION_COUNT);
 
+                                        auto pos_dimension_delta = fabs(fabs(pos_diff.x) - fabs(pos_diff.y));
+
                                         // if positions are diagonal to each other and the rotation between them is odd, check if we are moving into each other
-                                        if(fabs(pos_diff.x) == fabs(pos_diff.y) && (total_rotations) % 2 == 1){
+                                        if(pos_dimension_delta < 0.0001f && (total_rotations) % 2 == 1){
                                              // TODO: switch to using block_inside_another_block() because that is actually what we care about
                                              auto entangle_result = check_block_collision_with_other_blocks(entangled_block->pos,
                                                                                                             entangled_block->pos_delta,
@@ -2947,7 +2948,7 @@ int main(int argc, char** argv){
 
           glEnd();
 
-#if 1
+#if 0
           // light
           glBindTexture(GL_TEXTURE_2D, 0);
           glBegin(GL_QUADS);
