@@ -62,6 +62,14 @@ Rect_t block_get_rect(Block_t* b){
      return block_rect;
 }
 
+Rect_t block_get_rect(Pixel_t pixel){
+     Rect_t block_rect = {(S16)(pixel.x),
+                          (S16)(pixel.y),
+                          (S16)(pixel.x + BLOCK_SOLID_SIZE_IN_PIXELS),
+                          (S16)(pixel.y + BLOCK_SOLID_SIZE_IN_PIXELS)};
+     return block_rect;
+}
+
 Pixel_t block_bottom_right_pixel(Pixel_t block_pixel){
      return Pixel_t{(S16)(block_pixel.x + BLOCK_SOLID_SIZE_IN_PIXELS), block_pixel.y};
 }

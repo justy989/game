@@ -1971,6 +1971,8 @@ int main(int argc, char** argv){
 
                                         U8 total_rotations = (block->rotation + entangled_block->rotation + result.collided_portal_rotations) % (S8)(DIRECTION_COUNT);
 
+                                        // TODO: this 0.0001f is a hack, it used to be an equality check, but the
+                                        //       numbers were slightly off in the case of rotated portals but not rotated entangled blocks
                                         auto pos_dimension_delta = fabs(fabs(pos_diff.x) - fabs(pos_diff.y));
 
                                         // if positions are diagonal to each other and the rotation between them is odd, check if we are moving into each other

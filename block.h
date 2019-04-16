@@ -56,6 +56,7 @@ Coord_t block_get_coord(Block_t* block);
 Coord_t block_get_coord(Position_t pos);
 bool blocks_at_collidable_height(S8 a_z, S8 b_z);
 Rect_t block_get_rect(Block_t* block);
+Rect_t block_get_rect(Pixel_t pixel);
 
 Pixel_t block_bottom_right_pixel(Pixel_t block);
 Pixel_t block_top_left_pixel(Pixel_t block);
