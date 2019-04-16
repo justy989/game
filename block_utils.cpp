@@ -385,7 +385,7 @@ bool blocks_are_entangled(S16 a_index, S16 b_index, ObjectArray_t<Block_t>* bloc
 Block_t* block_inside_block_list(Position_t block_to_check_pos, Vec_t block_to_check_pos_delta,
                                  S16 block_to_check_index, bool block_to_check_cloning,
                                  Block_t** blocks, S16 block_count, ObjectArray_t<Block_t>* blocks_array,
-                                 Position_t* collided_with, Pixel_t* portal_offsets){
+                                 Position_t* collided_with, U8 portal_rotations, Pixel_t* portal_offsets){
      auto final_block_to_check_pos = block_to_check_pos + block_to_check_pos_delta;
 
      Quad_t quad = {0, 0, BLOCK_SOLID_SIZE, BLOCK_SOLID_SIZE};
@@ -403,7 +403,10 @@ Block_t* block_inside_block_list(Position_t block_to_check_pos, Vec_t block_to_c
 
           auto final_block_pos = block->pos;
           final_block_pos.pixel += portal_offsets[i];
-          final_block_pos += block->pos_delta;
+
+          // account for portal rotations in decimal portals of position
+          final_block_pos.decimal = vec_rotate_quadrants_counter_clockwise(final_block_pos.decimal, portal_rotations);
+          final_block_pos += vec_rotate_quadrants_counter_clockwise(block->pos_delta, portal_rotations);
 
           auto pos_diff = final_block_pos - final_block_to_check_pos;
           auto check_vec = pos_to_vec(pos_diff);
@@ -440,7 +443,7 @@ BlockInsideResult_t block_inside_another_block(Position_t block_to_check_pos, Ve
      Block_t* collided_block = block_inside_block_list(block_to_check_pos, block_to_check_pos_delta,
                                                        block_to_check_index,
                                                        block_to_check_cloning, blocks, block_count,
-                                                       block_array, &result.collision_pos, portal_offsets);
+                                                       block_array, &result.collision_pos, 0, portal_offsets);
      if(collided_block){
           result.block = collided_block;
           return result;
@@ -463,16 +466,19 @@ BlockInsideResult_t block_inside_another_block(Position_t block_to_check_pos, Ve
                               auto dst_coord = portal_exits.directions[d].coords[p];
                               if(dst_coord == src_coord) continue;
 
+                              U8 portal_rotations = portal_rotations_between(interactive->portal.face, (Direction_t)(d));
+
                               search_portal_destination_for_blocks(block_quad_tree, interactive->portal.face, (Direction_t)(d), src_coord,
                                                                    dst_coord, blocks, &block_count, portal_offsets);
 
                               collided_block = block_inside_block_list(block_to_check_pos, block_to_check_pos_delta,
                                                                        block_to_check_index,
                                                                        block_to_check_cloning, blocks, block_count,
-                                                                       block_array, &result.collision_pos, portal_offsets);
+                                                                       block_array, &result.collision_pos,
+                                                                       portal_rotations, portal_offsets);
                               if(collided_block){
                                    result.block = collided_block;
-                                   result.portal_rotations = portal_rotations_between(interactive->portal.face, (Direction_t)(d));
+                                   result.portal_rotations = portal_rotations;
                                    result.src_portal_coord = src_coord;
                                    result.dst_portal_coord = dst_coord;
                                    return result;

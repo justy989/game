@@ -862,7 +862,7 @@ int main(int argc, char** argv){
                     }
                     case SDL_SCANCODE_H:
                     {
-                         Pixel_t pixel = mouse_select_world_pixel(mouse_screen, camera);
+                         Pixel_t pixel = mouse_select_world_pixel(mouse_screen, camera) + HALF_TILE_SIZE_PIXEL;
                          Coord_t coord = mouse_select_world(mouse_screen, camera);
                          LOG("mouse pixel: %d, %d, Coord: %d, %d\n", pixel.x, pixel.y, coord.x, coord.y);
                          describe_coord(coord, &world);
@@ -1908,6 +1908,10 @@ int main(int argc, char** argv){
                               stop_on_boundary_y = true;
                          }
 
+                         if(i == 3 && frame_count == 404){
+                              LOG("I SEE U\n");
+                         }
+
                          if(block->pos_delta.x != 0.0f || block->pos_delta.y != 0.0f){
                               auto result = check_block_collision_with_other_blocks(block->pos,
                                                                                     block->pos_delta,
@@ -1986,7 +1990,7 @@ int main(int argc, char** argv){
                                                   // stop the blocks moving toward each other
                                                   static const VecMaskCollisionEntry_t table[] = {
                                                        {static_cast<S8>(DIRECTION_MASK_RIGHT | DIRECTION_MASK_UP), DIRECTION_LEFT, DIRECTION_UP, DIRECTION_DOWN, DIRECTION_RIGHT},
-                                                       {static_cast<S8>(DIRECTION_MASK_RIGHT | DIRECTION_MASK_DOWN), DIRECTION_RIGHT, DIRECTION_DOWN, DIRECTION_UP, DIRECTION_LEFT},
+                                                       {static_cast<S8>(DIRECTION_MASK_RIGHT | DIRECTION_MASK_DOWN), DIRECTION_LEFT, DIRECTION_DOWN, DIRECTION_UP, DIRECTION_RIGHT},
                                                        {static_cast<S8>(DIRECTION_MASK_LEFT  | DIRECTION_MASK_UP), DIRECTION_LEFT, DIRECTION_DOWN, DIRECTION_UP, DIRECTION_RIGHT},
                                                        {static_cast<S8>(DIRECTION_MASK_LEFT  | DIRECTION_MASK_DOWN), DIRECTION_LEFT, DIRECTION_UP, DIRECTION_DOWN, DIRECTION_RIGHT},
                                                        // TODO: single direction mask things
