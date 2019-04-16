@@ -30,6 +30,7 @@ struct CheckBlockCollisionResult_t{
 
      Position_t collided_pos;
      S16 collided_block_index;
+     U8 collided_portal_rotations;
 };
 
 struct BlockCollidesWithItselfResult_t{

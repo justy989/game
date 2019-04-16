@@ -7,8 +7,6 @@
 #include <string.h>
 #include <math.h>
 
-Pixel_t g_collided_with_pixel = {};
-
 bool block_adjacent_pixels_to_check(Position_t pos, Vec_t pos_delta, Direction_t direction, Pixel_t* a, Pixel_t* b){
      auto block_to_check_pos = pos + pos_delta;
 
@@ -415,7 +413,6 @@ Block_t* block_inside_block_list(Position_t block_to_check_pos, Vec_t block_to_c
           if(quad_in_quad(&quad, &quad_to_check)){
                *collided_with = block_get_center(block);
                collided_with->pixel += portal_offsets[i];
-               g_collided_with_pixel = collided_with->pixel;
                return block;
           }
      }
@@ -654,6 +651,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
           result.collided = true;
           result.collided_block_index = get_block_index(world, block_inside_result.block);
           result.collided_pos = block_inside_result.collision_pos;
+          result.collided_portal_rotations = block_inside_result.portal_rotations;
 
           auto moved_block_pos = block_get_center(block_pos);
           auto move_direction = move_direction_between(moved_block_pos, block_inside_result.collision_pos);

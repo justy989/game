@@ -1966,8 +1966,10 @@ int main(int argc, char** argv){
 
                                         auto pos_diff = pos_to_vec(block->pos - entangled_block_pos);
 
+                                        U8 total_rotations = (block->rotation + entangled_block->rotation + result.collided_portal_rotations) % (S8)(DIRECTION_COUNT);
+
                                         // if positions are diagonal to each other and the rotation between them is odd, check if we are moving into each other
-                                        if(fabs(pos_diff.x) == fabs(pos_diff.y) && (block->rotation + entangled_block->rotation) % 2 == 1){
+                                        if(fabs(pos_diff.x) == fabs(pos_diff.y) && (total_rotations) % 2 == 1){
                                              // TODO: switch to using block_inside_another_block() because that is actually what we care about
                                              auto entangle_result = check_block_collision_with_other_blocks(entangled_block->pos,
                                                                                                             entangled_block->pos_delta,
@@ -1995,7 +1997,7 @@ int main(int argc, char** argv){
                                                   auto delta_vec = pos_to_vec(block->pos - entangled_block_pos);
                                                   auto delta_mask = vec_direction_mask(delta_vec);
                                                   auto move_mask = vec_direction_mask(block->pos_delta);
-                                                  auto entangle_move_mask = vec_direction_mask(entangled_block->pos_delta);
+                                                  auto entangle_move_mask = vec_direction_mask(vec_rotate_quadrants_counter_clockwise(entangled_block->pos_delta, result.collided_portal_rotations));
 
                                                   Direction_t move_dir_to_stop = DIRECTION_COUNT;
                                                   Direction_t entangled_move_dir_to_stop = DIRECTION_COUNT;
@@ -2096,8 +2098,10 @@ int main(int argc, char** argv){
                                                                  }
                                                             }
                                                        }else{
+                                                            auto stop_entangled_dir = direction_rotate_clockwise(entangled_move_dir_to_stop, result.collided_portal_rotations);
+
                                                             stop_block_colliding_with_entangled(block, move_dir_to_stop, &result);
-                                                            stop_block_colliding_with_entangled(entangled_block, entangled_move_dir_to_stop, &entangle_result);
+                                                            stop_block_colliding_with_entangled(entangled_block, stop_entangled_dir, &entangle_result);
 
                                                             // TODO: compress this code, it's definitely used elsewhere
                                                             for(S16 p = 0; p < world.players.count; p++){
