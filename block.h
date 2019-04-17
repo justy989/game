@@ -26,6 +26,8 @@ struct Block_t : public GridMotion_t{
      DirectionMask_t cur_push_mask;
      DirectionMask_t prev_push_mask;
 
+     bool       held_up;
+
      bool       teleport;
      Position_t teleport_pos;
      Vec_t      teleport_pos_delta;

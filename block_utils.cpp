@@ -568,20 +568,20 @@ Player_t* block_against_player(Block_t* block, Direction_t direction, ObjectArra
      return nullptr;
 }
 
-Block_t* block_held_up_by_another_block(Block_t* block_to_check, QuadTreeNode_t<Block_t>* block_qt){
+static Block_t* block_at_height_in_block_rect(Block_t* block_to_check, QuadTreeNode_t<Block_t>* block_qt,
+                                              S8 expected_height){
      // TODO: need more complicated function to detect this
      auto block_to_check_pos = block_to_check->pos + block_to_check->pos_delta;
-     Rect_t rect = {block_to_check_pos.pixel.x, block_to_check_pos.pixel.y,
-                    (S16)(block_to_check_pos.pixel.x + BLOCK_SOLID_SIZE_IN_PIXELS),
-                    (S16)(block_to_check_pos.pixel.y + BLOCK_SOLID_SIZE_IN_PIXELS)};
+     Rect_t rect = block_get_rect(block_to_check_pos.pixel);
      Rect_t surrounding_rect = rect_to_check_surrounding_blocks(block_center_pixel(block_to_check));
+
      S16 block_count = 0;
      Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
      quad_tree_find_in(block_qt, surrounding_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
-     S8 held_at_height = block_to_check->pos.z - HEIGHT_INTERVAL;
+
      for(S16 i = 0; i < block_count; i++){
           Block_t* block = blocks[i];
-          if(block == block_to_check || block->pos.z != held_at_height) continue;
+          if(block == block_to_check || block->pos.z != expected_height) continue;
           auto block_pos = block->pos + block->pos_delta;
 
           if(pixel_in_rect(block_pos.pixel, rect) ||
@@ -593,6 +593,14 @@ Block_t* block_held_up_by_another_block(Block_t* block_to_check, QuadTreeNode_t<
      }
 
      return nullptr;
+}
+
+Block_t* block_held_up_by_another_block(Block_t* block_to_check, QuadTreeNode_t<Block_t>* block_qt){
+     return block_at_height_in_block_rect(block_to_check, block_qt, block_to_check->pos.z - HEIGHT_INTERVAL);
+}
+
+Block_t* block_held_down_by_another_block(Block_t* block_to_check, QuadTreeNode_t<Block_t>* block_qt){
+     return block_at_height_in_block_rect(block_to_check, block_qt, block_to_check->pos.z + HEIGHT_INTERVAL);
 }
 
 bool block_on_ice(Position_t pos, Vec_t pos_delta, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree){

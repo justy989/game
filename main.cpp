@@ -1152,6 +1152,9 @@ int main(int argc, char** argv){
                               Coord_t player_coord = pos_to_coord(player->pos);
                               if(interactive->coord == player_coord && interactive->popup.lift.ticks == player->pos.z + 2){
                                   player->pos.z++;
+
+                                  // if you are getting pushed up, it's hard to keep your grip!
+                                  player->push_time = 0.0f;
                               }
                          }
                     }else if(interactive->type == INTERACTIVE_TYPE_DOOR){
@@ -1159,6 +1162,7 @@ int main(int argc, char** argv){
                     }else if(interactive->type == INTERACTIVE_TYPE_PRESSURE_PLATE){
                          bool should_be_down = false;
                          for(S16 p = 0; p < world.players.count; p++){
+                              if(world.players.elements[p].pos.z != 0) continue;
                               Coord_t player_coord = pos_to_coord(world.players.elements[p].pos);
                               if(interactive->coord == player_coord){
                                    should_be_down = true;
@@ -1177,6 +1181,8 @@ int main(int argc, char** argv){
                                         quad_tree_find_in(world.block_qt, rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
 
                                         for(S16 b = 0; b < block_count; b++){
+                                             if(blocks[b]->pos.z != 0) continue;
+
                                              Coord_t bottom_left = pixel_to_coord(blocks[b]->pos.pixel);
                                              Coord_t bottom_right = pixel_to_coord(block_bottom_right_pixel(blocks[b]->pos.pixel));
                                              Coord_t top_left = pixel_to_coord(block_top_left_pixel(blocks[b]->pos.pixel));
@@ -1877,6 +1883,51 @@ int main(int argc, char** argv){
                                                BLOCK_ACCEL_DISTANCE, pos_vec.y);
                }
 
+               for(S16 i = 0; i < world.blocks.count; i++){
+                    auto block = world.blocks.elements + i;
+
+                    block->held_up = block_held_up_by_another_block(block, world.block_qt);
+
+                    // TODO: should we care about the decimal component of the position ?
+                    Coord_t rect_coords[4];
+                    bool pushed_up = false;
+                    get_rect_coords(block_get_rect(block), rect_coords);
+                    for(S8 c = 0; c < 4; c++){
+                         auto* interactive = quad_tree_interactive_find_at(world.interactive_qt, rect_coords[c]);
+                         if(interactive){
+                              if(interactive->type == INTERACTIVE_TYPE_POPUP){
+                                   if(!pushed_up && (block->pos.z == interactive->popup.lift.ticks - 2)){
+                                        Block_t* above_block = block_held_down_by_another_block(block, world.block_qt);
+                                        while(above_block){
+                                             Block_t* tmp_block = above_block;
+                                             above_block = block_held_down_by_another_block(above_block, world.block_qt);
+                                             tmp_block->pos.z++;
+                                             tmp_block->held_up = true;
+                                        }
+                                        block->pos.z++;
+                                        block->held_up = true;
+                                        pushed_up = true;
+                                   }else if(!block->held_up && block->pos.z == (interactive->popup.lift.ticks - 1)){
+                                        block->held_up = true;
+                                   }
+                              }
+                         }
+                    }
+               }
+
+               for(S16 i = 0; i < world.blocks.count; i++){
+                    auto block = world.blocks.elements + i;
+
+                    if(!block->held_up && block->pos.z > 0){
+                         block->fall_time += dt;
+                         if(block->fall_time >= FALL_TIME){
+                              block->fall_time -= FALL_TIME;
+                              block->pos.z--;
+                         }
+                    }
+               }
+
+
                // unbounded collision: this should be exciting
                // we have our initial position and our initial pos_delta, update pos_delta for all players and blocks until nothing is colliding anymore
                const int max_collision_attempts = 16;
@@ -1894,7 +1945,6 @@ int main(int argc, char** argv){
 
                          bool stop_on_boundary_x = false;
                          bool stop_on_boundary_y = false;
-                         bool held_up = false;
 
                          // if we are being stopped by the player and have moved more than the player radius (which is
                          // a check to ensure we don't stop a block instantaneously) then stop on the coordinate boundaries
@@ -2312,35 +2362,6 @@ int main(int argc, char** argv){
                                    block->vel.y = 0;
                                    block->pos_delta.y = 0;
                                    block->vertical_move.state = MOVE_STATE_IDLING;
-                              }
-                         }
-
-                         held_up = block_held_up_by_another_block(block, world.block_qt);
-
-                         // TODO: should we care about the decimal component of the position ?
-                         Coord_t rect_coords[4];
-                         bool pushed_up = false;
-                         get_rect_coords(block_get_rect(block), rect_coords);
-                         for(S8 c = 0; c < 4; c++){
-                              auto* interactive = quad_tree_interactive_find_at(world.interactive_qt, rect_coords[c]);
-                              if(interactive){
-                                   if(interactive->type == INTERACTIVE_TYPE_POPUP){
-                                        if(!pushed_up && (block->pos.z == interactive->popup.lift.ticks - 2)){
-                                             block->pos.z++;
-                                             held_up = true;
-                                             pushed_up = true;
-                                        }else if(!held_up && block->pos.z == (interactive->popup.lift.ticks - 1)){
-                                             held_up = true;
-                                        }
-                                   }
-                              }
-                         }
-
-                         if(!held_up && block->pos.z > 0){
-                              block->fall_time += dt;
-                              if(block->fall_time >= FALL_TIME){
-                                   block->fall_time -= FALL_TIME;
-                                   block->pos.z--;
                               }
                          }
 

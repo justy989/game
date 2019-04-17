@@ -676,21 +676,22 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                auto rotated_player_face = direction_rotate_counter_clockwise(player_face, collision_portal_rotations);
 
                if(collided_block_dir == player_face && (player_vel.x != 0.0f || player_vel.y != 0.0f)){
-                    if(result.pushing_block < 0){ // also check that the player is actually pushing against the block
-                         result.pushing_block = i;
-                         result.pushing_block_dir = rotated_player_face;
-                         result.pushing_block_rotation = collision_portal_rotations;
-                    }else{
-                         // stop the player from pushing 2 blocks at once
-                         result.pushing_block = -1;
-                         result.pushing_block_dir = DIRECTION_COUNT;
-                         result.pushing_block_rotation = 0;
+                    if(!block_held_down_by_another_block(block, world->block_qt)){
+                         if(result.pushing_block < 0){ // also check that the player is actually pushing against the block
+                              result.pushing_block = i;
+                              result.pushing_block_dir = rotated_player_face;
+                              result.pushing_block_rotation = collision_portal_rotations;
+                         }else{
+                              // stop the player from pushing 2 blocks at once
+                              result.pushing_block = -1;
+                              result.pushing_block_dir = DIRECTION_COUNT;
+                              result.pushing_block_rotation = 0;
+                         }
                     }
                }
 
                collided_blocks_mask_dir = direction_mask_add(collided_blocks_mask_dir, collided_block_dir);
                collided_blocks[collided_block_dir] = collided_block;
-
           }
      }
 

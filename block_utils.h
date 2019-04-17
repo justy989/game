@@ -58,6 +58,7 @@ Tile_t* block_against_solid_tile(Block_t* block_to_check, Direction_t direction,
 Player_t* block_against_player(Block_t* block_to_check, Direction_t direction, ObjectArray_t<Player_t>* players);
 
 Block_t* block_held_up_by_another_block(Block_t* block_to_check, QuadTreeNode_t<Block_t>* block_quad_tree);
+Block_t* block_held_down_by_another_block(Block_t* block_to_check, QuadTreeNode_t<Block_t>* block_quad_tree);
 
 bool block_on_ice(Position_t pos, Vec_t pos_delta, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree);
 
