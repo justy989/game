@@ -1187,9 +1187,11 @@ void describe_block(World_t* world, Block_t* block){
 
 void describe_player(World_t* world, Player_t* player){
      S16 index = player - world->players.elements;
-     LOG("Player %d: pixel: %d, %d, decimal %f, %f, face: %s push_block: %d, prev_push_block: %d\n", index,
+     LOG("Player %d: pixel: %d, %d, decimal %f, %f, face: %s push_block: %d\n", index,
          player->pos.pixel.x, player->pos.pixel.y, player->pos.decimal.x, player->pos.decimal.y,
-         direction_to_string(player->face), player->pushing_block, player->prev_pushing_block);
+         direction_to_string(player->face), player->pushing_block);
+     LOG("  rot: %d, move_rot: L %d, U %d, R %d, D %d\n", player->rotation,
+         player->move_rotation[DIRECTION_LEFT], player->move_rotation[DIRECTION_UP], player->move_rotation[DIRECTION_RIGHT], player->move_rotation[DIRECTION_DOWN]);
      LOG("\n");
 }
 

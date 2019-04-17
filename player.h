@@ -17,14 +17,14 @@
 struct Player_t : public Motion_t {
      Position_t  pos;
 
-     bool        teleport;
+     bool        teleport = false;
      Position_t  teleport_pos;
      Vec_t       teleport_pos_delta;
-     S16         teleport_pushing_block;
-     Direction_t teleport_pushing_block_dir;
-     S8          teleport_pushing_block_rotation;
-     U8          teleport_rotation;
-     Direction_t teleport_face;
+     S16         teleport_pushing_block = 0;
+     Direction_t teleport_pushing_block_dir = DIRECTION_COUNT;
+     S8          teleport_pushing_block_rotation = 0;
+     U8          teleport_rotation = 0;
+     Direction_t teleport_face = DIRECTION_LEFT;
 
      Direction_t face = DIRECTION_LEFT;
      bool        reface = false;

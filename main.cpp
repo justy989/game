@@ -16,14 +16,13 @@ Current bugs:
 - when pushing a block through a portal that turns off, the block keeps going
 - getting a block and it's rotated entangler to push into the centroid causes the any other entangled blocks to alternate pushing
 - lockups/crashing when lots of entangled blocks collided on ice
+- In the case of 3 rotated entangled blocks, 2 blocks that have a rotation of 2 between them colliding into each other seem to end up off of the grid
 
 Current Design issues:
 - it is important for the player to force a rotated entangled block to not move when we push the other block. To do this we have to wedge ourself against it before pushing the block we want.
   if you forget to do this the block will be slightly off grid which isn't great
 
 Big Features:
-- Multiple block entangling (kinda big)
-- Multiple player entangling
 - 3D
      - note: only 2 blocks high can go through portals
      - shadows and slightly discolored blocks should help with visualizations
@@ -128,8 +127,7 @@ bool load_map_number_map(S16 map_number, World_t* world, Undo_t* undo,
      return false;
 }
 
-void update_light_and_ice_detectors(Interactive_t* interactive, World_t* world)
-{
+void update_light_and_ice_detectors(Interactive_t* interactive, World_t* world){
      switch(interactive->type){
      default:
           break;
@@ -1381,8 +1379,7 @@ int main(int argc, char** argv){
                }
 
                // TODO: deal with all this for multiple players
-               bool rotated_move_actions[4];
-               for (bool &rotated_move_action : rotated_move_actions) rotated_move_action = false;
+               bool rotated_move_actions[DIRECTION_COUNT];
                bool user_stopping_x = false;
                bool user_stopping_y = false;
 
@@ -1390,9 +1387,12 @@ int main(int argc, char** argv){
                for(S16 i = 0; i < world.players.count; i++){
                     Player_t* player = world.players.elements + i;
 
+                    memset(rotated_move_actions, 0, sizeof(rotated_move_actions));
+
                     for(int d = 0; d < 4; d++){
                          if(player_action.move[d]){
                               Direction_t rot_dir = direction_rotate_clockwise((Direction_t)(d), player->move_rotation[d]);
+                              rot_dir = direction_rotate_clockwise(rot_dir, player->rotation);
                               rotated_move_actions[rot_dir] = true;
                               if(player->reface) player->face = static_cast<Direction_t>(rot_dir);
                          }
@@ -2618,16 +2618,27 @@ int main(int argc, char** argv){
                          player->pushing_block = player->teleport_pushing_block;
                          player->pushing_block_dir = player->teleport_pushing_block_dir;
                          player->pushing_block_rotation = player->teleport_pushing_block_rotation;
+                         player->rotation = (player->rotation + player->teleport_rotation) % DIRECTION_COUNT;
 
-                         if(i != 0) player->rotation = (player->rotation + player->teleport_rotation) % DIRECTION_COUNT;
+                         auto first_player = world.players.elements + 0;
+
+                         // set everyone's rotation relative to the first player
+                         if(i != 0) player->rotation = direction_rotations_between((Direction_t)(player->rotation), (Direction_t)(first_player->rotation));
 
                          // set rotations for each direction the player wants to move
                          for(S8 d = 0; d < DIRECTION_COUNT; d++){
-                              if(player_action.move[d]) player->move_rotation[d] = (player->move_rotation[d] + player->teleport_rotation) % DIRECTION_COUNT;
+                              if(player_action.move[d]){
+                                   player->move_rotation[d] = (player->move_rotation[d] + first_player->teleport_rotation) % DIRECTION_COUNT;
+                              }
                          }
                     }else{
                          player->pos += player->pos_delta;
                     }
+               }
+
+               // reset the first player's rotation
+               if(world.players.count > 0){
+                    world.players.elements[0].rotation = 0;
                }
 
                for(S16 i = 0; i < world.blocks.count; i++){
