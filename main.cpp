@@ -24,12 +24,16 @@ Current Design issues:
 
 Big Features:
 - 3D
-     - note: only 2 blocks high can go through portals
+     - push block on top of block adjacent to player
+     - extinguish elements on bottom block when top block slides over it
+     - block slides on top of other blocks that are iced
+     - if a player is standing on a sliding block, the player slides too
      - shadows and slightly discolored blocks should help with visualizations
+     - only 2 blocks high can go through portals
 - arrow kills player
 - arrow entanglement
 - Block splitting
-- Bring block ice collision to the masses
+- 'Bring Block Ice Collision to the Masses' - my favorite feature joke of the game
 
 */
 
@@ -271,17 +275,6 @@ void copy_block_collision_results(Block_t* block, CheckBlockCollisionResult_t* r
 
      block->horizontal_move = result->horizontal_move;
      block->vertical_move = result->vertical_move;
-}
-
-int block_height_comparer(const void* a, const void* b){
-    Block_t* real_a = *(Block_t**)(a);
-    Block_t* real_b = *(Block_t**)(b);
-
-    return real_a->pos.z > real_b->pos.z;
-}
-
-void sort_blocks_by_height(Block_t** blocks, S16 block_count){
-    qsort(blocks, block_count, sizeof(*blocks), block_height_comparer);
 }
 
 int main(int argc, char** argv){

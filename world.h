@@ -44,6 +44,8 @@ struct MovePlayerThroughWorldResult_t{
      S8 pushing_block_rotation;
 };
 
+void sort_blocks_by_height(Block_t** blocks, S16 block_count);
+
 bool load_map_number(S32 map_number, Coord_t* player_start, World_t* world);
 void reset_map(Coord_t player_start, World_t* world, Undo_t* undo);
 
