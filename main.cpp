@@ -19,6 +19,7 @@ Current bugs:
 - In the case of 3 rotated entangled blocks, 2 blocks that have a rotation of 2 between them colliding into each other seem to end up off of the grid
 - In the act of stopping a block where the player goes through a portal causes them to not teleport through the portal
 - When pushing a block through portals, the block seems to snap to grid oddly when you finish pushing it
+- Sometimes when pushing a block, it will slide a tiny bit (around a pixel) further than the square it is supposed to land on, then snap to the right pixel
 
 Current Design issues:
 - it is important for the player to force a rotated entangled block to not move when we push the other block. To do this we have to wedge ourself against it before pushing the block we want.
@@ -369,8 +370,8 @@ int main(int argc, char** argv){
           return 1;
      }
 
-     int window_width = 1440;
-     int window_height = 1440;
+     int window_width = 1024;
+     int window_height = 1024;
      SDL_Window* window = nullptr;
      SDL_GLContext opengl_context = nullptr;
      GLuint theme_texture = 0;
@@ -3026,7 +3027,7 @@ int main(int argc, char** argv){
 
           glEnd();
 
-#if 0
+#if 1
           // light
           glBindTexture(GL_TEXTURE_2D, 0);
           glBegin(GL_QUADS);
