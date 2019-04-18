@@ -450,6 +450,7 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
      U8 collision_portal_rotations = 0;
      Block_t* collided_with_block = nullptr;
      auto collided_block_dir = DIRECTION_COUNT;
+     S32 collided_with_block_count = 0;
 
      S16 block_count = 0;
      Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
@@ -467,11 +468,18 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
 
           Position_t block_pos = block->pos + block->pos_delta;
           bool collided = false;
-          position_collide_with_rect(player_pos, block_pos, TILE_SIZE, &result_pos_delta, &collided);
+          auto current_result_pos_delta = result.pos_delta;
+          position_collide_with_rect(player_pos, block_pos, TILE_SIZE, &current_result_pos_delta, &collided);
           if(collided){
-               collided_with_block = block;
                result.collided = true;
-               collided_block_dir = relative_quadrant(player_pos.pixel, block_pos.pixel + HALF_TILE_SIZE_PIXEL);
+               collided_with_block_count++;
+
+               // take the closest collision
+               if(vec_magnitude(current_result_pos_delta) < vec_magnitude(result_pos_delta)){
+                    result_pos_delta = current_result_pos_delta;
+                    collided_with_block = block;
+                    collided_block_dir = relative_quadrant(player_pos.pixel, block_pos.pixel + HALF_TILE_SIZE_PIXEL);
+               }
           }
      }
 
@@ -501,6 +509,10 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                               for(S8 b = 0; b < block_count; b++){
                                    Block_t* block = blocks[b];
 
+                                   // TODO: compress this statement with above
+                                   if(block->pos.z <= player_pos.z - HEIGHT_INTERVAL ||
+                                      block->pos.z >= player_pos.z + (HEIGHT_INTERVAL * 2)) continue;
+
                                    auto portal_rotations = portal_rotations_between(interactive->portal.face, (Direction_t)(pd));
                                    auto portal_src_pixel = coord_to_pixel_at_center(check_coord);
 
@@ -516,11 +528,13 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                                    canonicalize(&block_pos);
 
                                    bool collided = false;
+                                   result_pos_delta = result.pos_delta;
                                    position_collide_with_rect(player_pos, block_pos, TILE_SIZE, &result_pos_delta, &collided);
 
                                    if(collided){
                                         result.collided = true;
                                         collided_with_block = block;
+                                        collided_with_block_count++;
                                         collision_portal_rotations = portal_rotations;
                                         collided_block_dir = relative_quadrant(player_pos.pixel, block_pos.pixel + HALF_TILE_SIZE_PIXEL);
                                         break;
@@ -710,7 +724,8 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
 
           if(collided_block_dir == player_face && (player_vel.x != 0.0f || player_vel.y != 0.0f) &&
              !block_held_down_by_another_block(collided_with_block, world->block_qt)){
-               if(result.pushing_block < 0){ // also check that the player is actually pushing against the block
+               // LOG("col bl: %d\n", collided_with_block_count);
+               if(collided_with_block_count == 1){ // also check that the player is actually pushing against the block
                     result.pushing_block = get_block_index(world, collided_with_block);
                     result.pushing_block_dir = rotated_player_face;
                     result.pushing_block_rotation = collision_portal_rotations;
@@ -1220,6 +1235,7 @@ void describe_player(World_t* world, Player_t* player){
      LOG("Player %d: pixel: %d, %d, decimal %f, %f, face: %s push_block: %d\n", index,
          player->pos.pixel.x, player->pos.pixel.y, player->pos.decimal.x, player->pos.decimal.y,
          direction_to_string(player->face), player->pushing_block);
+     LOG("  vel: %f, %f accel: %f, %f pos_dt: %f, %f\n", player->vel.x, player->vel.y, player->accel.x, player->accel.y, player->pos_delta.x , player->pos_delta.y);
      LOG("  rot: %d, move_rot: L %d, U %d, R %d, D %d\n", player->rotation,
          player->move_rotation[DIRECTION_LEFT], player->move_rotation[DIRECTION_UP], player->move_rotation[DIRECTION_RIGHT], player->move_rotation[DIRECTION_DOWN]);
      LOG("\n");

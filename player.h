@@ -16,6 +16,7 @@
 
 struct Player_t : public Motion_t {
      Position_t  pos;
+     Vec_t       pos_delta_save;
 
      bool        teleport = false;
      Position_t  teleport_pos;

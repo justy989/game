@@ -99,6 +99,7 @@ void undo_snapshot(Undo_t* undo, ObjectArray_t<Player_t>* players, TileMap_t* ti
           UndoPlayer_t* undo_player = undo->players.elements + i;
           Player_t* player = players->elements + i;
           undo_player->pixel = player->pos.pixel;
+          undo_player->decimal = player->pos.decimal;
           undo_player->z = player->pos.z;
           undo_player->face = player->face;
      }
@@ -385,6 +386,7 @@ void undo_revert(Undo_t* undo, ObjectArray_t<Player_t>* players, TileMap_t* tile
                // TODO fix these numbers as they are important
                player->walk_frame_delta = 1;
                player->pos.pixel = player_entry->pixel;
+               player->pos.decimal = player_entry->decimal;
                player->pos.z = player_entry->z;
                player->face = player_entry->face;
                player->has_bow = true;

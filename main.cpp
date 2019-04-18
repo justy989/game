@@ -281,6 +281,21 @@ void copy_block_collision_results(Block_t* block, CheckBlockCollisionResult_t* r
      block->vertical_move = result->vertical_move;
 }
 
+void build_move_actions_from_player(PlayerAction_t* player_action, Player_t* player, bool* move_actions, S8 move_action_count)
+{
+     assert(move_action_count == DIRECTION_COUNT);
+     memset(move_actions, 0, sizeof(*move_actions) * move_action_count);
+
+     for(int d = 0; d < move_action_count; d++){
+          if(player_action->move[d]){
+               Direction_t rot_dir = direction_rotate_clockwise((Direction_t)(d), player->move_rotation[d]);
+               rot_dir = direction_rotate_clockwise(rot_dir, player->rotation);
+               move_actions[rot_dir] = true;
+               if(player->reface) player->face = static_cast<Direction_t>(rot_dir);
+          }
+     }
+}
+
 int main(int argc, char** argv){
      const char* load_map_filepath = nullptr;
      bool test = false;
@@ -354,8 +369,8 @@ int main(int argc, char** argv){
           return 1;
      }
 
-     int window_width = 800;
-     int window_height = 800;
+     int window_width = 1440;
+     int window_height = 1440;
      SDL_Window* window = nullptr;
      SDL_GLContext opengl_context = nullptr;
      GLuint theme_texture = 0;
@@ -1135,6 +1150,8 @@ int main(int argc, char** argv){
                }
           }
 
+          S8 collision_attempts = 1;
+
           if(!demo.paused || demo.seek_frame >= 0){
                reset_tilemap_light(&world);
 
@@ -1382,7 +1399,7 @@ int main(int argc, char** argv){
                }
 
                // TODO: deal with all this for multiple players
-               bool rotated_move_actions[DIRECTION_COUNT];
+               bool move_actions[DIRECTION_COUNT];
                bool user_stopping_x = false;
                bool user_stopping_y = false;
 
@@ -1390,21 +1407,12 @@ int main(int argc, char** argv){
                for(S16 i = 0; i < world.players.count; i++){
                     Player_t* player = world.players.elements + i;
 
-                    memset(rotated_move_actions, 0, sizeof(rotated_move_actions));
-
-                    for(int d = 0; d < 4; d++){
-                         if(player_action.move[d]){
-                              Direction_t rot_dir = direction_rotate_clockwise((Direction_t)(d), player->move_rotation[d]);
-                              rot_dir = direction_rotate_clockwise(rot_dir, player->rotation);
-                              rotated_move_actions[rot_dir] = true;
-                              if(player->reface) player->face = static_cast<Direction_t>(rot_dir);
-                         }
-                    }
+                    build_move_actions_from_player(&player_action, player, move_actions, DIRECTION_COUNT);
 
                     player->accel = vec_zero();
 
-                    if(rotated_move_actions[DIRECTION_RIGHT]){
-                         if(rotated_move_actions[DIRECTION_LEFT]){
+                    if(move_actions[DIRECTION_RIGHT]){
+                         if(move_actions[DIRECTION_LEFT]){
                               user_stopping_x = true;
 
                               if(player->vel.x > 0){
@@ -1415,7 +1423,7 @@ int main(int argc, char** argv){
                          }else{
                               player->accel.x += PLAYER_ACCEL;
                          }
-                    }else if(rotated_move_actions[DIRECTION_LEFT]){
+                    }else if(move_actions[DIRECTION_LEFT]){
                          player->accel.x -= PLAYER_ACCEL;
                     }else if(player->vel.x > 0){
                          user_stopping_x = true;
@@ -1425,8 +1433,8 @@ int main(int argc, char** argv){
                          player->accel.x += PLAYER_ACCEL;
                     }
 
-                    if(rotated_move_actions[DIRECTION_UP]){
-                         if(rotated_move_actions[DIRECTION_DOWN]){
+                    if(move_actions[DIRECTION_UP]){
+                         if(move_actions[DIRECTION_DOWN]){
                               user_stopping_y = true;
 
                               if(player->vel.y > 0){
@@ -1437,7 +1445,7 @@ int main(int argc, char** argv){
                          }else{
                               player->accel.y += PLAYER_ACCEL;
                          }
-                    }else if(rotated_move_actions[DIRECTION_DOWN]){
+                    }else if(move_actions[DIRECTION_DOWN]){
                          player->accel.y -= PLAYER_ACCEL;
                     }else if(player->vel.y > 0){
                          user_stopping_y = true;
@@ -1673,6 +1681,8 @@ int main(int argc, char** argv){
                     }else{
                          player->stopping_block_from = DIRECTION_COUNT;
                     }
+
+                    player->pos_delta_save = player->pos_delta;
                }
 
                // block movement
@@ -1928,8 +1938,7 @@ int main(int argc, char** argv){
 
                // unbounded collision: this should be exciting
                // we have our initial position and our initial pos_delta, update pos_delta for all players and blocks until nothing is colliding anymore
-               const int max_collision_attempts = 16;
-               int collision_attempts = 0;
+               const S8 max_collision_attempts = 16;
                bool collided = true;
                while(collided && collision_attempts < max_collision_attempts){
                     collided = false;
@@ -2632,13 +2641,14 @@ int main(int argc, char** argv){
                for(S16 i = 0; i < world.players.count; i++){
                     auto player = world.players.elements + i;
 
-                    if(!player->successfully_moved){
-                         player->pos_delta = vec_zero();
-                         player->prev_vel = vec_zero();
-                         player->vel = vec_zero();
-                         player->accel = vec_zero();
-                         continue;
-                    }
+                    // if(!player->successfully_moved){
+                         // LOG("killa from manilla\n");
+                         // player->pos_delta = vec_zero();
+                         // player->prev_vel = vec_zero();
+                         // player->vel = vec_zero();
+                         // player->accel = vec_zero();
+                    //      continue;
+                    // }
 
                     if(player->teleport){
                          player->pos = player->teleport_pos + player->teleport_pos_delta;
@@ -2665,6 +2675,25 @@ int main(int argc, char** argv){
                          }
                     }else{
                          player->pos += player->pos_delta;
+                    }
+
+                    build_move_actions_from_player(&player_action, player, move_actions, DIRECTION_COUNT);
+
+                    // if we have stopped short in either component, kill the movement for that component if we are no longer pressing keys for it
+                    if(fabs(player->pos_delta.x) < fabs(player->pos_delta_save.x)){
+                         if((player->pos_delta.x < 0 && !move_actions[DIRECTION_LEFT]) ||
+                            (player->pos_delta.x > 0 && !move_actions[DIRECTION_RIGHT])){
+                              player->vel.x = 0;
+                              player->accel.x = 0;
+                         }
+                    }
+
+                    if(fabs(player->pos_delta.y) < fabs(player->pos_delta_save.y)){
+                         if((player->pos_delta.y < 0 && !move_actions[DIRECTION_DOWN]) ||
+                            (player->pos_delta.y > 0 && !move_actions[DIRECTION_UP])){
+                              player->vel.y = 0;
+                              player->accel.y = 0;
+                         }
                     }
                }
 
@@ -3040,7 +3069,7 @@ int main(int argc, char** argv){
                draw_quad_wireframe(&pct_bar_outline_quad, 255.0f, 255.0f, 255.0f);
 
                char buffer[64];
-               snprintf(buffer, 64, "F: %ld/%ld", frame_count, demo.last_frame);
+               snprintf(buffer, 64, "F: %ld/%ld C: %d", frame_count, demo.last_frame, collision_attempts);
 
                glBindTexture(GL_TEXTURE_2D, text_texture);
                glBegin(GL_QUADS);
