@@ -177,6 +177,7 @@ bool load_map_from_file_v1(FILE* file, Coord_t* player_start, TileMap_t* tilemap
      // TODO: a lot of maps have -16, -16 as the first block
      for(S16 i = 0; i < block_count; i++){
           Block_t* block = block_array->elements + i;
+          *block = Block_t{};
           block->pos.pixel = map_blocks[i].pixel;
           block->pos.z = map_blocks[i].z;
           block->rotation = map_blocks[i].rotation;
@@ -304,6 +305,7 @@ bool load_map_from_file_v2(FILE* file, Coord_t* player_start, TileMap_t* tilemap
      // TODO: a lot of maps have -16, -16 as the first block
      for(S16 i = 0; i < block_count; i++){
           Block_t* block = block_array->elements + i;
+          *block = Block_t{};
           block->pos.pixel = map_blocks[i].pixel;
           block->pos.z = map_blocks[i].z;
           block->rotation = map_blocks[i].rotation;

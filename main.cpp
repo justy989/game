@@ -12,11 +12,13 @@ Entanglement Puzzles:
 - rotated entangled puzzles where the centroid is on a portal destination coord
 
 Current bugs:
-- a block on the tile outside a portal pushed into the portal to clone, the clone has weird behavior and ends up on the portal block
-- when pushing a block through a portal that turns off, the block keeps going
-- getting a block and it's rotated entangler to push into the centroid causes the any other entangled blocks to alternate pushing
-- lockups/crashing when lots of entangled blocks collided on ice
+- A block on the tile outside a portal pushed into the portal to clone, the clone has weird behavior and ends up on the portal block
+- When pushing a block through a portal that turns off, the block keeps going
+- Getting a block and it's rotated entangler to push into the centroid causes the any other entangled blocks to alternate pushing
+- Lockups/crashing when lots of entangled blocks collided on ice
 - In the case of 3 rotated entangled blocks, 2 blocks that have a rotation of 2 between them colliding into each other seem to end up off of the grid
+- In the act of stopping a block where the player goes through a portal causes them to not teleport through the portal
+- When pushing a block through portals, the block seems to snap to grid oddly when you finish pushing it
 
 Current Design issues:
 - it is important for the player to force a rotated entangled block to not move when we push the other block. To do this we have to wedge ourself against it before pushing the block we want.
@@ -25,11 +27,13 @@ Current Design issues:
 Big Features:
 - 3D
      - push block on top of block adjacent to player
+     - push block on top of block adjacent to player through portal
      - extinguish elements on bottom block when top block slides over it
      - block slides on top of other blocks that are iced
      - if a player is standing on a sliding block, the player slides too
      - shadows and slightly discolored blocks should help with visualizations
      - only 2 blocks high can go through portals
+- Get rid of skip_coords (I think this is possible and easy?)
 - arrow kills player
 - arrow entanglement
 - Block splitting
@@ -350,8 +354,8 @@ int main(int argc, char** argv){
           return 1;
      }
 
-     int window_width = 1024;
-     int window_height = 1024;
+     int window_width = 800;
+     int window_height = 800;
      SDL_Window* window = nullptr;
      SDL_GLContext opengl_context = nullptr;
      GLuint theme_texture = 0;
@@ -1705,7 +1709,7 @@ int main(int argc, char** argv){
                          block->teleport_accel = vec_rotate_quadrants_clockwise(block->accel, teleport_result.results[block->clone_id].rotations);
                          block->teleport_rotation = teleport_result.results[block->clone_id].rotations;
 
-                         if(block->teleport_rotation % 2){
+                         if((block->teleport_rotation % 2)){
                               Move_t tmp = block->horizontal_move;
                               block->horizontal_move = block->vertical_move;
                               block->vertical_move = tmp;
@@ -1714,10 +1718,6 @@ int main(int argc, char** argv){
                                    block->prev_push_mask = direction_mask_rotate_clockwise(block->prev_push_mask);
                               }
                          }
-
-                         block->teleport_horizontal_move = block->horizontal_move;
-                         block->teleport_vertical_move = block->vertical_move;
-
                     }else{
                          block->teleport = false;
                     }
@@ -1874,6 +1874,11 @@ int main(int argc, char** argv){
                     update_motion_grid_aligned(&block->vertical_move, motion_y_component(block),
                                                block->coast_vertical != BLOCK_COAST_NONE, dt, block->accel.y,
                                                BLOCK_ACCEL_DISTANCE, pos_vec.y);
+
+                    if(block->teleport){
+                         block->teleport_horizontal_move = block->horizontal_move;
+                         block->teleport_vertical_move = block->vertical_move;
+                    }
                }
 
                for(S16 i = 0; i < world.blocks.count; i++){
@@ -2492,9 +2497,22 @@ int main(int argc, char** argv){
 
                               find_portal_adjacents_to_skip_collision_check(teleport_player_coord, world.interactive_qt, skip_coord);
 
+                              auto pushing_block = player->pushing_block;
+                              auto pushing_block_dir = player->pushing_block_dir;
+                              auto pushing_block_rotation = player->pushing_block_rotation;
+
+                              // if we were pushing a block via teleporting in a previous iteration, keep it going
+                              // because in this or a future iteration we probably aren't colliding with a block anymore
+                              // but we wanna remember the block we are pushing
+                              if(player->teleport_pushing_block >= 0){
+                                   pushing_block = player->teleport_pushing_block;
+                                   pushing_block_dir = player->teleport_pushing_block_dir;
+                                   pushing_block_rotation = player->teleport_pushing_block_rotation;
+                              }
+
                               auto teleport_result = move_player_through_world(player->teleport_pos, player->vel, player->teleport_pos_delta, player->teleport_face,
-                                                                               player->clone_instance, i, player->pushing_block,
-                                                                               player->pushing_block_dir, player->pushing_block_rotation, skip_coord, &world);
+                                                                               player->clone_instance, i, pushing_block, pushing_block_dir, pushing_block_rotation,
+                                                                               skip_coord, &world);
 
                               if(teleport_result.collided){
                                    collided = true;
@@ -2678,6 +2696,10 @@ int main(int argc, char** argv){
                          block->rotation = (block->rotation + block->teleport_rotation) % static_cast<U8>(DIRECTION_COUNT);
                          block->horizontal_move = block->teleport_horizontal_move;
                          block->vertical_move = block->teleport_vertical_move;
+
+                         // reset started_on_pixel since we teleported and no longer want to follow those as a rule
+                         block->started_on_pixel_x = 0;
+                         block->started_on_pixel_y = 0;
 
                          if(block->rotation % 2 != 0){
                               F32 tmp = block->accel_magnitudes.x;
