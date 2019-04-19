@@ -508,7 +508,7 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                                    if(block->pos.z <= player_pos.z - HEIGHT_INTERVAL ||
                                       block->pos.z >= player_pos.z + (HEIGHT_INTERVAL * 2)) continue;
 
-                                   auto portal_rotations = portal_rotations_between(interactive->portal.face, direction_opposite((Direction_t)(pd)));
+                                   auto portal_rotations = direction_rotations_between(interactive->portal.face, direction_opposite((Direction_t)(pd)));
 
                                    auto block_portal_dst_offset = block->pos + block->pos_delta;
                                    block_portal_dst_offset.pixel += HALF_TILE_SIZE_PIXEL;
