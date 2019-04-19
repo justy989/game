@@ -20,6 +20,7 @@ Current bugs:
 - In the act of stopping a block where the player goes through a portal causes them to not teleport through the portal
 - When pushing a block through portals, the block seems to snap to grid oddly when you finish pushing it
 - Sometimes when pushing a block, it will slide a tiny bit (around a pixel) further than the square it is supposed to land on, then snap to the right pixel
+- Pushing an entangled block up against a wall, the block it is entangled with moves an additional tile
 
 Current Design issues:
 - it is important for the player to force a rotated entangled block to not move when we push the other block. To do this we have to wedge ourself against it before pushing the block we want.
