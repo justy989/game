@@ -481,6 +481,7 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
           // check if the block is in a portal and try to collide with it
           for(S8 d = 0; d < DIRECTION_COUNT && !collided_with_block; d++){
                Coord_t check_coord = player_coord + (Direction_t)(d);
+               auto portal_src_pixel = coord_to_pixel_at_center(check_coord);
                Interactive_t* interactive = quad_tree_interactive_find_at(world->interactive_qt, check_coord);
 
                if(is_active_portal(interactive)){
@@ -507,8 +508,7 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                                    if(block->pos.z <= player_pos.z - HEIGHT_INTERVAL ||
                                       block->pos.z >= player_pos.z + (HEIGHT_INTERVAL * 2)) continue;
 
-                                   auto portal_rotations = portal_rotations_between(interactive->portal.face, (Direction_t)(pd));
-                                   auto portal_src_pixel = coord_to_pixel_at_center(check_coord);
+                                   auto portal_rotations = portal_rotations_between(interactive->portal.face, direction_opposite((Direction_t)(pd)));
 
                                    auto block_portal_dst_offset = block->pos + block->pos_delta;
                                    block_portal_dst_offset.pixel += HALF_TILE_SIZE_PIXEL;
