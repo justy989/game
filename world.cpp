@@ -308,7 +308,7 @@ void activate(World_t* world, Coord_t coord){
 }
 
 void slow_block_toward_gridlock(World_t* world, Block_t* block, bool horizontal, bool negative){
-     if(!block_on_ice(block->pos, block->pos_delta, &world->tilemap, world->interactive_qt)) return;
+     if(!block_on_ice(block->pos, block->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt)) return;
 
      Move_t* move = horizontal ? &block->horizontal_move : &block->vertical_move;
 
@@ -1066,7 +1066,7 @@ bool block_push(Block_t* block, Direction_t direction, World_t* world, bool push
      if(collided_block){
           if(collided_block == block){
                // pass, this happens in a corner portal!
-          }else if(pushed_by_ice && block_on_ice(collided_block->pos, collided_block->pos_delta, &world->tilemap, world->interactive_qt)){
+          }else if(pushed_by_ice && block_on_ice(collided_block->pos, collided_block->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt)){
                if(block_push(collided_block, collided_block_push_dir, world, pushed_by_ice, instant_vel)){
                     push_entangled_block(collided_block, world, collided_block_push_dir, pushed_by_ice, instant_vel);
                }
@@ -1101,7 +1101,7 @@ bool block_push(Block_t* block, Direction_t direction, World_t* world, bool push
      }
 
      // if are sliding on ice and are pushed in the opposite direction then stop
-     if(block_on_ice(block->pos, block->pos_delta, &world->tilemap, world->interactive_qt)){
+     if(block_on_ice(block->pos, block->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt)){
           switch(direction){
           default:
                break;

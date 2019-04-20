@@ -1742,10 +1742,10 @@ int main(int argc, char** argv){
                     for(S16 i = 0; i < world.blocks.count; i++){
                          Block_t* block = world.blocks.elements + i;
 
-                         if(block->teleport && block_on_ice(block->teleport_pos, block->teleport_pos_delta, &world.tilemap, world.interactive_qt)){
+                         if(block->teleport && block_on_ice(block->teleport_pos, block->teleport_pos_delta, &world.tilemap, world.interactive_qt, world.block_qt)){
                               block->coast_horizontal = BLOCK_COAST_ICE;
                               block->coast_vertical = BLOCK_COAST_ICE;
-                         }else if(block_on_ice(block->pos, block->pos_delta, &world.tilemap, world.interactive_qt)){
+                         }else if(block_on_ice(block->pos, block->pos_delta, &world.tilemap, world.interactive_qt, world.block_qt)){
                               block->coast_horizontal = BLOCK_COAST_ICE;
                               block->coast_vertical = BLOCK_COAST_ICE;
                          }else{
@@ -2090,8 +2090,8 @@ int main(int argc, char** argv){
                                                   if(move_dir_to_stop == DIRECTION_COUNT){
                                                        copy_block_collision_results(block, &result);
                                                   }else{
-                                                       if(block_on_ice(block->pos, block->pos_delta, &world.tilemap, world.interactive_qt) &&
-                                                          block_on_ice(entangled_block->pos, entangled_block->pos_delta, &world.tilemap, world.interactive_qt)){
+                                                       if(block_on_ice(block->pos, block->pos_delta, &world.tilemap, world.interactive_qt, world.block_qt) &&
+                                                          block_on_ice(entangled_block->pos, entangled_block->pos_delta, &world.tilemap, world.interactive_qt, world.block_qt)){
                                                             // TODO: handle this case for blocks not entangled on ice
                                                             // handle pushing blocks diagonally
 
@@ -2219,7 +2219,7 @@ int main(int argc, char** argv){
                          }
 
                          // this instance of last_block_pushed is to keep the pushing smooth and not have it stop at the tile boundaries
-                         if(block != block_pushed && !block_on_ice(block->pos, block->pos_delta, &world.tilemap, world.interactive_qt)){
+                         if(block != block_pushed && !block_on_ice(block->pos, block->pos_delta, &world.tilemap, world.interactive_qt, world.block_qt)){
                               if(block_pushed && blocks_are_entangled(block_pushed, block, &world.blocks)){
                                    Block_t* entangled_block = block_pushed;
 
@@ -2480,6 +2480,38 @@ int main(int argc, char** argv){
                               }
 
                               block->clone_start = Coord_t{};
+                         }
+                    }
+
+                    // check if blocks extinguish elements of other blocks
+                    for(S16 i = 0; i < world.blocks.count; i++){
+                         auto block = world.blocks.elements + i;
+
+                         // filter out blocks that couldn't extinguish
+                         if(block->pos_delta.x == 0 && block->pos_delta.y == 0) continue;
+                         if(block->pos.z == 0) continue; // TODO: if we bring back pits, remove this line
+
+                         auto block_rect = block_get_rect(block);
+                         auto coord = block_get_coord(block);
+                         auto search_rect = rect_surrounding_adjacent_coords(coord);
+
+                         S16 block_count = 0;
+                         Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
+                         quad_tree_find_in(world.block_qt, search_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
+
+                         for(S16 b = 0; b < block_count; b++){
+                              auto check_block = blocks[b];
+
+                              if(check_block->element != ELEMENT_FIRE && check_block->element != ELEMENT_ICE) continue;
+                              if(check_block->pos.z + HEIGHT_INTERVAL != block->pos.z) continue;
+
+                              if(pixel_in_rect(block_center_pixel(check_block), block_rect)){
+                                   if(check_block->element == ELEMENT_FIRE){
+                                        check_block->element = ELEMENT_NONE;
+                                   }else if(check_block->element == ELEMENT_ICE){
+                                        check_block->element = ELEMENT_ONLY_ICED;
+                                   }
+                              }
                          }
                     }
 

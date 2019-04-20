@@ -603,26 +603,42 @@ Block_t* block_held_down_by_another_block(Block_t* block_to_check, QuadTreeNode_
      return block_at_height_in_block_rect(block_to_check, block_qt, block_to_check->pos.z + HEIGHT_INTERVAL);
 }
 
-bool block_on_ice(Position_t pos, Vec_t pos_delta, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree){
+bool block_on_ice(Position_t pos, Vec_t pos_delta, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt,
+                  QuadTreeNode_t<Block_t>* block_qt){
+     auto block_pos = pos + pos_delta;
+
+     Pixel_t pixel_to_check = block_pos.pixel + Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS};
+     Coord_t coord_to_check = pixel_to_coord(pixel_to_check);
+
      if(pos.z == 0){
-          auto block_pos = pos + pos_delta;
-
-          Pixel_t block_pixel_check = block_pos.pixel + Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS};
-
-          Coord_t coord = pixel_to_coord(block_pixel_check);
-          Interactive_t* interactive = quad_tree_interactive_find_at(interactive_quad_tree, coord);
-          if(interactive){
-               if(interactive->type == INTERACTIVE_TYPE_POPUP){
-                    if(interactive->popup.lift.ticks == 1 && interactive->popup.iced){
-                         return true;
-                    }
-               }
-          }
-
-          return tilemap_is_iced(tilemap, coord);
+          if(tilemap_is_iced(tilemap, coord_to_check)) return true;
      }
 
-     // TODO: check for blocks below
+     Interactive_t* interactive = quad_tree_interactive_find_at(interactive_qt, coord_to_check);
+     if(interactive){
+          if(interactive->type == INTERACTIVE_TYPE_POPUP){
+               if(interactive->popup.lift.ticks == (pos.z + 1) && interactive->popup.iced){
+                    return true;
+               }
+          }
+     }
+
+     auto rect_to_check = rect_surrounding_adjacent_coords(coord_to_check);
+
+     S16 block_count = 0;
+     Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
+     quad_tree_find_in(block_qt, rect_to_check, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
+
+     for(S16 i = 0; i < block_count; i++){
+          auto block = blocks[i];
+
+          if(block->pos.z + HEIGHT_INTERVAL != pos.z) continue;
+          if(block->element != ELEMENT_ICE && block->element != ELEMENT_ONLY_ICED) continue;
+
+          auto block_rect = block_get_rect(block);
+          if(pixel_in_rect(pixel_to_check, block_rect)) return true;
+     }
+
      return false;
 }
 
@@ -676,9 +692,9 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
           move_direction_to_directions(move_direction, &first_direction, &second_direction);
 
           // check if they are on ice before we adjust the position on our block to check
-          bool a_on_ice = block_on_ice(block_pos, result.pos_delta, &world->tilemap, world->interactive_qt);
+          bool a_on_ice = block_on_ice(block_pos, result.pos_delta, &world->tilemap, world->interactive_qt, world->block_qt);
           bool b_on_ice = block_on_ice(block_inside_result.block->pos, block_inside_result.block->pos_delta,
-                                       &world->tilemap, world->interactive_qt);
+                                       &world->tilemap, world->interactive_qt, world->block_qt);
 
           Vec_t save_vel = result.vel;
 

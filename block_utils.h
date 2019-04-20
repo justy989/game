@@ -42,25 +42,26 @@ struct BlockCollidesWithItselfResult_t{
 bool block_adjacent_pixels_to_check(Position_t pos, Vec_t pos_delta, Direction_t direction, Pixel_t* a, Pixel_t* b);
 
 Block_t* block_against_block_in_list(Position_t pos, Block_t** blocks, S16 block_count, Direction_t direction, Pixel_t* offsets);
-Block_t* block_against_another_block(Position_t pos, Direction_t direction, QuadTreeNode_t<Block_t>* block_quad_tree,
+Block_t* block_against_another_block(Position_t pos, Direction_t direction, QuadTreeNode_t<Block_t>* block_qt,
                                      QuadTreeNode_t<Interactive_t>* interactive_quad_tree, TileMap_t* tilemap, Direction_t* push_dir);
-Block_t* rotated_entangled_blocks_against_centroid(Block_t* block, Direction_t direction, QuadTreeNode_t<Block_t>* block_quad_tree,
+Block_t* rotated_entangled_blocks_against_centroid(Block_t* block, Direction_t direction, QuadTreeNode_t<Block_t>* block_qt,
                                                    ObjectArray_t<Block_t>* blocks_array,
                                                    QuadTreeNode_t<Interactive_t>* interactive_qt, TileMap_t* tilemap);
 Interactive_t* block_against_solid_interactive(Block_t* block_to_check, Direction_t direction,
                                                TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt);
 
-BlockInsideResult_t block_inside_another_block(Block_t* block_to_check, QuadTreeNode_t<Block_t>* block_quad_tree,
+BlockInsideResult_t block_inside_another_block(Block_t* block_to_check, QuadTreeNode_t<Block_t>* block_qt,
                                                QuadTreeNode_t<Interactive_t>* interactive_quad_tree, TileMap_t* tilemap,
                                                ObjectArray_t<Block_t>* block_array);
 Tile_t* block_against_solid_tile(Block_t* block_to_check, Direction_t direction, TileMap_t* tilemap,
                                  QuadTreeNode_t<Interactive_t>* interactive_qt);
 Player_t* block_against_player(Block_t* block_to_check, Direction_t direction, ObjectArray_t<Player_t>* players);
 
-Block_t* block_held_up_by_another_block(Block_t* block_to_check, QuadTreeNode_t<Block_t>* block_quad_tree);
-Block_t* block_held_down_by_another_block(Block_t* block_to_check, QuadTreeNode_t<Block_t>* block_quad_tree);
+Block_t* block_held_up_by_another_block(Block_t* block_to_check, QuadTreeNode_t<Block_t>* block_qt);
+Block_t* block_held_down_by_another_block(Block_t* block_to_check, QuadTreeNode_t<Block_t>* block_qt);
 
-bool block_on_ice(Position_t pos, Vec_t pos_delta, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree);
+bool block_on_ice(Position_t pos, Vec_t pos_delta, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree,
+                  QuadTreeNode_t<Block_t>* block_qt);
 
 CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t block_pos, Vec_t block_pos_delta, Vec_t block_vel,
                                                                     Vec_t block_accel, S16 block_stop_on_pixel_x, S16 block_stop_on_pixel_y,
@@ -70,7 +71,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
 BlockCollidesWithItselfResult_t resolve_block_colliding_with_itself(Direction_t src_portal_dir, Direction_t dst_portal_dir, DirectionMask_t move_mask,
                                                                     Vec_t block_vel, Vec_t block_accel, Direction_t check_horizontal, Direction_t check_vertical);
 
-void search_portal_destination_for_blocks(QuadTreeNode_t<Block_t>* block_quad_tree, Direction_t src_portal_face,
+void search_portal_destination_for_blocks(QuadTreeNode_t<Block_t>* block_qt, Direction_t src_portal_face,
                                           Direction_t dst_portal_face, Coord_t src_portal_coord,
                                           Coord_t dst_portal_coord, Block_t** blocks, S16* block_count, Pixel_t* offsets);
 
