@@ -12,19 +12,17 @@ Entanglement Puzzles:
 - rotated entangled puzzles where the centroid is on a portal destination coord
 
 Current bugs:
+- In the act of stopping a block where the player goes through a portal causes them to not teleport through the portal
+- Stopping a block halfway through a portal lead to some pretty buggy behavior where we could get the block out of the map
 - A block on the tile outside a portal pushed into the portal to clone, the clone has weird behavior and ends up on the portal block
 - When pushing a block through a portal that turns off, the block keeps going
 - Getting a block and it's rotated entangler to push into the centroid causes the any other entangled blocks to alternate pushing
 - Lockups/crashing when lots of entangled blocks collided on ice
 - In the case of 3 rotated entangled blocks, 2 blocks that have a rotation of 2 between them colliding into each other seem to end up off of the grid
-- In the act of stopping a block where the player goes through a portal causes them to not teleport through the portal
 - When pushing a block through portals, the block seems to snap to grid oddly when you finish pushing it
 - Sometimes when pushing a block, it will slide a tiny bit (around a pixel) further than the square it is supposed to land on, then snap to the right pixel
-- Pushing an entangled block up against a wall, the block it is entangled with moves an additional tile
-
-Current Design issues:
-- it is important for the player to force a rotated entangled block to not move when we push the other block. To do this we have to wedge ourself against it before pushing the block we want.
-  if you forget to do this the block will be slightly off grid which isn't great
+- Pushing an entangled block up against a wall to the left, the block it is entangled with moves an additional tile
+- Pushing a block and shooting an arrow causes the player to go invisible
 
 Big Features:
 - 3D
@@ -40,6 +38,7 @@ Big Features:
 - arrow entanglement
 - Block splitting
 - 'Bring Block Ice Collision to the Masses' - my favorite feature joke of the game
+- Multiple players pushing blocks at once
 
 */
 
@@ -1950,8 +1949,6 @@ int main(int argc, char** argv){
                     for(S16 i = 0; i < update_blocks_count; i++){
                          Block_t* block = world.blocks.elements + i;
 
-                         block->successfully_moved = true;
-
                          bool stop_on_boundary_x = false;
                          bool stop_on_boundary_y = false;
 
@@ -1996,8 +1993,6 @@ int main(int argc, char** argv){
                                    if(teleport_result.collided){
                                         collided = true;
 
-                                        block->successfully_moved = false;
-
                                         block->teleport_pos_delta = teleport_result.pos_delta;
                                         block->teleport_vel = teleport_result.vel;
                                         block->teleport_accel = teleport_result.accel;
@@ -2012,8 +2007,6 @@ int main(int argc, char** argv){
 
                               if(result.collided){
                                    collided = true;
-
-                                   block->successfully_moved = false;
 
                                    if(result.collided_block_index >= 0 && blocks_are_entangled(result.collided_block_index, i, &world.blocks)){
                                         // TODO: I don't love indexing the blocks without checking the index is valid first
@@ -2336,7 +2329,9 @@ int main(int argc, char** argv){
                                         if(block->vel.y != 0) stop_on_boundary_y = true;
                                    }
                               }else{
-                                   if(block->vel.x != 0) stop_on_boundary_x = true;
+                                   if(block->vel.x != 0){
+                                        stop_on_boundary_x = true;
+                                   }
                                    if(block->vel.y != 0) stop_on_boundary_y = true;
                               }
                          }
@@ -2349,13 +2344,14 @@ int main(int argc, char** argv){
                               if(boundary_x){
                                    collided = true;
 
-                                   block->successfully_moved = false;
-
                                    block->stop_on_pixel_x = boundary_x;
                                    block->accel.x = 0;
                                    block->vel.x = 0;
-                                   block->pos_delta.x = 0;
                                    block->horizontal_move.state = MOVE_STATE_IDLING;
+                                   block->coast_horizontal = BLOCK_COAST_NONE;
+
+                                   auto delta_pos = pixel_to_pos(Pixel_t{boundary_x, 0}) - block->pos;
+                                   block->pos_delta.x = pos_to_vec(delta_pos).x;
                               }
                          }
 
@@ -2364,13 +2360,14 @@ int main(int argc, char** argv){
                               if(boundary_y){
                                    collided = true;
 
-                                   block->successfully_moved = false;
-
                                    block->stop_on_pixel_y = boundary_y;
                                    block->accel.y = 0;
                                    block->vel.y = 0;
-                                   block->pos_delta.y = 0;
                                    block->vertical_move.state = MOVE_STATE_IDLING;
+                                   block->coast_vertical = BLOCK_COAST_NONE;
+
+                                   auto delta_pos = pixel_to_pos(Pixel_t{0, boundary_y}) - block->pos;
+                                   block->pos_delta.y = pos_to_vec(delta_pos).y;
                               }
                          }
 
@@ -2491,8 +2488,6 @@ int main(int argc, char** argv){
                     for(S16 i = 0; i < update_player_count; i++){
                          Player_t* player = world.players.elements + i;
 
-                         player->successfully_moved = true;
-
                          Coord_t skip_coord[DIRECTION_COUNT];
                          Coord_t player_coord = pos_to_coord(player->pos + player->pos_delta);
 
@@ -2527,7 +2522,6 @@ int main(int argc, char** argv){
 
                               if(teleport_result.collided){
                                    collided = true;
-                                   player->successfully_moved = false;
                               }
                               if(teleport_result.resetting) resetting = true;
                               player->teleport_pos_delta = teleport_result.pos_delta;
@@ -2538,7 +2532,6 @@ int main(int argc, char** argv){
 
                          if(result.collided){
                               collided = true;
-                              player->successfully_moved = false;
                          }
                          if(result.resetting) resetting = true;
                          player->pos_delta = result.pos_delta;
@@ -2643,15 +2636,6 @@ int main(int argc, char** argv){
                for(S16 i = 0; i < world.players.count; i++){
                     auto player = world.players.elements + i;
 
-                    // if(!player->successfully_moved){
-                         // LOG("killa from manilla\n");
-                         // player->pos_delta = vec_zero();
-                         // player->prev_vel = vec_zero();
-                         // player->vel = vec_zero();
-                         // player->accel = vec_zero();
-                    //      continue;
-                    // }
-
                     if(player->teleport){
                          player->pos = player->teleport_pos + player->teleport_pos_delta;
                          player->pos_delta = player->teleport_pos_delta;
@@ -2706,13 +2690,6 @@ int main(int argc, char** argv){
 
                for(S16 i = 0; i < world.blocks.count; i++){
                     Block_t* block = world.blocks.elements + i;
-
-                    if(!block->successfully_moved){
-                         // TODO: its probably not the best thing to stop this in all directions, we probably only
-                         //       want to stop it in the direction that it couldn't resolve collision in
-                         memset(block, 0, sizeof(GridMotion_t));
-                         continue;
-                    }
 
                     Position_t final_pos;
 

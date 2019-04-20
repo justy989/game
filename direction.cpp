@@ -57,10 +57,12 @@ U8 direction_rotations_between(Direction_t a, Direction_t b){
 }
 
 Direction_t direction_rotate_clockwise(Direction_t dir, U8 times){
+     if(dir >= DIRECTION_COUNT) return dir;
      return (Direction_t)((U8)(dir + times) % DIRECTION_COUNT);
 }
 
 Direction_t direction_rotate_counter_clockwise(Direction_t dir, U8 times){
+     if(dir >= DIRECTION_COUNT) return dir;
      S8 real_rot = DIRECTION_COUNT - times;
      return (Direction_t)((U8)(dir + real_rot) % DIRECTION_COUNT);
 }
