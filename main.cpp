@@ -26,8 +26,6 @@ Current bugs:
 
 Big Features:
 - 3D
-     - when falling off of an iced block, keep going when you land
-     - when falling off of a non-iced block, land adjacent to the block it was on
      - push block on top of block adjacent to player through portal
      - if a player is standing on a sliding block, the player slides too
      - shadows and slightly discolored blocks should help with visualizations
@@ -1939,7 +1937,6 @@ int main(int argc, char** argv){
                          }
                     }
                }
-
 
                // unbounded collision: this should be exciting
                // we have our initial position and our initial pos_delta, update pos_delta for all players and blocks until nothing is colliding anymore

@@ -463,8 +463,7 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
           Block_t* block = blocks[i];
 
           // check if the block is in our player's height range
-          if(block->pos.z <= player_pos.z - HEIGHT_INTERVAL ||
-             block->pos.z >= player_pos.z + (HEIGHT_INTERVAL * 2)) continue;
+          if(!block_in_height_range_of_player(block, player_pos)) continue;
 
           Position_t block_pos = block->pos + block->pos_delta;
           bool collided = false;
@@ -1586,3 +1585,10 @@ void reset_tilemap_light(World_t* world){
           }
      }
 }
+
+bool block_in_height_range_of_player(Block_t* block, Position_t player_pos){
+     if(block->pos.z <= player_pos.z - HEIGHT_INTERVAL ||
+        block->pos.z >= player_pos.z + (HEIGHT_INTERVAL * 2)) return false;
+     return true;
+}
+

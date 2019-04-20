@@ -560,6 +560,7 @@ Player_t* block_against_player(Block_t* block, Direction_t direction, ObjectArra
 
      for(S16 i = 0; i < players->count; i++){
           auto* player = players->elements + i;
+          if(!block_in_height_range_of_player(block, player->pos)) continue;
           if(pixel_in_rect(player->pos.pixel, block_rect)){
                return player;
           }

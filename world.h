@@ -77,3 +77,5 @@ bool test_map_end_state(World_t* world, Demo_t* demo);
 S16 get_block_index(World_t* world, Block_t* block);
 bool setup_default_room(World_t* world);
 void reset_tilemap_light(World_t* world);
+
+bool block_in_height_range_of_player(Block_t* block, Position_t player);
