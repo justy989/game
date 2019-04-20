@@ -569,12 +569,13 @@ Player_t* block_against_player(Block_t* block, Direction_t direction, ObjectArra
      return nullptr;
 }
 
-static Block_t* block_at_height_in_block_rect(Block_t* block_to_check, QuadTreeNode_t<Block_t>* block_qt,
-                                              S8 expected_height){
+static Block_t* block_at_height_in_block_rect(Position_t block_to_check_pos, QuadTreeNode_t<Block_t>* block_qt,
+                                              S8 expected_height, QuadTreeNode_t<Interactive_t>* interactive_qt,
+                                              TileMap_t* tilemap){
      // TODO: need more complicated function to detect this
-     auto block_to_check_pos = block_to_check->pos + block_to_check->pos_delta;
+     auto block_to_check_center = block_get_center(block_to_check_pos);
      Rect_t rect = block_get_rect(block_to_check_pos.pixel);
-     Rect_t surrounding_rect = rect_to_check_surrounding_blocks(block_center_pixel(block_to_check));
+     Rect_t surrounding_rect = rect_to_check_surrounding_blocks(block_to_check_center.pixel);
 
      S16 block_count = 0;
      Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
@@ -582,7 +583,7 @@ static Block_t* block_at_height_in_block_rect(Block_t* block_to_check, QuadTreeN
 
      for(S16 i = 0; i < block_count; i++){
           Block_t* block = blocks[i];
-          if(block == block_to_check || block->pos.z != expected_height) continue;
+          if(block->pos.z != expected_height) continue;
           auto block_pos = block->pos + block->pos_delta;
 
           if(pixel_in_rect(block_pos.pixel, rect) ||
@@ -593,15 +594,84 @@ static Block_t* block_at_height_in_block_rect(Block_t* block_to_check, QuadTreeN
           }
      }
 
+     auto block_to_check_coord = pos_to_coord(block_to_check_center);
+
+     // TODO: compress this logic with move_player_through_world()
+     for(S8 d = 0; d < DIRECTION_COUNT; d++){
+          Coord_t check_coord = block_to_check_coord + (Direction_t)(d);
+          auto portal_src_pixel = coord_to_pixel_at_center(check_coord);
+          auto interactive = quad_tree_interactive_find_at(interactive_qt, check_coord);
+
+          if(is_active_portal(interactive)){
+               PortalExit_t portal_exits = find_portal_exits(check_coord, tilemap, interactive_qt);
+
+               for(S8 pd = 0; pd < DIRECTION_COUNT; pd++){
+                    auto portal_exit = portal_exits.directions + pd;
+
+                    for(S8 p = 0; p < portal_exit->count; p++){
+                         auto portal_dst_coord = portal_exit->coords[p];
+                         if(portal_dst_coord == check_coord) continue;
+
+                         portal_dst_coord += direction_opposite((Direction_t)(pd));
+
+                         auto check_portal_rect = rect_surrounding_adjacent_coords(portal_dst_coord);
+                         quad_tree_find_in(block_qt, check_portal_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
+
+                         auto portal_dst_center_pixel = coord_to_pixel_at_center(portal_dst_coord);
+
+                         for(S8 b = 0; b < block_count; b++){
+                              Block_t* block = blocks[b];
+
+                              if(block->pos.z != expected_height) continue;
+
+                              auto portal_rotations = direction_rotations_between(interactive->portal.face, direction_opposite((Direction_t)(pd)));
+
+                              auto block_portal_dst_offset = block->pos + block->pos_delta;
+                              block_portal_dst_offset.pixel += HALF_TILE_SIZE_PIXEL;
+                              block_portal_dst_offset.pixel -= portal_dst_center_pixel;
+
+                              Position_t block_pos;
+                              block_pos.pixel = portal_src_pixel;
+                              block_pos.pixel += pixel_rotate_quadrants_clockwise(block_portal_dst_offset.pixel, portal_rotations);
+                              block_pos.pixel -= HALF_TILE_SIZE_PIXEL;
+                              block_pos.decimal = vec_rotate_quadrants_clockwise(block_portal_dst_offset.decimal, portal_rotations);
+                              canonicalize(&block_pos);
+
+                              if(pixel_in_rect(block_pos.pixel, rect) ||
+                                 pixel_in_rect(block_top_left_pixel(block_pos.pixel), rect) ||
+                                 pixel_in_rect(block_top_right_pixel(block_pos.pixel), rect) ||
+                                 pixel_in_rect(block_bottom_right_pixel(block_pos.pixel), rect)){
+                                   return block;
+                              }
+                         }
+                    }
+               }
+          }
+     }
+
      return nullptr;
 }
 
-Block_t* block_held_up_by_another_block(Block_t* block_to_check, QuadTreeNode_t<Block_t>* block_qt){
-     return block_at_height_in_block_rect(block_to_check, block_qt, block_to_check->pos.z - HEIGHT_INTERVAL);
+Block_t* block_held_up_by_another_block(Block_t* block, QuadTreeNode_t<Block_t>* block_qt,
+                                        QuadTreeNode_t<Interactive_t>* interactive_qt, TileMap_t* tilemap){
+     if(block->teleport){
+          return block_at_height_in_block_rect(block->teleport_pos + block->teleport_pos_delta, block_qt,
+                                               block->teleport_pos.z - HEIGHT_INTERVAL, interactive_qt, tilemap);
+     }
+
+     return block_at_height_in_block_rect(block->pos + block->pos_delta, block_qt,
+                                          block->pos.z - HEIGHT_INTERVAL, interactive_qt, tilemap);
 }
 
-Block_t* block_held_down_by_another_block(Block_t* block_to_check, QuadTreeNode_t<Block_t>* block_qt){
-     return block_at_height_in_block_rect(block_to_check, block_qt, block_to_check->pos.z + HEIGHT_INTERVAL);
+Block_t* block_held_down_by_another_block(Block_t* block, QuadTreeNode_t<Block_t>* block_qt,
+                                          QuadTreeNode_t<Interactive_t>* interactive_qt, TileMap_t* tilemap){
+     if(block->teleport){
+          return block_at_height_in_block_rect(block->teleport_pos + block->teleport_pos_delta, block_qt,
+                                               block->teleport_pos.z + HEIGHT_INTERVAL, interactive_qt, tilemap);
+     }
+
+     return block_at_height_in_block_rect(block->pos + block->pos_delta, block_qt,
+                                          block->pos.z + HEIGHT_INTERVAL, interactive_qt, tilemap);
 }
 
 bool block_on_ice(Position_t pos, Vec_t pos_delta, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt,

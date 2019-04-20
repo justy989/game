@@ -12,6 +12,7 @@ Entanglement Puzzles:
 - rotated entangled puzzles where the centroid is on a portal destination coord
 
 Current bugs:
+- BLOCK COLLIDING ON PORTAL BOUNDARIES IS A DISASTER
 - In the act of stopping a block where the player goes through a portal causes them to not teleport through the portal
 - Stopping a block halfway through a portal lead to some pretty buggy behavior where we could get the block out of the map
 - A block on the tile outside a portal pushed into the portal to clone, the clone has weird behavior and ends up on the portal block
@@ -28,6 +29,7 @@ Big Features:
 - 3D
      - push block on top of block adjacent to player through portal
      - shadows and slightly discolored blocks should help with visualizations
+     - draw blocks from top to bottom
      - only 2 blocks high can go through portals
 - Get rid of skip_coords (I think this is possible and easy?)
 - arrow kills player
@@ -1955,7 +1957,7 @@ int main(int argc, char** argv){
                for(S16 i = 0; i < world.blocks.count; i++){
                     auto block = world.blocks.elements + i;
 
-                    block->held_up = block_held_up_by_another_block(block, world.block_qt);
+                    block->held_up = block_held_up_by_another_block(block, world.block_qt, world.interactive_qt, &world.tilemap);
 
                     // TODO: should we care about the decimal component of the position ?
                     Coord_t rect_coords[4];
@@ -1966,10 +1968,10 @@ int main(int argc, char** argv){
                          if(interactive){
                               if(interactive->type == INTERACTIVE_TYPE_POPUP){
                                    if(!pushed_up && (block->pos.z == interactive->popup.lift.ticks - 2)){
-                                        Block_t* above_block = block_held_down_by_another_block(block, world.block_qt);
+                                        Block_t* above_block = block_held_down_by_another_block(block, world.block_qt, world.interactive_qt, &world.tilemap);
                                         while(above_block){
                                              Block_t* tmp_block = above_block;
-                                             above_block = block_held_down_by_another_block(above_block, world.block_qt);
+                                             above_block = block_held_down_by_another_block(above_block, world.block_qt, world.interactive_qt, &world.tilemap);
                                              tmp_block->pos.z++;
                                              tmp_block->held_up = true;
                                         }
@@ -1987,11 +1989,19 @@ int main(int argc, char** argv){
                for(S16 i = 0; i < world.blocks.count; i++){
                     auto block = world.blocks.elements + i;
 
-                    if(!block->held_up && block->pos.z > 0){
-                         block->fall_time -= dt;
-                         if(block->fall_time < 0){
-                              block->fall_time = FALL_TIME;
-                              block->pos.z--;
+                    if(!block->held_up){
+                         if(block->teleport && block->teleport_pos.z > 0){
+                              block->fall_time -= dt;
+                              if(block->fall_time < 0){
+                                   block->fall_time = FALL_TIME;
+                                   block->teleport_pos.z--;
+                              }
+                         }else if(block->pos.z > 0){
+                              block->fall_time -= dt;
+                              if(block->fall_time < 0){
+                                   block->fall_time = FALL_TIME;
+                                   block->pos.z--;
+                              }
                          }
                     }
                }

@@ -459,6 +459,7 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
 
      sort_blocks_by_height(blocks, block_count);
 
+     // the reverse loop is so we process higher blocks before lower blocks
      for(S16 i = block_count - 1; i >= 0; i--){
           Block_t* block = blocks[i];
 
@@ -500,7 +501,9 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
 
                               auto portal_dst_center_pixel = coord_to_pixel_at_center(portal_dst_coord);
 
-                              for(S8 b = 0; b < block_count; b++){
+                              sort_blocks_by_height(blocks, block_count);
+
+                              for(S16 b = block_count - 1; b >= 0; b--){
                                    Block_t* block = blocks[b];
 
                                    if(!block_in_height_range_of_player(block, final_player_pos)) continue;
@@ -527,7 +530,6 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                                         collided_with_block_count++;
                                         collision_portal_rotations = portal_rotations;
                                         collided_block_dir = relative_quadrant(player_pos.pixel, block_pos.pixel + HALF_TILE_SIZE_PIXEL);
-                                        break;
                                    }
                               }
                          }
@@ -713,7 +715,7 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
           auto rotated_player_face = direction_rotate_counter_clockwise(player_face, collision_portal_rotations);
 
           if(collided_block_dir == player_face && (player_vel.x != 0.0f || player_vel.y != 0.0f) &&
-             !block_held_down_by_another_block(collided_with_block, world->block_qt)){
+             !block_held_down_by_another_block(collided_with_block, world->block_qt, world->interactive_qt, &world->tilemap)){
                if(collided_with_block_count == 1){ // also check that the player is actually pushing against the block
                     result.pushing_block = get_block_index(world, collided_with_block);
                     result.pushing_block_dir = rotated_player_face;
