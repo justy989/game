@@ -617,8 +617,10 @@ bool block_on_ice(Position_t pos, Vec_t pos_delta, TileMap_t* tilemap, QuadTreeN
      Interactive_t* interactive = quad_tree_interactive_find_at(interactive_qt, coord_to_check);
      if(interactive){
           if(interactive->type == INTERACTIVE_TYPE_POPUP){
-               if(interactive->popup.lift.ticks == (pos.z + 1) && interactive->popup.iced){
-                    return true;
+               if(interactive->popup.lift.ticks == (pos.z + 1)){
+                    if(interactive->popup.iced){
+                        return true;
+                    }
                }
           }
      }
@@ -631,15 +633,55 @@ bool block_on_ice(Position_t pos, Vec_t pos_delta, TileMap_t* tilemap, QuadTreeN
 
      for(S16 i = 0; i < block_count; i++){
           auto block = blocks[i];
+          auto block_rect = block_get_rect(block);
 
           if(block->pos.z + HEIGHT_INTERVAL != pos.z) continue;
-          if(block->element != ELEMENT_ICE && block->element != ELEMENT_ONLY_ICED) continue;
+          if(!pixel_in_rect(pixel_to_check, block_rect)) continue;
 
-          auto block_rect = block_get_rect(block);
-          if(pixel_in_rect(pixel_to_check, block_rect)) return true;
+          if(block->element == ELEMENT_ICE || block->element == ELEMENT_ONLY_ICED){
+              return true;
+          }
      }
 
      return false;
+}
+
+bool block_on_air(Position_t pos, Vec_t pos_delta, QuadTreeNode_t<Interactive_t>* interactive_qt, QuadTreeNode_t<Block_t>* block_qt){
+     auto block_pos = pos + pos_delta;
+
+     // auto block_rect = block_get_rect(block_pos.pixel);
+     auto block_center = block_get_center(block_pos);
+     auto coord_to_check = block_get_coord(block_pos);
+
+     if(pos.z == 0) return false; // TODO: if we add pits, check for a pit obv
+
+     Interactive_t* interactive = quad_tree_interactive_find_at(interactive_qt, coord_to_check);
+     if(interactive){
+          if(interactive->type == INTERACTIVE_TYPE_POPUP){
+               if(interactive->popup.lift.ticks == (pos.z + 1)){
+                    return false;
+                    // auto coord_rect = rect_surrounding_coord(coord_to_check);
+                    // if(rect_in_rect(block_rect, coord_rect)) return false;
+               }
+          }
+     }
+
+     auto rect_to_check = rect_surrounding_adjacent_coords(coord_to_check);
+
+     S16 block_count = 0;
+     Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
+     quad_tree_find_in(block_qt, rect_to_check, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
+
+     for(S16 i = 0; i < block_count; i++){
+          auto block = blocks[i];
+          auto check_block_rect = block_get_rect(block);
+
+          if(block->pos.z + HEIGHT_INTERVAL != pos.z) continue;
+          if(pixel_in_rect(block_center.pixel, check_block_rect)) return false;
+          // if(rect_in_rect(block_rect, check_block_rect)) return false;
+     }
+
+     return true;
 }
 
 CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t block_pos, Vec_t block_pos_delta, Vec_t block_vel,

@@ -26,10 +26,9 @@ Current bugs:
 
 Big Features:
 - 3D
-     - push block on top of block adjacent to player
+     - when falling off of an iced block, keep going when you land
+     - when falling off of a non-iced block, land adjacent to the block it was on
      - push block on top of block adjacent to player through portal
-     - extinguish elements on bottom block when top block slides over it
-     - block slides on top of other blocks that are iced
      - if a player is standing on a sliding block, the player slides too
      - shadows and slightly discolored blocks should help with visualizations
      - only 2 blocks high can go through portals
@@ -370,8 +369,8 @@ int main(int argc, char** argv){
           return 1;
      }
 
-     int window_width = 1024;
-     int window_height = 1024;
+     int window_width = 1400;
+     int window_height = 1400;
      SDL_Window* window = nullptr;
      SDL_GLContext opengl_context = nullptr;
      GLuint theme_texture = 0;
@@ -1733,6 +1732,8 @@ int main(int argc, char** argv){
                          block->teleport = false;
                     }
 
+                    block->was_on_ice_or_air = (block->coast_horizontal == BLOCK_COAST_ICE || block->coast_horizontal == BLOCK_COAST_AIR);
+
                     block->coast_horizontal = BLOCK_COAST_NONE;
                     block->coast_vertical = BLOCK_COAST_NONE;
                }
@@ -1748,6 +1749,9 @@ int main(int argc, char** argv){
                          }else if(block_on_ice(block->pos, block->pos_delta, &world.tilemap, world.interactive_qt, world.block_qt)){
                               block->coast_horizontal = BLOCK_COAST_ICE;
                               block->coast_vertical = BLOCK_COAST_ICE;
+                         }else if(block->was_on_ice_or_air && block_on_air(block->pos, block->pos_delta, world.interactive_qt, world.block_qt)){
+                              block->coast_horizontal = BLOCK_COAST_AIR;
+                              block->coast_vertical = BLOCK_COAST_AIR;
                          }else{
                               if(block->horizontal_move.state == MOVE_STATE_STARTING ||
                                  block->horizontal_move.state == MOVE_STATE_COASTING){
@@ -2093,7 +2097,7 @@ int main(int argc, char** argv){
                                                        if(block_on_ice(block->pos, block->pos_delta, &world.tilemap, world.interactive_qt, world.block_qt) &&
                                                           block_on_ice(entangled_block->pos, entangled_block->pos_delta, &world.tilemap, world.interactive_qt, world.block_qt)){
                                                             // TODO: handle this case for blocks not entangled on ice
-                                                            // handle pushing blocks diagonally
+                                                            // TODO: handle pushing blocks diagonally
 
                                                             F32 block_instant_vel = 0;
                                                             F32 entangled_block_instant_vel = 0;
@@ -2219,7 +2223,8 @@ int main(int argc, char** argv){
                          }
 
                          // this instance of last_block_pushed is to keep the pushing smooth and not have it stop at the tile boundaries
-                         if(block != block_pushed && !block_on_ice(block->pos, block->pos_delta, &world.tilemap, world.interactive_qt, world.block_qt)){
+                         if(block != block_pushed && !block_on_ice(block->pos, block->pos_delta, &world.tilemap, world.interactive_qt, world.block_qt) &&
+                            !block_on_air(block->pos, block->pos_delta, world.interactive_qt, world.block_qt)){
                               if(block_pushed && blocks_are_entangled(block_pushed, block, &world.blocks)){
                                    Block_t* entangled_block = block_pushed;
 
@@ -2329,9 +2334,7 @@ int main(int argc, char** argv){
                                         if(block->vel.y != 0) stop_on_boundary_y = true;
                                    }
                               }else{
-                                   if(block->vel.x != 0){
-                                        stop_on_boundary_x = true;
-                                   }
+                                   if(block->vel.x != 0) stop_on_boundary_x = true;
                                    if(block->vel.y != 0) stop_on_boundary_y = true;
                               }
                          }
@@ -2350,6 +2353,7 @@ int main(int argc, char** argv){
                                    block->horizontal_move.state = MOVE_STATE_IDLING;
                                    block->coast_horizontal = BLOCK_COAST_NONE;
 
+                                   // figure out new pos_delta which will be used for collision in the next iteration
                                    auto delta_pos = pixel_to_pos(Pixel_t{boundary_x, 0}) - block->pos;
                                    block->pos_delta.x = pos_to_vec(delta_pos).x;
                               }
@@ -2366,6 +2370,7 @@ int main(int argc, char** argv){
                                    block->vertical_move.state = MOVE_STATE_IDLING;
                                    block->coast_vertical = BLOCK_COAST_NONE;
 
+                                   // figure out new pos_delta which will be used for collision in the next iteration
                                    auto delta_pos = pixel_to_pos(Pixel_t{0, boundary_y}) - block->pos;
                                    block->pos_delta.y = pos_to_vec(delta_pos).y;
                               }

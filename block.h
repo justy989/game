@@ -12,6 +12,7 @@ enum BlockCoast_t{
      BLOCK_COAST_NONE,
      BLOCK_COAST_ICE,
      BLOCK_COAST_PLAYER,
+     BLOCK_COAST_AIR, // lol coaster
 };
 
 struct Block_t : public GridMotion_t{
@@ -27,6 +28,7 @@ struct Block_t : public GridMotion_t{
      DirectionMask_t prev_push_mask;
 
      bool       held_up;
+     bool       was_on_ice_or_air;
 
      bool       teleport;
      Position_t teleport_pos;
