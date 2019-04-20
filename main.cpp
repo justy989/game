@@ -21,8 +21,8 @@ Current bugs:
 - In the case of 3 rotated entangled blocks, 2 blocks that have a rotation of 2 between them colliding into each other seem to end up off of the grid
 - When pushing a block through portals, the block seems to snap to grid oddly when you finish pushing it
 - Sometimes when pushing a block, it will slide a tiny bit (around a pixel) further than the square it is supposed to land on, then snap to the right pixel
-- Pushing an entangled block up against a wall to the left, the block it is entangled with moves an additional tile
 - Pushing a block and shooting an arrow causes the player to go invisible
+- Something funky about level 76 taking forever to test the map
 
 Big Features:
 - 3D
