@@ -503,9 +503,7 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                               for(S8 b = 0; b < block_count; b++){
                                    Block_t* block = blocks[b];
 
-                                   // TODO: compress this statement with above
-                                   if(block->pos.z <= player_pos.z - HEIGHT_INTERVAL ||
-                                      block->pos.z >= player_pos.z + (HEIGHT_INTERVAL * 2)) continue;
+                                   if(!block_in_height_range_of_player(block, final_player_pos)) continue;
 
                                    auto portal_rotations = direction_rotations_between(interactive->portal.face, direction_opposite((Direction_t)(pd)));
 

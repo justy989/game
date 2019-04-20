@@ -27,7 +27,6 @@ Current bugs:
 Big Features:
 - 3D
      - push block on top of block adjacent to player through portal
-     - if a player is standing on a sliding block, the player slides too
      - shadows and slightly discolored blocks should help with visualizations
      - only 2 blocks high can go through portals
 - Get rid of skip_coords (I think this is possible and easy?)
@@ -1599,23 +1598,25 @@ int main(int argc, char** argv){
                     Coord_t player_coord = pos_to_coord(projected_pos);
 
                     // drop the player if they are above 0 and not held up by anything. This also contains logic for following a block
-                    bool held_up = false;
+                    {
+                         bool held_up = false;
 
-                    Interactive_t* interactive = quad_tree_interactive_find_at(world.interactive_qt, player_coord);
-                    if(interactive && interactive->type == INTERACTIVE_TYPE_POPUP){
-                         if(interactive->popup.lift.ticks == projected_pos.z + 1){
-                               held_up = true;
-                         }else if(interactive->coord == player_coord && interactive->popup.lift.ticks == projected_pos.z + 2){
-                               player->pos.z++;
-                               held_up = true;
+                         Interactive_t* interactive = quad_tree_interactive_find_at(world.interactive_qt, player_previous_coord);
+                         if(interactive){
+                              if(interactive->type == INTERACTIVE_TYPE_POPUP){
+                                   if(interactive->popup.lift.ticks == projected_pos.z + 1){
+                                         held_up = true;
+                                   }else if(interactive->coord == player_coord && interactive->popup.lift.ticks == projected_pos.z + 2){
+                                         player->pos.z++;
+                                         held_up = true;
 
-                               // if you are getting pushed up, it's hard to keep your grip!
-                               player->push_time = 0.0f;
+                                         // if you are getting pushed up, it's hard to keep your grip!
+                                         player->push_time = 0.0f;
+                                   }
+                              }
                          }
-                    }
 
-                    if(player->pos.z > 0){
-                         Rect_t search_rect = rect_surrounding_adjacent_coords(player_coord);
+                         Rect_t search_rect = rect_surrounding_adjacent_coords(player_previous_coord);
 
                          S16 block_count = 0;
                          Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
@@ -1625,13 +1626,74 @@ int main(int argc, char** argv){
                              auto block_rect = block_get_rect(blocks[b]);
                              if(pixel_in_rect(projected_pos.pixel, block_rect) && blocks[b]->pos.z == projected_pos.z - HEIGHT_INTERVAL){
                                  player->pos_delta += blocks[b]->pos_delta;
+                                 projected_pos += blocks[b]->pos_delta;
                                  held_up = true;
                                  break;
                              }
                          }
 
-                         if(!held_up) player->pos.z--;
+                         // TODO: compress this logic with logic in move_player_through_world()
+                         for(S8 d = 0; d < DIRECTION_COUNT && !held_up; d++){
+                              Coord_t check_coord = player_previous_coord + (Direction_t)(d);
+                              auto portal_src_pixel = coord_to_pixel_at_center(check_coord);
+                              interactive = quad_tree_interactive_find_at(world.interactive_qt, check_coord);
+
+                              if(is_active_portal(interactive)){
+                                   PortalExit_t portal_exits = find_portal_exits(check_coord, &world.tilemap, world.interactive_qt);
+
+                                   for(S8 pd = 0; pd < DIRECTION_COUNT && !held_up; pd++){
+                                        auto portal_exit = portal_exits.directions + pd;
+
+                                        for(S8 p = 0; p < portal_exit->count; p++){
+                                             auto portal_dst_coord = portal_exit->coords[p];
+                                             if(portal_dst_coord == check_coord) continue;
+
+                                             portal_dst_coord += direction_opposite((Direction_t)(pd));
+
+                                             auto check_portal_rect = rect_surrounding_adjacent_coords(portal_dst_coord);
+                                             quad_tree_find_in(world.block_qt, check_portal_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
+
+                                             auto portal_dst_center_pixel = coord_to_pixel_at_center(portal_dst_coord);
+
+                                             for(S8 b = 0; b < block_count; b++){
+                                                  Block_t* block = blocks[b];
+
+                                                  if(block->pos.z != projected_pos.z - HEIGHT_INTERVAL) continue;
+
+                                                  auto portal_rotations = direction_rotations_between(interactive->portal.face, direction_opposite((Direction_t)(pd)));
+
+                                                  auto block_portal_dst_offset = block->pos + block->pos_delta;
+                                                  block_portal_dst_offset.pixel += HALF_TILE_SIZE_PIXEL;
+                                                  block_portal_dst_offset.pixel -= portal_dst_center_pixel;
+
+                                                  Position_t block_pos;
+                                                  block_pos.pixel = portal_src_pixel;
+                                                  block_pos.pixel += pixel_rotate_quadrants_clockwise(block_portal_dst_offset.pixel, portal_rotations);
+                                                  block_pos.pixel -= HALF_TILE_SIZE_PIXEL;
+                                                  block_pos.decimal = vec_rotate_quadrants_clockwise(block_portal_dst_offset.decimal, portal_rotations);
+                                                  canonicalize(&block_pos);
+
+                                                  auto block_rect = block_get_rect(block_pos.pixel);
+                                                  if(pixel_in_rect(projected_pos.pixel, block_rect)){
+                                                       auto rotated_pos_delta = vec_rotate_quadrants_clockwise(block->pos_delta, portal_rotations);
+                                                       player->pos_delta += rotated_pos_delta;
+                                                       projected_pos += rotated_pos_delta;
+                                                       held_up = true;
+                                                       break;
+                                                  }
+                                             }
+                                        }
+                                   }
+                              }
+                         }
+
+                         if(!held_up && player->pos.z > 0){
+                              player->pos.z--;
+                         }
                     }
+
+                    // recalc player coord since a block could have moved us
+                    player_coord = pos_to_coord(projected_pos);
 
                     // teleport position
                     auto teleport_result = teleport_position_across_portal(player->pos, player->pos_delta, &world,
