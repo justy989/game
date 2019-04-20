@@ -1932,9 +1932,9 @@ int main(int argc, char** argv){
                     auto block = world.blocks.elements + i;
 
                     if(!block->held_up && block->pos.z > 0){
-                         block->fall_time += dt;
-                         if(block->fall_time >= FALL_TIME){
-                              block->fall_time -= FALL_TIME;
+                         block->fall_time -= dt;
+                         if(block->fall_time < 0){
+                              block->fall_time = FALL_TIME;
                               block->pos.z--;
                          }
                     }

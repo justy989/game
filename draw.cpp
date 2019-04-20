@@ -539,9 +539,8 @@ void draw_text(const char* message, Vec_t pos)
 static Block_t block_from_stamp(Stamp_t* stamp){
      Block_t block = {};
      block.element = stamp->block.element;
-     // block.rotation = stamp->block.rotation;
-     block.entangle_index = stamp->block.entangle_index;
      block.rotation = stamp->block.rotation;
+     block.entangle_index = -1;
      block.clone_start = Coord_t{};
      block.clone_id = 0;
      return block;

@@ -193,7 +193,6 @@ bool init(Editor_t* editor){
                block_category->elements[index].elements[0].type = STAMP_TYPE_BLOCK;
                block_category->elements[index].elements[0].block.face = DIRECTION_LEFT;
                block_category->elements[index].elements[0].block.element = (Element_t)(i);
-               block_category->elements[index].elements[0].block.entangle_index = -1;
                block_category->elements[index].elements[0].block.rotation = d;
           }
      }
@@ -423,7 +422,7 @@ void apply_stamp(Stamp_t* stamp, Coord_t coord, TileMap_t* tilemap, ObjectArray_
           block->accel = vec_zero();
           block->element = stamp->block.element;
           block->rotation = stamp->block.rotation;
-          block->entangle_index = stamp->block.entangle_index;
+          block->entangle_index = -1;
      } break;
      case STAMP_TYPE_INTERACTIVE:
      {
