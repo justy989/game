@@ -1223,8 +1223,8 @@ void describe_block(World_t* world, Block_t* block){
 
 void describe_player(World_t* world, Player_t* player){
      S16 index = player - world->players.elements;
-     LOG("Player %d: pixel: %d, %d, decimal %f, %f, face: %s push_block: %d\n", index,
-         player->pos.pixel.x, player->pos.pixel.y, player->pos.decimal.x, player->pos.decimal.y,
+     LOG("Player %d: pixel: %d, %d, %d, decimal %f, %f, face: %s push_block: %d\n", index,
+         player->pos.pixel.x, player->pos.pixel.y, player->pos.z, player->pos.decimal.x, player->pos.decimal.y,
          direction_to_string(player->face), player->pushing_block);
      LOG("  vel: %f, %f accel: %f, %f pos_dt: %f, %f\n", player->vel.x, player->vel.y, player->accel.x, player->accel.y, player->pos_delta.x , player->pos_delta.y);
      LOG("  rot: %d, move_rot: L %d, U %d, R %d, D %d\n", player->rotation,

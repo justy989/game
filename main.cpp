@@ -1158,17 +1158,6 @@ int main(int argc, char** argv){
                     Interactive_t* interactive = world.interactives.elements + i;
                     if(interactive->type == INTERACTIVE_TYPE_POPUP){
                          lift_update(&interactive->popup.lift, POPUP_TICK_DELAY, dt, 1, POPUP_MAX_LIFT_TICKS);
-
-                         for(S16 p = 0; p < world.players.count; p++){
-                              auto* player = world.players.elements + p;
-                              Coord_t player_coord = pos_to_coord(player->pos);
-                              if(interactive->coord == player_coord && interactive->popup.lift.ticks == player->pos.z + 2){
-                                  player->pos.z++;
-
-                                  // if you are getting pushed up, it's hard to keep your grip!
-                                  player->push_time = 0.0f;
-                              }
-                         }
                     }else if(interactive->type == INTERACTIVE_TYPE_DOOR){
                          lift_update(&interactive->door.lift, POPUP_TICK_DELAY, dt, 0, DOOR_MAX_HEIGHT);
                     }else if(interactive->type == INTERACTIVE_TYPE_PRESSURE_PLATE){
@@ -1519,33 +1508,6 @@ int main(int argc, char** argv){
                               }
                          }
                     }
-
-                    bool held_up = false;
-
-                    auto player_coord = pos_to_coord(player->pos);
-                    Interactive_t* interactive = quad_tree_interactive_find_at(world.interactive_qt, player_coord);
-                    if(interactive && interactive->type == INTERACTIVE_TYPE_POPUP &&
-                       interactive->popup.lift.ticks == player->pos.z + 1){
-                        held_up = true;
-                    }
-
-                    Rect_t coord_rect = rect_surrounding_coord(player_coord);
-
-                    S16 block_count = 0;
-                    Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
-
-                    quad_tree_find_in(world.block_qt, coord_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
-                    for(S16 b = 0; b < block_count; b++){
-                        auto block_rect = block_get_rect(blocks[b]);
-                        if(pixel_in_rect(player->pos.pixel, block_rect) && blocks[b]->pos.z == player->pos.z - HEIGHT_INTERVAL){
-                            held_up = true;
-                            break;
-                        }
-                    }
-
-                    if(!held_up && player->pos.z > 0){
-                        player->pos.z--;
-                    }
                }
 
                Position_t room_center = coord_to_pos(Coord_t{8, 8});
@@ -1633,7 +1595,43 @@ int main(int argc, char** argv){
                     }
 
                     Coord_t player_previous_coord = pos_to_coord(player->pos);
-                    Coord_t player_coord = pos_to_coord(player->pos + player->pos_delta);
+                    auto projected_pos = player->pos + player->pos_delta;
+                    Coord_t player_coord = pos_to_coord(projected_pos);
+
+                    // drop the player if they are above 0 and not held up by anything. This also contains logic for following a block
+                    bool held_up = false;
+
+                    Interactive_t* interactive = quad_tree_interactive_find_at(world.interactive_qt, player_coord);
+                    if(interactive && interactive->type == INTERACTIVE_TYPE_POPUP){
+                         if(interactive->popup.lift.ticks == projected_pos.z + 1){
+                               held_up = true;
+                         }else if(interactive->coord == player_coord && interactive->popup.lift.ticks == projected_pos.z + 2){
+                               player->pos.z++;
+                               held_up = true;
+
+                               // if you are getting pushed up, it's hard to keep your grip!
+                               player->push_time = 0.0f;
+                         }
+                    }
+
+                    if(player->pos.z > 0){
+                         Rect_t search_rect = rect_surrounding_adjacent_coords(player_coord);
+
+                         S16 block_count = 0;
+                         Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
+
+                         quad_tree_find_in(world.block_qt, search_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
+                         for(S16 b = 0; b < block_count; b++){
+                             auto block_rect = block_get_rect(blocks[b]);
+                             if(pixel_in_rect(projected_pos.pixel, block_rect) && blocks[b]->pos.z == projected_pos.z - HEIGHT_INTERVAL){
+                                 player->pos_delta += blocks[b]->pos_delta;
+                                 held_up = true;
+                                 break;
+                             }
+                         }
+
+                         if(!held_up) player->pos.z--;
+                    }
 
                     // teleport position
                     auto teleport_result = teleport_position_across_portal(player->pos, player->pos_delta, &world,
