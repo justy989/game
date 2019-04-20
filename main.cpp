@@ -1595,7 +1595,6 @@ int main(int argc, char** argv){
 
                     Coord_t player_previous_coord = pos_to_coord(player->pos);
                     auto projected_pos = player->pos + player->pos_delta;
-                    Coord_t player_coord = pos_to_coord(projected_pos);
 
                     // drop the player if they are above 0 and not held up by anything. This also contains logic for following a block
                     {
@@ -1604,9 +1603,9 @@ int main(int argc, char** argv){
                          Interactive_t* interactive = quad_tree_interactive_find_at(world.interactive_qt, player_previous_coord);
                          if(interactive){
                               if(interactive->type == INTERACTIVE_TYPE_POPUP){
-                                   if(interactive->popup.lift.ticks == projected_pos.z + 1){
+                                   if(interactive->popup.lift.ticks == player->pos.z + 1){
                                          held_up = true;
-                                   }else if(interactive->coord == player_coord && interactive->popup.lift.ticks == projected_pos.z + 2){
+                                   }else if(interactive->coord == player_previous_coord && interactive->popup.lift.ticks == player->pos.z + 2){
                                          player->pos.z++;
                                          held_up = true;
 
@@ -1624,7 +1623,7 @@ int main(int argc, char** argv){
                          quad_tree_find_in(world.block_qt, search_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
                          for(S16 b = 0; b < block_count; b++){
                              auto block_rect = block_get_rect(blocks[b]);
-                             if(pixel_in_rect(projected_pos.pixel, block_rect) && blocks[b]->pos.z == projected_pos.z - HEIGHT_INTERVAL){
+                             if(pixel_in_rect(player->pos.pixel, block_rect) && blocks[b]->pos.z == player->pos.z - HEIGHT_INTERVAL){
                                  player->pos_delta += blocks[b]->pos_delta;
                                  projected_pos += blocks[b]->pos_delta;
                                  held_up = true;
@@ -1658,7 +1657,7 @@ int main(int argc, char** argv){
                                              for(S8 b = 0; b < block_count; b++){
                                                   Block_t* block = blocks[b];
 
-                                                  if(block->pos.z != projected_pos.z - HEIGHT_INTERVAL) continue;
+                                                  if(block->pos.z != player->pos.z - HEIGHT_INTERVAL) continue;
 
                                                   auto portal_rotations = direction_rotations_between(interactive->portal.face, direction_opposite((Direction_t)(pd)));
 
@@ -1674,7 +1673,7 @@ int main(int argc, char** argv){
                                                   canonicalize(&block_pos);
 
                                                   auto block_rect = block_get_rect(block_pos.pixel);
-                                                  if(pixel_in_rect(projected_pos.pixel, block_rect)){
+                                                  if(pixel_in_rect(player->pos.pixel, block_rect)){
                                                        auto rotated_pos_delta = vec_rotate_quadrants_clockwise(block->pos_delta, portal_rotations);
                                                        player->pos_delta += rotated_pos_delta;
                                                        projected_pos += rotated_pos_delta;
@@ -1692,8 +1691,7 @@ int main(int argc, char** argv){
                          }
                     }
 
-                    // recalc player coord since a block could have moved us
-                    player_coord = pos_to_coord(projected_pos);
+                    auto player_coord = pos_to_coord(projected_pos);
 
                     // teleport position
                     auto teleport_result = teleport_position_across_portal(player->pos, player->pos_delta, &world,
