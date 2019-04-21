@@ -12,7 +12,6 @@ Entanglement Puzzles:
 - rotated entangled puzzles where the centroid is on a portal destination coord
 
 Current bugs:
-- BLOCK COLLIDING ON PORTAL BOUNDARIES IS A DISASTER
 - In the act of stopping a block where the player goes through a portal causes them to not teleport through the portal
 - Stopping a block halfway through a portal lead to some pretty buggy behavior where we could get the block out of the map
 - A block on the tile outside a portal pushed into the portal to clone, the clone has weird behavior and ends up on the portal block
@@ -27,10 +26,14 @@ Current bugs:
 
 Big Features:
 - 3D
-     - push block on top of block adjacent to player through portal
-     - shadows and slightly discolored blocks should help with visualizations
-     - draw blocks from top to bottom
      - only 2 blocks high can go through portals
+     - a block on top of a block that is moving must move with it
+     - draw blocks from top to bottom
+     - shadows and slightly discolored blocks should help with visualizations
+     - entangled blocks dealing with popups
+     - an entangled block with a block on top of it doesn't move because it is held down
+     - when a block slides on top of an iced block, and slots into the adjacent tile because another block is 2 tiles away,
+       should a push be applied to that adjacent block if it is on ice? Probably
 - Get rid of skip_coords (I think this is possible and easy?)
 - arrow kills player
 - arrow entanglement

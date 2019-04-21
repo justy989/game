@@ -579,8 +579,7 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                          collided_with_block->pos.decimal.x = 0;
                     }else{
                          auto new_pos = collided_with_block->pos + Vec_t{TILE_SIZE + PLAYER_RADIUS, 0};
-                         player->pos.pixel.x = new_pos.pixel.x;
-                         player->pos.decimal.x = new_pos.decimal.x;
+                         result.pos_delta.x = pos_to_vec(new_pos - player->pos).x;
 
                          player->stopping_block_from = collided_block_dir;
 
@@ -618,8 +617,7 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                          collided_with_block->pos.pixel.x = (player->pos.pixel.x + 5);
                     }else{
                          auto new_pos = collided_with_block->pos - Vec_t{PLAYER_RADIUS, 0};
-                         player->pos.pixel.x = new_pos.pixel.x;
-                         player->pos.decimal.x = new_pos.decimal.x;
+                         result.pos_delta.x = pos_to_vec(new_pos - player->pos).x;
 
                          player->stopping_block_from = collided_block_dir;
 
@@ -656,8 +654,7 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                          collided_with_block->pos.decimal.y = 0;
                     }else{
                          auto new_pos = collided_with_block->pos - Vec_t{0, PLAYER_RADIUS};
-                         player->pos.pixel.y = new_pos.pixel.y;
-                         player->pos.decimal.y = new_pos.decimal.y;
+                         result.pos_delta.y = pos_to_vec(new_pos - player->pos).y;
 
                          player->stopping_block_from = collided_block_dir;
 
@@ -694,8 +691,7 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                          collided_with_block->pos.pixel.y = (player->pos.pixel.y - 5) - BLOCK_SOLID_SIZE_IN_PIXELS;
                     }else{
                          auto new_pos = collided_with_block->pos + Vec_t{0, TILE_SIZE + PLAYER_RADIUS};
-                         player->pos.pixel.y = new_pos.pixel.y;
-                         player->pos.decimal.y = new_pos.decimal.y;
+                         result.pos_delta.y = pos_to_vec(new_pos - player->pos).y;
 
                          player->stopping_block_from = collided_block_dir;
 
