@@ -1529,6 +1529,7 @@ int main(int argc, char** argv){
                     }
                     player->pushing_block = -1;
 
+                    player->teleport = false;
                     player->teleport_pushing_block = -1;
 
                     player->prev_vel = player->vel;
@@ -1694,43 +1695,6 @@ int main(int argc, char** argv){
                          if(!held_up && player->pos.z > 0){
                               player->pos.z--;
                          }
-                    }
-
-                    auto player_coord = pos_to_coord(projected_pos);
-
-                    // teleport position
-                    auto teleport_result = teleport_position_across_portal(player->pos, player->pos_delta, &world,
-                                                                           player_previous_coord, player_coord);
-                    auto teleport_clone_id = player->clone_id;
-                    if(player_coord != player->clone_start){
-                         // if we are going back to our clone portal, then all clones should go back
-
-                         // find the index closest to our original clone portal
-                         F32 shortest_distance = FLT_MAX;
-                         auto clone_start_center = coord_to_pixel_at_center(player->clone_start);
-
-                         for(S8 t = 0; t < teleport_result.count; t++){
-                              F32 distance = pixel_distance_between(clone_start_center, teleport_result.results[t].pos.pixel);
-                              if(distance < shortest_distance){
-                                   shortest_distance = distance;
-                                   teleport_clone_id = t;
-                              }
-                         }
-                    }
-
-                    // if a teleport happened, update the position
-                    if(teleport_result.count){
-                         assert(teleport_result.count > teleport_clone_id);
-
-                         player->teleport = true;
-                         player->teleport_pos = teleport_result.results[teleport_clone_id].pos;
-                         player->teleport_pos_delta = teleport_result.results[teleport_clone_id].delta;
-                         player->teleport_rotation = teleport_result.results[teleport_clone_id].rotations;
-                         player->teleport_face = direction_rotate_clockwise(player->face, teleport_result.results[teleport_clone_id].rotations);
-                    }else{
-                         // if we collide enough to reduce our pos_delta, we could have previously teleported and are no
-                         // longer teleporting in the same frame.
-                         player->teleport = false;
                     }
 
                     if(player->stopping_block_from_time > 0){
@@ -2044,9 +2008,9 @@ int main(int argc, char** argv){
                // unbounded collision: this should be exciting
                // we have our initial position and our initial pos_delta, update pos_delta for all players and blocks until nothing is colliding anymore
                const S8 max_collision_attempts = 16;
-               bool collided = true;
-               while(collided && collision_attempts < max_collision_attempts){
-                    collided = false;
+               bool repeat_collision = true;
+               while(repeat_collision && collision_attempts < max_collision_attempts){
+                    repeat_collision = false;
 
                     // do a collision pass on each block
                     S16 update_blocks_count = world.blocks.count;
@@ -2068,56 +2032,56 @@ int main(int argc, char** argv){
                               stop_on_boundary_y = true;
                          }
 
-                         if(block->pos_delta.x != 0.0f || block->pos_delta.y != 0.0f){
-                              auto result = check_block_collision_with_other_blocks(block->pos,
-                                                                                    block->pos_delta,
-                                                                                    block->vel,
-                                                                                    block->accel,
-                                                                                    block->stop_on_pixel_x,
-                                                                                    block->stop_on_pixel_y,
-                                                                                    block->horizontal_move,
-                                                                                    block->vertical_move,
-                                                                                    i,
-                                                                                    block->clone_start.x > 0,
-                                                                                    &world);
+                         CheckBlockCollisionResult_t collision_result = {};
 
-                              if(block->teleport){
-                                   auto teleport_result = check_block_collision_with_other_blocks(block->teleport_pos,
-                                                                                                  block->teleport_pos_delta,
-                                                                                                  block->teleport_vel,
-                                                                                                  block->teleport_accel,
-                                                                                                  block->stop_on_pixel_x,
-                                                                                                  block->stop_on_pixel_y,
-                                                                                                  block->horizontal_move,
-                                                                                                  block->vertical_move,
-                                                                                                  i,
-                                                                                                  block->clone_start.x > 0,
-                                                                                                  &world);
-                                   // TODO: find the closer collision between the regular collided result and the teleported collided result
-                                   if(teleport_result.collided){
-                                        collided = true;
+                         if(block->teleport){
+                              if(block->teleport_pos_delta.x != 0.0f || block->teleport_pos_delta.y != 0.0f){
+                                   collision_result = check_block_collision_with_other_blocks(block->teleport_pos,
+                                                                                              block->teleport_pos_delta,
+                                                                                              block->teleport_vel,
+                                                                                              block->teleport_accel,
+                                                                                              block->stop_on_pixel_x,
+                                                                                              block->stop_on_pixel_y,
+                                                                                              block->horizontal_move,
+                                                                                              block->vertical_move,
+                                                                                              i,
+                                                                                              block->clone_start.x > 0,
+                                                                                              &world);
+                                   if(collision_result.collided){
+                                        repeat_collision = true;
 
-                                        block->teleport_pos_delta = teleport_result.pos_delta;
-                                        block->teleport_vel = teleport_result.vel;
-                                        block->teleport_accel = teleport_result.accel;
+                                        block->teleport_pos_delta = collision_result.pos_delta;
+                                        block->teleport_vel = collision_result.vel;
+                                        block->teleport_accel = collision_result.accel;
 
-                                        block->teleport_stop_on_pixel_x = teleport_result.stop_on_pixel_x;
-                                        block->teleport_stop_on_pixel_y = teleport_result.stop_on_pixel_y;
+                                        block->teleport_stop_on_pixel_x = collision_result.stop_on_pixel_x;
+                                        block->teleport_stop_on_pixel_y = collision_result.stop_on_pixel_y;
 
-                                        block->teleport_horizontal_move = teleport_result.horizontal_move;
-                                        block->teleport_vertical_move = teleport_result.vertical_move;
+                                        block->teleport_horizontal_move = collision_result.horizontal_move;
+                                        block->teleport_vertical_move = collision_result.vertical_move;
                                    }
                               }
+                         }else{
+                              if(block->pos_delta.x != 0.0f || block->pos_delta.y != 0.0f){
+                                   collision_result = check_block_collision_with_other_blocks(block->pos, block->pos_delta,
+                                                                                              block->vel, block->accel,
+                                                                                              block->stop_on_pixel_x,
+                                                                                              block->stop_on_pixel_y,
+                                                                                              block->horizontal_move,
+                                                                                              block->vertical_move,
+                                                                                              i, block->clone_start.x > 0,
+                                                                                              &world);
+                              }
 
-                              if(result.collided){
-                                   collided = true;
+                              if(collision_result.collided){
+                                   repeat_collision = true;
 
-                                   if(result.collided_block_index >= 0 && blocks_are_entangled(result.collided_block_index, i, &world.blocks)){
+                                   if(collision_result.collided_block_index >= 0 && blocks_are_entangled(collision_result.collided_block_index, i, &world.blocks)){
                                         // TODO: I don't love indexing the blocks without checking the index is valid first
-                                        auto* entangled_block = world.blocks.elements + result.collided_block_index;
+                                        auto* entangled_block = world.blocks.elements + collision_result.collided_block_index;
 
                                         // the entangled block pos might be faked due to portals, so use the resulting collision pos instead of the actual position
-                                        auto entangled_block_pos = result.collided_pos;
+                                        auto entangled_block_pos = collision_result.collided_pos;
 
                                         // the result collided position is the center of the block, so handle this
                                         entangled_block_pos.pixel -= HALF_TILE_SIZE_PIXEL;
@@ -2125,7 +2089,7 @@ int main(int argc, char** argv){
                                         auto final_block_pos = block->pos + block->pos_delta;
                                         auto pos_diff = pos_to_vec(final_block_pos - entangled_block_pos);
 
-                                        U8 total_rotations = (block->rotation + entangled_block->rotation + result.collided_portal_rotations) % (S8)(DIRECTION_COUNT);
+                                        U8 total_rotations = (block->rotation + entangled_block->rotation + collision_result.collided_portal_rotations) % (S8)(DIRECTION_COUNT);
 
                                         // TODO: this 0.0001f is a hack, it used to be an equality check, but the
                                         //       numbers were slightly off in the case of rotated portals but not rotated entangled blocks
@@ -2160,7 +2124,7 @@ int main(int argc, char** argv){
                                                   auto delta_vec = pos_to_vec(block->pos - entangled_block_pos);
                                                   auto delta_mask = vec_direction_mask(delta_vec);
                                                   auto move_mask = vec_direction_mask(block->pos_delta);
-                                                  auto entangle_move_mask = vec_direction_mask(vec_rotate_quadrants_counter_clockwise(entangled_block->pos_delta, result.collided_portal_rotations));
+                                                  auto entangle_move_mask = vec_direction_mask(vec_rotate_quadrants_counter_clockwise(entangled_block->pos_delta, collision_result.collided_portal_rotations));
 
                                                   Direction_t move_dir_to_stop = DIRECTION_COUNT;
                                                   Direction_t entangled_move_dir_to_stop = DIRECTION_COUNT;
@@ -2192,7 +2156,7 @@ int main(int argc, char** argv){
                                                   }
 
                                                   if(move_dir_to_stop == DIRECTION_COUNT){
-                                                       copy_block_collision_results(block, &result);
+                                                       copy_block_collision_results(block, &collision_result);
                                                   }else{
                                                        if(block_on_ice(block->pos, block->pos_delta, &world.tilemap, world.interactive_qt, world.block_qt) &&
                                                           block_on_ice(entangled_block->pos, entangled_block->pos_delta, &world.tilemap, world.interactive_qt, world.block_qt)){
@@ -2261,9 +2225,9 @@ int main(int argc, char** argv){
                                                                  }
                                                             }
                                                        }else{
-                                                            auto stop_entangled_dir = direction_rotate_clockwise(entangled_move_dir_to_stop, result.collided_portal_rotations);
+                                                            auto stop_entangled_dir = direction_rotate_clockwise(entangled_move_dir_to_stop, collision_result.collided_portal_rotations);
 
-                                                            stop_block_colliding_with_entangled(block, move_dir_to_stop, &result);
+                                                            stop_block_colliding_with_entangled(block, move_dir_to_stop, &collision_result);
                                                             stop_block_colliding_with_entangled(entangled_block, stop_entangled_dir, &entangle_result);
 
                                                             // TODO: compress this code, it's definitely used elsewhere
@@ -2277,10 +2241,10 @@ int main(int argc, char** argv){
                                                   }
                                              }
                                         }else{
-                                             copy_block_collision_results(block, &result);
+                                             copy_block_collision_results(block, &collision_result);
                                         }
                                    }else{
-                                        copy_block_collision_results(block, &result);
+                                        copy_block_collision_results(block, &collision_result);
                                    }
                               }
                          }
@@ -2445,7 +2409,7 @@ int main(int argc, char** argv){
                               // stop on tile boundaries separately for each axis
                               S16 boundary_x = range_passes_tile_boundary(block->pos.pixel.x, final_pos.pixel.x, block->started_on_pixel_x);
                               if(boundary_x){
-                                   collided = true;
+                                   repeat_collision = true;
 
                                    block->stop_on_pixel_x = boundary_x;
                                    block->accel.x = 0;
@@ -2462,7 +2426,7 @@ int main(int argc, char** argv){
                          if(stop_on_boundary_y){
                               S16 boundary_y = range_passes_tile_boundary(block->pos.pixel.y, final_pos.pixel.y, block->started_on_pixel_y);
                               if(boundary_y){
-                                   collided = true;
+                                   repeat_collision = true;
 
                                    block->stop_on_pixel_y = boundary_y;
                                    block->accel.y = 0;
@@ -2630,10 +2594,7 @@ int main(int argc, char** argv){
 
                          find_portal_adjacents_to_skip_collision_check(player_coord, world.interactive_qt, skip_coord);
 
-                         auto result = move_player_through_world(player->pos, player->vel, player->pos_delta, player->face,
-                                                                 player->clone_instance, i, player->pushing_block,
-                                                                 player->pushing_block_dir, player->pushing_block_rotation,
-                                                                 skip_coord, &world);
+                         MovePlayerThroughWorldResult_t move_result {};
 
                          if(player->teleport){
                               Coord_t teleport_player_coord = pos_to_coord(player->teleport_pos + player->teleport_pos_delta);
@@ -2653,28 +2614,29 @@ int main(int argc, char** argv){
                                    pushing_block_rotation = player->teleport_pushing_block_rotation;
                               }
 
-                              auto teleport_result = move_player_through_world(player->teleport_pos, player->vel, player->teleport_pos_delta, player->teleport_face,
-                                                                               player->clone_instance, i, pushing_block, pushing_block_dir, pushing_block_rotation,
-                                                                               skip_coord, &world);
+                              move_result = move_player_through_world(player->teleport_pos, player->teleport_vel, player->teleport_pos_delta, player->teleport_face,
+                                                                      player->clone_instance, i, pushing_block, pushing_block_dir, pushing_block_rotation,
+                                                                      skip_coord, &world);
 
-                              if(teleport_result.collided){
-                                   collided = true;
-                              }
-                              if(teleport_result.resetting) resetting = true;
-                              player->teleport_pos_delta = teleport_result.pos_delta;
-                              player->teleport_pushing_block = teleport_result.pushing_block;
-                              player->teleport_pushing_block_dir = teleport_result.pushing_block_dir;
-                              player->teleport_pushing_block_rotation = teleport_result.pushing_block_rotation;
-                         }
+                              if(move_result.collided) repeat_collision = true;
+                              if(move_result.resetting) resetting = true;
+                              player->teleport_pos_delta = move_result.pos_delta;
+                              player->teleport_pushing_block = move_result.pushing_block;
+                              player->teleport_pushing_block_dir = move_result.pushing_block_dir;
+                              player->teleport_pushing_block_rotation = move_result.pushing_block_rotation;
+                         }else{
+                              move_result = move_player_through_world(player->pos, player->vel, player->pos_delta, player->face,
+                                                                      player->clone_instance, i, player->pushing_block,
+                                                                      player->pushing_block_dir, player->pushing_block_rotation,
+                                                                      skip_coord, &world);
 
-                         if(result.collided){
-                              collided = true;
+                              if(move_result.collided) repeat_collision = true;
+                              if(move_result.resetting) resetting = true;
+                              player->pos_delta = move_result.pos_delta;
+                              player->pushing_block = move_result.pushing_block;
+                              player->pushing_block_dir = move_result.pushing_block_dir;
+                              player->pushing_block_rotation = move_result.pushing_block_rotation;
                          }
-                         if(result.resetting) resetting = true;
-                         player->pos_delta = result.pos_delta;
-                         player->pushing_block = result.pushing_block;
-                         player->pushing_block_dir = result.pushing_block_dir;
-                         player->pushing_block_rotation = result.pushing_block_rotation;
 
                          auto* portal = player_is_teleporting(player, world.interactive_qt);
 
@@ -2766,6 +2728,50 @@ int main(int argc, char** argv){
                          }
                     }
 
+                    // based on changing pos_deltas, determine if we are teleporting
+                    for(S16 i = 0; i < update_player_count; i++){
+                         auto player = world.players.elements + i;
+                         if(player->teleport) continue;
+
+                         auto player_prev_coord = pos_to_coord(player->pos);
+                         auto player_cur_coord = pos_to_coord(player->pos + player->pos_delta);
+
+                         // teleport position
+                         auto teleport_result = teleport_position_across_portal(player->pos, player->pos_delta, &world,
+                                                                                player_prev_coord, player_cur_coord);
+                         auto teleport_clone_id = player->clone_id;
+                         if(player_cur_coord != player->clone_start){
+                              // if we are going back to our clone portal, then all clones should go back
+
+                              // find the index closest to our original clone portal
+                              F32 shortest_distance = FLT_MAX;
+                              auto clone_start_center = coord_to_pixel_at_center(player->clone_start);
+
+                              for(S8 t = 0; t < teleport_result.count; t++){
+                                   F32 distance = pixel_distance_between(clone_start_center, teleport_result.results[t].pos.pixel);
+                                   if(distance < shortest_distance){
+                                        shortest_distance = distance;
+                                        teleport_clone_id = t;
+                                   }
+                              }
+                         }
+
+                         // if a teleport happened, update the position
+                         if(teleport_result.count){
+                              assert(teleport_result.count > teleport_clone_id);
+
+                              player->teleport = true;
+                              player->teleport_pos = teleport_result.results[teleport_clone_id].pos;
+                              player->teleport_pos_delta = teleport_result.results[teleport_clone_id].delta;
+                              player->teleport_vel = vec_rotate_quadrants_clockwise(player->vel, teleport_result.results[teleport_clone_id].rotations);
+                              player->teleport_accel = vec_rotate_quadrants_clockwise(player->accel, teleport_result.results[teleport_clone_id].rotations);
+                              player->teleport_rotation = teleport_result.results[teleport_clone_id].rotations;
+                              player->teleport_face = direction_rotate_clockwise(player->face, teleport_result.results[teleport_clone_id].rotations);
+
+                              repeat_collision = true;
+                         }
+                    }
+
                     collision_attempts++;
                }
 
@@ -2778,8 +2784,8 @@ int main(int argc, char** argv){
                          player->pos_delta = player->teleport_pos_delta;
 
                          player->face = player->teleport_face;
-                         player->vel = vec_rotate_quadrants_clockwise(player->vel, player->teleport_rotation);
-                         player->accel = vec_rotate_quadrants_clockwise(player->accel, player->teleport_rotation);
+                         player->vel = player->teleport_vel;
+                         player->accel = player->teleport_accel;
                          player->pushing_block = player->teleport_pushing_block;
                          player->pushing_block_dir = player->teleport_pushing_block_dir;
                          player->pushing_block_rotation = player->teleport_pushing_block_rotation;

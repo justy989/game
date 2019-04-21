@@ -21,6 +21,8 @@ struct Player_t : public Motion_t {
      bool        teleport = false;
      Position_t  teleport_pos;
      Vec_t       teleport_pos_delta;
+     Vec_t       teleport_vel;
+     Vec_t       teleport_accel; // TODO: I don't know if we will ever need this field
      S16         teleport_pushing_block = 0;
      Direction_t teleport_pushing_block_dir = DIRECTION_COUNT;
      S8          teleport_pushing_block_rotation = 0;
