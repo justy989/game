@@ -1,0 +1,12 @@
+#!/bin/sh
+
+PUZZLE_COUNT=$(ls content/*.bm | grep -v _test | wc -l)
+FEATURE_TEST_COUNT=$(ls content/*.bm | grep _test | wc -l)
+TOTAL_COUNT=$(ls content/*.bm | wc -l)
+
+echo
+echo "Puzzles       : $PUZZLE_COUNT"
+echo "Feature Tests : $FEATURE_TEST_COUNT"
+echo "-------------------"
+echo "Total         : $TOTAL_COUNT"
+echo
