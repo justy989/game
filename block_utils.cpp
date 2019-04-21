@@ -796,7 +796,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
           result.collided_pos = block_inside_result.collision_pos;
           result.collided_portal_rotations = block_inside_result.portal_rotations;
 
-          auto collided_block_center = block_get_center(block_inside_result.block);
+          auto collided_block_center = block_inside_result.collision_pos;
 
           auto moved_block_pos = block_get_center(block_pos);
           auto move_direction = move_direction_between(moved_block_pos, block_inside_result.collision_pos);
@@ -819,13 +819,18 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
           if(blocks_are_entangled(result.collided_block_index, block_index, &world->blocks)){
                auto* block = world->blocks.elements + block_index;
                auto* entangled_block = world->blocks.elements + result.collided_block_index;
-               auto pos_diff = pos_to_vec(block->pos - entangled_block->pos);
+               auto pos_diff = pos_to_vec(entangled_block->pos - block->pos);
 
                // if positions are diagonal to each other and the rotation between them is odd, check if we are moving into each other
                if(fabs(pos_diff.x) == fabs(pos_diff.y) && (block->rotation + entangled_block->rotation) % 2 == 1){
                     // just gtfo if this happens, we handle this case outside this function
                     break;
                }
+
+               // if we are not moving towards the entangled block, it's on them to resolve the collision, so get outta here
+               DirectionMask_t pos_diff_dir_mask = vec_direction_mask(pos_diff);
+               auto pos_delta_dir = vec_direction(block->pos_delta);
+               if(!direction_in_mask(pos_diff_dir_mask, pos_delta_dir)) break;
           }
 
           if(block_inside_index != block_index){
@@ -1054,7 +1059,23 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                }
 
                if(push){
-                    F32 instant_vel = direction_is_horizontal(first_direction) ? save_vel.x : save_vel.y;
+                    F32 instant_vel = 0;
+
+                    // take into account direction and portal rotations before setting the instant vel
+                    if(direction_is_horizontal(first_direction)){
+                         if((block_inside_result.portal_rotations % 2)){
+                              instant_vel = save_vel.y;
+                         }else{
+                              instant_vel = save_vel.x;
+                         }
+                    }else{
+                         if((block_inside_result.portal_rotations % 2)){
+                              instant_vel = save_vel.x;
+                         }else{
+                              instant_vel = save_vel.y;
+                         }
+                    }
+
                     if(block_push(block_inside_result.block, first_direction, world, true, instant_vel)){
                          push_entangled_block(block_inside_result.block, world, first_direction, true, instant_vel);
                          if(blocks_are_entangled(block_inside_result.block - world->blocks.elements, block_index, &world->blocks)){
