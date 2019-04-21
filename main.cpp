@@ -1782,8 +1782,40 @@ int main(int argc, char** argv){
                               block->horizontal_move = block->vertical_move;
                               block->vertical_move = tmp;
 
+                              // figure out if we need to flip the horizontal or vertical move signs
+                              {
+                                   auto prev_horizontal_dir = vec_direction(Vec_t{block->pos_delta.x, 0});
+                                   auto prev_vertical_dir = vec_direction(Vec_t{0, block->pos_delta.y});
+
+                                   auto cur_horizontal_dir = vec_direction(Vec_t{block->teleport_pos_delta.x, 0});
+                                   auto cur_vertical_dir = vec_direction(Vec_t{0, block->teleport_pos_delta.y});
+
+                                   if(direction_is_positive(prev_horizontal_dir) != direction_is_positive(cur_vertical_dir)){
+                                        move_flip_sign(&block->vertical_move);
+                                   }
+
+                                   if(direction_is_positive(prev_vertical_dir) != direction_is_positive(cur_horizontal_dir)){
+                                        move_flip_sign(&block->horizontal_move);
+                                   }
+                              }
+
                               for(S8 r = 0; r < block->teleport_rotation; r++){
                                    block->prev_push_mask = direction_mask_rotate_clockwise(block->prev_push_mask);
+                              }
+                         }else{
+                              // figure out if we need to flip the horizontal or vertical move signs
+                              auto prev_horizontal_dir = vec_direction(Vec_t{block->pos_delta.x, 0});
+                              auto prev_vertical_dir = vec_direction(Vec_t{0, block->pos_delta.y});
+
+                              auto cur_horizontal_dir = vec_direction(Vec_t{block->teleport_pos_delta.x, 0});
+                              auto cur_vertical_dir = vec_direction(Vec_t{0, block->teleport_pos_delta.y});
+
+                              if(direction_is_positive(prev_vertical_dir) != direction_is_positive(cur_vertical_dir)){
+                                   move_flip_sign(&block->vertical_move);
+                              }
+
+                              if(direction_is_positive(prev_horizontal_dir) != direction_is_positive(cur_horizontal_dir)){
+                                   move_flip_sign(&block->horizontal_move);
                               }
                          }
                     }else{

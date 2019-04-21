@@ -345,6 +345,18 @@ void reset_move(Move_t* move){
      move->distance = 0;
 }
 
+void move_flip_sign(Move_t* move){
+     // intentional no-op for MOVE_SIGN_ZERO
+
+     if(move->sign == MOVE_SIGN_POSITIVE){
+          move->sign = MOVE_SIGN_NEGATIVE;
+          move->distance = -move->distance;
+     }else if(move->sign == MOVE_SIGN_NEGATIVE){
+          move->sign = MOVE_SIGN_POSITIVE;
+          move->distance = -move->distance;
+     }
+}
+
 bool grid_motion_moving_in_direction(GridMotion_t* grid_motion, Direction_t direction){
      switch(direction){
      default:

@@ -105,3 +105,7 @@ Direction_t direction_from_single_mask(DirectionMask_t mask){
 bool direction_is_horizontal(Direction_t dir){
      return dir == DIRECTION_LEFT || dir == DIRECTION_RIGHT;
 }
+
+bool direction_is_positive(Direction_t dir){
+     return dir == DIRECTION_RIGHT || dir == DIRECTION_UP;
+}
