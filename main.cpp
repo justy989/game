@@ -14,6 +14,7 @@ Entanglement Puzzles:
 Current bugs:
 - In the act of stopping a block where the player goes through a portal causes them to not teleport through the portal
 - Stopping a block halfway through a portal lead to some pretty buggy behavior where we could get the block out of the map
+- When a block the player is standing on is moving and collides, the pos delta isn't updated for the player and they get offset a little bit
 - A block on the tile outside a portal pushed into the portal to clone, the clone has weird behavior and ends up on the portal block
 - When pushing a block through a portal that turns off, the block keeps going
 - Getting a block and it's rotated entangler to push into the centroid causes the any other entangled blocks to alternate pushing
@@ -1729,65 +1730,7 @@ int main(int argc, char** argv){
                     block->pos_delta.y = calc_position_motion(block->vel.y, block->accel.y, dt);
                     block->vel.y = calc_velocity_motion(block->vel.y, block->accel.y, dt);
 
-                    // teleport if necessary
-                    auto block_center = block_get_center(block);
-                    auto premove_coord = block_get_coord(block);
-                    auto coord = block_get_coord(block->pos + block->pos_delta);
-                    auto teleport_result = teleport_position_across_portal(block_center, block->pos_delta, &world, premove_coord, coord);
-                    if(teleport_result.count > block->clone_id){
-                         block->teleport = true;
-                         block->teleport_pos = teleport_result.results[block->clone_id].pos;
-                         block->teleport_pos.pixel -= HALF_TILE_SIZE_PIXEL;
-
-                         block->teleport_pos_delta = teleport_result.results[block->clone_id].delta;
-                         block->teleport_vel = vec_rotate_quadrants_clockwise(block->vel, teleport_result.results[block->clone_id].rotations);
-                         block->teleport_accel = vec_rotate_quadrants_clockwise(block->accel, teleport_result.results[block->clone_id].rotations);
-                         block->teleport_rotation = teleport_result.results[block->clone_id].rotations;
-
-                         if((block->teleport_rotation % 2)){
-                              Move_t tmp = block->horizontal_move;
-                              block->horizontal_move = block->vertical_move;
-                              block->vertical_move = tmp;
-
-                              // figure out if we need to flip the horizontal or vertical move signs
-                              {
-                                   auto prev_horizontal_dir = vec_direction(Vec_t{block->pos_delta.x, 0});
-                                   auto prev_vertical_dir = vec_direction(Vec_t{0, block->pos_delta.y});
-
-                                   auto cur_horizontal_dir = vec_direction(Vec_t{block->teleport_pos_delta.x, 0});
-                                   auto cur_vertical_dir = vec_direction(Vec_t{0, block->teleport_pos_delta.y});
-
-                                   if(direction_is_positive(prev_horizontal_dir) != direction_is_positive(cur_vertical_dir)){
-                                        move_flip_sign(&block->vertical_move);
-                                   }
-
-                                   if(direction_is_positive(prev_vertical_dir) != direction_is_positive(cur_horizontal_dir)){
-                                        move_flip_sign(&block->horizontal_move);
-                                   }
-                              }
-
-                              for(S8 r = 0; r < block->teleport_rotation; r++){
-                                   block->prev_push_mask = direction_mask_rotate_clockwise(block->prev_push_mask);
-                              }
-                         }else{
-                              // figure out if we need to flip the horizontal or vertical move signs
-                              auto prev_horizontal_dir = vec_direction(Vec_t{block->pos_delta.x, 0});
-                              auto prev_vertical_dir = vec_direction(Vec_t{0, block->pos_delta.y});
-
-                              auto cur_horizontal_dir = vec_direction(Vec_t{block->teleport_pos_delta.x, 0});
-                              auto cur_vertical_dir = vec_direction(Vec_t{0, block->teleport_pos_delta.y});
-
-                              if(direction_is_positive(prev_vertical_dir) != direction_is_positive(cur_vertical_dir)){
-                                   move_flip_sign(&block->vertical_move);
-                              }
-
-                              if(direction_is_positive(prev_horizontal_dir) != direction_is_positive(cur_horizontal_dir)){
-                                   move_flip_sign(&block->horizontal_move);
-                              }
-                         }
-                    }else{
-                         block->teleport = false;
-                    }
+                    block->teleport = false;
 
                     block->was_on_ice_or_air = (block->coast_horizontal == BLOCK_COAST_ICE || block->coast_horizontal == BLOCK_COAST_AIR);
 
@@ -2556,6 +2499,8 @@ int main(int argc, char** argv){
                     for(S16 i = 0; i < world.blocks.count; i++){
                          auto block = world.blocks.elements + i;
 
+                         // TODO: use teleport pos and pos_delta here?
+
                          // filter out blocks that couldn't extinguish
                          if(block->pos_delta.x == 0 && block->pos_delta.y == 0) continue;
                          if(block->pos.z == 0) continue; // TODO: if we bring back pits, remove this line
@@ -2581,6 +2526,70 @@ int main(int argc, char** argv){
                                         check_block->element = ELEMENT_ONLY_ICED;
                                    }
                               }
+                         }
+                    }
+
+                    for(S16 i = 0; i < world.blocks.count; i++){
+                         auto block = world.blocks.elements + i;
+                         if(block->teleport) continue;
+
+                         auto block_center = block_get_center(block);
+                         auto premove_coord = block_get_coord(block);
+                         auto coord = block_get_coord(block->pos + block->pos_delta);
+                         auto teleport_result = teleport_position_across_portal(block_center, block->pos_delta, &world, premove_coord, coord);
+                         if(teleport_result.count > block->clone_id){
+                              block->teleport = true;
+                              block->teleport_pos = teleport_result.results[block->clone_id].pos;
+                              block->teleport_pos.pixel -= HALF_TILE_SIZE_PIXEL;
+
+                              block->teleport_pos_delta = teleport_result.results[block->clone_id].delta;
+                              block->teleport_vel = vec_rotate_quadrants_clockwise(block->vel, teleport_result.results[block->clone_id].rotations);
+                              block->teleport_accel = vec_rotate_quadrants_clockwise(block->accel, teleport_result.results[block->clone_id].rotations);
+                              block->teleport_rotation = teleport_result.results[block->clone_id].rotations;
+
+                              if((block->teleport_rotation % 2)){
+                                   Move_t tmp = block->horizontal_move;
+                                   block->horizontal_move = block->vertical_move;
+                                   block->vertical_move = tmp;
+
+                                   // figure out if we need to flip the horizontal or vertical move signs
+                                   {
+                                        auto prev_horizontal_dir = vec_direction(Vec_t{block->pos_delta.x, 0});
+                                        auto prev_vertical_dir = vec_direction(Vec_t{0, block->pos_delta.y});
+
+                                        auto cur_horizontal_dir = vec_direction(Vec_t{block->teleport_pos_delta.x, 0});
+                                        auto cur_vertical_dir = vec_direction(Vec_t{0, block->teleport_pos_delta.y});
+
+                                        if(direction_is_positive(prev_horizontal_dir) != direction_is_positive(cur_vertical_dir)){
+                                             move_flip_sign(&block->vertical_move);
+                                        }
+
+                                        if(direction_is_positive(prev_vertical_dir) != direction_is_positive(cur_horizontal_dir)){
+                                             move_flip_sign(&block->horizontal_move);
+                                        }
+                                   }
+
+                                   for(S8 r = 0; r < block->teleport_rotation; r++){
+                                        block->prev_push_mask = direction_mask_rotate_clockwise(block->prev_push_mask);
+                                   }
+                              }else{
+                                   // figure out if we need to flip the horizontal or vertical move signs
+                                   auto prev_horizontal_dir = vec_direction(Vec_t{block->pos_delta.x, 0});
+                                   auto prev_vertical_dir = vec_direction(Vec_t{0, block->pos_delta.y});
+
+                                   auto cur_horizontal_dir = vec_direction(Vec_t{block->teleport_pos_delta.x, 0});
+                                   auto cur_vertical_dir = vec_direction(Vec_t{0, block->teleport_pos_delta.y});
+
+                                   if(direction_is_positive(prev_vertical_dir) != direction_is_positive(cur_vertical_dir)){
+                                        move_flip_sign(&block->vertical_move);
+                                   }
+
+                                   if(direction_is_positive(prev_horizontal_dir) != direction_is_positive(cur_horizontal_dir)){
+                                        move_flip_sign(&block->horizontal_move);
+                                   }
+                              }
+
+                              repeat_collision = true;
                          }
                     }
 

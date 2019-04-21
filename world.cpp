@@ -451,6 +451,7 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
      Block_t* collided_with_block = nullptr;
      auto collided_block_dir = DIRECTION_COUNT;
      S32 collided_with_block_count = 0;
+     Position_t collided_pos;
 
      S16 block_count = 0;
      Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
@@ -473,7 +474,9 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                result.collided = true;
                collided_with_block_count++;
                collided_with_block = block;
+               collided_pos = block_pos;
                collided_block_dir = relative_quadrant(player_pos.pixel, block_pos.pixel + HALF_TILE_SIZE_PIXEL);
+               break;
           }
      }
 
@@ -526,8 +529,9 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
 
                                    if(collided){
                                         result.collided = true;
-                                        collided_with_block = block;
                                         collided_with_block_count++;
+                                        collided_with_block = block;
+                                        collided_pos = block_pos;
                                         collision_portal_rotations = portal_rotations;
                                         collided_block_dir = relative_quadrant(player_pos.pixel, block_pos.pixel + HALF_TILE_SIZE_PIXEL);
                                    }
@@ -570,13 +574,15 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                     // TODO: handle rotations
                     if(would_squish){
                          reset_move(&collided_with_block->horizontal_move);
-
-                         // TODO: enforce the same behavior on entangled blocks
-                         collided_with_block->pos_delta.x = 0;
                          collided_with_block->vel.x = 0;
                          collided_with_block->accel.x = 0;
-                         collided_with_block->pos.pixel.x = (player->pos.pixel.x - 5) - BLOCK_SOLID_SIZE_IN_PIXELS;
-                         collided_with_block->pos.decimal.x = 0;
+
+                         auto collided_pos_offset = collided_pos - collided_with_block->pos;
+                         auto block_new_pos = collided_pos;
+                         block_new_pos.pixel.x--;
+                         block_new_pos.decimal.x = 0;
+                         block_new_pos -= collided_pos_offset;
+                         collided_with_block->pos_delta.x = pos_to_vec(block_new_pos - collided_with_block->pos).x;
                     }else{
                          auto new_pos = collided_with_block->pos + Vec_t{TILE_SIZE + PLAYER_RADIUS, 0};
                          result.pos_delta.x = pos_to_vec(new_pos - player->pos).x;
@@ -610,11 +616,15 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
 
                     if(would_squish){
                          reset_move(&collided_with_block->horizontal_move);
-                         collided_with_block->pos_delta.x = 0;
                          collided_with_block->vel.x = 0;
                          collided_with_block->accel.x = 0;
-                         collided_with_block->pos.decimal.x = 0;
-                         collided_with_block->pos.pixel.x = (player->pos.pixel.x + 5);
+
+                         auto collided_pos_offset = collided_pos - collided_with_block->pos;
+                         auto block_new_pos = collided_pos;
+                         block_new_pos.pixel.x++;
+                         block_new_pos.decimal.x = 0;
+                         block_new_pos -= collided_pos_offset;
+                         collided_with_block->pos_delta.x = pos_to_vec(block_new_pos - collided_with_block->pos).x;
                     }else{
                          auto new_pos = collided_with_block->pos - Vec_t{PLAYER_RADIUS, 0};
                          result.pos_delta.x = pos_to_vec(new_pos - player->pos).x;
@@ -647,11 +657,15 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
 
                     if(would_squish){
                          reset_move(&collided_with_block->vertical_move);
-                         collided_with_block->pos_delta.y = 0;
                          collided_with_block->vel.y = 0;
                          collided_with_block->accel.y = 0;
-                         collided_with_block->pos.pixel.y = player->pos.pixel.y + 5;
-                         collided_with_block->pos.decimal.y = 0;
+
+                         auto collided_pos_offset = collided_pos - collided_with_block->pos;
+                         auto block_new_pos = collided_pos;
+                         block_new_pos.pixel.y++;
+                         block_new_pos.decimal.y = 0;
+                         block_new_pos -= collided_pos_offset;
+                         collided_with_block->pos_delta.y = pos_to_vec(block_new_pos - collided_with_block->pos).y;
                     }else{
                          auto new_pos = collided_with_block->pos - Vec_t{0, PLAYER_RADIUS};
                          result.pos_delta.y = pos_to_vec(new_pos - player->pos).y;
@@ -684,11 +698,15 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
 
                     if(would_squish){
                          reset_move(&collided_with_block->vertical_move);
-                         collided_with_block->pos_delta.y = 0;
                          collided_with_block->vel.y = 0;
                          collided_with_block->accel.y = 0;
-                         collided_with_block->pos.decimal.y = 0;
-                         collided_with_block->pos.pixel.y = (player->pos.pixel.y - 5) - BLOCK_SOLID_SIZE_IN_PIXELS;
+
+                         auto collided_pos_offset = collided_pos - collided_with_block->pos;
+                         auto block_new_pos = collided_pos;
+                         block_new_pos.pixel.y--;
+                         block_new_pos.decimal.y = 0;
+                         block_new_pos -= collided_pos_offset;
+                         collided_with_block->pos_delta.y = pos_to_vec(block_new_pos - collided_with_block->pos).y;
                     }else{
                          auto new_pos = collided_with_block->pos + Vec_t{0, TILE_SIZE + PLAYER_RADIUS};
                          result.pos_delta.y = pos_to_vec(new_pos - player->pos).y;
@@ -698,7 +716,6 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                          if(even_rotations){
                               slow_block_toward_gridlock(world, collided_with_block, false, true);
                          }else{
-                              collided_with_block->stopped_by_player_horizontal = true;
                               slow_block_toward_gridlock(world, collided_with_block, true, true);
                          }
                     }
@@ -1229,7 +1246,9 @@ void describe_player(World_t* world, Player_t* player){
 }
 
 void describe_coord(Coord_t coord, World_t* world){
-     LOG("\ndescribe_coord(%d, %d)\n", coord.x, coord.y);
+     auto coord_rect = rect_surrounding_coord(coord);
+     LOG("\ndescribe_coord(%d, %d) rect: %d, %d, <-> %d, %d\n", coord.x, coord.y, coord_rect.left, coord_rect.bottom,
+         coord_rect.right, coord_rect.top);
      auto* tile = tilemap_get_tile(&world->tilemap, coord);
      if(tile){
           LOG("Tile: id: %u, light: %u\n", tile->id, tile->light);
@@ -1312,13 +1331,6 @@ void describe_coord(Coord_t coord, World_t* world){
 
           LOG("type: %s %s\n", type_string, info_string);
      }
-
-     Rect_t coord_rect;
-
-     coord_rect.left = coord.x * TILE_SIZE_IN_PIXELS;
-     coord_rect.bottom = coord.y * TILE_SIZE_IN_PIXELS;
-     coord_rect.right = coord_rect.left + TILE_SIZE_IN_PIXELS;
-     coord_rect.top = coord_rect.bottom + TILE_SIZE_IN_PIXELS;
 
      S16 block_count = 0;
      Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
