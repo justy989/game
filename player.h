@@ -55,7 +55,8 @@ struct Player_t : public Motion_t {
      Direction_t stopping_block_from = DIRECTION_COUNT;
      F32         stopping_block_from_time = 0.0;
 
-     bool successfully_moved = false;
+     bool        successfully_moved = false;
+     bool        carried_by_block = false;
 };
 
 // rough estimate since player is 3.5 pixels radius

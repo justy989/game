@@ -12,9 +12,6 @@ Entanglement Puzzles:
 - rotated entangled puzzles where the centroid is on a portal destination coord
 
 Current bugs:
-- In the act of stopping a block where the player goes through a portal causes them to not teleport through the portal
-- Stopping a block halfway through a portal lead to some pretty buggy behavior where we could get the block out of the map
-- When a block the player is standing on is moving and collides, the pos delta isn't updated for the player and they get offset a little bit
 - A block on the tile outside a portal pushed into the portal to clone, the clone has weird behavior and ends up on the portal block
 - When pushing a block through a portal that turns off, the block keeps going
 - Getting a block and it's rotated entangler to push into the centroid causes the any other entangled blocks to alternate pushing
@@ -297,6 +294,85 @@ void build_move_actions_from_player(PlayerAction_t* player_action, Player_t* pla
                if(player->reface) player->face = static_cast<Direction_t>(rot_dir);
           }
      }
+}
+
+struct HeldByBlockResult_t{
+     Block_t* block = nullptr;
+     S8 portal_rotations = 0;
+};
+
+HeldByBlockResult_t player_held_up_by_block(Player_t* player, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt, QuadTreeNode_t<Block_t>* block_qt){
+     HeldByBlockResult_t result;
+
+     auto player_coord = pos_to_coord(player->pos);
+     Rect_t search_rect = rect_surrounding_adjacent_coords(player_coord);
+
+     S16 block_count = 0;
+     Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
+
+     quad_tree_find_in(block_qt, search_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
+     for(S16 b = 0; b < block_count; b++){
+         auto block_rect = block_get_rect(blocks[b]);
+         if(pixel_in_rect(player->pos.pixel, block_rect) && blocks[b]->pos.z == player->pos.z - HEIGHT_INTERVAL){
+              result.block = blocks[b];
+              return result;
+         }
+     }
+
+     // TODO: compress this logic with logic in move_player_through_world()
+     for(S8 d = 0; d < DIRECTION_COUNT; d++){
+          Coord_t check_coord = player_coord + (Direction_t)(d);
+          auto portal_src_pixel = coord_to_pixel_at_center(check_coord);
+          auto interactive = quad_tree_interactive_find_at(interactive_qt, check_coord);
+
+          if(is_active_portal(interactive)){
+               PortalExit_t portal_exits = find_portal_exits(check_coord, tilemap, interactive_qt);
+
+               for(S8 pd = 0; pd < DIRECTION_COUNT; pd++){
+                    auto portal_exit = portal_exits.directions + pd;
+
+                    for(S8 p = 0; p < portal_exit->count; p++){
+                         auto portal_dst_coord = portal_exit->coords[p];
+                         if(portal_dst_coord == check_coord) continue;
+
+                         portal_dst_coord += direction_opposite((Direction_t)(pd));
+
+                         auto check_portal_rect = rect_surrounding_adjacent_coords(portal_dst_coord);
+                         quad_tree_find_in(block_qt, check_portal_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
+
+                         auto portal_dst_center_pixel = coord_to_pixel_at_center(portal_dst_coord);
+
+                         for(S8 b = 0; b < block_count; b++){
+                              Block_t* block = blocks[b];
+
+                              if(block->pos.z != player->pos.z - HEIGHT_INTERVAL) continue;
+
+                              auto portal_rotations = direction_rotations_between(interactive->portal.face, direction_opposite((Direction_t)(pd)));
+
+                              auto block_portal_dst_offset = block->pos + block->pos_delta;
+                              block_portal_dst_offset.pixel += HALF_TILE_SIZE_PIXEL;
+                              block_portal_dst_offset.pixel -= portal_dst_center_pixel;
+
+                              Position_t block_pos;
+                              block_pos.pixel = portal_src_pixel;
+                              block_pos.pixel += pixel_rotate_quadrants_clockwise(block_portal_dst_offset.pixel, portal_rotations);
+                              block_pos.pixel -= HALF_TILE_SIZE_PIXEL;
+                              block_pos.decimal = vec_rotate_quadrants_clockwise(block_portal_dst_offset.decimal, portal_rotations);
+                              canonicalize(&block_pos);
+
+                              auto block_rect = block_get_rect(block_pos.pixel);
+                              if(pixel_in_rect(player->pos.pixel, block_rect)){
+                                   result.block = blocks[b];
+                                   result.portal_rotations = portal_rotations;
+                                   return result;
+                              }
+                         }
+                    }
+               }
+          }
+     }
+
+     return result;
 }
 
 int main(int argc, char** argv){
@@ -1529,6 +1605,7 @@ int main(int argc, char** argv){
                          player->prev_pushing_block = -1;
                     }
                     player->pushing_block = -1;
+                    player->carried_by_block = false;
 
                     player->teleport = false;
                     player->teleport_pushing_block = -1;
@@ -1601,7 +1678,6 @@ int main(int argc, char** argv){
                     }
 
                     Coord_t player_previous_coord = pos_to_coord(player->pos);
-                    auto projected_pos = player->pos + player->pos_delta;
 
                     // drop the player if they are above 0 and not held up by anything. This also contains logic for following a block
                     {
@@ -1622,76 +1698,8 @@ int main(int argc, char** argv){
                               }
                          }
 
-                         Rect_t search_rect = rect_surrounding_adjacent_coords(player_previous_coord);
-
-                         S16 block_count = 0;
-                         Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
-
-                         quad_tree_find_in(world.block_qt, search_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
-                         for(S16 b = 0; b < block_count; b++){
-                             auto block_rect = block_get_rect(blocks[b]);
-                             if(pixel_in_rect(player->pos.pixel, block_rect) && blocks[b]->pos.z == player->pos.z - HEIGHT_INTERVAL){
-                                 player->pos_delta += blocks[b]->pos_delta;
-                                 projected_pos += blocks[b]->pos_delta;
-                                 held_up = true;
-                                 break;
-                             }
-                         }
-
-                         // TODO: compress this logic with logic in move_player_through_world()
-                         for(S8 d = 0; d < DIRECTION_COUNT && !held_up; d++){
-                              Coord_t check_coord = player_previous_coord + (Direction_t)(d);
-                              auto portal_src_pixel = coord_to_pixel_at_center(check_coord);
-                              interactive = quad_tree_interactive_find_at(world.interactive_qt, check_coord);
-
-                              if(is_active_portal(interactive)){
-                                   PortalExit_t portal_exits = find_portal_exits(check_coord, &world.tilemap, world.interactive_qt);
-
-                                   for(S8 pd = 0; pd < DIRECTION_COUNT && !held_up; pd++){
-                                        auto portal_exit = portal_exits.directions + pd;
-
-                                        for(S8 p = 0; p < portal_exit->count; p++){
-                                             auto portal_dst_coord = portal_exit->coords[p];
-                                             if(portal_dst_coord == check_coord) continue;
-
-                                             portal_dst_coord += direction_opposite((Direction_t)(pd));
-
-                                             auto check_portal_rect = rect_surrounding_adjacent_coords(portal_dst_coord);
-                                             quad_tree_find_in(world.block_qt, check_portal_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
-
-                                             auto portal_dst_center_pixel = coord_to_pixel_at_center(portal_dst_coord);
-
-                                             for(S8 b = 0; b < block_count; b++){
-                                                  Block_t* block = blocks[b];
-
-                                                  if(block->pos.z != player->pos.z - HEIGHT_INTERVAL) continue;
-
-                                                  auto portal_rotations = direction_rotations_between(interactive->portal.face, direction_opposite((Direction_t)(pd)));
-
-                                                  auto block_portal_dst_offset = block->pos + block->pos_delta;
-                                                  block_portal_dst_offset.pixel += HALF_TILE_SIZE_PIXEL;
-                                                  block_portal_dst_offset.pixel -= portal_dst_center_pixel;
-
-                                                  Position_t block_pos;
-                                                  block_pos.pixel = portal_src_pixel;
-                                                  block_pos.pixel += pixel_rotate_quadrants_clockwise(block_portal_dst_offset.pixel, portal_rotations);
-                                                  block_pos.pixel -= HALF_TILE_SIZE_PIXEL;
-                                                  block_pos.decimal = vec_rotate_quadrants_clockwise(block_portal_dst_offset.decimal, portal_rotations);
-                                                  canonicalize(&block_pos);
-
-                                                  auto block_rect = block_get_rect(block_pos.pixel);
-                                                  if(pixel_in_rect(player->pos.pixel, block_rect)){
-                                                       auto rotated_pos_delta = vec_rotate_quadrants_clockwise(block->pos_delta, portal_rotations);
-                                                       player->pos_delta += rotated_pos_delta;
-                                                       projected_pos += rotated_pos_delta;
-                                                       held_up = true;
-                                                       break;
-                                                  }
-                                             }
-                                        }
-                                   }
-                              }
-                         }
+                         auto result = player_held_up_by_block(player, &world.tilemap, world.interactive_qt, world.block_qt);
+                         if(!held_up) held_up = (result.block != nullptr);
 
                          if(!held_up && player->pos.z > 0){
                               player->pos.z--;
@@ -2735,6 +2743,16 @@ int main(int argc, char** argv){
                                    update_player_count = 1;
                               }else{
                                    resetting = true;
+                              }
+                         }
+
+                         if(!player->carried_by_block){
+                              auto result = player_held_up_by_block(player, &world.tilemap, world.interactive_qt, world.block_qt);
+                              if(result.block){
+                                   auto rotated_pos_delta = vec_rotate_quadrants_clockwise(result.block->pos_delta, result.portal_rotations);
+                                   player->pos_delta += rotated_pos_delta;
+                                   player->carried_by_block = true;
+                                   repeat_collision = true;
                               }
                          }
                     }
