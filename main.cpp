@@ -1743,10 +1743,20 @@ int main(int argc, char** argv){
                     for(S16 i = 0; i < world.blocks.count; i++){
                          Block_t* block = world.blocks.elements + i;
 
-                         if(block->teleport && block_on_ice(block->teleport_pos, block->teleport_pos_delta, &world.tilemap, world.interactive_qt, world.block_qt)){
-                              block->coast_horizontal = BLOCK_COAST_ICE;
-                              block->coast_vertical = BLOCK_COAST_ICE;
-                         }else if(block_on_ice(block->pos, block->pos_delta, &world.tilemap, world.interactive_qt, world.block_qt)){
+                         bool would_teleport_onto_ice = false;
+
+                         auto block_center = block_get_center(block);
+                         auto premove_coord = block_get_coord(block);
+                         auto coord = block_get_coord(block->pos + block->pos_delta);
+                         auto teleport_result = teleport_position_across_portal(block_center, block->pos_delta, &world, premove_coord, coord);
+                         if(teleport_result.count > block->clone_id){
+                              auto pos = teleport_result.results[block->clone_id].pos;
+                              pos.pixel -= HALF_TILE_SIZE_PIXEL;
+                              auto pos_delta = teleport_result.results[block->clone_id].delta;
+                              would_teleport_onto_ice = block_on_ice(pos, pos_delta, &world.tilemap, world.interactive_qt, world.block_qt);
+                         }
+
+                         if(block_on_ice(block->pos, block->pos_delta, &world.tilemap, world.interactive_qt, world.block_qt) || would_teleport_onto_ice){
                               block->coast_horizontal = BLOCK_COAST_ICE;
                               block->coast_vertical = BLOCK_COAST_ICE;
                          }else if(block->was_on_ice_or_air && block_on_air(block->pos, block->pos_delta, world.interactive_qt, world.block_qt)){
@@ -1889,13 +1899,9 @@ int main(int argc, char** argv){
                     update_motion_grid_aligned(&block->vertical_move, motion_y_component(block),
                                                block->coast_vertical != BLOCK_COAST_NONE, dt, block->accel.y,
                                                BLOCK_ACCEL_DISTANCE, pos_vec.y);
-
-                    if(block->teleport){
-                         block->teleport_horizontal_move = block->horizontal_move;
-                         block->teleport_vertical_move = block->vertical_move;
-                    }
                }
 
+               // TODO: for these next 2 passes, do we need to care about teleport position? Probably just the next loop?
                for(S16 i = 0; i < world.blocks.count; i++){
                     auto block = world.blocks.elements + i;
 
@@ -1932,13 +1938,7 @@ int main(int argc, char** argv){
                     auto block = world.blocks.elements + i;
 
                     if(!block->held_up){
-                         if(block->teleport && block->teleport_pos.z > 0){
-                              block->fall_time -= dt;
-                              if(block->fall_time < 0){
-                                   block->fall_time = FALL_TIME;
-                                   block->teleport_pos.z--;
-                              }
-                         }else if(block->pos.z > 0){
+                         if(block->pos.z > 0){
                               block->fall_time -= dt;
                               if(block->fall_time < 0){
                                    block->fall_time = FALL_TIME;
@@ -1985,8 +1985,8 @@ int main(int argc, char** argv){
                                                                                               block->teleport_accel,
                                                                                               block->stop_on_pixel_x,
                                                                                               block->stop_on_pixel_y,
-                                                                                              block->horizontal_move,
-                                                                                              block->vertical_move,
+                                                                                              block->teleport_horizontal_move,
+                                                                                              block->teleport_vertical_move,
                                                                                               i,
                                                                                               block->clone_start.x > 0,
                                                                                               &world);
@@ -2548,9 +2548,8 @@ int main(int argc, char** argv){
                               block->teleport_rotation = teleport_result.results[block->clone_id].rotations;
 
                               if((block->teleport_rotation % 2)){
-                                   Move_t tmp = block->horizontal_move;
-                                   block->horizontal_move = block->vertical_move;
-                                   block->vertical_move = tmp;
+                                   block->teleport_vertical_move   = block->horizontal_move;
+                                   block->teleport_horizontal_move = block->vertical_move;
 
                                    // figure out if we need to flip the horizontal or vertical move signs
                                    {
@@ -2561,11 +2560,11 @@ int main(int argc, char** argv){
                                         auto cur_vertical_dir = vec_direction(Vec_t{0, block->teleport_pos_delta.y});
 
                                         if(direction_is_positive(prev_horizontal_dir) != direction_is_positive(cur_vertical_dir)){
-                                             move_flip_sign(&block->vertical_move);
+                                             move_flip_sign(&block->teleport_vertical_move);
                                         }
 
                                         if(direction_is_positive(prev_vertical_dir) != direction_is_positive(cur_horizontal_dir)){
-                                             move_flip_sign(&block->horizontal_move);
+                                             move_flip_sign(&block->teleport_horizontal_move);
                                         }
                                    }
 
@@ -2573,6 +2572,9 @@ int main(int argc, char** argv){
                                         block->prev_push_mask = direction_mask_rotate_clockwise(block->prev_push_mask);
                                    }
                               }else{
+                                   block->teleport_horizontal_move = block->horizontal_move;
+                                   block->teleport_vertical_move = block->vertical_move;
+
                                    // figure out if we need to flip the horizontal or vertical move signs
                                    auto prev_horizontal_dir = vec_direction(Vec_t{block->pos_delta.x, 0});
                                    auto prev_vertical_dir = vec_direction(Vec_t{0, block->pos_delta.y});
@@ -2581,11 +2583,11 @@ int main(int argc, char** argv){
                                    auto cur_vertical_dir = vec_direction(Vec_t{0, block->teleport_pos_delta.y});
 
                                    if(direction_is_positive(prev_vertical_dir) != direction_is_positive(cur_vertical_dir)){
-                                        move_flip_sign(&block->vertical_move);
+                                        move_flip_sign(&block->teleport_vertical_move);
                                    }
 
                                    if(direction_is_positive(prev_horizontal_dir) != direction_is_positive(cur_horizontal_dir)){
-                                        move_flip_sign(&block->horizontal_move);
+                                        move_flip_sign(&block->teleport_horizontal_move);
                                    }
                               }
 

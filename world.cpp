@@ -587,14 +587,14 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                          auto new_pos = collided_with_block->pos + Vec_t{TILE_SIZE + PLAYER_RADIUS, 0};
                          result.pos_delta.x = pos_to_vec(new_pos - player->pos).x;
 
-                         player->stopping_block_from = collided_block_dir;
-
                          if(even_rotations){
                               slow_block_toward_gridlock(world, collided_with_block, true, true);
                          }else{
                               slow_block_toward_gridlock(world, collided_with_block, false, true);
                          }
                     }
+
+                    player->stopping_block_from = collided_block_dir;
                }else{
                     result.pos_delta = result_pos_delta;
                }
@@ -629,14 +629,14 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                          auto new_pos = collided_with_block->pos - Vec_t{PLAYER_RADIUS, 0};
                          result.pos_delta.x = pos_to_vec(new_pos - player->pos).x;
 
-                         player->stopping_block_from = collided_block_dir;
-
                          if(even_rotations){
                               slow_block_toward_gridlock(world, collided_with_block, true, false);
                          }else{
                               slow_block_toward_gridlock(world, collided_with_block, false, false);
                          }
                     }
+
+                    player->stopping_block_from = collided_block_dir;
                }else{
                     result.pos_delta = result_pos_delta;
                }
@@ -670,14 +670,14 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                          auto new_pos = collided_with_block->pos - Vec_t{0, PLAYER_RADIUS};
                          result.pos_delta.y = pos_to_vec(new_pos - player->pos).y;
 
-                         player->stopping_block_from = collided_block_dir;
-
                          if(even_rotations){
                               slow_block_toward_gridlock(world, collided_with_block, false, false);
                          }else{
                               slow_block_toward_gridlock(world, collided_with_block, true, false);
                          }
                     }
+
+                    player->stopping_block_from = collided_block_dir;
                }else{
                     result.pos_delta = result_pos_delta;
                }
@@ -711,14 +711,14 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                          auto new_pos = collided_with_block->pos + Vec_t{0, TILE_SIZE + PLAYER_RADIUS};
                          result.pos_delta.y = pos_to_vec(new_pos - player->pos).y;
 
-                         player->stopping_block_from = collided_block_dir;
-
                          if(even_rotations){
                               slow_block_toward_gridlock(world, collided_with_block, false, true);
                          }else{
                               slow_block_toward_gridlock(world, collided_with_block, true, true);
                          }
                     }
+
+                    player->stopping_block_from = collided_block_dir;
                }else{
                     result.pos_delta = result_pos_delta;
                }
@@ -1227,9 +1227,9 @@ void describe_block(World_t* world, Block_t* block){
          block->pos.decimal.x, block->pos.decimal.y,
          block->rotation, element_to_string(block->element),
          block->entangle_index, block->clone_id);
+     LOG(" vel: %f, %f accel: %f, %f accel_mag: %f, %f\n", block->vel.x, block->vel.y, block->accel.x, block->accel.y, block->accel_magnitudes.x, block->accel_magnitudes.y);
      LOG(" hmove: %s %s %f\n", move_state_to_string(block->horizontal_move.state), move_sign_to_string(block->horizontal_move.sign), block->horizontal_move.distance);
      LOG(" vmove: %s %s %f\n", move_state_to_string(block->vertical_move.state), move_sign_to_string(block->vertical_move.sign), block->vertical_move.distance);
-     LOG(" stop on pixel: %d, %d\n", block->stop_on_pixel_x, block->stop_on_pixel_y);
      LOG(" hcoast: %s vcoast: %s\n", block_coast_to_string(block->coast_horizontal), block_coast_to_string(block->coast_vertical));
      LOG("\n");
 }
