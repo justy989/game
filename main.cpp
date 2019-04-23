@@ -32,6 +32,7 @@ Big Features:
      - an entangled block with a block on top of it doesn't move because it is held down
      - when a block slides on top of an iced block, and slots into the adjacent tile because another block is 2 tiles away,
        should a push be applied to that adjacent block if it is on ice? Probably
+     - a fire block pushed up shouldn't emit light as far (unless it is surrounded by blocks)
 - Get rid of skip_coords (I think this is possible and easy?)
 - arrow kills player
 - arrow entanglement
@@ -296,13 +297,28 @@ void build_move_actions_from_player(PlayerAction_t* player_action, Player_t* pla
      }
 }
 
-struct HeldByBlockResult_t{
-     Block_t* block = nullptr;
-     S8 portal_rotations = 0;
+#define MAX_PLAYER_IN_BLOCK_RECT_RESULTS 16
+
+struct PlayerInBlockRectResult_t{
+     struct Entry_t{
+          Block_t* block = nullptr;
+          Position_t block_pos;
+          S8 portal_rotations = 0;
+     };
+
+     Entry_t entries[MAX_PLAYER_IN_BLOCK_RECT_RESULTS];
+     S8 entry_count = 0;
+
+     void add_entry(Entry_t entry){
+          if(entry_count < MAX_PLAYER_IN_BLOCK_RECT_RESULTS){
+               entries[entry_count] = entry;
+               entry_count++;
+          }
+     }
 };
 
-HeldByBlockResult_t player_held_up_by_block(Player_t* player, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt, QuadTreeNode_t<Block_t>* block_qt){
-     HeldByBlockResult_t result;
+PlayerInBlockRectResult_t player_in_block_rect(Player_t* player, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt, QuadTreeNode_t<Block_t>* block_qt){
+     PlayerInBlockRectResult_t result;
 
      auto player_coord = pos_to_coord(player->pos);
      Rect_t search_rect = rect_surrounding_adjacent_coords(player_coord);
@@ -313,9 +329,12 @@ HeldByBlockResult_t player_held_up_by_block(Player_t* player, TileMap_t* tilemap
      quad_tree_find_in(block_qt, search_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
      for(S16 b = 0; b < block_count; b++){
          auto block_rect = block_get_rect(blocks[b]);
-         if(pixel_in_rect(player->pos.pixel, block_rect) && blocks[b]->pos.z == player->pos.z - HEIGHT_INTERVAL){
-              result.block = blocks[b];
-              return result;
+         if(pixel_in_rect(player->pos.pixel, block_rect)){
+              PlayerInBlockRectResult_t::Entry_t entry;
+              entry.block = blocks[b];
+              entry.block_pos = blocks[b]->pos;
+              entry.portal_rotations = 0;
+              result.add_entry(entry);
          }
      }
 
@@ -345,8 +364,6 @@ HeldByBlockResult_t player_held_up_by_block(Player_t* player, TileMap_t* tilemap
                          for(S8 b = 0; b < block_count; b++){
                               Block_t* block = blocks[b];
 
-                              if(block->pos.z != player->pos.z - HEIGHT_INTERVAL) continue;
-
                               auto portal_rotations = direction_rotations_between(interactive->portal.face, direction_opposite((Direction_t)(pd)));
 
                               auto block_portal_dst_offset = block->pos + block->pos_delta;
@@ -362,9 +379,11 @@ HeldByBlockResult_t player_held_up_by_block(Player_t* player, TileMap_t* tilemap
 
                               auto block_rect = block_get_rect(block_pos.pixel);
                               if(pixel_in_rect(player->pos.pixel, block_rect)){
-                                   result.block = blocks[b];
-                                   result.portal_rotations = portal_rotations;
-                                   return result;
+                                   PlayerInBlockRectResult_t::Entry_t entry;
+                                   entry.block = blocks[b];
+                                   entry.block_pos = block_pos;
+                                   entry.portal_rotations = portal_rotations;
+                                   result.add_entry(entry);
                               }
                          }
                     }
@@ -448,8 +467,8 @@ int main(int argc, char** argv){
           return 1;
      }
 
-     int window_width = 1400;
-     int window_height = 1400;
+     int window_width = 1024;
+     int window_height = 1024;
      SDL_Window* window = nullptr;
      SDL_GLContext opengl_context = nullptr;
      GLuint theme_texture = 0;
@@ -1698,8 +1717,20 @@ int main(int argc, char** argv){
                               }
                          }
 
-                         auto result = player_held_up_by_block(player, &world.tilemap, world.interactive_qt, world.block_qt);
-                         if(!held_up) held_up = (result.block != nullptr);
+                         if(!held_up){
+                              auto result = player_in_block_rect(player, &world.tilemap, world.interactive_qt, world.block_qt);
+                              for(S8 e = 0; e < result.entry_count; e++){
+                                   auto& entry = result.entries[e];
+                                   if(entry.block_pos.z == player->pos.z - HEIGHT_INTERVAL){
+                                        held_up = true;
+                                   }else if((entry.block_pos.z - 1) == player->pos.z - HEIGHT_INTERVAL){
+                                        held_up = true;
+                                        player->pos.z++;
+
+                                        player->push_time = 0.0f;
+                                   }
+                              }
+                         }
 
                          if(!held_up && player->pos.z > 0){
                               player->pos.z--;
@@ -2747,12 +2778,15 @@ int main(int argc, char** argv){
                          }
 
                          if(!player->carried_by_block){
-                              auto result = player_held_up_by_block(player, &world.tilemap, world.interactive_qt, world.block_qt);
-                              if(result.block){
-                                   auto rotated_pos_delta = vec_rotate_quadrants_clockwise(result.block->pos_delta, result.portal_rotations);
-                                   player->pos_delta += rotated_pos_delta;
-                                   player->carried_by_block = true;
-                                   repeat_collision = true;
+                              auto result = player_in_block_rect(player, &world.tilemap, world.interactive_qt, world.block_qt);
+                              for(S8 e = 0; e < result.entry_count; e++){
+                                   auto& entry = result.entries[e];
+                                   if(entry.block_pos.z == player->pos.z - HEIGHT_INTERVAL){
+                                        auto rotated_pos_delta = vec_rotate_quadrants_clockwise(entry.block->pos_delta, entry.portal_rotations);
+                                        player->pos_delta += rotated_pos_delta;
+                                        player->carried_by_block = true;
+                                        repeat_collision = true;
+                                   }
                               }
                          }
                     }
