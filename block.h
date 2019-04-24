@@ -27,8 +27,10 @@ struct Block_t : public GridMotion_t{
      DirectionMask_t cur_push_mask;
      DirectionMask_t prev_push_mask;
 
+     // these could all be flags one day when they grow up
      bool       held_up;
      bool       was_on_ice_or_air;
+     bool       carried_by_block;
 
      bool       teleport;
      Position_t teleport_pos;

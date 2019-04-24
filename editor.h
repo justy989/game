@@ -20,6 +20,7 @@ struct StampBlock_t{
      Element_t element;
      Direction_t face;
      U8 rotation;
+     U8 z;
 };
 
 struct Stamp_t{

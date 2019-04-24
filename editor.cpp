@@ -418,6 +418,7 @@ void apply_stamp(Stamp_t* stamp, Coord_t coord, TileMap_t* tilemap, ObjectArray_
           Block_t* block = block_array->elements + index;
           *block = {};
           block->pos = coord_to_pos(coord);
+          block->pos.z = stamp->block.z;
           block->vel = vec_zero();
           block->accel = vec_zero();
           block->element = stamp->block.element;

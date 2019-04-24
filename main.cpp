@@ -918,6 +918,9 @@ int main(int argc, char** argv){
                                                &world.tilemap, &world.blocks, &world.interactives, &world.interactive_qt, ctrl_down);
                               }
 
+                              quad_tree_free(world.block_qt);
+                              world.block_qt = quad_tree_build(&world.blocks);
+
                               editor.mode = EDITOR_MODE_CATEGORY_SELECT;
                          }
                          break;
@@ -1201,6 +1204,7 @@ int main(int argc, char** argv){
                                                   stamp->block.rotation = block->rotation;
                                                   stamp->block.element = block->element;
                                                   stamp->offset = offset;
+                                                  stamp->block.z = block->pos.z;
                                              }
                                         }
                                    }
@@ -1770,6 +1774,7 @@ int main(int argc, char** argv){
                     block->vel.y = calc_velocity_motion(block->vel.y, block->accel.y, dt);
 
                     block->teleport = false;
+                    block->carried_by_block = false;
 
                     block->was_on_ice_or_air = (block->coast_horizontal == BLOCK_COAST_ICE || block->coast_horizontal == BLOCK_COAST_AIR);
 
@@ -2564,6 +2569,18 @@ int main(int argc, char** argv){
                                    }else if(check_block->element == ELEMENT_ICE){
                                         check_block->element = ELEMENT_ONLY_ICED;
                                    }
+                              }
+                         }
+                    }
+
+                    for(S16 i = 0; i < world.blocks.count; i++){
+                         auto block = world.blocks.elements + i;
+                         if(!block->carried_by_block){
+                              auto holder = block_held_up_by_another_block(block, world.block_qt, world.interactive_qt, &world.tilemap);
+                              if(holder){
+                                   block->pos_delta += holder->pos_delta;
+                                   block->carried_by_block = true;
+                                   repeat_collision = true;
                               }
                          }
                     }

@@ -400,6 +400,7 @@ Block_t* block_inside_block_list(Position_t block_to_check_pos, Vec_t block_to_c
           }
 
           if(block_to_check_index == (block - blocks_array->elements)) continue;
+          if(!blocks_at_collidable_height(final_block_to_check_pos.z, block->pos.z)) continue;
 
           auto final_block_pos = block->pos;
           final_block_pos.pixel += portal_offsets[i];
@@ -782,7 +783,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                                                                               world->interactive_qt,
                                                                               &world->tilemap,
                                                                               &world->blocks);
-         block_inside_result.block && blocks_at_collidable_height(block_pos.z, block_inside_result.block->pos.z) && attempts < max_attempts;
+         block_inside_result.block && attempts < max_attempts;
          block_inside_result = block_inside_another_block(block_pos,
                                                           result.pos_delta,
                                                           block_index,

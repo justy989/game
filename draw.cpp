@@ -540,6 +540,7 @@ static Block_t block_from_stamp(Stamp_t* stamp){
      Block_t block = {};
      block.element = stamp->block.element;
      block.rotation = stamp->block.rotation;
+     block.pos.z = stamp->block.z;
      block.entangle_index = -1;
      block.clone_start = Coord_t{};
      block.clone_id = 0;
@@ -585,6 +586,7 @@ void draw_editor(Editor_t* editor, World_t* world, Position_t screen_camera, Vec
                     case STAMP_TYPE_BLOCK:
                     {
                          Block_t block = block_from_stamp(stamp);
+                         vec.y += PIXEL_SIZE * block.pos.z;
                          draw_block(&block, vec, 0);
                     } break;
                     case STAMP_TYPE_INTERACTIVE:
@@ -625,6 +627,7 @@ void draw_editor(Editor_t* editor, World_t* world, Position_t screen_camera, Vec
                case STAMP_TYPE_BLOCK:
                {
                     Block_t block = block_from_stamp(stamp);
+                    stamp_pos.y += PIXEL_SIZE * block.pos.z;
                     draw_block(&block, stamp_pos, 0);
                } break;
                case STAMP_TYPE_INTERACTIVE:
@@ -661,6 +664,7 @@ void draw_editor(Editor_t* editor, World_t* world, Position_t screen_camera, Vec
                          case STAMP_TYPE_BLOCK:
                          {
                               Block_t block = block_from_stamp(stamp);
+                              stamp_vec.y += PIXEL_SIZE * block.pos.z;
                               draw_block(&block, stamp_vec, 0);
                          } break;
                          case STAMP_TYPE_INTERACTIVE:
@@ -703,10 +707,14 @@ void draw_editor(Editor_t* editor, World_t* world, Position_t screen_camera, Vec
                     break;
                case STAMP_TYPE_TILE_FLAGS:
                     draw_tile_flags(stamp->tile_flags, stamp_vec);
+                    if(stamp->tile_flags & TILE_FLAG_ICED){
+                         draw_ice(stamp_vec, theme_texture);
+                    }
                     break;
                case STAMP_TYPE_BLOCK:
                {
                     Block_t block = block_from_stamp(stamp);
+                    stamp_vec.y += PIXEL_SIZE * block.pos.z;
                     draw_block(&block, stamp_vec, 0);
                } break;
                case STAMP_TYPE_INTERACTIVE:
