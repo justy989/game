@@ -964,7 +964,7 @@ void illuminate(Coord_t coord, U8 value, World_t* world, Coord_t from_portal){
      }
 }
 
-static void impact_ice(Coord_t center, S16 radius, World_t* world, bool teleported, bool spread_the_ice){
+static void impact_ice(Coord_t center, S8 height, S16 radius, World_t* world, bool teleported, bool spread_the_ice){
      Coord_t delta {radius, radius};
      Coord_t min = center - delta;
      Coord_t max = center + delta;
@@ -979,53 +979,57 @@ static void impact_ice(Coord_t center, S16 radius, World_t* world, bool teleport
                     Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
                     quad_tree_find_in(world->block_qt, coord_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
 
-                    Block_t* block = nullptr;
+                    bool spread_on_block = false;
                     for(S16 i = 0; i < block_count; i++){
-                         if(block_get_coord(blocks[i]) == coord && blocks[i]->pos.z == 0){
-                              block = blocks[i];
-                              break;
+                         Block_t* block = blocks[i];
+                         if(block_get_coord(block) == coord && height > block->pos.z &&
+                            height < (block->pos.z + HEIGHT_INTERVAL + MELT_SPREAD_HEIGHT) &&
+                            !block_held_down_by_another_block(block, world->block_qt, world->interactive_qt, &world->tilemap)){
+                              if(spread_the_ice){
+                                   if(block->element == ELEMENT_NONE) block->element = ELEMENT_ONLY_ICED;
+                                   spread_on_block = true;
+                              }else{
+                                   if(block->element == ELEMENT_ONLY_ICED) block->element = ELEMENT_NONE;
+                                   spread_on_block = true;
+                              }
                          }
                     }
 
                     Interactive_t* interactive = quad_tree_find_at(world->interactive_qt, coord.x, coord.y);
 
-                    if(block){
-                         if(spread_the_ice){
-                              if(block->element == ELEMENT_NONE) block->element = ELEMENT_ONLY_ICED;
-                         }else{
-                              if(block->element == ELEMENT_ONLY_ICED) block->element = ELEMENT_NONE;
-                         }
-                    }else{
+                    if(!spread_on_block){
                          if(interactive){
                               switch(interactive->type){
                               case INTERACTIVE_TYPE_POPUP:
-                                   if(interactive->popup.lift.ticks == 1){
+                                   if(interactive->popup.lift.ticks == 1 && height <= MELT_SPREAD_HEIGHT){
                                         if(spread_the_ice){
                                              interactive->popup.iced = false;
                                              tile->flags |= TILE_FLAG_ICED;
                                         }else{
                                              tile->flags &= ~TILE_FLAG_ICED;
                                         }
-                                   }else{
+                                   }else if(height < interactive->popup.lift.ticks + MELT_SPREAD_HEIGHT){
                                         interactive->popup.iced = spread_the_ice;
                                    }
                                    break;
                               case INTERACTIVE_TYPE_PRESSURE_PLATE:
                               case INTERACTIVE_TYPE_ICE_DETECTOR:
                               case INTERACTIVE_TYPE_LIGHT_DETECTOR:
-                                   if(spread_the_ice){
-                                        tile->flags |= TILE_FLAG_ICED;
-                                   }else{
-                                        tile->flags &= ~TILE_FLAG_ICED;
-                                        if(interactive->type == INTERACTIVE_TYPE_PRESSURE_PLATE){
-                                             interactive->pressure_plate.iced_under = false;
+                                   if(height <= MELT_SPREAD_HEIGHT){
+                                        if(spread_the_ice){
+                                             tile->flags |= TILE_FLAG_ICED;
+                                        }else{
+                                             tile->flags &= ~TILE_FLAG_ICED;
+                                             if(interactive->type == INTERACTIVE_TYPE_PRESSURE_PLATE){
+                                                  interactive->pressure_plate.iced_under = false;
+                                             }
                                         }
                                    }
                                    break;
                               default:
                                    break;
                               }
-                         }else{
+                         }else if(height <= MELT_SPREAD_HEIGHT){
                               if(spread_the_ice){
                                    tile->flags |= TILE_FLAG_ICED;
                               }else{
@@ -1044,7 +1048,7 @@ static void impact_ice(Coord_t center, S16 radius, World_t* world, bool teleport
                                    U8 distance_from_center = (U8)(sqrt(x_diff * x_diff + y_diff * y_diff));
                                    Direction_t opposite = direction_opposite((Direction_t)(d));
 
-                                   impact_ice(portal_exits.directions[d].coords[p] + opposite, radius - distance_from_center,
+                                   impact_ice(portal_exits.directions[d].coords[p] + opposite, height, radius - distance_from_center,
                                               world, true, spread_the_ice);
                               }
                          }
@@ -1054,12 +1058,12 @@ static void impact_ice(Coord_t center, S16 radius, World_t* world, bool teleport
      }
 }
 
-void spread_ice(Coord_t center, S16 radius, World_t* world, bool teleported){
-     impact_ice(center, radius, world, teleported, true);
+void spread_ice(Coord_t center, S8 height, S16 radius, World_t* world, bool teleported){
+     impact_ice(center, height, radius, world, teleported, true);
 }
 
-void melt_ice(Coord_t center, S16 radius, World_t* world, bool teleported){
-     impact_ice(center, radius, world, teleported, false);
+void melt_ice(Coord_t center, S8 height, S16 radius, World_t* world, bool teleported){
+     impact_ice(center, height, radius, world, teleported, false);
 }
 
 bool block_push(Block_t* block, MoveDirection_t move_direction, World_t* world, bool pushed_by_ice, F32 instant_vel){
