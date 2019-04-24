@@ -24,10 +24,7 @@ Current bugs:
 
 Big Features:
 - 3D
-     - arrows must melt ice on top of blocks, but not covered blocks
-     - fire blocks lifted up must not melt ice on the ground
-     - only 2 blocks high can go through portals
-     - draw blocks from top to bottom
+     - make block_covered_by_another_block()
      - shadows and slightly discolored blocks should help with visualizations
      - entangled blocks dealing with popups
      - an entangled block with a block on top of it doesn't move because it is held down
