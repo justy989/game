@@ -927,9 +927,11 @@ static void illuminate_line(Coord_t start, Coord_t end, U8 value, World_t* world
           if(block) break;
 
           // TODO: probably handle doors too?
-          Interactive_t* interactive = quad_tree_interactive_find_at(world->interactive_qt, coords[i]);
-          if(interactive && interactive->type == INTERACTIVE_TYPE_POPUP && interactive->popup.lift.ticks >= (POPUP_MAX_LIFT_TICKS / 2)){
-               break;
+          if(coords[i] != start){
+               Interactive_t* interactive = quad_tree_interactive_find_at(world->interactive_qt, coords[i]);
+               if(interactive && interactive->type == INTERACTIVE_TYPE_POPUP && interactive->popup.lift.ticks >= (POPUP_MAX_LIFT_TICKS / 2)){
+                    break;
+               }
           }
      }
 }

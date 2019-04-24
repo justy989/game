@@ -24,8 +24,9 @@ Current bugs:
 
 Big Features:
 - 3D
+     - arrows must melt ice on top of blocks, but not covered blocks
+     - fire blocks lifted up must not melt ice on the ground
      - only 2 blocks high can go through portals
-     - a block on top of a block that is moving must move with it
      - draw blocks from top to bottom
      - shadows and slightly discolored blocks should help with visualizations
      - entangled blocks dealing with popups
@@ -1319,7 +1320,8 @@ int main(int argc, char** argv){
                     Coord_t pre_move_coord = pixel_to_coord(arrow->pos.pixel);
 
                     if(arrow->element == ELEMENT_FIRE){
-                         illuminate(pre_move_coord, 255 - LIGHT_DECAY, &world);
+                         U8 light_height = (arrow->pos.z / HEIGHT_INTERVAL) * LIGHT_DECAY;
+                         illuminate(pre_move_coord, 255 - light_height, &world);
                     }
 
                     if(arrow->stuck_time > 0.0f){
@@ -1409,8 +1411,12 @@ int main(int argc, char** argv){
                                              }
                                         }
                                    }
+                              // the block is only iced so we just want to melt the ice, if the block isn't covered
+                              }else if(arrow->element == ELEMENT_FIRE && blocks[b]->element == ELEMENT_ONLY_ICED &&
+                                       arrow->pos.z >= block_bottom && arrow->pos.z <= (block_top + (HEIGHT_INTERVAL + HEIGHT_INTERVAL / 2)) &&
+                                       !block_held_down_by_another_block(blocks[b], world.block_qt, world.interactive_qt, &world.tilemap)){
+                                   blocks[b]->element = ELEMENT_NONE;
                               }
-                              break;
                          }
                     }
 
@@ -1436,9 +1442,9 @@ int main(int argc, char** argv){
 
                          // catch or give elements
                          if(arrow->element == ELEMENT_FIRE){
-                              melt_ice(post_move_coord, 0, &world);
+                              if(arrow->pos.z < (HEIGHT_INTERVAL + HEIGHT_INTERVAL / 2)) melt_ice(post_move_coord, 0, &world);
                          }else if(arrow->element == ELEMENT_ICE){
-                              spread_ice(post_move_coord, 0, &world);
+                              if(arrow->pos.z < (HEIGHT_INTERVAL + HEIGHT_INTERVAL / 2)) spread_ice(post_move_coord, 0, &world);
                          }
 
                          Interactive_t* interactive = quad_tree_interactive_find_at(world.interactive_qt, post_move_coord);
@@ -3021,7 +3027,8 @@ int main(int argc, char** argv){
                for(S16 i = 0; i < world.blocks.count; i++){
                     Block_t* block = world.blocks.elements + i;
                     if(block->element == ELEMENT_FIRE){
-                         illuminate(block_get_coord(block), 255, &world);
+                         U8 block_light_height = (block->pos.z / HEIGHT_INTERVAL) * LIGHT_DECAY;
+                         illuminate(block_get_coord(block), 255 - block_light_height, &world);
                     }else if(block->element == ELEMENT_ICE){
                          auto block_coord = block_get_coord(block);
                          spread_ice(block_coord, 1, &world);
