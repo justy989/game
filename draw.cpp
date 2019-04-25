@@ -310,8 +310,11 @@ void draw_selection(Coord_t selection_start, Coord_t selection_end, Position_t c
      draw_quad_wireframe(&selection_quad, red, green, blue);
 }
 
-static void draw_ice(Vec_t pos, GLuint theme_texture){
+static void draw_ice(Vec_t pos){
      glEnd();
+
+     GLint save_texture;
+     glGetIntegerv(GL_TEXTURE_BINDING_2D, &save_texture);
 
      // get state ready for ice
      glBindTexture(GL_TEXTURE_2D, 0);
@@ -324,13 +327,70 @@ static void draw_ice(Vec_t pos, GLuint theme_texture){
      glEnd();
 
      // reset state back to default
-     glBindTexture(GL_TEXTURE_2D, theme_texture);
+     glBindTexture(GL_TEXTURE_2D, save_texture);
      glBegin(GL_QUADS);
      glColor3f(1.0f, 1.0f, 1.0f);
 }
 
-void draw_flats(Vec_t pos, Tile_t* tile, Interactive_t* interactive, GLuint theme_texture,
-                U8 portal_rotations){
+void draw_player(Player_t* player, Vec_t camera, Coord_t source_coord, Coord_t destination_coord, S8 portal_rotations)
+{
+     Vec_t pos_vec = pos_to_vec(player->pos) + camera;
+     if(destination_coord.x >= 0){
+          Position_t destination_pos = coord_to_pos_at_tile_center(destination_coord);
+          Position_t source_pos = coord_to_pos_at_tile_center(source_coord);
+          Position_t center_delta = player->pos - source_pos;
+          center_delta = position_rotate_quadrants_clockwise(center_delta, portal_rotations);
+          pos_vec = pos_to_vec(destination_pos + center_delta);
+     }
+
+     S8 player_frame_y = direction_rotate_clockwise(player->face, portal_rotations);
+     if(player->pushing_block >= 0){
+         player_frame_y += 4;
+     }else if(player->stopping_block_from < DIRECTION_COUNT){
+          player_frame_y = direction_rotate_clockwise(player->stopping_block_from, portal_rotations);
+          player_frame_y += 4;
+     }
+
+     if(player->has_bow){
+          player_frame_y += 8;
+          if(player->bow_draw_time > (PLAYER_BOW_DRAW_DELAY / 2.0f)){
+               player_frame_y += 8;
+               if(player->bow_draw_time >= PLAYER_BOW_DRAW_DELAY){
+                    player_frame_y += 4;
+               }
+          }
+     }
+
+     Vec_t tex_vec = player_frame(player->walk_frame, player_frame_y);
+     pos_vec.y += (5.0f * PIXEL_SIZE);
+     pos_vec.y += ((float)(player->pos.z) * PIXEL_SIZE);
+
+     Vec_t shadow_vec = player_frame(3, 0);
+
+     // draw shadow
+     glColor4f(1.0f, 1.0f, 1.0f, 0.15f);
+     glTexCoord2f(shadow_vec.x, shadow_vec.y);
+     glVertex2f(pos_vec.x - HALF_TILE_SIZE, pos_vec.y - HALF_TILE_SIZE);
+     glTexCoord2f(shadow_vec.x, shadow_vec.y + PLAYER_FRAME_HEIGHT);
+     glVertex2f(pos_vec.x - HALF_TILE_SIZE, pos_vec.y + HALF_TILE_SIZE);
+     glTexCoord2f(shadow_vec.x + PLAYER_FRAME_WIDTH, shadow_vec.y + PLAYER_FRAME_HEIGHT);
+     glVertex2f(pos_vec.x + HALF_TILE_SIZE, pos_vec.y + HALF_TILE_SIZE);
+     glTexCoord2f(shadow_vec.x + PLAYER_FRAME_WIDTH, shadow_vec.y);
+     glVertex2f(pos_vec.x + HALF_TILE_SIZE, pos_vec.y - HALF_TILE_SIZE);
+
+     // draw player
+     glColor3f(1.0f, 1.0f, 1.0f);
+     glTexCoord2f(tex_vec.x, tex_vec.y);
+     glVertex2f(pos_vec.x - HALF_TILE_SIZE, pos_vec.y - HALF_TILE_SIZE);
+     glTexCoord2f(tex_vec.x, tex_vec.y + PLAYER_FRAME_HEIGHT);
+     glVertex2f(pos_vec.x - HALF_TILE_SIZE, pos_vec.y + HALF_TILE_SIZE);
+     glTexCoord2f(tex_vec.x + PLAYER_FRAME_WIDTH, tex_vec.y + PLAYER_FRAME_HEIGHT);
+     glVertex2f(pos_vec.x + HALF_TILE_SIZE, pos_vec.y + HALF_TILE_SIZE);
+     glTexCoord2f(tex_vec.x + PLAYER_FRAME_WIDTH, tex_vec.y);
+     glVertex2f(pos_vec.x + HALF_TILE_SIZE, pos_vec.y - HALF_TILE_SIZE);
+}
+
+void draw_flats(Vec_t pos, Tile_t* tile, Interactive_t* interactive, U8 portal_rotations){
      draw_tile_id(tile->id, pos);
 
      U16 tile_flags = tile->flags;
@@ -351,7 +411,7 @@ void draw_flats(Vec_t pos, Tile_t* tile, Interactive_t* interactive, GLuint them
      if(interactive){
           if(interactive->type == INTERACTIVE_TYPE_PRESSURE_PLATE){
                if(!tile_is_iced(tile) && interactive->pressure_plate.iced_under){
-                    draw_ice(pos, theme_texture);
+                    draw_ice(pos);
                }
 
                draw_interactive(interactive, pos, Coord_t{-1, -1}, nullptr, nullptr);
@@ -371,7 +431,7 @@ void draw_flats(Vec_t pos, Tile_t* tile, Interactive_t* interactive, GLuint them
           }
      }
 
-     if(tile_is_iced(tile)) draw_ice(pos, theme_texture);
+     if(tile_is_iced(tile)) draw_ice(pos);
 }
 
 void draw_solids(Vec_t pos, Interactive_t* interactive, Block_t** blocks, S16 block_count,
@@ -379,6 +439,9 @@ void draw_solids(Vec_t pos, Interactive_t* interactive, Block_t** blocks, S16 bl
                  Position_t screen_camera, GLuint theme_texture, GLuint player_texture,
                  Coord_t source_coord, Coord_t destination_coord, U8 portal_rotations,
                  TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree){
+     (void)(theme_texture);
+     (void)(player_texture);
+
      if(interactive){
           if(interactive->type == INTERACTIVE_TYPE_PRESSURE_PLATE ||
              interactive->type == INTERACTIVE_TYPE_ICE_DETECTOR ||
@@ -420,77 +483,114 @@ void draw_solids(Vec_t pos, Interactive_t* interactive, Block_t** blocks, S16 bl
           if(!draw_players[i]) continue;
           Player_t* player = players->elements + i;
 
-          Vec_t pos_vec = pos_to_vec(player->pos);
-          if(destination_coord.x >= 0){
-               Position_t destination_pos = coord_to_pos_at_tile_center(destination_coord);
-               Position_t source_pos = coord_to_pos_at_tile_center(source_coord);
-               Position_t center_delta = player->pos - source_pos;
-               center_delta = position_rotate_quadrants_clockwise(center_delta, portal_rotations);
-               pos_vec = pos_to_vec(destination_pos + center_delta);
-          }
+          draw_player(player, Vec_t{}, source_coord, destination_coord, portal_rotations);
 
-          S8 player_frame_y = direction_rotate_clockwise(player->face, portal_rotations);
-          if(player->pushing_block >= 0){
-              player_frame_y += 4;
-          }else if(player->stopping_block_from < DIRECTION_COUNT){
-               player_frame_y = direction_rotate_clockwise(player->stopping_block_from, portal_rotations);
-               player_frame_y += 4;
-          }
-
-          if(player->has_bow){
-               player_frame_y += 8;
-               if(player->bow_draw_time > (PLAYER_BOW_DRAW_DELAY / 2.0f)){
-                    player_frame_y += 8;
-                    if(player->bow_draw_time >= PLAYER_BOW_DRAW_DELAY){
-                         player_frame_y += 4;
-                    }
-               }
-          }
-
-          Vec_t tex_vec = player_frame(player->walk_frame, player_frame_y);
-          pos_vec.y += (5.0f * PIXEL_SIZE);
-          pos_vec.y += ((float)(player->pos.z) * PIXEL_SIZE);
-
-          glEnd();
-          glBindTexture(GL_TEXTURE_2D, player_texture);
-          glBegin(GL_QUADS);
-
-          Vec_t shadow_vec = player_frame(3, 0);
-
-          // draw shadow
-          glColor4f(1.0f, 1.0f, 1.0f, 0.15f);
-          glTexCoord2f(shadow_vec.x, shadow_vec.y);
-          glVertex2f(pos_vec.x - HALF_TILE_SIZE, pos_vec.y - HALF_TILE_SIZE);
-          glTexCoord2f(shadow_vec.x, shadow_vec.y + PLAYER_FRAME_HEIGHT);
-          glVertex2f(pos_vec.x - HALF_TILE_SIZE, pos_vec.y + HALF_TILE_SIZE);
-          glTexCoord2f(shadow_vec.x + PLAYER_FRAME_WIDTH, shadow_vec.y + PLAYER_FRAME_HEIGHT);
-          glVertex2f(pos_vec.x + HALF_TILE_SIZE, pos_vec.y + HALF_TILE_SIZE);
-          glTexCoord2f(shadow_vec.x + PLAYER_FRAME_WIDTH, shadow_vec.y);
-          glVertex2f(pos_vec.x + HALF_TILE_SIZE, pos_vec.y - HALF_TILE_SIZE);
-
-          // draw player
-          glColor3f(1.0f, 1.0f, 1.0f);
-          glTexCoord2f(tex_vec.x, tex_vec.y);
-          glVertex2f(pos_vec.x - HALF_TILE_SIZE, pos_vec.y - HALF_TILE_SIZE);
-          glTexCoord2f(tex_vec.x, tex_vec.y + PLAYER_FRAME_HEIGHT);
-          glVertex2f(pos_vec.x - HALF_TILE_SIZE, pos_vec.y + HALF_TILE_SIZE);
-          glTexCoord2f(tex_vec.x + PLAYER_FRAME_WIDTH, tex_vec.y + PLAYER_FRAME_HEIGHT);
-          glVertex2f(pos_vec.x + HALF_TILE_SIZE, pos_vec.y + HALF_TILE_SIZE);
-          glTexCoord2f(tex_vec.x + PLAYER_FRAME_WIDTH, tex_vec.y);
-          glVertex2f(pos_vec.x + HALF_TILE_SIZE, pos_vec.y - HALF_TILE_SIZE);
-
-          glEnd();
-
-          glBindTexture(GL_TEXTURE_2D, theme_texture);
-          glBegin(GL_QUADS);
-          glColor3f(1.0f, 1.0f, 1.0f);
-
+#if 0
+          // draw entangled players
           if(i >= 1){
               pos_vec -= Vec_t{HALF_TILE_SIZE, HALF_TILE_SIZE};
               tex_vec = theme_frame(0, 22);
               draw_theme_frame(pos_vec, tex_vec);
           }
+#endif
      }
+}
+
+void draw_world_row_flats(S16 y, S16 x_start, S16 x_end, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt,
+                          Vec_t camera){
+     auto draw_pos = Vec_t{(float)(x_start) * TILE_SIZE, (float)(y) * TILE_SIZE} + camera;
+     auto save_draw_pos = draw_pos;
+
+     // tile layer
+     for(S16 x = x_start; x <= x_end; x++){
+          auto tile = tilemap_get_tile(tilemap, Coord_t{x, y});
+          if(tile) draw_tile_id(tile->id, draw_pos);
+          draw_pos.x += TILE_SIZE;
+     }
+
+     // flat layer
+     draw_pos = save_draw_pos;
+     for(S16 x = x_start; x <= x_end; x++){
+          auto tile = tilemap_get_tile(tilemap, Coord_t{x, y});
+          Interactive_t* interactive = quad_tree_find_at(interactive_qt, x, y);
+          draw_flats(draw_pos, tile, interactive, 0);
+          draw_pos.x += TILE_SIZE;
+     }
+}
+
+void draw_world_row_solids(S16 y, S16 x_start, S16 x_end, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt,
+                           QuadTreeNode_t<Block_t>* block_qt, ObjectArray_t<Player_t>* players, Vec_t camera, GLuint player_texture){
+     auto draw_pos = Vec_t{(float)(x_start) * TILE_SIZE, (float)(y) * TILE_SIZE} + camera;
+     auto save_draw_pos = draw_pos;
+
+     // solid layer
+     draw_pos = save_draw_pos;
+     for(S16 x = x_start; x <= x_end; x++){
+          Interactive_t* interactive = quad_tree_find_at(interactive_qt, x, y);
+          if(interactive){
+               if(interactive->type == INTERACTIVE_TYPE_PRESSURE_PLATE ||
+                  interactive->type == INTERACTIVE_TYPE_ICE_DETECTOR ||
+                  interactive->type == INTERACTIVE_TYPE_LIGHT_DETECTOR ||
+                  (interactive->type == INTERACTIVE_TYPE_POPUP && interactive->popup.lift.ticks == 1)){
+                    // pass
+               }else{
+                    draw_interactive(interactive, draw_pos, Coord_t{x, y}, tilemap, interactive_qt);
+
+                    if(interactive->type == INTERACTIVE_TYPE_POPUP && interactive->popup.iced){
+                         auto ice_draw_pos = draw_pos;
+                         ice_draw_pos.y += interactive->popup.lift.ticks * PIXEL_SIZE;
+                         Vec_t tex_vec = theme_frame(3, 12);
+                         glColor4f(1.0f, 1.0f, 1.0f, 0.5f);
+                         draw_theme_frame(ice_draw_pos, tex_vec);
+                         glColor3f(1.0f, 1.0f, 1.0f);
+                    }
+               }
+          }
+
+          draw_pos.x += TILE_SIZE;
+     }
+
+     // block layer
+     auto search_rect = Rect_t{(S16)(x_start * TILE_SIZE_IN_PIXELS), (S16)(y * TILE_SIZE_IN_PIXELS),
+                               (S16)((x_end * TILE_SIZE_IN_PIXELS) + TILE_SIZE_IN_PIXELS),
+                               (S16)((y * TILE_SIZE_IN_PIXELS) + TILE_SIZE_IN_PIXELS)};
+
+     S16 block_count = 0;
+     Block_t* blocks[256]; // oh god i hope we don't need more than that?
+     quad_tree_find_in(block_qt, search_rect, blocks, &block_count, 256);
+
+     sort_blocks_by_height(blocks, block_count);
+
+     for(S16 i = 0; i < block_count; i++){
+          auto block = blocks[i];
+          auto draw_block_pos = block->pos;
+          draw_block_pos.pixel.y += block->pos.z;
+          draw_block(block, pos_to_vec(draw_block_pos) + camera, 0);
+     }
+
+     glEnd();
+
+     GLint save_texture = 0;
+     glGetIntegerv(GL_TEXTURE_BINDING_2D, &save_texture);
+
+     glBindTexture(GL_TEXTURE_2D, player_texture);
+     glBegin(GL_QUADS);
+
+     // player layer slayer flayer bayer
+     for(S16 i = 0; i < players->count; i++){
+          auto player = players->elements + i;
+          auto coord = pos_to_coord(player->pos);
+
+          if(coord.y == y && coord.x >= x_start && coord.x <= x_end){
+               draw_player(player, camera, coord, Coord_t{-1, -1}, 0);
+          }
+     }
+
+     glEnd();
+
+     glBindTexture(GL_TEXTURE_2D, save_texture);
+     glBegin(GL_QUADS);
+     glColor3f(1.0f, 1.0f, 1.0f);
 }
 
 void draw_text(const char* message, Vec_t pos)
@@ -708,7 +808,7 @@ void draw_editor(Editor_t* editor, World_t* world, Position_t screen_camera, Vec
                case STAMP_TYPE_TILE_FLAGS:
                     draw_tile_flags(stamp->tile_flags, stamp_vec);
                     if(stamp->tile_flags & TILE_FLAG_ICED){
-                         draw_ice(stamp_vec, theme_texture);
+                         draw_ice(stamp_vec);
                     }
                     break;
                case STAMP_TYPE_BLOCK:

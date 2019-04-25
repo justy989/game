@@ -3080,6 +3080,16 @@ int main(int argc, char** argv){
           glColor3f(1.0f, 1.0f, 1.0f);
 
           for(S16 y = max.y; y >= min.y; y--){
+               draw_world_row_flats(y, min.x, max.y, &world.tilemap, world.interactive_qt, camera_offset);
+          }
+
+          for(S16 y = max.y; y >= min.y; y--){
+               draw_world_row_solids(y, min.x, max.y, &world.tilemap, world.interactive_qt, world.block_qt,
+                                     &world.players, camera_offset, player_texture);
+          }
+
+#if 0
+          for(S16 y = max.y; y >= min.y; y--){
                for(S16 x = min.x; x <= max.x; x++){
                     Vec_t tile_pos {(F32)(x - min.x) * TILE_SIZE + camera_offset.x,
                                     (F32)(y - min.y) * TILE_SIZE + camera_offset.y};
@@ -3109,6 +3119,7 @@ int main(int argc, char** argv){
           bool* draw_players = (bool*)malloc((size_t)(world.players.count));
 
           for(S16 y = max.y; y >= min.y; y--){
+
                for(S16 x = min.x; x <= max.x; x++){
                     Vec_t tile_pos {(F32)(x - min.x) * TILE_SIZE + camera_offset.x,
                                     (F32)(y - min.y) * TILE_SIZE + camera_offset.y};
@@ -3232,6 +3243,7 @@ int main(int argc, char** argv){
           }
 
           free(draw_players);
+#endif
 
           glEnd();
 

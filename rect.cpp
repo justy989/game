@@ -42,6 +42,21 @@ bool rect_in_rect(Rect_t a, Rect_t b){
           }
      }
 
+     // another special case where they are like this:
+     //            __
+     //           |  |
+     //      _____|  |____
+     //      |    |  |    |
+     //      |____|  |____|
+     //           |  |
+     //            __
+     //
+     //
+     if(a.left >= b.left && a.right <= b.right &&
+        a.bottom <= b.bottom && a.top >= b.top){
+          return true;
+     }
+
      return false;
 }
 
