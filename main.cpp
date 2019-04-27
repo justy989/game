@@ -25,9 +25,6 @@ Current bugs:
 
 Big Features:
 - 3D
-     - make block_covered_by_another_block()
-     - entangled blocks dealing with popups
-     - an entangled block with a block on top of it doesn't move because it is held down
      - when a block slides on top of an iced block, and slots into the adjacent tile because another block is 2 tiles away,
        should a push be applied to that adjacent block if it is on ice? Probably
 - Get rid of skip_coords (I think this is possible and easy?)
