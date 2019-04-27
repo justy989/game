@@ -585,12 +585,43 @@ void draw_world_row_solids(S16 y, S16 x_start, S16 x_end, TileMap_t* tilemap, Qu
                draw_player(player, camera, coord, Coord_t{-1, -1}, 0);
           }
      }
+}
 
-     glEnd();
+void draw_world_row_arrows(S16 y, S16 x_start, S16 x_end, const ArrowArray_t* arrow_array, Vec_t camera){
+     // draw arrows
+     static Vec_t arrow_tip_offset[DIRECTION_COUNT] = {
+          {0.0f,               9.0f * PIXEL_SIZE},
+          {8.0f * PIXEL_SIZE,  16.0f * PIXEL_SIZE},
+          {16.0f * PIXEL_SIZE, 9.0f * PIXEL_SIZE},
+          {8.0f * PIXEL_SIZE,  0.0f * PIXEL_SIZE},
+     };
 
-     glBindTexture(GL_TEXTURE_2D, save_texture);
-     glBegin(GL_QUADS);
-     glColor3f(1.0f, 1.0f, 1.0f);
+     for(S16 a = 0; a < ARROW_ARRAY_MAX; a++){
+          const Arrow_t* arrow = arrow_array->arrows + a;
+          if(!arrow->alive) continue;
+          auto coord = pos_to_coord(arrow->pos);
+          if(coord.y != y) continue;
+          if(coord.x < x_start || coord.x > x_end) continue;
+
+          Vec_t arrow_vec = pos_to_vec(arrow->pos - camera);
+          arrow_vec.x -= arrow_tip_offset[arrow->face].x;
+          arrow_vec.y -= arrow_tip_offset[arrow->face].y;
+
+          // shadow
+          //arrow_vec.y -= (arrow->pos.z * PIXEL_SIZE);
+          Vec_t tex_vec = arrow_frame(arrow->face, 1);
+          Vec_t dim {TILE_SIZE, TILE_SIZE};
+          Vec_t tex_dim {ARROW_FRAME_WIDTH, ARROW_FRAME_HEIGHT};
+          draw_screen_texture(arrow_vec, tex_vec, dim, tex_dim);
+
+          arrow_vec.y += (arrow->pos.z * PIXEL_SIZE);
+
+          S8 y_frame = 0;
+          if(arrow->element) y_frame = (S8)(2 + ((arrow->element - 1) * 4));
+
+          tex_vec = arrow_frame(arrow->face, y_frame);
+          draw_screen_texture(arrow_vec, tex_vec, dim, tex_dim);
+     }
 }
 
 void draw_text(const char* message, Vec_t pos)

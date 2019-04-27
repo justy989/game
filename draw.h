@@ -7,6 +7,7 @@
 #include "quad_tree.h"
 #include "tile.h"
 #include "player.h"
+#include "arrow.h"
 #include "quad.h"
 
 #include <SDL2/SDL_opengl.h>
@@ -61,6 +62,7 @@ void draw_world_row_flats(S16 y, S16 x_start, S16 x_end, TileMap_t* tilemap, Qua
                           Vec_t camera);
 void draw_world_row_solids(S16 y, S16 x_start, S16 x_end, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt,
                            QuadTreeNode_t<Block_t>* block_qt, ObjectArray_t<Player_t>* players, Vec_t camera, GLuint player_texture);
+void draw_world_row_arrows(S16 y, S16 x_start, S16 x_end, const ArrowArray_t* arrow_aray, Vec_t camera);
 void draw_quad_wireframe(const Quad_t* quad, F32 red, F32 green, F32 blue);
 void draw_quad_filled(const Quad_t* quad, F32 red, F32 green, F32 blue);
 

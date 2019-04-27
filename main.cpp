@@ -465,8 +465,8 @@ int main(int argc, char** argv){
           return 1;
      }
 
-     int window_width = 1024;
-     int window_height = 1024;
+     int window_width = 1400;
+     int window_height = 1400;
      SDL_Window* window = nullptr;
      SDL_GLContext opengl_context = nullptr;
      GLuint theme_texture = 0;
@@ -3086,6 +3086,19 @@ int main(int argc, char** argv){
           for(S16 y = max.y; y >= min.y; y--){
                draw_world_row_solids(y, min.x, max.y, &world.tilemap, world.interactive_qt, world.block_qt,
                                      &world.players, camera_offset, player_texture);
+
+               glEnd();
+               glBindTexture(GL_TEXTURE_2D, arrow_texture);
+               glBegin(GL_QUADS);
+               glColor3f(1.0f, 1.0f, 1.0f);
+
+               draw_world_row_arrows(y, min.x, max.x, &world.arrows, camera_offset);
+
+               glEnd();
+
+               glBindTexture(GL_TEXTURE_2D, theme_texture);
+               glBegin(GL_QUADS);
+               glColor3f(1.0f, 1.0f, 1.0f);
           }
 
 #if 0
