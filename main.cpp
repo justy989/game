@@ -12,6 +12,7 @@ Entanglement Puzzles:
 - rotated entangled puzzles where the centroid is on a portal destination coord
 
 Current bugs:
+- Triple entangled blocks in a row cannot be pushed horizontally
 - A block on the tile outside a portal pushed into the portal to clone, the clone has weird behavior and ends up on the portal block
 - When pushing a block through a portal that turns off, the block keeps going
 - Getting a block and it's rotated entangler to push into the centroid causes the any other entangled blocks to alternate pushing
@@ -3089,30 +3090,46 @@ int main(int argc, char** argv){
                     Interactive_t* interactive = quad_tree_find_at(world.interactive_qt, coord.x, coord.y);
 
                     if(is_active_portal(interactive)){
-                         Vec_t coord_pos {(F32)(x - min.x) * TILE_SIZE + camera_offset.x,
-                                         (F32)(y - min.y) * TILE_SIZE + camera_offset.y};
-
                          PortalExit_t portal_exits = find_portal_exits(coord, &world.tilemap, world.interactive_qt);
 
                          for(S8 d = 0; d < DIRECTION_COUNT; d++){
                               for(S8 i = 0; i < portal_exits.directions[d].count; i++){
                                    if(portal_exits.directions[d].coords[i] == coord) continue;
                                    Coord_t portal_coord = portal_exits.directions[d].coords[i] + direction_opposite((Direction_t)(d));
-                                   Rect_t coord_rect = rect_surrounding_adjacent_coords(portal_coord);
+                                   Rect_t coord_rect = rect_surrounding_coord(portal_coord);
+                                   coord_rect.left -= HALF_TILE_SIZE_IN_PIXELS;
+                                   coord_rect.right += HALF_TILE_SIZE_IN_PIXELS;
+                                   coord_rect.bottom -= TILE_SIZE_IN_PIXELS;
+                                   coord_rect.top += HALF_TILE_SIZE_IN_PIXELS;
 
                                    S16 block_count = 0;
                                    Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
 
                                    U8 portal_rotations = portal_rotations_between((Direction_t)(d), interactive->portal.face);
 
-                                   draw_flats(coord_pos, tilemap_get_tile(&world.tilemap, coord), nullptr, portal_rotations);
-
                                    quad_tree_find_in(world.block_qt, coord_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
                                    if(block_count){
                                         sort_blocks_by_height(blocks, block_count);
 
-                                        draw_blocks(blocks, block_count, portal_coord, coord, portal_rotations, camera_offset);
+                                        draw_portal_blocks(blocks, block_count, portal_coord, coord, portal_rotations, camera_offset);
                                    }
+
+                                   glEnd();
+                                   glBindTexture(GL_TEXTURE_2D, player_texture);
+                                   glBegin(GL_QUADS);
+                                   glColor3f(1.0f, 1.0f, 1.0f);
+
+                                   auto player_region = rect_surrounding_coord(portal_coord);
+                                   player_region.left -= 4;
+                                   player_region.right += 4;
+                                   player_region.bottom -= 10;
+                                   player_region.top += 4;
+                                   draw_portal_players(&world.players, player_region, portal_coord, coord, portal_rotations, camera_offset);
+
+                                   glEnd();
+                                   glBindTexture(GL_TEXTURE_2D, theme_texture);
+                                   glBegin(GL_QUADS);
+                                   glColor3f(1.0f, 1.0f, 1.0f);
                               }
                          }
                     }
@@ -3121,7 +3138,8 @@ int main(int argc, char** argv){
 
           for(S16 y = max.y; y >= min.y; y--){
                for(S16 x = min.x; x <= max.x; x++){
-                    Tile_t* tile = world.tilemap.tiles[y] + x;
+                    Coord_t coord {x, y};
+                    Tile_t* tile = tilemap_get_tile(&world.tilemap, coord);
                     if(tile && tile->id >= 16){
                          Vec_t tile_pos {(F32)(x - min.x) * TILE_SIZE + camera_offset.x,
                                          (F32)(y - min.y) * TILE_SIZE + camera_offset.y};

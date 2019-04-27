@@ -496,23 +496,32 @@ void draw_solids(Vec_t pos, Interactive_t* interactive, Block_t** blocks, S16 bl
      }
 }
 
-void draw_blocks(Block_t** blocks, S16 block_count, Coord_t source_coord, Coord_t destination_coord, S8 portal_rotations, Vec_t camera) {
+void draw_portal_blocks(Block_t** blocks, S16 block_count, Coord_t source_coord, Coord_t destination_coord, S8 portal_rotations, Vec_t camera) {
      for(S16 i = 0; i < block_count; i++){
           Block_t* block = blocks[i];
           Position_t draw_pos = block->pos;
           draw_pos.pixel += HALF_TILE_SIZE_PIXEL;
-          if(destination_coord.x >= 0){
-               Position_t destination_pos = coord_to_pos_at_tile_center(destination_coord);
-               Position_t source_pos = coord_to_pos_at_tile_center(source_coord);
-               Position_t center_delta = draw_pos - source_pos;
-               center_delta = position_rotate_quadrants_clockwise(center_delta, portal_rotations);
-               draw_pos = destination_pos + center_delta;
-          }
+
+          Position_t destination_pos = coord_to_pos_at_tile_center(destination_coord);
+          Position_t source_pos = coord_to_pos_at_tile_center(source_coord);
+          Position_t center_delta = draw_pos - source_pos;
+          center_delta = position_rotate_quadrants_clockwise(center_delta, portal_rotations);
+          draw_pos = destination_pos + center_delta;
 
           draw_pos.pixel -= HALF_TILE_SIZE_PIXEL;
           draw_pos += camera;
           draw_pos.pixel.y += block->pos.z;
           draw_block(block, pos_to_vec(draw_pos), portal_rotations);
+     }
+}
+
+void draw_portal_players(ObjectArray_t<Player_t>* players, Rect_t region, Coord_t source_coord, Coord_t destination_coord,
+                         S8 portal_rotations, Vec_t camera){
+     for(S16 i = 0; i < players->count; i++){
+          Player_t* player = players->elements + i;
+          if(!pixel_in_rect(player->pos.pixel, region)) continue;
+
+          draw_player(player, camera, source_coord, destination_coord, portal_rotations);
      }
 }
 
