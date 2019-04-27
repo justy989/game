@@ -49,7 +49,6 @@ void draw_theme_frame(Vec_t tex_vec, Vec_t pos_vec);
 void draw_double_theme_frame(Vec_t tex_vec, Vec_t pos_vec);
 void draw_tile_id(U8 id, Vec_t pos);
 void draw_tile_flags(U16 flags, Vec_t tile_pos);
-void draw_block(Block_t* block, Vec_t pos_vec);
 void draw_interactive(Interactive_t* interactive, Vec_t pos_vec, Coord_t coord,
                       TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree);
 void draw_flats(Vec_t pos, Tile_t* tile, Interactive_t* interactive, U8 portal_rotations);

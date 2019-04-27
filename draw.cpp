@@ -137,6 +137,8 @@ void draw_tile_flags(U16 flags, Vec_t tile_pos){
 }
 
 void draw_block(Block_t* block, Vec_t pos_vec, U8 portal_rotations){
+     static const F32 block_shadow_opacity = 0.3f;
+
      U8 rotation = (block->rotation + portal_rotations) % static_cast<U8>(DIRECTION_COUNT);
      Vec_t tex_vec = theme_frame(rotation, 29);
      draw_double_theme_frame(pos_vec, tex_vec);
@@ -159,6 +161,32 @@ void draw_block(Block_t* block, Vec_t pos_vec, U8 portal_rotations){
      if(block->entangle_index >= 0){
           tex_vec = theme_frame(0, 22);
           draw_theme_frame(pos_vec, tex_vec);
+     }
+
+     if(block->pos.z > 0){
+          Quad_t quad;
+          quad.left = pos_vec.x;
+          quad.right = pos_vec.x + (F32)(TILE_SIZE_IN_PIXELS) * PIXEL_SIZE;;
+          quad.top = pos_vec.y;
+          quad.bottom = pos_vec.y - (F32)(block->pos.z) * PIXEL_SIZE;
+
+          glEnd();
+
+          GLint save_texture;
+          glGetIntegerv(GL_TEXTURE_BINDING_2D, &save_texture);
+
+          glBindTexture(GL_TEXTURE_2D, 0);
+          glBegin(GL_QUADS);
+          glColor4f(0.0f, 0.0f, 0.0f, block_shadow_opacity);
+          glVertex2f(quad.left,  quad.top);
+          glVertex2f(quad.left,  quad.bottom);
+          glVertex2f(quad.right, quad.bottom);
+          glVertex2f(quad.right, quad.top);
+          glEnd();
+
+          glBindTexture(GL_TEXTURE_2D, save_texture);
+          glBegin(GL_QUADS);
+          glColor3f(1.0f, 1.0f, 1.0f);
      }
 }
 
@@ -366,8 +394,10 @@ Vec_t draw_player(Player_t* player, Vec_t camera, Coord_t source_coord, Coord_t 
 
      Vec_t shadow_vec = player_frame(3, 0);
 
+
      // draw shadow
-     glColor4f(1.0f, 1.0f, 1.0f, 0.15f);
+     pos_vec.y += PIXEL_SIZE; // move shadow up 1
+     glColor4f(1.0f, 1.0f, 1.0f, 0.5f);
      glTexCoord2f(shadow_vec.x, shadow_vec.y);
      glVertex2f(pos_vec.x - HALF_TILE_SIZE, pos_vec.y - HALF_TILE_SIZE);
      glTexCoord2f(shadow_vec.x, shadow_vec.y + PLAYER_FRAME_HEIGHT);
@@ -376,6 +406,7 @@ Vec_t draw_player(Player_t* player, Vec_t camera, Coord_t source_coord, Coord_t 
      glVertex2f(pos_vec.x + HALF_TILE_SIZE, pos_vec.y + HALF_TILE_SIZE);
      glTexCoord2f(shadow_vec.x + PLAYER_FRAME_WIDTH, shadow_vec.y);
      glVertex2f(pos_vec.x + HALF_TILE_SIZE, pos_vec.y - HALF_TILE_SIZE);
+     pos_vec.y += PIXEL_SIZE; // undo shadow transform
 
      // draw player
      glColor3f(1.0f, 1.0f, 1.0f);
