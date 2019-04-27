@@ -572,7 +572,7 @@ Player_t* block_against_player(Block_t* block, Direction_t direction, ObjectArra
 
 static Block_t* block_at_height_in_block_rect(Position_t block_to_check_pos, QuadTreeNode_t<Block_t>* block_qt,
                                               S8 expected_height, QuadTreeNode_t<Interactive_t>* interactive_qt,
-                                              TileMap_t* tilemap){
+                                              TileMap_t* tilemap, S16 min_area = 0){
      // TODO: need more complicated function to detect this
      auto block_to_check_center = block_get_center(block_to_check_pos);
      Rect_t rect = block_get_rect(block_to_check_pos.pixel);
@@ -591,7 +591,10 @@ static Block_t* block_at_height_in_block_rect(Position_t block_to_check_pos, Qua
              pixel_in_rect(block_top_left_pixel(block_pos.pixel), rect) ||
              pixel_in_rect(block_top_right_pixel(block_pos.pixel), rect) ||
              pixel_in_rect(block_bottom_right_pixel(block_pos.pixel), rect)){
-               return block;
+               auto intserection_area = rect_intersecting_area(block_get_rect(block_pos.pixel), rect);
+               if(intserection_area >= min_area){
+                    return block;
+               }
           }
      }
 
@@ -642,7 +645,10 @@ static Block_t* block_at_height_in_block_rect(Position_t block_to_check_pos, Qua
                                  pixel_in_rect(block_top_left_pixel(block_pos.pixel), rect) ||
                                  pixel_in_rect(block_top_right_pixel(block_pos.pixel), rect) ||
                                  pixel_in_rect(block_bottom_right_pixel(block_pos.pixel), rect)){
-                                   return block;
+                                   auto intserection_area = rect_intersecting_area(block_get_rect(block_pos.pixel), rect);
+                                   if(intserection_area >= min_area){
+                                        return block;
+                                   }
                               }
                          }
                     }
@@ -654,25 +660,25 @@ static Block_t* block_at_height_in_block_rect(Position_t block_to_check_pos, Qua
 }
 
 Block_t* block_held_up_by_another_block(Block_t* block, QuadTreeNode_t<Block_t>* block_qt,
-                                        QuadTreeNode_t<Interactive_t>* interactive_qt, TileMap_t* tilemap){
+                                        QuadTreeNode_t<Interactive_t>* interactive_qt, TileMap_t* tilemap, S16 min_area){
      if(block->teleport){
           return block_at_height_in_block_rect(block->teleport_pos + block->teleport_pos_delta, block_qt,
-                                               block->teleport_pos.z - HEIGHT_INTERVAL, interactive_qt, tilemap);
+                                               block->teleport_pos.z - HEIGHT_INTERVAL, interactive_qt, tilemap, min_area);
      }
 
      return block_at_height_in_block_rect(block->pos + block->pos_delta, block_qt,
-                                          block->pos.z - HEIGHT_INTERVAL, interactive_qt, tilemap);
+                                          block->pos.z - HEIGHT_INTERVAL, interactive_qt, tilemap, min_area);
 }
 
 Block_t* block_held_down_by_another_block(Block_t* block, QuadTreeNode_t<Block_t>* block_qt,
-                                          QuadTreeNode_t<Interactive_t>* interactive_qt, TileMap_t* tilemap){
+                                          QuadTreeNode_t<Interactive_t>* interactive_qt, TileMap_t* tilemap, S16 min_area){
      if(block->teleport){
           return block_at_height_in_block_rect(block->teleport_pos + block->teleport_pos_delta, block_qt,
-                                               block->teleport_pos.z + HEIGHT_INTERVAL, interactive_qt, tilemap);
+                                               block->teleport_pos.z + HEIGHT_INTERVAL, interactive_qt, tilemap, min_area);
      }
 
      return block_at_height_in_block_rect(block->pos + block->pos_delta, block_qt,
-                                          block->pos.z + HEIGHT_INTERVAL, interactive_qt, tilemap);
+                                          block->pos.z + HEIGHT_INTERVAL, interactive_qt, tilemap, min_area);
 }
 
 bool block_on_ice(Position_t pos, Vec_t pos_delta, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt,
@@ -881,7 +887,6 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                case MOVE_DIRECTION_LEFT:
                {
                     // TODO: compress these cases
-
                     if(direction_in_mask(collided_block_move_mask, first_direction)){
                          // if the block is moving in the direction we collided, just move right up against it
                          // TODO: set the decimal portion so we are right up against the block

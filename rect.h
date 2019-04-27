@@ -17,3 +17,6 @@ bool coord_in_rect(Coord_t c, Rect_t r);
 bool rect_in_rect(Rect_t a, Rect_t b);
 bool rects_overlap(Rect_t a, Rect_t b);
 bool axis_line_intersects_rect(AxisLine_t l, Rect_t r);
+
+S16 rect_area(Rect_t a);
+S16 rect_intersecting_area(Rect_t a, Rect_t b);

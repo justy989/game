@@ -1,4 +1,7 @@
 #include "rect.h"
+#include "defines.h"
+
+#include <math.h>
 
 bool xy_in_rect(const Rect_t& rect, S16 x, S16 y){
      return (x >= rect.left && x <= rect.right &&
@@ -72,4 +75,14 @@ bool axis_line_intersects_rect(AxisLine_t l, Rect_t r){
      if(axis_lines_intersect(l, right)) return true;
 
      return false;
+}
+
+S16 rect_area(Rect_t a){
+     return (a.right - a.left) * (a.top - a.bottom);
+}
+
+S16 rect_intersecting_area(Rect_t a, Rect_t b){
+     auto horizontal = MINIMUM(a.right, b.right) - MAXIMUM(a.left, b.left);
+     auto vertical = MINIMUM(a.top, b.top) - MAXIMUM(a.bottom, b.bottom);
+     return abs(horizontal * vertical);
 }

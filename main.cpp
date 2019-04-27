@@ -26,12 +26,10 @@ Current bugs:
 Big Features:
 - 3D
      - make block_covered_by_another_block()
-     - shadows and slightly discolored blocks should help with visualizations
      - entangled blocks dealing with popups
      - an entangled block with a block on top of it doesn't move because it is held down
      - when a block slides on top of an iced block, and slots into the adjacent tile because another block is 2 tiles away,
        should a push be applied to that adjacent block if it is on ice? Probably
-     - a fire block pushed up shouldn't emit light as far (unless it is surrounded by blocks)
 - Get rid of skip_coords (I think this is possible and easy?)
 - arrow kills player
 - arrow entanglement
@@ -391,6 +389,20 @@ PlayerInBlockRectResult_t player_in_block_rect(Player_t* player, TileMap_t* tile
      }
 
      return result;
+}
+
+void raise_entangled_blocks(World_t* world, Block_t* block){
+     if(block->entangle_index >= 0){
+          S16 block_index = get_block_index(world, block);
+          S16 entangle_index = block->entangle_index;
+          while(entangle_index != block_index && entangle_index >= 0){
+               auto entangled_block = world->blocks.elements + entangle_index;
+               entangled_block->pos.z++;
+               entangled_block->held_up = true;
+               entangle_index = entangled_block->entangle_index;
+          }
+     }
+
 }
 
 int main(int argc, char** argv){
@@ -1782,6 +1794,7 @@ int main(int argc, char** argv){
 
                     block->teleport = false;
                     block->carried_by_block = false;
+                    block->held_up = false;
 
                     block->was_on_ice_or_air = (block->coast_horizontal == BLOCK_COAST_ICE || block->coast_horizontal == BLOCK_COAST_AIR);
 
@@ -1973,9 +1986,15 @@ int main(int argc, char** argv){
                                              above_block = block_held_down_by_another_block(above_block, world.block_qt, world.interactive_qt, &world.tilemap);
                                              tmp_block->pos.z++;
                                              tmp_block->held_up = true;
+
+                                             raise_entangled_blocks(&world, tmp_block);
                                         }
+
                                         block->pos.z++;
                                         block->held_up = true;
+
+                                        raise_entangled_blocks(&world, block);
+
                                         pushed_up = true;
                                    }else if(!block->held_up && block->pos.z == (interactive->popup.lift.ticks - 1)){
                                         block->held_up = true;
@@ -1989,7 +2008,19 @@ int main(int argc, char** argv){
                     auto block = world.blocks.elements + i;
 
                     if(!block->held_up){
-                         if(block->pos.z > 0){
+                         if(block->entangle_index >= 0){
+                              S16 entangle_index = block->entangle_index;
+                              while(entangle_index != i && entangle_index >= 0){
+                                   auto entangled_block = world.blocks.elements + entangle_index;
+                                   if(entangled_block->held_up){
+                                        block->held_up = true;
+                                        break;
+                                   }
+                                   entangle_index = entangled_block->entangle_index;
+                              }
+                         }
+
+                         if(!block->held_up && block->pos.z > 0){
                               block->fall_time -= dt;
                               if(block->fall_time < 0){
                                    block->fall_time = FALL_TIME;
@@ -2583,9 +2614,19 @@ int main(int argc, char** argv){
                     for(S16 i = 0; i < world.blocks.count; i++){
                          auto block = world.blocks.elements + i;
                          if(!block->carried_by_block){
-                              auto holder = block_held_up_by_another_block(block, world.block_qt, world.interactive_qt, &world.tilemap);
-                              if(holder){
+                              auto holder = block_held_up_by_another_block(block, world.block_qt, world.interactive_qt, &world.tilemap,
+                                                                           BLOCK_SOLID_SIZE_IN_PIXELS * (BLOCK_SOLID_SIZE_IN_PIXELS / 2));
+                              if(holder && holder->element != ELEMENT_ICE && holder->element != ELEMENT_ONLY_ICED &&
+                                 holder->pos_delta != vec_zero()){
                                    block->pos_delta += holder->pos_delta;
+
+                                   S16 entangle_index = block->entangle_index;
+                                   while(entangle_index != i && entangle_index >= 0){
+                                        Block_t* entangled_block = world.blocks.elements + entangle_index;
+                                        entangled_block->pos_delta += holder->pos_delta;
+                                        entangle_index = entangled_block->entangle_index;
+                                   }
+
                                    block->carried_by_block = true;
                                    repeat_collision = true;
                               }
