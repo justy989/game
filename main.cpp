@@ -3084,6 +3084,53 @@ int main(int argc, char** argv){
           }
 
           for(S16 y = max.y; y >= min.y; y--){
+               for(S16 x = min.x; x <= max.x; x++){
+                    Coord_t coord {x, y};
+                    Interactive_t* interactive = quad_tree_find_at(world.interactive_qt, coord.x, coord.y);
+
+                    if(is_active_portal(interactive)){
+                         Vec_t coord_pos {(F32)(x - min.x) * TILE_SIZE + camera_offset.x,
+                                         (F32)(y - min.y) * TILE_SIZE + camera_offset.y};
+
+                         PortalExit_t portal_exits = find_portal_exits(coord, &world.tilemap, world.interactive_qt);
+
+                         for(S8 d = 0; d < DIRECTION_COUNT; d++){
+                              for(S8 i = 0; i < portal_exits.directions[d].count; i++){
+                                   if(portal_exits.directions[d].coords[i] == coord) continue;
+                                   Coord_t portal_coord = portal_exits.directions[d].coords[i] + direction_opposite((Direction_t)(d));
+                                   Rect_t coord_rect = rect_surrounding_adjacent_coords(portal_coord);
+
+                                   S16 block_count = 0;
+                                   Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
+
+                                   U8 portal_rotations = portal_rotations_between((Direction_t)(d), interactive->portal.face);
+
+                                   draw_flats(coord_pos, tilemap_get_tile(&world.tilemap, coord), nullptr, portal_rotations);
+
+                                   quad_tree_find_in(world.block_qt, coord_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
+                                   if(block_count){
+                                        sort_blocks_by_height(blocks, block_count);
+
+                                        draw_blocks(blocks, block_count, portal_coord, coord, portal_rotations, camera_offset);
+                                   }
+                              }
+                         }
+                    }
+               }
+          }
+
+          for(S16 y = max.y; y >= min.y; y--){
+               for(S16 x = min.x; x <= max.x; x++){
+                    Tile_t* tile = world.tilemap.tiles[y] + x;
+                    if(tile && tile->id >= 16){
+                         Vec_t tile_pos {(F32)(x - min.x) * TILE_SIZE + camera_offset.x,
+                                         (F32)(y - min.y) * TILE_SIZE + camera_offset.y};
+                         draw_tile_id(tile->id, tile_pos);
+                    }
+               }
+          }
+
+          for(S16 y = max.y; y >= min.y; y--){
                draw_world_row_solids(y, min.x, max.y, &world.tilemap, world.interactive_qt, world.block_qt,
                                      &world.players, camera_offset, player_texture);
 
@@ -3132,7 +3179,6 @@ int main(int argc, char** argv){
           bool* draw_players = (bool*)malloc((size_t)(world.players.count));
 
           for(S16 y = max.y; y >= min.y; y--){
-
                for(S16 x = min.x; x <= max.x; x++){
                     Vec_t tile_pos {(F32)(x - min.x) * TILE_SIZE + camera_offset.x,
                                     (F32)(y - min.y) * TILE_SIZE + camera_offset.y};
@@ -3207,7 +3253,6 @@ int main(int argc, char** argv){
 
                     draw_solids(tile_pos, interactive, blocks, block_count, &world.players, draw_players, screen_camera,
                                 theme_texture, player_texture, coord, Coord_t{-1, -1}, 0, &world.tilemap, world.interactive_qt);
-
                }
 
                // draw arrows

@@ -496,24 +496,53 @@ void draw_solids(Vec_t pos, Interactive_t* interactive, Block_t** blocks, S16 bl
      }
 }
 
+void draw_blocks(Block_t** blocks, S16 block_count, Coord_t source_coord, Coord_t destination_coord, S8 portal_rotations, Vec_t camera) {
+     for(S16 i = 0; i < block_count; i++){
+          Block_t* block = blocks[i];
+          Position_t draw_pos = block->pos;
+          draw_pos.pixel += HALF_TILE_SIZE_PIXEL;
+          if(destination_coord.x >= 0){
+               Position_t destination_pos = coord_to_pos_at_tile_center(destination_coord);
+               Position_t source_pos = coord_to_pos_at_tile_center(source_coord);
+               Position_t center_delta = draw_pos - source_pos;
+               center_delta = position_rotate_quadrants_clockwise(center_delta, portal_rotations);
+               draw_pos = destination_pos + center_delta;
+          }
+
+          draw_pos.pixel -= HALF_TILE_SIZE_PIXEL;
+          draw_pos += camera;
+          draw_pos.pixel.y += block->pos.z;
+          draw_block(block, pos_to_vec(draw_pos), portal_rotations);
+     }
+}
+
 void draw_world_row_flats(S16 y, S16 x_start, S16 x_end, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt,
                           Vec_t camera){
      auto draw_pos = Vec_t{(float)(x_start) * TILE_SIZE, (float)(y) * TILE_SIZE} + camera;
      auto save_draw_pos = draw_pos;
-
-     // tile layer
-     for(S16 x = x_start; x <= x_end; x++){
-          auto tile = tilemap_get_tile(tilemap, Coord_t{x, y});
-          if(tile) draw_tile_id(tile->id, draw_pos);
-          draw_pos.x += TILE_SIZE;
-     }
 
      // flat layer
      draw_pos = save_draw_pos;
      for(S16 x = x_start; x <= x_end; x++){
           auto tile = tilemap_get_tile(tilemap, Coord_t{x, y});
           Interactive_t* interactive = quad_tree_find_at(interactive_qt, x, y);
-          draw_flats(draw_pos, tile, interactive, 0);
+          if(is_active_portal(interactive)){
+               Coord_t coord {x, y};
+               PortalExit_t portal_exits = find_portal_exits(coord, tilemap, interactive_qt);
+
+               for(S8 d = 0; d < DIRECTION_COUNT; d++){
+                    for(S8 i = 0; i < portal_exits.directions[d].count; i++){
+                         if(portal_exits.directions[d].coords[i] == coord) continue;
+                         Coord_t portal_coord = portal_exits.directions[d].coords[i] + direction_opposite((Direction_t)(d));
+                         Tile_t* portal_tile = tilemap_get_tile(tilemap, portal_coord);
+                         Interactive_t* portal_interactive = quad_tree_find_at(interactive_qt, portal_coord.x, portal_coord.y);
+                         U8 portal_rotations = portal_rotations_between((Direction_t)(d), interactive->portal.face);
+                         draw_flats(draw_pos, portal_tile, portal_interactive, portal_rotations);
+                    }
+               }
+          }else{
+               draw_flats(draw_pos, tile, interactive, 0);
+          }
           draw_pos.x += TILE_SIZE;
      }
 }
