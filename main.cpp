@@ -1823,7 +1823,8 @@ int main(int argc, char** argv){
                          if(block_on_ice(block->pos, block->pos_delta, &world.tilemap, world.interactive_qt, world.block_qt) || would_teleport_onto_ice){
                               block->coast_horizontal = BLOCK_COAST_ICE;
                               block->coast_vertical = BLOCK_COAST_ICE;
-                         }else if(block->was_on_ice_or_air && block_on_air(block->pos, block->pos_delta, world.interactive_qt, world.block_qt)){
+                         // we also check held_up because the block could be entangled and it's entangler could be held up
+                         }else if(block->was_on_ice_or_air && block_on_air(block->pos, block->pos_delta, world.interactive_qt, world.block_qt) && !block->held_up){
                               block->coast_horizontal = BLOCK_COAST_AIR;
                               block->coast_vertical = BLOCK_COAST_AIR;
                          }else{
@@ -2313,7 +2314,7 @@ int main(int argc, char** argv){
 
                          // this instance of last_block_pushed is to keep the pushing smooth and not have it stop at the tile boundaries
                          if(block != block_pushed && !block_on_ice(block->pos, block->pos_delta, &world.tilemap, world.interactive_qt, world.block_qt) &&
-                            !block_on_air(block->pos, block->pos_delta, world.interactive_qt, world.block_qt)){
+                            (!block_on_air(block->pos, block->pos_delta, world.interactive_qt, world.block_qt) || block->held_up)){
                               if(block_pushed && blocks_are_entangled(block_pushed, block, &world.blocks)){
                                    Block_t* entangled_block = block_pushed;
 
