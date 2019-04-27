@@ -332,8 +332,7 @@ static void draw_ice(Vec_t pos){
      glColor3f(1.0f, 1.0f, 1.0f);
 }
 
-void draw_player(Player_t* player, Vec_t camera, Coord_t source_coord, Coord_t destination_coord, S8 portal_rotations)
-{
+Vec_t draw_player(Player_t* player, Vec_t camera, Coord_t source_coord, Coord_t destination_coord, S8 portal_rotations){
      Vec_t pos_vec = pos_to_vec(player->pos) + camera;
      if(destination_coord.x >= 0){
           Position_t destination_pos = coord_to_pos_at_tile_center(destination_coord);
@@ -388,6 +387,8 @@ void draw_player(Player_t* player, Vec_t camera, Coord_t source_coord, Coord_t d
      glVertex2f(pos_vec.x + HALF_TILE_SIZE, pos_vec.y + HALF_TILE_SIZE);
      glTexCoord2f(tex_vec.x + PLAYER_FRAME_WIDTH, tex_vec.y);
      glVertex2f(pos_vec.x + HALF_TILE_SIZE, pos_vec.y - HALF_TILE_SIZE);
+
+     return pos_vec;
 }
 
 void draw_flats(Vec_t pos, Tile_t* tile, Interactive_t* interactive, U8 portal_rotations){
@@ -432,68 +433,6 @@ void draw_flats(Vec_t pos, Tile_t* tile, Interactive_t* interactive, U8 portal_r
      }
 
      if(tile_is_iced(tile)) draw_ice(pos);
-}
-
-void draw_solids(Vec_t pos, Interactive_t* interactive, Block_t** blocks, S16 block_count,
-                 ObjectArray_t<Player_t>* players, bool* draw_players,
-                 Position_t screen_camera, GLuint theme_texture, GLuint player_texture,
-                 Coord_t source_coord, Coord_t destination_coord, U8 portal_rotations,
-                 TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree){
-     (void)(theme_texture);
-     (void)(player_texture);
-
-     if(interactive){
-          if(interactive->type == INTERACTIVE_TYPE_PRESSURE_PLATE ||
-             interactive->type == INTERACTIVE_TYPE_ICE_DETECTOR ||
-             interactive->type == INTERACTIVE_TYPE_LIGHT_DETECTOR ||
-             (interactive->type == INTERACTIVE_TYPE_POPUP && interactive->popup.lift.ticks == 1)){
-               // pass, these are flat
-          }else{
-               draw_interactive(interactive, pos, source_coord, tilemap, interactive_quad_tree);
-
-               if(interactive->type == INTERACTIVE_TYPE_POPUP && interactive->popup.iced){
-                    pos.y += interactive->popup.lift.ticks * PIXEL_SIZE;
-                    Vec_t tex_vec = theme_frame(3, 12);
-                    glColor4f(1.0f, 1.0f, 1.0f, 0.5f);
-                    draw_theme_frame(pos, tex_vec);
-                    glColor3f(1.0f, 1.0f, 1.0f);
-               }
-          }
-     }
-
-     for(S16 i = 0; i < block_count; i++){
-          Block_t* block = blocks[i];
-          Position_t block_camera_offset = block->pos;
-          block_camera_offset.pixel += HALF_TILE_SIZE_PIXEL;
-          if(destination_coord.x >= 0){
-               Position_t destination_pos = coord_to_pos_at_tile_center(destination_coord);
-               Position_t source_pos = coord_to_pos_at_tile_center(source_coord);
-               Position_t center_delta = block_camera_offset - source_pos;
-               center_delta = position_rotate_quadrants_clockwise(center_delta, portal_rotations);
-               block_camera_offset = destination_pos + center_delta;
-          }
-
-          block_camera_offset.pixel -= HALF_TILE_SIZE_PIXEL;
-          block_camera_offset -= screen_camera;
-          block_camera_offset.pixel.y += block->pos.z;
-          draw_block(block, pos_to_vec(block_camera_offset), portal_rotations);
-     }
-
-     for(S16 i = 0; i < players->count; i++){
-          if(!draw_players[i]) continue;
-          Player_t* player = players->elements + i;
-
-          draw_player(player, Vec_t{}, source_coord, destination_coord, portal_rotations);
-
-#if 0
-          // draw entangled players
-          if(i >= 1){
-              pos_vec -= Vec_t{HALF_TILE_SIZE, HALF_TILE_SIZE};
-              tex_vec = theme_frame(0, 22);
-              draw_theme_frame(pos_vec, tex_vec);
-          }
-#endif
-     }
 }
 
 void draw_portal_blocks(Block_t** blocks, S16 block_count, Coord_t source_coord, Coord_t destination_coord, S8 portal_rotations, Vec_t camera) {
@@ -620,7 +559,21 @@ void draw_world_row_solids(S16 y, S16 x_start, S16 x_end, TileMap_t* tilemap, Qu
           auto coord = pos_to_coord(player->pos);
 
           if(coord.y == y && coord.x >= x_start && coord.x <= x_end){
-               draw_player(player, camera, coord, Coord_t{-1, -1}, 0);
+               draw_pos = draw_player(player, camera, coord, Coord_t{-1, -1}, 0);
+
+               if(i >= 1){
+                   glEnd();
+                   glBindTexture(GL_TEXTURE_2D, save_texture);
+                   glBegin(GL_QUADS);
+
+                   draw_pos -= Vec_t{HALF_TILE_SIZE, HALF_TILE_SIZE};
+                   auto tex_vec = theme_frame(0, 22);
+                   draw_theme_frame(draw_pos, tex_vec);
+
+                   glEnd();
+                   glBindTexture(GL_TEXTURE_2D, player_texture);
+                   glBegin(GL_QUADS);
+               }
           }
      }
 }
