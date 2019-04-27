@@ -1898,7 +1898,8 @@ int main(int argc, char** argv){
                                                   block->coast_horizontal = entangled_block->coast_horizontal;
 
                                                   // TODO: compress this code with the 3 instances below it
-                                                  if(block->horizontal_move.state == MOVE_STATE_IDLING && player->push_time > BLOCK_PUSH_TIME){
+                                                  if(block->horizontal_move.state == MOVE_STATE_IDLING && player->push_time > BLOCK_PUSH_TIME &&
+                                                     !block_held_down_by_another_block(block, world.block_qt, world.interactive_qt, &world.tilemap)){
                                                        Vec_t block_horizontal_vel = {entangled_block->vel.x, 0};
                                                        auto block_move_dir = vec_direction(block_horizontal_vel);
                                                        if(block_move_dir != DIRECTION_COUNT){
@@ -1909,7 +1910,8 @@ int main(int argc, char** argv){
                                              }else{
                                                   block->coast_vertical = entangled_block->coast_horizontal;
 
-                                                  if(block->vertical_move.state == MOVE_STATE_IDLING && player->push_time > BLOCK_PUSH_TIME){
+                                                  if(block->vertical_move.state == MOVE_STATE_IDLING && player->push_time > BLOCK_PUSH_TIME &&
+                                                     !block_held_down_by_another_block(block, world.block_qt, world.interactive_qt, &world.tilemap)){
                                                        Vec_t block_horizontal_vel = {entangled_block->vel.x, 0};
                                                        auto block_move_dir = vec_direction(block_horizontal_vel);
                                                        if(block_move_dir != DIRECTION_COUNT){
@@ -1924,7 +1926,8 @@ int main(int argc, char** argv){
                                              if(rotations_between % 2 == 0){
                                                   block->coast_vertical = entangled_block->coast_vertical;
 
-                                                  if(block->vertical_move.state == MOVE_STATE_IDLING && player->push_time > BLOCK_PUSH_TIME){
+                                                  if(block->vertical_move.state == MOVE_STATE_IDLING && player->push_time > BLOCK_PUSH_TIME &&
+                                                     !block_held_down_by_another_block(block, world.block_qt, world.interactive_qt, &world.tilemap)){
                                                        Vec_t block_vertical_vel = {0, entangled_block->vel.y};
                                                        auto block_move_dir = vec_direction(block_vertical_vel);
                                                        if(block_move_dir != DIRECTION_COUNT){
@@ -1935,7 +1938,8 @@ int main(int argc, char** argv){
                                              }else{
                                                   block->coast_horizontal = entangled_block->coast_vertical;
 
-                                                  if(block->horizontal_move.state == MOVE_STATE_IDLING && player->push_time > BLOCK_PUSH_TIME){
+                                                  if(block->horizontal_move.state == MOVE_STATE_IDLING && player->push_time > BLOCK_PUSH_TIME &&
+                                                     !block_held_down_by_another_block(block, world.block_qt, world.interactive_qt, &world.tilemap)){
                                                        Vec_t block_vertical_vel = {0, entangled_block->vel.y};
                                                        auto block_move_dir = vec_direction(block_vertical_vel);
                                                        if(block_move_dir != DIRECTION_COUNT){

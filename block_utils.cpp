@@ -1212,9 +1212,11 @@ void push_entangled_block(Block_t* block, World_t* world, Direction_t push_dir, 
      S16 entangle_index = block->entangle_index;
      while(entangle_index != block_index && entangle_index >= 0){
           Block_t* entangled_block = world->blocks.elements + entangle_index;
-          auto rotations_between = direction_rotations_between(static_cast<Direction_t>(entangled_block->rotation), static_cast<Direction_t>(block->rotation));
-          Direction_t rotated_dir = direction_rotate_clockwise(push_dir, rotations_between);
-          block_push(entangled_block, rotated_dir, world, pushed_by_ice, instant_vel);
+          if(!block_held_down_by_another_block(entangled_block, world->block_qt, world->interactive_qt, &world->tilemap)){
+               auto rotations_between = direction_rotations_between(static_cast<Direction_t>(entangled_block->rotation), static_cast<Direction_t>(block->rotation));
+               Direction_t rotated_dir = direction_rotate_clockwise(push_dir, rotations_between);
+               block_push(entangled_block, rotated_dir, world, pushed_by_ice, instant_vel);
+          }
           entangle_index = entangled_block->entangle_index;
      }
 }
