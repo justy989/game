@@ -174,18 +174,6 @@ Interactive_t* quad_tree_interactive_solid_at(QuadTreeNode_t<Interactive_t>* roo
      return nullptr;
 }
 
-// NOTE: skip_coord needs to be DIRECTION_COUNT size
-void find_portal_adjacents_to_skip_collision_check(Coord_t coord, QuadTreeNode_t<Interactive_t>* interactive_quad_tree,
-                                                   Coord_t* skip_coord){
-     for(S8 i = 0; i < DIRECTION_COUNT; i++) skip_coord[i] = {-1, -1};
-
-     // figure out which coords we can skip collision checking on, because they have portal exits
-     Interactive_t* interactive = quad_tree_interactive_find_at(interactive_quad_tree, coord);
-     if(is_active_portal(interactive)){
-          skip_coord[interactive->portal.face] = coord + interactive->portal.face;
-     }
-}
-
 bool portal_has_destination(Coord_t coord, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree){
      bool result = false;
      // search all portal exits for a portal they can go through

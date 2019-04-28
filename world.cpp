@@ -425,8 +425,7 @@ bool player_against_solid_interactive(Player_t* player, Direction_t direction, Q
 MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, Vec_t player_vel, Vec_t player_pos_delta,
                                                          Direction_t player_face, S8 player_clone_instance, S16 player_index,
                                                          S16 player_pushing_block, Direction_t player_pushing_block_dir,
-                                                         S8 player_pushing_block_rotation,
-                                                         Coord_t* skip_coord, World_t* world){
+                                                         S8 player_pushing_block_rotation, World_t* world){
      MovePlayerThroughWorldResult_t result = {};
 
      result.pos_delta = player_pos_delta;
@@ -747,14 +746,6 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
           for(S16 x = min.x; x <= max.x; x++){
                if(world->tilemap.tiles[y][x].id){
                     Coord_t coord {x, y};
-                    bool skip = false;
-                    for(S16 d = 0; d < DIRECTION_COUNT; d++){
-                         if(skip_coord[d] == coord){
-                              skip = true;
-                              break;
-                         }
-                    }
-                    if(skip) continue;
                     bool collide_with_tile = false;
                     position_slide_against_rect(player_pos, coord, PLAYER_RADIUS, &result.pos_delta, &collide_with_tile);
                     if(collide_with_tile){
@@ -1096,7 +1087,7 @@ bool block_push(Block_t* block, Direction_t direction, World_t* world, bool push
                                                                                &collided_block_push_dir);
                if(entangled_collided_block) return false;
                if(collided_block->rotation != block->rotation) return false; // only when the rotation is equal can we move with the block
-               if(block_against_solid_tile(collided_block, direction, &world->tilemap, world->interactive_qt)) return false;
+               if(block_against_solid_tile(collided_block, direction, &world->tilemap)) return false;
                if(block_against_solid_interactive(collided_block, direction, &world->tilemap, world->interactive_qt)) return false;
           }else{
                return false;
@@ -1109,7 +1100,7 @@ bool block_push(Block_t* block, Direction_t direction, World_t* world, bool push
           if(collided_block) return false;
      }
 
-     if(block_against_solid_tile(block, direction, &world->tilemap, world->interactive_qt)) return false;
+     if(block_against_solid_tile(block, direction, &world->tilemap)) return false;
      if(block_against_solid_interactive(block, direction, &world->tilemap, world->interactive_qt)) return false;
      auto* player = block_against_player(block, direction, &world->players);
      if(player){

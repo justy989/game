@@ -493,8 +493,7 @@ BlockInsideResult_t block_inside_another_block(Position_t block_to_check_pos, Ve
      return result;
 }
 
-Tile_t* block_against_solid_tile(Block_t* block_to_check, Direction_t direction, TileMap_t* tilemap,
-                                 QuadTreeNode_t<Interactive_t>* interactive_quad_tree){
+Tile_t* block_against_solid_tile(Block_t* block_to_check, Direction_t direction, TileMap_t* tilemap){
      Pixel_t pixel_a {};
      Pixel_t pixel_b {};
 
@@ -502,38 +501,15 @@ Tile_t* block_against_solid_tile(Block_t* block_to_check, Direction_t direction,
           return nullptr;
      }
 
-     Coord_t skip_coord[DIRECTION_COUNT];
-     find_portal_adjacents_to_skip_collision_check(block_get_coord(block_to_check), interactive_quad_tree, skip_coord);
-
      Coord_t tile_coord = pixel_to_coord(pixel_a);
 
-     bool skip = false;
-     for (auto d : skip_coord) {
-          if(d == tile_coord){
-               skip = true;
-               break;
-          }
-     }
-
-     if(!skip){
-          Tile_t* tile = tilemap_get_tile(tilemap, tile_coord);
-          if(tile && tile->id) return tile;
-     }
+     Tile_t* tile = tilemap_get_tile(tilemap, tile_coord);
+     if(tile && tile->id) return tile;
 
      tile_coord = pixel_to_coord(pixel_b);
 
-     skip = false;
-     for (auto d : skip_coord) {
-          if(d == tile_coord){
-               skip = true;
-               break;
-          }
-     }
-
-     if(!skip){
-          Tile_t* tile = tilemap_get_tile(tilemap, tile_coord);
-          if(tile && tile->id) return tile;
-     }
+     tile = tilemap_get_tile(tilemap, tile_coord);
+     if(tile && tile->id) return tile;
 
      return nullptr;
 }

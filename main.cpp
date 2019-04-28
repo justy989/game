@@ -27,7 +27,6 @@ Big Features:
 - 3D
      - when a block slides on top of an iced block, and slots into the adjacent tile because another block is 2 tiles away,
        should a push be applied to that adjacent block if it is on ice? Probably
-- Get rid of skip_coords (I think this is possible and easy?)
 - arrow kills player
 - arrow entanglement
 - Block splitting
@@ -229,16 +228,16 @@ void stop_block_colliding_with_entangled(Block_t* block, Direction_t move_dir_to
 }
 
 bool check_direction_from_block_for_adjacent_walls(Block_t* block, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt,
-                                                   Coord_t* skip_coords, Direction_t direction){
+                                                   Direction_t direction){
      Pixel_t pixel_a {};
      Pixel_t pixel_b {};
      block_adjacent_pixels_to_check(block->pos, block->pos_delta, direction, &pixel_a, &pixel_b);
      Coord_t coord_a = pixel_to_coord(pixel_a);
      Coord_t coord_b = pixel_to_coord(pixel_b);
 
-     if(coord_a != skip_coords[direction] && tilemap_is_solid(tilemap, coord_a)){
+     if(tilemap_is_solid(tilemap, coord_a)){
           return true;
-     }else if(coord_b != skip_coords[direction] && tilemap_is_solid(tilemap, coord_b)){
+     }else if(tilemap_is_solid(tilemap, coord_b)){
           return true;
      }
 
@@ -475,8 +474,8 @@ int main(int argc, char** argv){
           return 1;
      }
 
-     int window_width = 1024;
-     int window_height = 1024;
+     int window_width = 1400;
+     int window_height = 1400;
      SDL_Window* window = nullptr;
      SDL_GLContext opengl_context = nullptr;
      GLuint theme_texture = 0;
@@ -1434,20 +1433,10 @@ int main(int argc, char** argv){
                          arrow->element_from_block = -1;
                     }
 
-                    Coord_t skip_coord[DIRECTION_COUNT];
-                    find_portal_adjacents_to_skip_collision_check(pre_move_coord, world.interactive_qt, skip_coord);
-
                     if(pre_move_coord != post_move_coord){
-                         bool skip = false;
-                         for (auto d : skip_coord) {
-                              if(post_move_coord == d) skip = true;
-                         }
-
-                         if(!skip){
-                              Tile_t* tile = tilemap_get_tile(&world.tilemap, post_move_coord);
-                              if(tile_is_solid(tile)){
-                                   arrow->stuck_time = dt;
-                              }
+                         Tile_t* tile = tilemap_get_tile(&world.tilemap, post_move_coord);
+                         if(tile && tile_is_solid(tile)){
+                              arrow->stuck_time = dt;
                          }
 
                          // catch or give elements
@@ -2276,30 +2265,23 @@ int main(int argc, char** argv){
                               }
                          }
 
-                         // get the current coord of the center of the block
-                         Pixel_t center = block->pos.pixel + HALF_TILE_SIZE_PIXEL;
-                         Coord_t coord = pixel_to_coord(center);
-
-                         Coord_t skip_coords[DIRECTION_COUNT];
-                         find_portal_adjacents_to_skip_collision_check(coord, world.interactive_qt, skip_coords);
-
                          // check for adjacent walls
                          if(block->vel.x > 0.0f){
-                              if(check_direction_from_block_for_adjacent_walls(block, &world.tilemap, world.interactive_qt, skip_coords, DIRECTION_RIGHT)){
+                              if(check_direction_from_block_for_adjacent_walls(block, &world.tilemap, world.interactive_qt, DIRECTION_RIGHT)){
                                    stop_on_boundary_x = true;
                               }
                          }else if(block->vel.x < 0.0f){
-                              if(check_direction_from_block_for_adjacent_walls(block, &world.tilemap, world.interactive_qt, skip_coords, DIRECTION_LEFT)){
+                              if(check_direction_from_block_for_adjacent_walls(block, &world.tilemap, world.interactive_qt, DIRECTION_LEFT)){
                                    stop_on_boundary_x = true;
                               }
                          }
 
                          if(block->vel.y > 0.0f){
-                              if(check_direction_from_block_for_adjacent_walls(block, &world.tilemap, world.interactive_qt, skip_coords, DIRECTION_UP)){
+                              if(check_direction_from_block_for_adjacent_walls(block, &world.tilemap, world.interactive_qt, DIRECTION_UP)){
                                    stop_on_boundary_y = true;
                               }
                          }else if(block->vel.y < 0.0f){
-                              if(check_direction_from_block_for_adjacent_walls(block, &world.tilemap, world.interactive_qt, skip_coords, DIRECTION_DOWN)){
+                              if(check_direction_from_block_for_adjacent_walls(block, &world.tilemap, world.interactive_qt, DIRECTION_DOWN)){
                                    stop_on_boundary_y = true;
                               }
                          }
@@ -2706,18 +2688,11 @@ int main(int argc, char** argv){
                     for(S16 i = 0; i < update_player_count; i++){
                          Player_t* player = world.players.elements + i;
 
-                         Coord_t skip_coord[DIRECTION_COUNT];
                          Coord_t player_coord = pos_to_coord(player->pos + player->pos_delta);
-
-                         find_portal_adjacents_to_skip_collision_check(player_coord, world.interactive_qt, skip_coord);
 
                          MovePlayerThroughWorldResult_t move_result {};
 
                          if(player->teleport){
-                              Coord_t teleport_player_coord = pos_to_coord(player->teleport_pos + player->teleport_pos_delta);
-
-                              find_portal_adjacents_to_skip_collision_check(teleport_player_coord, world.interactive_qt, skip_coord);
-
                               auto pushing_block = player->pushing_block;
                               auto pushing_block_dir = player->pushing_block_dir;
                               auto pushing_block_rotation = player->pushing_block_rotation;
@@ -2733,7 +2708,7 @@ int main(int argc, char** argv){
 
                               move_result = move_player_through_world(player->teleport_pos, player->teleport_vel, player->teleport_pos_delta, player->teleport_face,
                                                                       player->clone_instance, i, pushing_block, pushing_block_dir, pushing_block_rotation,
-                                                                      skip_coord, &world);
+                                                                      &world);
 
                               if(move_result.collided) repeat_collision = true;
                               if(move_result.resetting) resetting = true;
@@ -2745,7 +2720,7 @@ int main(int argc, char** argv){
                               move_result = move_player_through_world(player->pos, player->vel, player->pos_delta, player->face,
                                                                       player->clone_instance, i, player->pushing_block,
                                                                       player->pushing_block_dir, player->pushing_block_rotation,
-                                                                      skip_coord, &world);
+                                                                      &world);
 
                               if(move_result.collided) repeat_collision = true;
                               if(move_result.resetting) resetting = true;

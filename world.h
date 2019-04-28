@@ -54,8 +54,7 @@ void activate(World_t* world, Coord_t coord);
 MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, Vec_t player_vel, Vec_t player_pos_delta,
                                                          Direction_t player_face, S8 player_clone_id, S16 player_index,
                                                          S16 player_pushing_block, Direction_t player_pushing_block_dir,
-                                                         S8 player_pushing_block_rotation,
-                                                         Coord_t* skip_coord, World_t* world);
+                                                         S8 player_pushing_block_rotation, World_t* world);
 
 TeleportPositionResult_t teleport_position_across_portal(Position_t position, Vec_t pos_delta, World_t* world,
                                                          Coord_t premove_coord, Coord_t postmove_coord);
