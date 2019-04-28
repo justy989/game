@@ -12,7 +12,6 @@ Entanglement Puzzles:
 - rotated entangled puzzles where the centroid is on a portal destination coord
 
 Current bugs:
-- Triple entangled blocks in a row cannot be pushed horizontally
 - A block on the tile outside a portal pushed into the portal to clone, the clone has weird behavior and ends up on the portal block
 - When pushing a block through a portal that turns off, the block keeps going
 - Getting a block and it's rotated entangler to push into the centroid causes the any other entangled blocks to alternate pushing
@@ -27,6 +26,8 @@ Big Features:
 - 3D
      - when a block slides on top of an iced block, and slots into the adjacent tile because another block is 2 tiles away,
        should a push be applied to that adjacent block if it is on ice? Probably
+     - entangled players on popups
+- A way to tell which blocks are entangled
 - arrow kills player
 - arrow entanglement
 - Block splitting
