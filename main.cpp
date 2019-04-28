@@ -241,24 +241,11 @@ bool check_direction_from_block_for_adjacent_walls(Block_t* block, TileMap_t* ti
           return true;
      }
 
-     Interactive_t* a = quad_tree_interactive_solid_at(interactive_qt, tilemap, coord_a);
-     Interactive_t* b = quad_tree_interactive_solid_at(interactive_qt, tilemap, coord_b);
+     Interactive_t* a = quad_tree_interactive_solid_at(interactive_qt, tilemap, coord_a, block->pos.z);
+     Interactive_t* b = quad_tree_interactive_solid_at(interactive_qt, tilemap, coord_b, block->pos.z);
 
-     if(a){
-          if(a->type == INTERACTIVE_TYPE_POPUP &&
-             (a->popup.lift.ticks - 1) <= block->pos.z){
-          }else{
-               return true;
-          }
-     }
-
-     if(b){
-          if(b->type == INTERACTIVE_TYPE_POPUP &&
-             (b->popup.lift.ticks - 1) <= block->pos.z){
-          }else{
-               return true;
-          }
-     }
+     if(a) return true;
+     if(b) return true;
 
      return false;
 }
@@ -2728,6 +2715,7 @@ int main(int argc, char** argv){
                               player->pushing_block = move_result.pushing_block;
                               player->pushing_block_dir = move_result.pushing_block_dir;
                               player->pushing_block_rotation = move_result.pushing_block_rotation;
+
                          }
 
                          auto* portal = player_is_teleporting(player, world.interactive_qt);

@@ -340,7 +340,7 @@ Interactive_t* block_against_solid_interactive(Block_t* block_to_check, Directio
      }
 
      Coord_t tile_coord = pixel_to_coord(pixel_a);
-     Interactive_t* interactive = quad_tree_interactive_solid_at(interactive_quad_tree, tilemap, tile_coord);
+     Interactive_t* interactive = quad_tree_interactive_solid_at(interactive_quad_tree, tilemap, tile_coord, block_to_check->pos.z);
      if(interactive){
           if(interactive->type == INTERACTIVE_TYPE_POPUP &&
              interactive->popup.lift.ticks - 1 <= block_to_check->pos.z){
@@ -350,14 +350,8 @@ Interactive_t* block_against_solid_interactive(Block_t* block_to_check, Directio
      }
 
      tile_coord = pixel_to_coord(pixel_b);
-     interactive = quad_tree_interactive_solid_at(interactive_quad_tree, tilemap, tile_coord);
-     if(interactive){
-          if(interactive->type == INTERACTIVE_TYPE_POPUP &&
-             interactive->popup.lift.ticks - 1 <= block_to_check->pos.z){
-          }else{
-               return interactive;
-          }
-     }
+     interactive = quad_tree_interactive_solid_at(interactive_quad_tree, tilemap, tile_coord, block_to_check->pos.z);
+     if(interactive) return interactive;
 
      return nullptr;
 }

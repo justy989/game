@@ -161,13 +161,18 @@ Interactive_t* quad_tree_interactive_find_at(QuadTreeNode_t<Interactive_t>* root
      return quad_tree_find_at(root, coord.x, coord.y);
 }
 
-Interactive_t* quad_tree_interactive_solid_at(QuadTreeNode_t<Interactive_t>* root, TileMap_t* tilemap, Coord_t coord){
+Interactive_t* quad_tree_interactive_solid_at(QuadTreeNode_t<Interactive_t>* root, TileMap_t* tilemap, Coord_t coord, S8 check_height){
      Interactive_t* interactive = quad_tree_find_at(root, coord.x, coord.y);
      if(interactive){
           if(interactive_is_solid(interactive)){
-               return interactive;
+                if(interactive->type == INTERACTIVE_TYPE_POPUP && (interactive->popup.lift.ticks - 1) <= check_height){
+                     // pass
+                }else{
+                     return interactive;
+                }
           }else if(is_active_portal(interactive)){
                if(!portal_has_destination(coord, tilemap, root)) return interactive;
+               if(check_height >= PORTAL_MAX_HEIGHT) return interactive;
           }
      }
 

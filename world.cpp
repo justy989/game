@@ -413,11 +413,17 @@ bool player_against_solid_interactive(Player_t* player, Direction_t direction, Q
 
      Coord_t coord = pixel_to_coord(pos_a.pixel);
      Interactive_t* interactive = quad_tree_find_at(interactive_qt, coord.x, coord.y);
-     if(interactive && interactive_is_solid(interactive)) return true;
+     if(interactive){
+          if(interactive_is_solid(interactive)) return true;
+          if(interactive->type == INTERACTIVE_TYPE_PORTAL && interactive->portal.on && player->pos.z > PORTAL_MAX_HEIGHT) return true;
+     }
 
      coord = pixel_to_coord(pos_b.pixel);
      interactive = quad_tree_find_at(interactive_qt, coord.x, coord.y);
-     if(interactive && interactive_is_solid(interactive)) return true;
+     if(interactive){
+          if(interactive_is_solid(interactive)) return true;
+          if(interactive->type == INTERACTIVE_TYPE_PORTAL && interactive->portal.on && player->pos.z > PORTAL_MAX_HEIGHT) return true;
+     }
 
      return false;
 }
@@ -451,6 +457,7 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
      auto collided_block_dir = DIRECTION_COUNT;
      S32 collided_with_block_count = 0;
      Position_t collided_pos;
+     bool collided_through_portal = false;
 
      S16 block_count = 0;
      Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
@@ -528,6 +535,7 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
 
                                    if(collided){
                                         result.collided = true;
+                                        collided_through_portal = true;
                                         collided_with_block_count++;
                                         collided_with_block = block;
                                         collided_pos = block_pos;
@@ -728,7 +736,9 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
 
           if(collided_block_dir == player_face && (player_vel.x != 0.0f || player_vel.y != 0.0f) &&
              !block_held_down_by_another_block(collided_with_block, world->block_qt, world->interactive_qt, &world->tilemap)){
-               if(collided_with_block_count == 1){ // also check that the player is actually pushing against the block
+               // check that we collide with exactly one block and that if we are pushing through a portal, it is not too high up
+               if(collided_with_block_count == 1 &&
+                  (!collided_through_portal || (collided_through_portal && collided_with_block->pos.z < PORTAL_MAX_HEIGHT))){ // also check that the player is actually pushing against the block
                     result.pushing_block = get_block_index(world, collided_with_block);
                     result.pushing_block_dir = rotated_player_face;
                     result.pushing_block_rotation = collision_portal_rotations;
@@ -761,12 +771,8 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
           for(S16 x = min.x; x <= max.x; x++){
                Coord_t coord {x, y};
 
-               Interactive_t* interactive = quad_tree_interactive_solid_at(world->interactive_qt, &world->tilemap, coord);
+               Interactive_t* interactive = quad_tree_interactive_solid_at(world->interactive_qt, &world->tilemap, coord, player_pos.z);
                if(interactive){
-                    // skip popups at the same level or lower than us
-                    if(interactive->type == INTERACTIVE_TYPE_POPUP &&
-                       interactive->popup.lift.ticks - 1 <= player_pos.z) continue;
-
                     bool collided = false;
                     position_slide_against_rect(player_pos, coord, PLAYER_RADIUS, &result.pos_delta, &collided);
                     if(collided && !result.collided){
