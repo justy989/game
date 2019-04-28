@@ -12,6 +12,7 @@ Entanglement Puzzles:
 - rotated entangled puzzles where the centroid is on a portal destination coord
 
 Current bugs:
+- An entangled block with a block on top of it that gets raised doesn't raise the block on top of it
 - A block on the tile outside a portal pushed into the portal to clone, the clone has weird behavior and ends up on the portal block
 - When pushing a block through a portal that turns off, the block keeps going
 - Getting a block and it's rotated entangler to push into the centroid causes the any other entangled blocks to alternate pushing
@@ -24,6 +25,7 @@ Current bugs:
 
 Big Features:
 - 3D
+     - floating entangled block should act like they are on ice, until they are on top of a block
      - when a block slides on top of an iced block, and slots into the adjacent tile because another block is 2 tiles away,
        should a push be applied to that adjacent block if it is on ice? Probably
      - entangled players on popups
@@ -375,18 +377,32 @@ PlayerInBlockRectResult_t player_in_block_rect(Player_t* player, TileMap_t* tile
      return result;
 }
 
+void raise_entangled_blocks(World_t* world, Block_t* block);
+
+void raise_above_blocks(World_t* world, Block_t* block){
+     Block_t* above_block = block_held_down_by_another_block(block, world->block_qt, world->interactive_qt, &world->tilemap);
+     while(above_block){
+          Block_t* tmp_block = above_block;
+          above_block = block_held_down_by_another_block(above_block, world->block_qt, world->interactive_qt, &world->tilemap);
+          tmp_block->pos.z++;
+          tmp_block->held_up = true;
+
+          raise_entangled_blocks(world, tmp_block);
+     }
+}
+
 void raise_entangled_blocks(World_t* world, Block_t* block){
      if(block->entangle_index >= 0){
           S16 block_index = get_block_index(world, block);
           S16 entangle_index = block->entangle_index;
           while(entangle_index != block_index && entangle_index >= 0){
                auto entangled_block = world->blocks.elements + entangle_index;
+               raise_above_blocks(world, entangled_block);
                entangled_block->pos.z++;
                entangled_block->held_up = true;
                entangle_index = entangled_block->entangle_index;
           }
      }
-
 }
 
 int main(int argc, char** argv){
@@ -1798,7 +1814,7 @@ int main(int argc, char** argv){
                               block->coast_horizontal = BLOCK_COAST_ICE;
                               block->coast_vertical = BLOCK_COAST_ICE;
                          // we also check held_up because the block could be entangled and it's entangler could be held up
-                         }else if(block->was_on_ice_or_air && block_on_air(block->pos, block->pos_delta, world.interactive_qt, world.block_qt) && !block->held_up){
+                         }else if(block->was_on_ice_or_air && block_on_air(block->pos, block->pos_delta, world.interactive_qt, world.block_qt)){
                               block->coast_horizontal = BLOCK_COAST_AIR;
                               block->coast_vertical = BLOCK_COAST_AIR;
                          }else{
@@ -1959,15 +1975,7 @@ int main(int argc, char** argv){
                          if(interactive){
                               if(interactive->type == INTERACTIVE_TYPE_POPUP){
                                    if(!pushed_up && (block->pos.z == interactive->popup.lift.ticks - 2)){
-                                        Block_t* above_block = block_held_down_by_another_block(block, world.block_qt, world.interactive_qt, &world.tilemap);
-                                        while(above_block){
-                                             Block_t* tmp_block = above_block;
-                                             above_block = block_held_down_by_another_block(above_block, world.block_qt, world.interactive_qt, &world.tilemap);
-                                             tmp_block->pos.z++;
-                                             tmp_block->held_up = true;
-
-                                             raise_entangled_blocks(&world, tmp_block);
-                                        }
+                                        raise_above_blocks(&world, block);
 
                                         block->pos.z++;
                                         block->held_up = true;
@@ -2587,7 +2595,7 @@ int main(int argc, char** argv){
                          auto block = world.blocks.elements + i;
                          if(!block->carried_by_block){
                               auto holder = block_held_up_by_another_block(block, world.block_qt, world.interactive_qt, &world.tilemap,
-                                                                           BLOCK_SOLID_SIZE_IN_PIXELS * (BLOCK_SOLID_SIZE_IN_PIXELS / 2));
+                                                                           BLOCK_FRICTION_AREA);
                               if(holder && holder->element != ELEMENT_ICE && holder->element != ELEMENT_ONLY_ICED &&
                                  holder->pos_delta != vec_zero()){
                                    block->pos_delta += holder->pos_delta;

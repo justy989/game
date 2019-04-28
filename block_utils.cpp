@@ -540,6 +540,24 @@ Player_t* block_against_player(Block_t* block, Direction_t direction, ObjectArra
      return nullptr;
 }
 
+Interactive_t* block_held_up_by_popup(Block_t* block, QuadTreeNode_t<Interactive_t>* interactive_qt, S16 min_area){
+     auto block_rect = block_get_rect(block);
+     Coord_t rect_coords[4];
+     get_rect_coords(block_rect, rect_coords);
+     for(S8 i = 0; i < 4; i++){
+          auto* interactive = quad_tree_interactive_find_at(interactive_qt, rect_coords[i]);
+          if(interactive && interactive->type == INTERACTIVE_TYPE_POPUP && block->pos.z == (interactive->popup.lift.ticks - 1)){
+               auto coord_rect = rect_surrounding_coord(rect_coords[i]);
+               auto intserection_area = rect_intersecting_area(block_rect, coord_rect);
+               if(intserection_area >= min_area){
+                    return interactive;
+               }
+          }
+     }
+
+     return nullptr;
+}
+
 static Block_t* block_at_height_in_block_rect(Position_t block_to_check_pos, QuadTreeNode_t<Block_t>* block_qt,
                                               S8 expected_height, QuadTreeNode_t<Interactive_t>* interactive_qt,
                                               TileMap_t* tilemap, S16 min_area = 0){
