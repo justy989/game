@@ -29,6 +29,7 @@ Big Features:
      - when a block slides on top of an iced block, and slots into the adjacent tile because another block is 2 tiles away,
        should a push be applied to that adjacent block if it is on ice? Probably
      - entangled players on popups
+     - if we put a popup on the other side of a portal and a block 1 interval high goes through the portal, will it work the way we expect?
 - A way to tell which blocks are entangled
 - arrow kills player
 - arrow entanglement
@@ -380,14 +381,13 @@ PlayerInBlockRectResult_t player_in_block_rect(Player_t* player, TileMap_t* tile
 void raise_entangled_blocks(World_t* world, Block_t* block);
 
 void raise_above_blocks(World_t* world, Block_t* block){
-     Block_t* above_block = block_held_down_by_another_block(block, world->block_qt, world->interactive_qt, &world->tilemap);
-     while(above_block){
-          Block_t* tmp_block = above_block;
-          above_block = block_held_down_by_another_block(above_block, world->block_qt, world->interactive_qt, &world->tilemap);
-          tmp_block->pos.z++;
-          tmp_block->held_up = true;
-
-          raise_entangled_blocks(world, tmp_block);
+     auto result = block_held_down_by_another_block(block, world->block_qt, world->interactive_qt, &world->tilemap);
+     for(S16 i = 0; i < result.count; i++){
+          Block_t* above_block = result.blocks_held[i].block;
+          raise_above_blocks(world, above_block);
+          above_block->pos.z++;
+          above_block->held_up = true;
+          raise_entangled_blocks(world, above_block);
      }
 }
 
@@ -1423,7 +1423,7 @@ int main(int argc, char** argv){
                                    }
                               // the block is only iced so we just want to melt the ice, if the block isn't covered
                               }else if(arrow->pos.z >= block_bottom && arrow->pos.z <= (block_top + MELT_SPREAD_HEIGHT) &&
-                                       !block_held_down_by_another_block(blocks[b], world.block_qt, world.interactive_qt, &world.tilemap)){
+                                       !block_held_down_by_another_block(blocks[b], world.block_qt, world.interactive_qt, &world.tilemap).held()){
                                    if(arrow->element == ELEMENT_FIRE && blocks[b]->element == ELEMENT_ONLY_ICED){
                                         blocks[b]->element = ELEMENT_NONE;
                                    }else if(arrow->element == ELEMENT_ICE && blocks[b]->element == ELEMENT_NONE){
@@ -1889,7 +1889,7 @@ int main(int argc, char** argv){
 
                                                   // TODO: compress this code with the 3 instances below it
                                                   if(block->horizontal_move.state == MOVE_STATE_IDLING && player->push_time > BLOCK_PUSH_TIME &&
-                                                     !block_held_down_by_another_block(block, world.block_qt, world.interactive_qt, &world.tilemap)){
+                                                     !block_held_down_by_another_block(block, world.block_qt, world.interactive_qt, &world.tilemap).held()){
                                                        Vec_t block_horizontal_vel = {entangled_block->vel.x, 0};
                                                        auto block_move_dir = vec_direction(block_horizontal_vel);
                                                        if(block_move_dir != DIRECTION_COUNT){
@@ -1901,7 +1901,7 @@ int main(int argc, char** argv){
                                                   block->coast_vertical = entangled_block->coast_horizontal;
 
                                                   if(block->vertical_move.state == MOVE_STATE_IDLING && player->push_time > BLOCK_PUSH_TIME &&
-                                                     !block_held_down_by_another_block(block, world.block_qt, world.interactive_qt, &world.tilemap)){
+                                                     !block_held_down_by_another_block(block, world.block_qt, world.interactive_qt, &world.tilemap).held()){
                                                        Vec_t block_horizontal_vel = {entangled_block->vel.x, 0};
                                                        auto block_move_dir = vec_direction(block_horizontal_vel);
                                                        if(block_move_dir != DIRECTION_COUNT){
@@ -1917,7 +1917,7 @@ int main(int argc, char** argv){
                                                   block->coast_vertical = entangled_block->coast_vertical;
 
                                                   if(block->vertical_move.state == MOVE_STATE_IDLING && player->push_time > BLOCK_PUSH_TIME &&
-                                                     !block_held_down_by_another_block(block, world.block_qt, world.interactive_qt, &world.tilemap)){
+                                                     !block_held_down_by_another_block(block, world.block_qt, world.interactive_qt, &world.tilemap).held()){
                                                        Vec_t block_vertical_vel = {0, entangled_block->vel.y};
                                                        auto block_move_dir = vec_direction(block_vertical_vel);
                                                        if(block_move_dir != DIRECTION_COUNT){
@@ -1929,7 +1929,7 @@ int main(int argc, char** argv){
                                                   block->coast_horizontal = entangled_block->coast_vertical;
 
                                                   if(block->horizontal_move.state == MOVE_STATE_IDLING && player->push_time > BLOCK_PUSH_TIME &&
-                                                     !block_held_down_by_another_block(block, world.block_qt, world.interactive_qt, &world.tilemap)){
+                                                     !block_held_down_by_another_block(block, world.block_qt, world.interactive_qt, &world.tilemap).held()){
                                                        Vec_t block_vertical_vel = {0, entangled_block->vel.y};
                                                        auto block_move_dir = vec_direction(block_vertical_vel);
                                                        if(block_move_dir != DIRECTION_COUNT){
@@ -1964,7 +1964,8 @@ int main(int argc, char** argv){
                for(S16 i = 0; i < world.blocks.count; i++){
                     auto block = world.blocks.elements + i;
 
-                    block->held_up = block_held_up_by_another_block(block, world.block_qt, world.interactive_qt, &world.tilemap);
+                    auto result = block_held_up_by_another_block(block, world.block_qt, world.interactive_qt, &world.tilemap);
+                    block->held_up = result.held();
 
                     // TODO: should we care about the decimal component of the position ?
                     Coord_t rect_coords[4];
@@ -2594,21 +2595,24 @@ int main(int argc, char** argv){
                     for(S16 i = 0; i < world.blocks.count; i++){
                          auto block = world.blocks.elements + i;
                          if(!block->carried_by_block){
-                              auto holder = block_held_up_by_another_block(block, world.block_qt, world.interactive_qt, &world.tilemap,
+                              auto result = block_held_up_by_another_block(block, world.block_qt, world.interactive_qt, &world.tilemap,
                                                                            BLOCK_FRICTION_AREA);
-                              if(holder && holder->element != ELEMENT_ICE && holder->element != ELEMENT_ONLY_ICED &&
-                                 holder->pos_delta != vec_zero()){
-                                   block->pos_delta += holder->pos_delta;
+                              for(S16 b = 0; b < result.count; b++){
+                                   auto holder = result.blocks_held[b].block;
+                                   if(holder && holder->element != ELEMENT_ICE && holder->element != ELEMENT_ONLY_ICED &&
+                                      holder->pos_delta != vec_zero()){
+                                        block->pos_delta += holder->pos_delta;
 
-                                   S16 entangle_index = block->entangle_index;
-                                   while(entangle_index != i && entangle_index >= 0){
-                                        Block_t* entangled_block = world.blocks.elements + entangle_index;
-                                        entangled_block->pos_delta += holder->pos_delta;
-                                        entangle_index = entangled_block->entangle_index;
+                                        S16 entangle_index = block->entangle_index;
+                                        while(entangle_index != i && entangle_index >= 0){
+                                             Block_t* entangled_block = world.blocks.elements + entangle_index;
+                                             entangled_block->pos_delta += holder->pos_delta;
+                                             entangle_index = entangled_block->entangle_index;
+                                        }
+
+                                        block->carried_by_block = true;
+                                        repeat_collision = true;
                                    }
-
-                                   block->carried_by_block = true;
-                                   repeat_collision = true;
                               }
                          }
                     }

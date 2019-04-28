@@ -7,6 +7,14 @@
 #include <string.h>
 #include <math.h>
 
+void add_block_held(BlockHeldResult_t* result, Block_t* block, Rect_t rect){
+     if(result->count < MAX_HELD_BLOCKS){
+          result->blocks_held[result->count].block = block;
+          result->blocks_held[result->count].rect = rect;
+          result->count++;
+     }
+}
+
 bool block_adjacent_pixels_to_check(Position_t pos, Vec_t pos_delta, Direction_t direction, Pixel_t* a, Pixel_t* b){
      auto block_to_check_pos = pos + pos_delta;
 
@@ -558,12 +566,14 @@ Interactive_t* block_held_up_by_popup(Block_t* block, QuadTreeNode_t<Interactive
      return nullptr;
 }
 
-static Block_t* block_at_height_in_block_rect(Position_t block_to_check_pos, QuadTreeNode_t<Block_t>* block_qt,
-                                              S8 expected_height, QuadTreeNode_t<Interactive_t>* interactive_qt,
-                                              TileMap_t* tilemap, S16 min_area = 0){
+static BlockHeldResult_t block_at_height_in_block_rect(Position_t block_to_check_pos, QuadTreeNode_t<Block_t>* block_qt,
+                                                       S8 expected_height, QuadTreeNode_t<Interactive_t>* interactive_qt,
+                                                       TileMap_t* tilemap, S16 min_area = 0){
+     BlockHeldResult_t result;
+
      // TODO: need more complicated function to detect this
      auto block_to_check_center = block_get_center(block_to_check_pos);
-     Rect_t rect = block_get_rect(block_to_check_pos.pixel);
+     Rect_t check_rect = block_get_rect(block_to_check_pos.pixel);
      Rect_t surrounding_rect = rect_to_check_surrounding_blocks(block_to_check_center.pixel);
 
      S16 block_count = 0;
@@ -575,13 +585,14 @@ static Block_t* block_at_height_in_block_rect(Position_t block_to_check_pos, Qua
           if(block->pos.z != expected_height) continue;
           auto block_pos = block->pos + block->pos_delta;
 
-          if(pixel_in_rect(block_pos.pixel, rect) ||
-             pixel_in_rect(block_top_left_pixel(block_pos.pixel), rect) ||
-             pixel_in_rect(block_top_right_pixel(block_pos.pixel), rect) ||
-             pixel_in_rect(block_bottom_right_pixel(block_pos.pixel), rect)){
-               auto intserection_area = rect_intersecting_area(block_get_rect(block_pos.pixel), rect);
+          if(pixel_in_rect(block_pos.pixel, check_rect) ||
+             pixel_in_rect(block_top_left_pixel(block_pos.pixel), check_rect) ||
+             pixel_in_rect(block_top_right_pixel(block_pos.pixel), check_rect) ||
+             pixel_in_rect(block_bottom_right_pixel(block_pos.pixel), check_rect)){
+               auto block_rect = block_get_rect(block_pos.pixel);
+               auto intserection_area = rect_intersecting_area(block_rect, check_rect);
                if(intserection_area >= min_area){
-                    return block;
+                    add_block_held(&result, block, block_rect);
                }
           }
      }
@@ -629,13 +640,14 @@ static Block_t* block_at_height_in_block_rect(Position_t block_to_check_pos, Qua
                               block_pos.decimal = vec_rotate_quadrants_clockwise(block_portal_dst_offset.decimal, portal_rotations);
                               canonicalize(&block_pos);
 
-                              if(pixel_in_rect(block_pos.pixel, rect) ||
-                                 pixel_in_rect(block_top_left_pixel(block_pos.pixel), rect) ||
-                                 pixel_in_rect(block_top_right_pixel(block_pos.pixel), rect) ||
-                                 pixel_in_rect(block_bottom_right_pixel(block_pos.pixel), rect)){
-                                   auto intserection_area = rect_intersecting_area(block_get_rect(block_pos.pixel), rect);
+                              if(pixel_in_rect(block_pos.pixel, check_rect) ||
+                                 pixel_in_rect(block_top_left_pixel(block_pos.pixel), check_rect) ||
+                                 pixel_in_rect(block_top_right_pixel(block_pos.pixel), check_rect) ||
+                                 pixel_in_rect(block_bottom_right_pixel(block_pos.pixel), check_rect)){
+                                   auto block_rect = block_get_rect(block_pos.pixel);
+                                   auto intserection_area = rect_intersecting_area(block_rect, check_rect);
                                    if(intserection_area >= min_area){
-                                        return block;
+                                        add_block_held(&result, block, block_rect);
                                    }
                               }
                          }
@@ -644,10 +656,10 @@ static Block_t* block_at_height_in_block_rect(Position_t block_to_check_pos, Qua
           }
      }
 
-     return nullptr;
+     return result;
 }
 
-Block_t* block_held_up_by_another_block(Block_t* block, QuadTreeNode_t<Block_t>* block_qt,
+BlockHeldResult_t block_held_up_by_another_block(Block_t* block, QuadTreeNode_t<Block_t>* block_qt,
                                         QuadTreeNode_t<Interactive_t>* interactive_qt, TileMap_t* tilemap, S16 min_area){
      if(block->teleport){
           return block_at_height_in_block_rect(block->teleport_pos + block->teleport_pos_delta, block_qt,
@@ -658,7 +670,7 @@ Block_t* block_held_up_by_another_block(Block_t* block, QuadTreeNode_t<Block_t>*
                                           block->pos.z - HEIGHT_INTERVAL, interactive_qt, tilemap, min_area);
 }
 
-Block_t* block_held_down_by_another_block(Block_t* block, QuadTreeNode_t<Block_t>* block_qt,
+BlockHeldResult_t block_held_down_by_another_block(Block_t* block, QuadTreeNode_t<Block_t>* block_qt,
                                           QuadTreeNode_t<Interactive_t>* interactive_qt, TileMap_t* tilemap, S16 min_area){
      if(block->teleport){
           return block_at_height_in_block_rect(block->teleport_pos + block->teleport_pos_delta, block_qt,
@@ -1200,7 +1212,7 @@ void push_entangled_block(Block_t* block, World_t* world, Direction_t push_dir, 
      S16 entangle_index = block->entangle_index;
      while(entangle_index != block_index && entangle_index >= 0){
           Block_t* entangled_block = world->blocks.elements + entangle_index;
-          if(!block_held_down_by_another_block(entangled_block, world->block_qt, world->interactive_qt, &world->tilemap)){
+          if(!block_held_down_by_another_block(entangled_block, world->block_qt, world->interactive_qt, &world->tilemap).held()){
                auto rotations_between = direction_rotations_between(static_cast<Direction_t>(entangled_block->rotation), static_cast<Direction_t>(block->rotation));
                Direction_t rotated_dir = direction_rotate_clockwise(push_dir, rotations_between);
                block_push(entangled_block, rotated_dir, world, pushed_by_ice, instant_vel);

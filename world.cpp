@@ -735,7 +735,7 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
           auto rotated_player_face = direction_rotate_counter_clockwise(player_face, collision_portal_rotations);
 
           if(collided_block_dir == player_face && (player_vel.x != 0.0f || player_vel.y != 0.0f) &&
-             !block_held_down_by_another_block(collided_with_block, world->block_qt, world->interactive_qt, &world->tilemap)){
+             !block_held_down_by_another_block(collided_with_block, world->block_qt, world->interactive_qt, &world->tilemap).held()){
                // check that we collide with exactly one block and that if we are pushing through a portal, it is not too high up
                if(collided_with_block_count == 1 &&
                   (!collided_through_portal || (collided_through_portal && collided_with_block->pos.z < PORTAL_MAX_HEIGHT))){ // also check that the player is actually pushing against the block
@@ -981,7 +981,7 @@ static void impact_ice(Coord_t center, S8 height, S16 radius, World_t* world, bo
                          Block_t* block = blocks[i];
                          if(block_get_coord(block) == coord && height > block->pos.z &&
                             height < (block->pos.z + HEIGHT_INTERVAL + MELT_SPREAD_HEIGHT) &&
-                            !block_held_down_by_another_block(block, world->block_qt, world->interactive_qt, &world->tilemap)){
+                            !block_held_down_by_another_block(block, world->block_qt, world->interactive_qt, &world->tilemap).held()){
                               if(spread_the_ice){
                                    if(block->element == ELEMENT_NONE) block->element = ELEMENT_ONLY_ICED;
                                    spread_on_block = true;

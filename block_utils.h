@@ -39,6 +39,22 @@ struct BlockCollidesWithItselfResult_t{
      Vec_t accel;
 };
 
+#define MAX_HELD_BLOCKS 16
+
+struct BlockHeld_t{
+     Block_t* block = nullptr;
+     Rect_t rect;
+};
+
+struct BlockHeldResult_t{
+     BlockHeld_t blocks_held[MAX_HELD_BLOCKS];
+     S16 count = 0;
+
+     bool held(){return count > 0;}
+};
+
+void add_block_held(BlockHeldResult_t* result, Block_t* block, Rect_t rect);
+
 bool block_adjacent_pixels_to_check(Position_t pos, Vec_t pos_delta, Direction_t direction, Pixel_t* a, Pixel_t* b);
 
 Block_t* block_against_block_in_list(Position_t pos, Block_t** blocks, S16 block_count, Direction_t direction, Pixel_t* offsets);
@@ -57,8 +73,10 @@ Tile_t* block_against_solid_tile(Block_t* block_to_check, Direction_t direction,
 Player_t* block_against_player(Block_t* block_to_check, Direction_t direction, ObjectArray_t<Player_t>* players);
 
 Interactive_t* block_held_up_by_popup(Block_t* block, QuadTreeNode_t<Interactive_t>* interactive_qt, S16 min_area = 0);
-Block_t* block_held_up_by_another_block(Block_t* block, QuadTreeNode_t<Block_t>* block_qt, QuadTreeNode_t<Interactive_t>* interactive_qt, TileMap_t* tilemap, S16 min_area = 0);
-Block_t* block_held_down_by_another_block(Block_t* block, QuadTreeNode_t<Block_t>* block_qt, QuadTreeNode_t<Interactive_t>* interactive_qt, TileMap_t* tilemap, S16 min_area = 0);
+BlockHeldResult_t block_held_up_by_another_block(Block_t* block, QuadTreeNode_t<Block_t>* block_qt, QuadTreeNode_t<Interactive_t>* interactive_qt, TileMap_t* tilemap, S16 min_area = 0);
+BlockHeldResult_t block_held_down_by_another_block(Block_t* block, QuadTreeNode_t<Block_t>* block_qt, QuadTreeNode_t<Interactive_t>* interactive_qt, TileMap_t* tilemap, S16 min_area = 0);
+
+// Rect_t block_over_air(Block_t* block, QuadTreeNode_t<Block_t>* block_qt, QuadTreeNode_t<Interactive_t>* interactive_qt);
 
 bool block_on_ice(Position_t pos, Vec_t pos_delta, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree,
                   QuadTreeNode_t<Block_t>* block_qt);
