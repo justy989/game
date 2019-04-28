@@ -1971,7 +1971,15 @@ int main(int argc, char** argv){
                     Coord_t rect_coords[4];
                     bool pushed_up = false;
                     auto final_pos = block->pos + block->pos_delta;
-                    auto block_rect = block_get_rect(final_pos.pixel);
+                    Pixel_t final_pixel = final_pos.pixel;
+
+                    // check if we pass over a grid aligned pixel, then use that one if so for both axis
+                    auto check_x_pixel = passes_over_grid_pixel(block->pos.pixel.x, final_pos.pixel.x);
+                    if(check_x_pixel >= 0) final_pixel.x = check_x_pixel;
+                    auto check_y_pixel = passes_over_grid_pixel(block->pos.pixel.y, final_pos.pixel.y);
+                    if(check_y_pixel >= 0) final_pixel.y = check_y_pixel;
+
+                    auto block_rect = block_get_rect(final_pixel);
                     get_rect_coords(block_rect, rect_coords);
                     for(S8 c = 0; c < 4; c++){
                          auto* interactive = quad_tree_interactive_find_at(world.interactive_qt, rect_coords[c]);
@@ -2000,6 +2008,8 @@ int main(int argc, char** argv){
                for(S16 i = 0; i < world.blocks.count; i++){
                     auto block = world.blocks.elements + i;
 
+                    if(block->pos.z == 0) continue;
+
                     if(block->entangle_index >= 0){
                          S16 entangle_index = block->entangle_index;
                          while(entangle_index != i && entangle_index >= 0){
@@ -2012,7 +2022,7 @@ int main(int argc, char** argv){
                          }
                     }
 
-                    if(!block->held_up && block->pos.z > 0){
+                    if(!block->held_up){
                          block->fall_time -= dt;
                          if(block->fall_time < 0){
                               block->fall_time = FALL_TIME;

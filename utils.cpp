@@ -292,6 +292,27 @@ S16 closest_pixel(S16 pixel, F32 decimal){
      return pixel;
 }
 
+S16 passes_over_grid_pixel(S16 pixel_a, S16 pixel_b){
+     if(pixel_a == pixel_b){
+          if((pixel_a % TILE_SIZE_IN_PIXELS) == 0) return pixel_a;
+          return -1;
+     }
+
+     S16 start = pixel_a;
+     S16 end = pixel_b;
+
+     if(pixel_a > pixel_b){
+          start = pixel_b;
+          end = pixel_a;
+     }
+
+     for(S16 i = start; i <= end; i++){
+          if((i % TILE_SIZE_IN_PIXELS) == 0) return i;
+     }
+
+     return -1;
+}
+
 void get_rect_coords(Rect_t rect, Coord_t* coords){
      coords[0] = pixel_to_coord(Pixel_t{rect.left, rect.bottom});
      coords[1] = pixel_to_coord(Pixel_t{rect.left, rect.top});
