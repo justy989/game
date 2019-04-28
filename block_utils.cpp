@@ -15,6 +15,14 @@ void add_block_held(BlockHeldResult_t* result, Block_t* block, Rect_t rect){
      }
 }
 
+void add_interactive_held(InteractiveHeldResult_t* result, Interactive_t* interactive, Rect_t rect){
+     if(result->count < MAX_HELD_INTERACTIVES){
+          result->interactives_held[result->count].interactive = interactive;
+          result->interactives_held[result->count].rect = rect;
+          result->count++;
+     }
+}
+
 bool block_adjacent_pixels_to_check(Position_t pos, Vec_t pos_delta, Direction_t direction, Pixel_t* a, Pixel_t* b){
      auto block_to_check_pos = pos + pos_delta;
 
@@ -548,22 +556,23 @@ Player_t* block_against_player(Block_t* block, Direction_t direction, ObjectArra
      return nullptr;
 }
 
-Interactive_t* block_held_up_by_popup(Block_t* block, QuadTreeNode_t<Interactive_t>* interactive_qt, S16 min_area){
-     auto block_rect = block_get_rect(block);
+InteractiveHeldResult_t block_held_up_by_popup(Position_t block_pos, QuadTreeNode_t<Interactive_t>* interactive_qt, S16 min_area){
+     InteractiveHeldResult_t result;
+     auto block_rect = block_get_rect(block_pos.pixel);
      Coord_t rect_coords[4];
      get_rect_coords(block_rect, rect_coords);
      for(S8 i = 0; i < 4; i++){
           auto* interactive = quad_tree_interactive_find_at(interactive_qt, rect_coords[i]);
-          if(interactive && interactive->type == INTERACTIVE_TYPE_POPUP && block->pos.z == (interactive->popup.lift.ticks - 1)){
-               auto coord_rect = rect_surrounding_coord(rect_coords[i]);
-               auto intserection_area = rect_intersecting_area(block_rect, coord_rect);
+          if(interactive && interactive->type == INTERACTIVE_TYPE_POPUP && block_pos.z == (interactive->popup.lift.ticks - 1)){
+               auto popup_rect = block_get_rect(coord_to_pixel(rect_coords[i]));
+               auto intserection_area = rect_intersecting_area(block_rect, popup_rect);
                if(intserection_area >= min_area){
-                    return interactive;
+                    add_interactive_held(&result, interactive, popup_rect);
                }
           }
      }
 
-     return nullptr;
+     return result;
 }
 
 static BlockHeldResult_t block_at_height_in_block_rect(Position_t block_to_check_pos, QuadTreeNode_t<Block_t>* block_qt,
@@ -685,7 +694,7 @@ bool block_on_ice(Position_t pos, Vec_t pos_delta, TileMap_t* tilemap, QuadTreeN
                   QuadTreeNode_t<Block_t>* block_qt){
      auto block_pos = pos + pos_delta;
 
-     Pixel_t pixel_to_check = block_pos.pixel + Pixel_t{HALF_TILE_SIZE_IN_PIXELS, HALF_TILE_SIZE_IN_PIXELS};
+     Pixel_t pixel_to_check = block_get_center(block_pos).pixel;
      Coord_t coord_to_check = pixel_to_coord(pixel_to_check);
 
      if(pos.z == 0){
@@ -724,42 +733,26 @@ bool block_on_ice(Position_t pos, Vec_t pos_delta, TileMap_t* tilemap, QuadTreeN
      return false;
 }
 
-bool block_on_air(Position_t pos, Vec_t pos_delta, QuadTreeNode_t<Interactive_t>* interactive_qt, QuadTreeNode_t<Block_t>* block_qt){
-     auto block_pos = pos + pos_delta;
+bool block_on_air(Position_t block_pos, QuadTreeNode_t<Interactive_t>* interactive_qt, QuadTreeNode_t<Block_t>* block_qt, TileMap_t* tilemap){
+     if(block_pos.z == 0) return false; // TODO: if we add pits, check for a pit obv
 
-     // auto block_rect = block_get_rect(block_pos.pixel);
      auto block_center = block_get_center(block_pos);
-     auto coord_to_check = block_get_coord(block_pos);
-
-     if(pos.z == 0) return false; // TODO: if we add pits, check for a pit obv
-
-     Interactive_t* interactive = quad_tree_interactive_find_at(interactive_qt, coord_to_check);
-     if(interactive){
-          if(interactive->type == INTERACTIVE_TYPE_POPUP){
-               if(interactive->popup.lift.ticks == (pos.z + 1)){
-                    return false;
-                    // auto coord_rect = rect_surrounding_coord(coord_to_check);
-                    // if(rect_in_rect(block_rect, coord_rect)) return false;
-               }
-          }
+     auto block_result = block_at_height_in_block_rect(block_pos, block_qt,
+                                                       block_pos.z - HEIGHT_INTERVAL, interactive_qt, tilemap);
+     for(S16 i = 0; i < block_result.count; i++){
+          if(pixel_in_rect(block_center.pixel, block_result.blocks_held[i].rect)) return false;
      }
 
-     auto rect_to_check = rect_surrounding_adjacent_coords(coord_to_check);
-
-     S16 block_count = 0;
-     Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
-     quad_tree_find_in(block_qt, rect_to_check, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
-
-     for(S16 i = 0; i < block_count; i++){
-          auto block = blocks[i];
-          auto check_block_rect = block_get_rect(block);
-
-          if(block->pos.z + HEIGHT_INTERVAL != pos.z) continue;
-          if(pixel_in_rect(block_center.pixel, check_block_rect)) return false;
-          // if(rect_in_rect(block_rect, check_block_rect)) return false;
+     auto interactive_result = block_held_up_by_popup(block_pos, interactive_qt);
+     for(S16 i = 0; i < interactive_result.count; i++){
+          if(pixel_in_rect(block_center.pixel, interactive_result.interactives_held[i].rect)) return false;
      }
 
      return true;
+}
+
+bool block_on_air(Block_t* block, QuadTreeNode_t<Interactive_t>* interactive_qt, QuadTreeNode_t<Block_t>* block_qt, TileMap_t* tilemap){
+     return block_on_air(block->pos + block->pos_delta, interactive_qt, block_qt, tilemap);
 }
 
 CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t block_pos, Vec_t block_pos_delta, Vec_t block_vel,

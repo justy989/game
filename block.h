@@ -15,6 +15,12 @@ enum BlockCoast_t{
      BLOCK_COAST_AIR, // lol coaster
 };
 
+enum BlockHeldBy_t{
+     BLOCK_HELD_BY_NONE = 0,
+     BLOCK_HELD_BY_SOLID = 1,
+     BLOCK_HELD_BY_ENTANGLE = 2,
+};
+
 struct Block_t : public GridMotion_t{
      Position_t      pos;
      Element_t       element;
@@ -28,9 +34,8 @@ struct Block_t : public GridMotion_t{
      DirectionMask_t prev_push_mask;
 
      // these could all be flags one day when they grow up
-     bool       held_up;
-     bool       was_on_ice_or_air;
-     bool       carried_by_block;
+     S8   held_up;
+     bool carried_by_block;
 
      bool       teleport;
      Position_t teleport_pos;

@@ -53,7 +53,21 @@ struct BlockHeldResult_t{
      bool held(){return count > 0;}
 };
 
+#define MAX_HELD_INTERACTIVES 4
+struct InteractiveHeld_t{
+     Interactive_t* interactive = nullptr;
+     Rect_t rect;
+};
+
+struct InteractiveHeldResult_t{
+     InteractiveHeld_t interactives_held[MAX_HELD_INTERACTIVES];
+     S16 count = 0;
+
+     bool held(){return count > 0;}
+};
+
 void add_block_held(BlockHeldResult_t* result, Block_t* block, Rect_t rect);
+void add_interactive_held(InteractiveHeldResult_t* result, Interactive_t* interactive, Rect_t rect);
 
 bool block_adjacent_pixels_to_check(Position_t pos, Vec_t pos_delta, Direction_t direction, Pixel_t* a, Pixel_t* b);
 
@@ -72,16 +86,15 @@ BlockInsideResult_t block_inside_another_block(Block_t* block_to_check, QuadTree
 Tile_t* block_against_solid_tile(Block_t* block_to_check, Direction_t direction, TileMap_t* tilemap);
 Player_t* block_against_player(Block_t* block_to_check, Direction_t direction, ObjectArray_t<Player_t>* players);
 
-Interactive_t* block_held_up_by_popup(Block_t* block, QuadTreeNode_t<Interactive_t>* interactive_qt, S16 min_area = 0);
+InteractiveHeldResult_t block_held_up_by_popup(Position_t block_pos, QuadTreeNode_t<Interactive_t>* interactive_qt, S16 min_area = 0);
 BlockHeldResult_t block_held_up_by_another_block(Block_t* block, QuadTreeNode_t<Block_t>* block_qt, QuadTreeNode_t<Interactive_t>* interactive_qt, TileMap_t* tilemap, S16 min_area = 0);
 BlockHeldResult_t block_held_down_by_another_block(Block_t* block, QuadTreeNode_t<Block_t>* block_qt, QuadTreeNode_t<Interactive_t>* interactive_qt, TileMap_t* tilemap, S16 min_area = 0);
-
-// Rect_t block_over_air(Block_t* block, QuadTreeNode_t<Block_t>* block_qt, QuadTreeNode_t<Interactive_t>* interactive_qt);
 
 bool block_on_ice(Position_t pos, Vec_t pos_delta, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree,
                   QuadTreeNode_t<Block_t>* block_qt);
 
-bool block_on_air(Position_t pos, Vec_t pos_delta, QuadTreeNode_t<Interactive_t>* interactive_quad_tree, QuadTreeNode_t<Block_t>* block_qt);
+bool block_on_air(Position_t pos, QuadTreeNode_t<Interactive_t>* interactive_qt, QuadTreeNode_t<Block_t>* block_qt, TileMap_t* tilemap);
+bool block_on_air(Block_t* block, QuadTreeNode_t<Interactive_t>* interactive_qt, QuadTreeNode_t<Block_t>* block_qt, TileMap_t* tilemap);
 
 CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t block_pos, Vec_t block_pos_delta, Vec_t block_vel,
                                                                     Vec_t block_accel, S16 block_stop_on_pixel_x, S16 block_stop_on_pixel_y,

@@ -396,7 +396,7 @@ Vec_t draw_player(Player_t* player, Vec_t camera, Coord_t source_coord, Coord_t 
 
 
      // draw shadow
-     pos_vec.y += PIXEL_SIZE; // move shadow up 1
+     pos_vec.y -= PIXEL_SIZE; // move shadow up 1
      glColor4f(1.0f, 1.0f, 1.0f, 0.5f);
      glTexCoord2f(shadow_vec.x, shadow_vec.y);
      glVertex2f(pos_vec.x - HALF_TILE_SIZE, pos_vec.y - HALF_TILE_SIZE);
