@@ -313,6 +313,12 @@ S16 passes_over_grid_pixel(S16 pixel_a, S16 pixel_b){
      return -1;
 }
 
+S16 passes_over_pixel(S16 pixel_a, S16 pixel_b){
+     if(pixel_a == pixel_b) return pixel_a;
+     if(pixel_a > pixel_b) return pixel_a;
+     return pixel_b;
+}
+
 void get_rect_coords(Rect_t rect, Coord_t* coords){
      coords[0] = pixel_to_coord(Pixel_t{rect.left, rect.bottom});
      coords[1] = pixel_to_coord(Pixel_t{rect.left, rect.top});

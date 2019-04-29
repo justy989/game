@@ -575,15 +575,15 @@ InteractiveHeldResult_t block_held_up_by_popup(Position_t block_pos, QuadTreeNod
      return result;
 }
 
-static BlockHeldResult_t block_at_height_in_block_rect(Position_t block_to_check_pos, QuadTreeNode_t<Block_t>* block_qt,
+static BlockHeldResult_t block_at_height_in_block_rect(Pixel_t block_to_check_pixel, QuadTreeNode_t<Block_t>* block_qt,
                                                        S8 expected_height, QuadTreeNode_t<Interactive_t>* interactive_qt,
                                                        TileMap_t* tilemap, S16 min_area = 0){
      BlockHeldResult_t result;
 
      // TODO: need more complicated function to detect this
-     auto block_to_check_center = block_get_center(block_to_check_pos);
-     Rect_t check_rect = block_get_rect(block_to_check_pos.pixel);
-     Rect_t surrounding_rect = rect_to_check_surrounding_blocks(block_to_check_center.pixel);
+     auto block_to_check_center = block_center_pixel(block_to_check_pixel);
+     Rect_t check_rect = block_get_rect(block_to_check_pixel);
+     Rect_t surrounding_rect = rect_to_check_surrounding_blocks(block_to_check_center);
 
      S16 block_count = 0;
      Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
@@ -606,7 +606,7 @@ static BlockHeldResult_t block_at_height_in_block_rect(Position_t block_to_check
           }
      }
 
-     auto block_to_check_coord = pos_to_coord(block_to_check_center);
+     auto block_to_check_coord = pixel_to_coord(block_to_check_center);
 
      // TODO: compress this logic with move_player_through_world()
      for(S8 d = 0; d < DIRECTION_COUNT; d++){
@@ -671,22 +671,34 @@ static BlockHeldResult_t block_at_height_in_block_rect(Position_t block_to_check
 BlockHeldResult_t block_held_up_by_another_block(Block_t* block, QuadTreeNode_t<Block_t>* block_qt,
                                         QuadTreeNode_t<Interactive_t>* interactive_qt, TileMap_t* tilemap, S16 min_area){
      if(block->teleport){
-          return block_at_height_in_block_rect(block->teleport_pos + block->teleport_pos_delta, block_qt,
+          auto final_pos = block->teleport_pos + block->teleport_pos_delta;
+          final_pos.pixel.x = passes_over_pixel(block->teleport_pos.pixel.x, final_pos.pixel.x);
+          final_pos.pixel.y = passes_over_pixel(block->teleport_pos.pixel.y, final_pos.pixel.y);
+          return block_at_height_in_block_rect(final_pos.pixel, block_qt,
                                                block->teleport_pos.z - HEIGHT_INTERVAL, interactive_qt, tilemap, min_area);
      }
 
-     return block_at_height_in_block_rect(block->pos + block->pos_delta, block_qt,
+     auto final_pos = block->pos + block->pos_delta;
+     final_pos.pixel.x = passes_over_pixel(block->pos.pixel.x, final_pos.pixel.x);
+     final_pos.pixel.y = passes_over_pixel(block->pos.pixel.y, final_pos.pixel.y);
+     return block_at_height_in_block_rect(final_pos.pixel, block_qt,
                                           block->pos.z - HEIGHT_INTERVAL, interactive_qt, tilemap, min_area);
 }
 
 BlockHeldResult_t block_held_down_by_another_block(Block_t* block, QuadTreeNode_t<Block_t>* block_qt,
                                           QuadTreeNode_t<Interactive_t>* interactive_qt, TileMap_t* tilemap, S16 min_area){
      if(block->teleport){
-          return block_at_height_in_block_rect(block->teleport_pos + block->teleport_pos_delta, block_qt,
+          auto final_pos = block->teleport_pos + block->teleport_pos_delta;
+          final_pos.pixel.x = passes_over_pixel(block->teleport_pos.pixel.x, final_pos.pixel.x);
+          final_pos.pixel.y = passes_over_pixel(block->teleport_pos.pixel.y, final_pos.pixel.y);
+          return block_at_height_in_block_rect(final_pos.pixel, block_qt,
                                                block->teleport_pos.z + HEIGHT_INTERVAL, interactive_qt, tilemap, min_area);
      }
 
-     return block_at_height_in_block_rect(block->pos + block->pos_delta, block_qt,
+     auto final_pos = block->pos + block->pos_delta;
+     final_pos.pixel.x = passes_over_pixel(block->pos.pixel.x, final_pos.pixel.x);
+     final_pos.pixel.y = passes_over_pixel(block->pos.pixel.y, final_pos.pixel.y);
+     return block_at_height_in_block_rect(final_pos.pixel, block_qt,
                                           block->pos.z + HEIGHT_INTERVAL, interactive_qt, tilemap, min_area);
 }
 
@@ -733,26 +745,27 @@ bool block_on_ice(Position_t pos, Vec_t pos_delta, TileMap_t* tilemap, QuadTreeN
      return false;
 }
 
-bool block_on_air(Position_t block_pos, QuadTreeNode_t<Interactive_t>* interactive_qt, QuadTreeNode_t<Block_t>* block_qt, TileMap_t* tilemap){
-     if(block_pos.z == 0) return false; // TODO: if we add pits, check for a pit obv
+bool block_on_air(Position_t pos, Vec_t pos_delta, QuadTreeNode_t<Interactive_t>* interactive_qt, QuadTreeNode_t<Block_t>* block_qt, TileMap_t* tilemap){
+     if(pos.z == 0) return false; // TODO: if we add pits, check for a pit obv
 
-     auto block_center = block_get_center(block_pos);
-     auto block_result = block_at_height_in_block_rect(block_pos, block_qt,
-                                                       block_pos.z - HEIGHT_INTERVAL, interactive_qt, tilemap);
+     auto final_pos = pos + pos_delta;
+     auto block_center = block_center_pixel(final_pos);
+     auto block_result = block_at_height_in_block_rect(final_pos.pixel, block_qt,
+                                                       final_pos.z - HEIGHT_INTERVAL, interactive_qt, tilemap);
      for(S16 i = 0; i < block_result.count; i++){
-          if(pixel_in_rect(block_center.pixel, block_result.blocks_held[i].rect)) return false;
+          if(pixel_in_rect(block_center, block_result.blocks_held[i].rect)) return false;
      }
 
-     auto interactive_result = block_held_up_by_popup(block_pos, interactive_qt);
+     auto interactive_result = block_held_up_by_popup(final_pos, interactive_qt);
      for(S16 i = 0; i < interactive_result.count; i++){
-          if(pixel_in_rect(block_center.pixel, interactive_result.interactives_held[i].rect)) return false;
+          if(pixel_in_rect(block_center, interactive_result.interactives_held[i].rect)) return false;
      }
 
      return true;
 }
 
 bool block_on_air(Block_t* block, QuadTreeNode_t<Interactive_t>* interactive_qt, QuadTreeNode_t<Block_t>* block_qt, TileMap_t* tilemap){
-     return block_on_air(block->pos + block->pos_delta, interactive_qt, block_qt, tilemap);
+     return block_on_air(block->pos, block->pos_delta, interactive_qt, block_qt, tilemap);
 }
 
 CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t block_pos, Vec_t block_pos_delta, Vec_t block_vel,
