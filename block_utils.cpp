@@ -818,9 +818,11 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
           move_direction_to_directions(move_direction, &first_direction, &second_direction);
 
           // check if they are on ice before we adjust the position on our block to check
-          bool a_on_ice = block_on_ice(block_pos, result.pos_delta, &world->tilemap, world->interactive_qt, world->block_qt);
-          bool b_on_ice = block_on_ice(block_inside_result.block->pos, block_inside_result.block->pos_delta,
-                                       &world->tilemap, world->interactive_qt, world->block_qt);
+          bool a_on_ice_or_air = block_on_ice(block_pos, result.pos_delta, &world->tilemap, world->interactive_qt, world->block_qt) ||
+              block_on_air(block_pos, result.pos_delta, world->interactive_qt, world->block_qt, &world->tilemap);
+          bool b_on_ice_or_air = block_on_ice(block_inside_result.block->pos, block_inside_result.block->pos_delta,
+                                       &world->tilemap, world->interactive_qt, world->block_qt) ||
+              block_on_air(block_inside_result.block->pos, block_inside_result.block->pos_delta, world->interactive_qt, world->block_qt, &world->tilemap);
 
           Vec_t save_vel = result.vel;
 
@@ -968,7 +970,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                }
           }
 
-          if(a_on_ice && b_on_ice){
+          if(a_on_ice_or_air && b_on_ice_or_air){
                bool push = true;
 
                if(block_inside_index == block_index){

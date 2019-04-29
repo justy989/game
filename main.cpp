@@ -25,9 +25,6 @@ Current bugs:
 
 Big Features:
 - 3D
-     - floating entangled block should act like they are on ice, until they are on top of a block
-     - when a block slides on top of an iced block, and slots into the adjacent tile because another block is 2 tiles away,
-       should a push be applied to that adjacent block if it is on ice? Probably
      - entangled players on popups
      - if we put a popup on the other side of a portal and a block 1 interval high goes through the portal, will it work the way we expect?
 - A way to tell which blocks are entangled
@@ -2185,8 +2182,13 @@ int main(int argc, char** argv){
                                                   if(move_dir_to_stop == DIRECTION_COUNT){
                                                        copy_block_collision_results(block, &collision_result);
                                                   }else{
-                                                       if(block_on_ice(block->pos, block->pos_delta, &world.tilemap, world.interactive_qt, world.block_qt) &&
-                                                          block_on_ice(entangled_block->pos, entangled_block->pos_delta, &world.tilemap, world.interactive_qt, world.block_qt)){
+                                                       bool block_on_ice_or_air = block_on_ice(block->pos, block->pos_delta, &world.tilemap, world.interactive_qt, world.block_qt) ||
+                                                       block_on_air(block->pos, block->pos_delta, world.interactive_qt, world.block_qt, &world.tilemap);
+
+                                                       bool entangled_block_on_ice_or_air = block_on_ice(entangled_block->pos, entangled_block->pos_delta, &world.tilemap, world.interactive_qt, world.block_qt) ||
+                                                       block_on_air(entangled_block->pos, entangled_block->pos_delta, world.interactive_qt, world.block_qt, &world.tilemap);
+
+                                                       if(block_on_ice_or_air && entangled_block_on_ice_or_air){
                                                             // TODO: handle this case for blocks not entangled on ice
                                                             // TODO: handle pushing blocks diagonally
 
