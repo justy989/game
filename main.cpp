@@ -402,6 +402,22 @@ void raise_entangled_blocks(World_t* world, Block_t* block){
      }
 }
 
+void raise_players(ObjectArray_t<Player_t>* players){
+     for(S16 i = 0; i < players->count; i++){
+          players->elements[i].pos.z++;
+          players->elements[i].held_up = true;
+
+          // gettin raised makes it hard to push stuff
+          players->elements[i].push_time = 0.0f;
+     }
+}
+
+void hold_players(ObjectArray_t<Player_t>* players){
+     for(S16 i = 0; i < players->count; i++){
+          players->elements[i].held_up = true;
+     }
+}
+
 int main(int argc, char** argv){
      const char* load_map_filepath = nullptr;
      bool test = false;
@@ -1635,6 +1651,7 @@ int main(int argc, char** argv){
                     }
                     player->pushing_block = -1;
                     player->carried_by_block = false;
+                    player->held_up = false;
 
                     player->teleport = false;
                     player->teleport_pushing_block = -1;
@@ -1706,47 +1723,6 @@ int main(int argc, char** argv){
                          player->pos_delta = vec_normalize(player->pos_delta) * max_pos_delta;
                     }
 
-                    Coord_t player_previous_coord = pos_to_coord(player->pos);
-
-                    // drop the player if they are above 0 and not held up by anything. This also contains logic for following a block
-                    {
-                         bool held_up = false;
-
-                         Interactive_t* interactive = quad_tree_interactive_find_at(world.interactive_qt, player_previous_coord);
-                         if(interactive){
-                              if(interactive->type == INTERACTIVE_TYPE_POPUP){
-                                   if(interactive->popup.lift.ticks == player->pos.z + 1){
-                                         held_up = true;
-                                   }else if(interactive->coord == player_previous_coord && interactive->popup.lift.ticks == player->pos.z + 2){
-                                         player->pos.z++;
-                                         held_up = true;
-
-                                         // if you are getting pushed up, it's hard to keep your grip!
-                                         player->push_time = 0.0f;
-                                   }
-                              }
-                         }
-
-                         if(!held_up){
-                              auto result = player_in_block_rect(player, &world.tilemap, world.interactive_qt, world.block_qt);
-                              for(S8 e = 0; e < result.entry_count; e++){
-                                   auto& entry = result.entries[e];
-                                   if(entry.block_pos.z == player->pos.z - HEIGHT_INTERVAL){
-                                        held_up = true;
-                                   }else if((entry.block_pos.z - 1) == player->pos.z - HEIGHT_INTERVAL){
-                                        held_up = true;
-                                        player->pos.z++;
-
-                                        player->push_time = 0.0f;
-                                   }
-                              }
-                         }
-
-                         if(!held_up && player->pos.z > 0){
-                              player->pos.z--;
-                         }
-                    }
-
                     if(player->stopping_block_from_time > 0){
                          player->stopping_block_from_time -= dt;
                          if(player->stopping_block_from_time < 0){
@@ -1758,6 +1734,45 @@ int main(int argc, char** argv){
                     }
 
                     player->pos_delta_save = player->pos_delta;
+               }
+
+               // check for being held up
+               for(S16 i = 0; i < world.players.count; i++){
+                    auto player = world.players.elements + i;
+
+                    Coord_t player_previous_coord = pos_to_coord(player->pos);
+
+                    // drop the player if they are above 0 and not held up by anything. This also contains logic for following a block
+                    Interactive_t* interactive = quad_tree_interactive_find_at(world.interactive_qt, player_previous_coord);
+                    if(interactive){
+                         if(interactive->type == INTERACTIVE_TYPE_POPUP){
+                              if(interactive->popup.lift.ticks == player->pos.z + 1){
+                                    hold_players(&world.players);
+                              }else if(interactive->coord == player_previous_coord && interactive->popup.lift.ticks == player->pos.z + 2){
+                                    raise_players(&world.players);
+                              }
+                         }
+                    }
+
+                    if(!player->held_up){
+                         auto result = player_in_block_rect(player, &world.tilemap, world.interactive_qt, world.block_qt);
+                         for(S8 e = 0; e < result.entry_count; e++){
+                              auto& entry = result.entries[e];
+                              if(entry.block_pos.z == player->pos.z - HEIGHT_INTERVAL){
+                                   hold_players(&world.players);
+                              }else if((entry.block_pos.z - 1) == player->pos.z - HEIGHT_INTERVAL){
+                                   raise_players(&world.players);
+                              }
+                         }
+                    }
+               }
+
+               // fall pass
+               for(S16 i = 0; i < world.players.count; i++){
+                    auto player = world.players.elements + i;
+                    if(!player->held_up && player->pos.z > 0){
+                         player->pos.z--;
+                    }
                }
 
                // block movement
@@ -2842,7 +2857,10 @@ int main(int argc, char** argv){
                                    auto& entry = result.entries[e];
                                    if(entry.block_pos.z == player->pos.z - HEIGHT_INTERVAL){
                                         auto rotated_pos_delta = vec_rotate_quadrants_clockwise(entry.block->pos_delta, entry.portal_rotations);
-                                        player->pos_delta += rotated_pos_delta;
+                                        for(S16 p = 0; p < world.players.count; p++){
+                                             auto tmp_player = world.players.elements + p;
+                                             tmp_player->pos_delta += rotated_pos_delta;
+                                        }
                                         player->carried_by_block = true;
                                         repeat_collision = true;
                                    }

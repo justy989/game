@@ -57,6 +57,7 @@ struct Player_t : public Motion_t {
 
      bool        successfully_moved = false;
      bool        carried_by_block = false;
+     bool        held_up = false;
 };
 
 // rough estimate since player is 3.5 pixels radius
