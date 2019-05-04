@@ -12,10 +12,9 @@ Entanglement Puzzles:
 - rotated entangled puzzles where the centroid is on a portal destination coord
 
 Current bugs:
-- An entangled block with a block on top of it that gets raised doesn't raise the block on top of it
 - A block on the tile outside a portal pushed into the portal to clone, the clone has weird behavior and ends up on the portal block
 - When pushing a block through a portal that turns off, the block keeps going
-- Getting a block and it's rotated entangler to push into the centroid causes the any other entangled blocks to alternate pushing
+- Getting a block and it's rotated entangler to push into the centroid causes any other entangled blocks to alternate pushing
 - Lockups/crashing when lots of entangled blocks collided on ice
 - In the case of 3 rotated entangled blocks, 2 blocks that have a rotation of 2 between them colliding into each other seem to end up off of the grid
 - When pushing a block through portals, the block seems to snap to grid oddly when you finish pushing it
@@ -491,8 +490,8 @@ int main(int argc, char** argv){
           return 1;
      }
 
-     int window_width = 1400;
-     int window_height = 1400;
+     int window_width = 1024;
+     int window_height = 1024;
      SDL_Window* window = nullptr;
      SDL_GLContext opengl_context = nullptr;
      GLuint theme_texture = 0;
@@ -1650,7 +1649,9 @@ int main(int argc, char** argv){
                          player->prev_pushing_block = -1;
                     }
                     player->pushing_block = -1;
-                    player->carried_by_block = false;
+                    player->carried_by_block = -1;
+                    player->carried_positive_pos_delta = vec_zero();
+                    player->carried_negative_pos_delta = vec_zero();
                     player->held_up = false;
 
                     player->teleport = false;
@@ -2851,19 +2852,65 @@ int main(int argc, char** argv){
                               }
                          }
 
-                         if(!player->carried_by_block){
-                              auto result = player_in_block_rect(player, &world.tilemap, world.interactive_qt, world.block_qt);
-                              for(S8 e = 0; e < result.entry_count; e++){
-                                   auto& entry = result.entries[e];
-                                   if(entry.block_pos.z == player->pos.z - HEIGHT_INTERVAL){
-                                        auto rotated_pos_delta = vec_rotate_quadrants_clockwise(entry.block->pos_delta, entry.portal_rotations);
-                                        for(S16 p = 0; p < world.players.count; p++){
-                                             auto tmp_player = world.players.elements + p;
-                                             tmp_player->pos_delta += rotated_pos_delta;
+                         auto result = player_in_block_rect(player, &world.tilemap, world.interactive_qt, world.block_qt);
+                         for(S8 e = 0; e < result.entry_count; e++){
+                              auto& entry = result.entries[e];
+                              if(entry.block_pos.z == player->pos.z - HEIGHT_INTERVAL){
+                                   bool no_change = false;
+                                   auto rotated_pos_delta = vec_rotate_quadrants_clockwise(entry.block->pos_delta, entry.portal_rotations);
+                                   for(S16 p = 0; p < world.players.count; p++){
+                                        auto tmp_player = world.players.elements + p;
+                                        auto block_index = get_block_index(&world, entry.block);
+                                        auto old_carried_pos_delta = tmp_player->carried_positive_pos_delta + tmp_player->carried_negative_pos_delta;
+
+                                        if(rotated_pos_delta.x > 0){
+                                             if(rotated_pos_delta.x > tmp_player->carried_positive_pos_delta.x){
+                                                  tmp_player->carried_positive_pos_delta.x = rotated_pos_delta.x;
+                                             }else if(tmp_player->carried_by_block == block_index &&
+                                                      rotated_pos_delta.x < tmp_player->carried_positive_pos_delta.x){
+                                                  tmp_player->carried_positive_pos_delta.x = rotated_pos_delta.x;
+                                             }else{
+                                                  no_change = true;
+                                             }
+                                        }else if(rotated_pos_delta.x < 0){
+                                             if(rotated_pos_delta.x < tmp_player->carried_negative_pos_delta.x){
+                                                  tmp_player->carried_negative_pos_delta.x = rotated_pos_delta.x;
+                                             }else if(tmp_player->carried_by_block == block_index &&
+                                                      rotated_pos_delta.x > tmp_player->carried_negative_pos_delta.x){
+                                                  tmp_player->carried_negative_pos_delta.x = rotated_pos_delta.x;
+                                             }else{
+                                                  no_change = true;
+                                             }
                                         }
-                                        player->carried_by_block = true;
-                                        repeat_collision = true;
+
+                                        if(rotated_pos_delta.y > 0){
+                                             if(rotated_pos_delta.y > tmp_player->carried_positive_pos_delta.y){
+                                                  tmp_player->carried_positive_pos_delta.y = rotated_pos_delta.y;
+                                             }else if(tmp_player->carried_by_block == block_index &&
+                                                      rotated_pos_delta.y < tmp_player->carried_positive_pos_delta.y){
+                                                  tmp_player->carried_positive_pos_delta.y = rotated_pos_delta.y;
+                                             }else{
+                                                  no_change = true;
+                                             }
+                                        }else if(rotated_pos_delta.y < 0){
+                                             if(rotated_pos_delta.y < tmp_player->carried_negative_pos_delta.y){
+                                                  tmp_player->carried_negative_pos_delta.y = rotated_pos_delta.y;
+                                             }else if(tmp_player->carried_by_block == block_index &&
+                                                      rotated_pos_delta.y > tmp_player->carried_negative_pos_delta.y){
+                                                  tmp_player->carried_negative_pos_delta.y = rotated_pos_delta.y;
+                                             }else{
+                                                  no_change = true;
+                                             }
+                                        }
+
+                                        auto new_carried_pos_delta = tmp_player->carried_positive_pos_delta + tmp_player->carried_negative_pos_delta;
+
+                                        tmp_player->pos_delta -= old_carried_pos_delta;
+                                        tmp_player->pos_delta += new_carried_pos_delta;
                                    }
+
+                                   player->carried_by_block = get_block_index(&world, entry.block);
+                                   if(!no_change) repeat_collision = true;
                               }
                          }
                     }
