@@ -12,7 +12,7 @@ Position_t pixel_pos(Pixel_t pixel){
 }
 
 void canonicalize(Position_t* position){
-     if(position->decimal.x > PIXEL_SIZE){
+     if(position->decimal.x >= PIXEL_SIZE){
           F32 pixels = (F32)(floor(position->decimal.x / PIXEL_SIZE));
           position->pixel.x += (S16)(pixels);
           position->decimal.x = (F32)(fmod(position->decimal.x, PIXEL_SIZE));
@@ -24,7 +24,7 @@ void canonicalize(Position_t* position){
           else if(position->decimal.x == -0.0f) position->decimal.x = 0.0f;
      }
 
-     if(position->decimal.y > PIXEL_SIZE){
+     if(position->decimal.y >= PIXEL_SIZE){
           F32 pixels = (F32)(floor(position->decimal.y / PIXEL_SIZE));
           position->pixel.y += (S16)(pixels);
           position->decimal.y = (F32)(fmod(position->decimal.y, PIXEL_SIZE));

@@ -485,6 +485,8 @@ int main(int argc, char** argv){
           return -1;
      }
 
+     LOG("pixel size: %f\n", PIXEL_SIZE);
+
      if(test && !load_map_filepath && !suite){
           LOG("cannot test without specifying a map to load\n");
           return 1;
@@ -2049,7 +2051,7 @@ int main(int argc, char** argv){
                // we have our initial position and our initial pos_delta, update pos_delta for all players and blocks until nothing is colliding anymore
                const S8 max_collision_attempts = 16;
                bool repeat_collision = true;
-               while(repeat_collision && collision_attempts < max_collision_attempts){
+               while(repeat_collision && collision_attempts <= max_collision_attempts){
                     repeat_collision = false;
 
                     // do a collision pass on each block
@@ -2115,6 +2117,20 @@ int main(int argc, char** argv){
 
                               if(collision_result.collided){
                                    repeat_collision = true;
+
+                                   if(frame_count == 248){// || frame_count == 248){
+                                        LOG("frame: %ld, attempted: %d, block %d collided with block %d\n", frame_count, collision_attempts, i, collision_result.collided_block_index);
+                                        auto final_pos = block->pos + block->pos_delta;
+                                        LOG("  block pos: %d, %d, %f, %f -> %d, %d, %f, %f\n", block->pos.pixel.x, block->pos.pixel.y, block->pos.decimal.x, block->pos.decimal.y,
+                                            block->pos.pixel.x + BLOCK_SOLID_SIZE_IN_PIXELS, block->pos.pixel.y + BLOCK_SOLID_SIZE_IN_PIXELS, block->pos.decimal.x, block->pos.decimal.y);
+                                        LOG("  block pos_delta: %f, %f\n", block->pos_delta.x, block->pos_delta.y);
+                                        LOG("    final block pos: %d, %d, %f, %f -> %d, %d, %f, %f\n", final_pos.pixel.x, final_pos.pixel.y, final_pos.decimal.x, final_pos.decimal.y,
+                                            final_pos.pixel.x + BLOCK_SOLID_SIZE_IN_PIXELS, final_pos.pixel.y + BLOCK_SOLID_SIZE_IN_PIXELS, final_pos.decimal.x, final_pos.decimal.y);
+                                        LOG("  result pos_delta: %f, %f\n", collision_result.pos_delta.x, collision_result.pos_delta.y);
+                                        final_pos = block->pos + collision_result.pos_delta;
+                                        LOG("    result final block pos: %d, %d, %f, %f -> %d, %d, %f, %f\n", final_pos.pixel.x, final_pos.pixel.y, final_pos.decimal.x, final_pos.decimal.y,
+                                            final_pos.pixel.x + BLOCK_SOLID_SIZE_IN_PIXELS, final_pos.pixel.y + BLOCK_SOLID_SIZE_IN_PIXELS, final_pos.decimal.x, final_pos.decimal.y);
+                                   }
 
                                    if(collision_result.collided_block_index >= 0 && blocks_are_entangled(collision_result.collided_block_index, i, &world.blocks)){
                                         // TODO: I don't love indexing the blocks without checking the index is valid first
