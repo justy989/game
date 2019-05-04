@@ -490,8 +490,8 @@ int main(int argc, char** argv){
           return 1;
      }
 
-     int window_width = 1024;
-     int window_height = 1024;
+     int window_width = 1400;
+     int window_height = 1400;
      SDL_Window* window = nullptr;
      SDL_GLContext opengl_context = nullptr;
      GLuint theme_texture = 0;
@@ -2921,8 +2921,13 @@ int main(int argc, char** argv){
 
                                         auto new_carried_pos_delta = tmp_player->carried_positive_pos_delta + tmp_player->carried_negative_pos_delta;
 
-                                        tmp_player->pos_delta -= old_carried_pos_delta;
-                                        tmp_player->pos_delta += new_carried_pos_delta;
+                                        if(tmp_player->teleport){
+                                             tmp_player->teleport_pos_delta -= old_carried_pos_delta;
+                                             tmp_player->teleport_pos_delta += new_carried_pos_delta;
+                                        }else{
+                                             tmp_player->pos_delta -= old_carried_pos_delta;
+                                             tmp_player->pos_delta += new_carried_pos_delta;
+                                        }
                                    }
 
                                    player->carried_by_block = get_block_index(&world, entry.block);
