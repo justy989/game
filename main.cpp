@@ -485,8 +485,6 @@ int main(int argc, char** argv){
           return -1;
      }
 
-     LOG("pixel size: %f\n", PIXEL_SIZE);
-
      if(test && !load_map_filepath && !suite){
           LOG("cannot test without specifying a map to load\n");
           return 1;
@@ -2118,6 +2116,7 @@ int main(int argc, char** argv){
                               if(collision_result.collided){
                                    repeat_collision = true;
 
+#if 0
                                    if(frame_count == 248){// || frame_count == 248){
                                         LOG("frame: %ld, attempted: %d, block %d collided with block %d\n", frame_count, collision_attempts, i, collision_result.collided_block_index);
                                         auto final_pos = block->pos + block->pos_delta;
@@ -2131,6 +2130,7 @@ int main(int argc, char** argv){
                                         LOG("    result final block pos: %d, %d, %f, %f -> %d, %d, %f, %f\n", final_pos.pixel.x, final_pos.pixel.y, final_pos.decimal.x, final_pos.decimal.y,
                                             final_pos.pixel.x + BLOCK_SOLID_SIZE_IN_PIXELS, final_pos.pixel.y + BLOCK_SOLID_SIZE_IN_PIXELS, final_pos.decimal.x, final_pos.decimal.y);
                                    }
+#endif
 
                                    if(collision_result.collided_block_index >= 0 && blocks_are_entangled(collision_result.collided_block_index, i, &world.blocks)){
                                         // TODO: I don't love indexing the blocks without checking the index is valid first
@@ -2142,7 +2142,7 @@ int main(int argc, char** argv){
                                         // the result collided position is the center of the block, so handle this
                                         entangled_block_pos.pixel -= HALF_TILE_SIZE_PIXEL;
 
-                                        auto final_block_pos = block->pos + block->pos_delta;
+                                        auto final_block_pos = block->pos + collision_result.pos_delta;
                                         auto pos_diff = pos_to_vec(final_block_pos - entangled_block_pos);
 
                                         U8 total_rotations = (block->rotation + entangled_block->rotation + collision_result.collided_portal_rotations) % (S8)(DIRECTION_COUNT);
