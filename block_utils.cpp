@@ -824,10 +824,12 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
           if(blocks_are_entangled(result.collided_block_index, block_index, &world->blocks)){
                auto* block = world->blocks.elements + block_index;
                auto* entangled_block = world->blocks.elements + result.collided_block_index;
-               auto pos_diff = pos_to_vec(entangled_block->pos - block->pos);
+               auto final_block_pos = block->pos + block->pos_delta;
+               final_block_pos.pixel += HALF_TILE_SIZE_PIXEL;
+               auto pos_diff = pos_to_vec(result.collided_pos - final_block_pos);
 
                // if positions are diagonal to each other and the rotation between them is odd, check if we are moving into each other
-               if(fabs(pos_diff.x) == fabs(pos_diff.y) && (block->rotation + entangled_block->rotation) % 2 == 1){
+               if(fabs(pos_diff.x) == fabs(pos_diff.y) && (block->rotation + entangled_block->rotation + result.collided_portal_rotations) % 2 == 1){
                     // just gtfo if this happens, we handle this case outside this function
                     return result;
                }

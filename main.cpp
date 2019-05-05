@@ -15,6 +15,7 @@ Entanglement Puzzles:
 
 Current bugs:
 - two entangled blocks on ice collided with 2 entangled blocks all on ice, it doesn't do the right thing (i believe)
+- pressure plates don't see blocks as 1 pixel too small on the right and top, so their activation is delayed in those directions
 - A block on the tile outside a portal pushed into the portal to clone, the clone has weird behavior and ends up on the portal block
 - When pushing a block through a portal that turns off, the block keeps going
 - Getting a block and it's rotated entangler to push into the centroid causes any other entangled blocks to alternate pushing
@@ -187,17 +188,28 @@ void stop_block_colliding_with_entangled(Block_t* block, Direction_t move_dir_to
           break;
      case DIRECTION_LEFT:
      case DIRECTION_RIGHT:
-          block->pos_delta.x = 0;
+     {
+          block->stop_on_pixel_x = closest_pixel(block->pos.pixel.x, block->pos.decimal.x);
+
+          Position_t final_stop_pos = pixel_pos(Pixel_t{block->stop_on_pixel_x, 0});
+          Vec_t pos_delta = pos_to_vec(final_stop_pos - block->pos);
+
+          block->pos_delta.x = pos_delta.x;
           block->vel.x = 0;
           block->accel.x = 0;
 
-          block->stop_on_pixel_x = 0;
-
           reset_move(&block->horizontal_move);
           break;
+     }
      case DIRECTION_UP:
      case DIRECTION_DOWN:
-          block->pos_delta.y = 0;
+     {
+          block->stop_on_pixel_y = closest_pixel(block->pos.pixel.y, block->pos.decimal.y);
+
+          Position_t final_stop_pos = pixel_pos(Pixel_t{0, block->stop_on_pixel_y});
+          Vec_t pos_delta = pos_to_vec(final_stop_pos - block->pos);
+
+          block->pos_delta.y = pos_delta.y;
           block->vel.y = 0;
           block->accel.y = 0;
 
@@ -206,20 +218,6 @@ void stop_block_colliding_with_entangled(Block_t* block, Direction_t move_dir_to
           reset_move(&block->vertical_move);
           break;
      }
-
-     switch(move_dir_to_stop){
-     default:
-          break;
-     case DIRECTION_LEFT:
-          if(block->pos.decimal.x > 0) block->pos.pixel.x += 1;
-     case DIRECTION_RIGHT:
-          block->pos.decimal.x = 0;
-          break;
-     case DIRECTION_DOWN:
-          if(block->pos.decimal.y > 0) block->pos.pixel.y += 1;
-     case DIRECTION_UP:
-          block->pos.decimal.y = 0;
-          break;
      }
 }
 
