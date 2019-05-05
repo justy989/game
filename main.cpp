@@ -2616,25 +2616,50 @@ int main(int argc, char** argv){
 
                     for(S16 i = 0; i < world.blocks.count; i++){
                          auto block = world.blocks.elements + i;
-                         if(block->carried_pos_delta.block_index < 0){
-                              auto result = block_held_up_by_another_block(block, world.block_qt, world.interactive_qt, &world.tilemap,
-                                                                           BLOCK_FRICTION_AREA);
-                              for(S16 b = 0; b < result.count; b++){
-                                   auto holder = result.blocks_held[b].block;
-                                   if(holder && holder->element != ELEMENT_ICE && holder->element != ELEMENT_ONLY_ICED &&
-                                      holder->pos_delta != vec_zero()){
-                                        block->pos_delta += holder->pos_delta;
+                         auto result = block_held_up_by_another_block(block, world.block_qt, world.interactive_qt, &world.tilemap,
+                                                                      BLOCK_FRICTION_AREA);
+                         for(S16 b = 0; b < result.count; b++){
+                              auto holder = result.blocks_held[b].block;
+                              if(holder && holder->element != ELEMENT_ICE && holder->element != ELEMENT_ONLY_ICED &&
+                                 holder->pos_delta != vec_zero()){
+                                   auto old_carried_pos_delta = block->carried_pos_delta.positive + block->carried_pos_delta.negative;
+
+                                   auto holder_index = get_block_index(&world, holder);
+                                   if(!get_carried_noob(&block->carried_pos_delta, holder->pos_delta, holder_index, false)){
+                                        auto new_carried_pos_delta = block->carried_pos_delta.positive + block->carried_pos_delta.negative;
+
+                                        if(block->teleport){
+                                             block->teleport_pos_delta -= old_carried_pos_delta;
+                                             block->teleport_pos_delta += new_carried_pos_delta;
+                                        }else{
+                                             block->pos_delta -= old_carried_pos_delta;
+                                             block->pos_delta += new_carried_pos_delta;
+                                        }
 
                                         S16 entangle_index = block->entangle_index;
                                         while(entangle_index != i && entangle_index >= 0){
                                              Block_t* entangled_block = world.blocks.elements + entangle_index;
-                                             entangled_block->pos_delta += holder->pos_delta;
+
+                                             S8 rotations_between = blocks_rotations_between(block, entangled_block);
+                                             auto rotated_pos_delta = vec_rotate_quadrants_clockwise(holder->pos_delta, rotations_between);
+
+                                             old_carried_pos_delta = entangled_block->carried_pos_delta.positive + entangled_block->carried_pos_delta.negative;
+                                             get_carried_noob(&entangled_block->carried_pos_delta, rotated_pos_delta, holder_index, true);
+                                             new_carried_pos_delta = entangled_block->carried_pos_delta.positive + entangled_block->carried_pos_delta.negative;
+
+                                             if(entangled_block->teleport){
+                                                  entangled_block->teleport_pos_delta -= old_carried_pos_delta;
+                                                  entangled_block->teleport_pos_delta += new_carried_pos_delta;
+                                             }else{
+                                                  entangled_block->pos_delta -= old_carried_pos_delta;
+                                                  entangled_block->pos_delta += new_carried_pos_delta;
+                                             }
+
                                              entangle_index = entangled_block->entangle_index;
                                         }
-
-                                        block->carried_pos_delta.block_index = get_block_index(&world, holder);
-                                        repeat_collision = true;
                                    }
+
+                                   repeat_collision = true;
                               }
                          }
                     }
@@ -2850,7 +2875,7 @@ int main(int argc, char** argv){
                                    auto rotated_pos_delta = vec_rotate_quadrants_clockwise(entry.block->pos_delta, entry.portal_rotations);
                                    auto old_carried_pos_delta = player->carried_pos_delta.positive + player->carried_pos_delta.negative;
 
-                                   if(!get_carried_noob(&player->carried_pos_delta, rotated_pos_delta, block_index)){
+                                   if(!get_carried_noob(&player->carried_pos_delta, rotated_pos_delta, block_index, false)){
                                         auto new_carried_pos_delta = player->carried_pos_delta.positive + player->carried_pos_delta.negative;
 
                                         if(player->teleport){
@@ -2861,8 +2886,6 @@ int main(int argc, char** argv){
                                              player->pos_delta += new_carried_pos_delta;
                                         }
 
-                                        player->carried_pos_delta.block_index = get_block_index(&world, entry.block);
-
                                         for(S16 p = 0; p < world.players.count; p++){
                                              if(i == p) continue;
 
@@ -2871,7 +2894,7 @@ int main(int argc, char** argv){
                                              auto local_pos_delta = vec_rotate_quadrants_clockwise(rotated_pos_delta, relative_rotation);
                                              old_carried_pos_delta = tmp_player->carried_pos_delta.positive + tmp_player->carried_pos_delta.negative;
 
-                                             get_carried_noob(&tmp_player->carried_pos_delta, local_pos_delta, block_index);
+                                             get_carried_noob(&tmp_player->carried_pos_delta, local_pos_delta, block_index, true);
 
                                              new_carried_pos_delta = tmp_player->carried_pos_delta.positive + tmp_player->carried_pos_delta.negative;
 
