@@ -2893,19 +2893,19 @@ int main(int argc, char** argv){
                                         }
                                    }
 
-                                   auto new_carried_pos_delta = player->carried_positive_pos_delta + player->carried_negative_pos_delta;
-
-                                   if(player->teleport){
-                                        player->teleport_pos_delta -= old_carried_pos_delta;
-                                        player->teleport_pos_delta += new_carried_pos_delta;
-                                   }else{
-                                        player->pos_delta -= old_carried_pos_delta;
-                                        player->pos_delta += new_carried_pos_delta;
-                                   }
-
-                                   player->carried_by_block = get_block_index(&world, entry.block);
-
                                    if(!no_change){
+                                        auto new_carried_pos_delta = player->carried_positive_pos_delta + player->carried_negative_pos_delta;
+
+                                        if(player->teleport){
+                                             player->teleport_pos_delta -= old_carried_pos_delta;
+                                             player->teleport_pos_delta += new_carried_pos_delta;
+                                        }else{
+                                             player->pos_delta -= old_carried_pos_delta;
+                                             player->pos_delta += new_carried_pos_delta;
+                                        }
+
+                                        player->carried_by_block = get_block_index(&world, entry.block);
+
                                         for(S16 p = 0; p < world.players.count; p++){
                                              if(i == p) continue;
 
@@ -3043,18 +3043,21 @@ int main(int argc, char** argv){
 
                     build_move_actions_from_player(&player_action, player, move_actions, DIRECTION_COUNT);
 
+                    auto pure_input_pos_delta = player->pos_delta;
+                    pure_input_pos_delta -= player->carried_positive_pos_delta + player->carried_negative_pos_delta;
+
                     // if we have stopped short in either component, kill the movement for that component if we are no longer pressing keys for it
-                    if(fabs(player->pos_delta.x) < fabs(player->pos_delta_save.x)){
-                         if((player->pos_delta.x < 0 && !move_actions[DIRECTION_LEFT]) ||
-                            (player->pos_delta.x > 0 && !move_actions[DIRECTION_RIGHT])){
+                    if(fabs(pure_input_pos_delta.x) < fabs(player->pos_delta_save.x)){
+                         if((pure_input_pos_delta.x < 0 && !move_actions[DIRECTION_LEFT]) ||
+                            (pure_input_pos_delta.x > 0 && !move_actions[DIRECTION_RIGHT])){
                               player->vel.x = 0;
                               player->accel.x = 0;
                          }
                     }
 
-                    if(fabs(player->pos_delta.y) < fabs(player->pos_delta_save.y)){
-                         if((player->pos_delta.y < 0 && !move_actions[DIRECTION_DOWN]) ||
-                            (player->pos_delta.y > 0 && !move_actions[DIRECTION_UP])){
+                    if(fabs(pure_input_pos_delta.y) < fabs(player->pos_delta_save.y)){
+                         if((pure_input_pos_delta.y < 0 && !move_actions[DIRECTION_DOWN]) ||
+                            (pure_input_pos_delta.y > 0 && !move_actions[DIRECTION_UP])){
                               player->vel.y = 0;
                               player->accel.y = 0;
                          }

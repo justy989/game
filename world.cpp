@@ -1242,7 +1242,8 @@ void describe_block(World_t* world, Block_t* block){
          block->pos.decimal.x, block->pos.decimal.y,
          block->rotation, element_to_string(block->element),
          block->entangle_index, block->clone_id);
-     LOG(" vel: %f, %f accel: %f, %f accel_mag: %f, %f\n", block->vel.x, block->vel.y, block->accel.x, block->accel.y, block->accel_magnitudes.x, block->accel_magnitudes.y);
+     LOG(" vel: %f, %f accel: %f, %f accel_mag: %f, %f pos_delta: %f, %f\n", block->vel.x, block->vel.y, block->accel.x, block->accel.y, block->accel_magnitudes.x, block->accel_magnitudes.y,
+         block->pos_delta.x, block->pos_delta.y);
      LOG(" hmove: %s %s %f\n", move_state_to_string(block->horizontal_move.state), move_sign_to_string(block->horizontal_move.sign), block->horizontal_move.distance);
      LOG(" vmove: %s %s %f\n", move_state_to_string(block->vertical_move.state), move_sign_to_string(block->vertical_move.sign), block->vertical_move.distance);
      LOG(" hcoast: %s vcoast: %s\n", block_coast_to_string(block->coast_horizontal), block_coast_to_string(block->coast_vertical));
@@ -1258,6 +1259,8 @@ void describe_player(World_t* world, Player_t* player){
      LOG("  vel: %f, %f accel: %f, %f pos_dt: %f, %f\n", player->vel.x, player->vel.y, player->accel.x, player->accel.y, player->pos_delta.x , player->pos_delta.y);
      LOG("  rot: %d, move_rot: L %d, U %d, R %d, D %d\n", player->rotation,
          player->move_rotation[DIRECTION_LEFT], player->move_rotation[DIRECTION_UP], player->move_rotation[DIRECTION_RIGHT], player->move_rotation[DIRECTION_DOWN]);
+     LOG("  carried by: pos: %f, %f neg: %f, %f\n", player->carried_positive_pos_delta.x, player->carried_positive_pos_delta.y,
+         player->carried_negative_pos_delta.x, player->carried_negative_pos_delta.y);
      LOG("\n");
 }
 
