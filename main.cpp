@@ -409,6 +409,52 @@ void hold_players(ObjectArray_t<Player_t>* players){
      }
 }
 
+bool get_carried_noob(Player_t* player, Vec_t carry_vec, S16 block_index){
+     bool no_change = false;
+
+     if(carry_vec.x > 0){
+          if(carry_vec.x > player->carried_positive_pos_delta.x){
+               player->carried_positive_pos_delta.x = carry_vec.x;
+          }else if(player->carried_by_block == block_index &&
+                   carry_vec.x < player->carried_positive_pos_delta.x){
+               player->carried_positive_pos_delta.x = carry_vec.x;
+          }else{
+               no_change = true;
+          }
+     }else if(carry_vec.x < 0){
+          if(carry_vec.x < player->carried_negative_pos_delta.x){
+               player->carried_negative_pos_delta.x = carry_vec.x;
+          }else if(player->carried_by_block == block_index &&
+                   carry_vec.x > player->carried_negative_pos_delta.x){
+               player->carried_negative_pos_delta.x = carry_vec.x;
+          }else{
+               no_change = true;
+          }
+     }
+
+     if(carry_vec.y > 0){
+          if(carry_vec.y > player->carried_positive_pos_delta.y){
+               player->carried_positive_pos_delta.y = carry_vec.y;
+          }else if(player->carried_by_block == block_index &&
+                   carry_vec.y < player->carried_positive_pos_delta.y){
+               player->carried_positive_pos_delta.y = carry_vec.y;
+          }else{
+               no_change = true;
+          }
+     }else if(carry_vec.y < 0){
+          if(carry_vec.y < player->carried_negative_pos_delta.y){
+               player->carried_negative_pos_delta.y = carry_vec.y;
+          }else if(player->carried_by_block == block_index &&
+                   carry_vec.y > player->carried_negative_pos_delta.y){
+               player->carried_negative_pos_delta.y = carry_vec.y;
+          }else{
+               no_change = true;
+          }
+     }
+
+     return no_change;
+}
+
 int main(int argc, char** argv){
      const char* load_map_filepath = nullptr;
      bool test = false;
@@ -2848,52 +2894,11 @@ int main(int argc, char** argv){
                          for(S8 e = 0; e < result.entry_count; e++){
                               auto& entry = result.entries[e];
                               if(entry.block_pos.z == player->pos.z - HEIGHT_INTERVAL){
-                                   bool no_change = false;
                                    auto block_index = get_block_index(&world, entry.block);
                                    auto rotated_pos_delta = vec_rotate_quadrants_clockwise(entry.block->pos_delta, entry.portal_rotations);
                                    auto old_carried_pos_delta = player->carried_positive_pos_delta + player->carried_negative_pos_delta;
 
-                                   if(rotated_pos_delta.x > 0){
-                                        if(rotated_pos_delta.x > player->carried_positive_pos_delta.x){
-                                             player->carried_positive_pos_delta.x = rotated_pos_delta.x;
-                                        }else if(player->carried_by_block == block_index &&
-                                                 rotated_pos_delta.x < player->carried_positive_pos_delta.x){
-                                             player->carried_positive_pos_delta.x = rotated_pos_delta.x;
-                                        }else{
-                                             no_change = true;
-                                        }
-                                   }else if(rotated_pos_delta.x < 0){
-                                        if(rotated_pos_delta.x < player->carried_negative_pos_delta.x){
-                                             player->carried_negative_pos_delta.x = rotated_pos_delta.x;
-                                        }else if(player->carried_by_block == block_index &&
-                                                 rotated_pos_delta.x > player->carried_negative_pos_delta.x){
-                                             player->carried_negative_pos_delta.x = rotated_pos_delta.x;
-                                        }else{
-                                             no_change = true;
-                                        }
-                                   }
-
-                                   if(rotated_pos_delta.y > 0){
-                                        if(rotated_pos_delta.y > player->carried_positive_pos_delta.y){
-                                             player->carried_positive_pos_delta.y = rotated_pos_delta.y;
-                                        }else if(player->carried_by_block == block_index &&
-                                                 rotated_pos_delta.y < player->carried_positive_pos_delta.y){
-                                             player->carried_positive_pos_delta.y = rotated_pos_delta.y;
-                                        }else{
-                                             no_change = true;
-                                        }
-                                   }else if(rotated_pos_delta.y < 0){
-                                        if(rotated_pos_delta.y < player->carried_negative_pos_delta.y){
-                                             player->carried_negative_pos_delta.y = rotated_pos_delta.y;
-                                        }else if(player->carried_by_block == block_index &&
-                                                 rotated_pos_delta.y > player->carried_negative_pos_delta.y){
-                                             player->carried_negative_pos_delta.y = rotated_pos_delta.y;
-                                        }else{
-                                             no_change = true;
-                                        }
-                                   }
-
-                                   if(!no_change){
+                                   if(!get_carried_noob(player, rotated_pos_delta, block_index)){
                                         auto new_carried_pos_delta = player->carried_positive_pos_delta + player->carried_negative_pos_delta;
 
                                         if(player->teleport){
@@ -2914,37 +2919,7 @@ int main(int argc, char** argv){
                                              auto local_pos_delta = vec_rotate_quadrants_clockwise(rotated_pos_delta, relative_rotation);
                                              old_carried_pos_delta = tmp_player->carried_positive_pos_delta + tmp_player->carried_negative_pos_delta;
 
-                                             if(local_pos_delta.x > 0){
-                                                  if(local_pos_delta.x > tmp_player->carried_positive_pos_delta.x){
-                                                       tmp_player->carried_positive_pos_delta.x = local_pos_delta.x;
-                                                  }else if(tmp_player->carried_by_block == block_index &&
-                                                           local_pos_delta.x < tmp_player->carried_positive_pos_delta.x){
-                                                       tmp_player->carried_positive_pos_delta.x = local_pos_delta.x;
-                                                  }
-                                             }else if(local_pos_delta.x < 0){
-                                                  if(local_pos_delta.x < tmp_player->carried_negative_pos_delta.x){
-                                                       tmp_player->carried_negative_pos_delta.x = local_pos_delta.x;
-                                                  }else if(tmp_player->carried_by_block == block_index &&
-                                                           local_pos_delta.x > tmp_player->carried_negative_pos_delta.x){
-                                                       tmp_player->carried_negative_pos_delta.x = local_pos_delta.x;
-                                                  }
-                                             }
-
-                                             if(local_pos_delta.y > 0){
-                                                  if(local_pos_delta.y > tmp_player->carried_positive_pos_delta.y){
-                                                       tmp_player->carried_positive_pos_delta.y = local_pos_delta.y;
-                                                  }else if(tmp_player->carried_by_block == block_index &&
-                                                           local_pos_delta.y < tmp_player->carried_positive_pos_delta.y){
-                                                       tmp_player->carried_positive_pos_delta.y = local_pos_delta.y;
-                                                  }
-                                             }else if(local_pos_delta.y < 0){
-                                                  if(local_pos_delta.y < tmp_player->carried_negative_pos_delta.y){
-                                                       tmp_player->carried_negative_pos_delta.y = local_pos_delta.y;
-                                                  }else if(tmp_player->carried_by_block == block_index &&
-                                                           local_pos_delta.y > tmp_player->carried_negative_pos_delta.y){
-                                                       tmp_player->carried_negative_pos_delta.y = local_pos_delta.y;
-                                                  }
-                                             }
+                                             get_carried_noob(tmp_player, local_pos_delta, block_index);
 
                                              new_carried_pos_delta = tmp_player->carried_positive_pos_delta + tmp_player->carried_negative_pos_delta;
 
