@@ -19,3 +19,27 @@ bool quad_in_quad(const Quad_t* a, const Quad_t* b){
 
      return false;
 }
+
+bool quad_in_quad_high_range_exclusive(const Quad_t* a, const Quad_t* b){
+     if(a->left >= b->left && a->left < b->right &&
+        a->bottom >= b->bottom && a->bottom < b->top){
+          return true;
+     }
+
+     if(a->right > b->left && a->right < b->right &&
+        a->bottom >= b->bottom && a->bottom < b->top){
+          return true;
+     }
+
+     if(a->left >= b->left && a->left < b->right &&
+        a->top > b->bottom && a->top < b->top){
+          return true;
+     }
+
+     if(a->right > b->left && a->right < b->right &&
+        a->top > b->bottom && a->top < b->top){
+          return true;
+     }
+
+     return false;
+}

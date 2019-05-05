@@ -26,6 +26,7 @@ Big Features:
 - 3D
      - entangled players on popups
      - if we put a popup on the other side of a portal and a block 1 interval high goes through the portal, will it work the way we expect?
+     - Player stopping a tower of blocks
 - A way to tell which blocks are entangled
 - arrow kills player
 - arrow entanglement
@@ -414,9 +415,11 @@ int main(int argc, char** argv){
      bool test = false;
      bool suite = false;
      bool show_suite = false;
+     bool fail_slow = false;
      S16 map_number = 0;
      S16 first_map_number = 0;
      S16 first_frame = 0;
+     S16 fail_count = 0;
 
      Demo_t demo {};
 
@@ -455,6 +458,8 @@ int main(int argc, char** argv){
                int next = i + 1;
                if(next >= argc) continue;
                demo.dt_scalar = (F32)(atof(argv[next]));
+          }else if(strcmp(argv[i], "-failslow") == 0){
+               fail_slow = true;
           }else if(strcmp(argv[i], "-h") == 0){
                printf("%s [options]\n", argv[0]);
                printf("  -play   <demo filepath> replay a recorded demo file\n");
@@ -466,6 +471,7 @@ int main(int argc, char** argv){
                printf("  -map    <integer>       load a map by number\n");
                printf("  -speed  <decimal>       when replaying a demo, specify how fast/slow to replay where 1.0 is realtime\n");
                printf("  -frame  <integer>       which frame to play to automatically before drawing\n");
+               printf("  -failslow               opposite of failfast, where we continue running tests in the suite after failure\n");
                printf("  -h this help.\n");
                return 0;
           }
@@ -476,6 +482,8 @@ int main(int argc, char** argv){
           fprintf(stderr, "failed to create log file: '%s'\n", log_path);
           return -1;
      }
+
+     LOG("pixel size: %f\n", PIXEL_SIZE);
 
      if(test && !load_map_filepath && !suite){
           LOG("cannot test without specifying a map to load\n");
@@ -651,8 +659,12 @@ int main(int argc, char** argv){
           if(demo.mode == DEMO_MODE_PLAY){
                if(demo_play_frame(&demo, &player_action, &world.players, frame_count)){
                     if(test){
-                         if(!test_map_end_state(&world, &demo)){
+                         bool passed = test_map_end_state(&world, &demo);
+                         if(!passed){
                               LOG("test failed\n");
+                              fail_count++;
+                         }
+                         if(!passed && !fail_slow){
                               demo.mode = DEMO_MODE_NONE;
                               if(suite && !show_suite) return 1;
                          }else if(suite){
@@ -668,7 +680,11 @@ int main(int argc, char** argv){
                                         return 1;
                                    }
                               }else{
-                                   LOG("Done Testing %d maps.\n", maps_tested);
+                                   if(fail_slow){
+                                        LOG("Done Testing %d maps where %d failed.\n", maps_tested, fail_count);
+                                   }else{
+                                        LOG("Done Testing %d maps.\n", maps_tested);
+                                   }
                                    return 0;
                               }
                          }
@@ -3269,7 +3285,7 @@ int main(int argc, char** argv){
 
           glEnd();
 
-#if 1
+#if 0
           // light
           glBindTexture(GL_TEXTURE_2D, 0);
           glBegin(GL_QUADS);

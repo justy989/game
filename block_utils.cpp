@@ -398,7 +398,7 @@ Block_t* block_inside_block_list(Position_t block_to_check_pos, Vec_t block_to_c
                                  Position_t* collided_with, U8 portal_rotations, Pixel_t* portal_offsets){
      auto final_block_to_check_pos = block_to_check_pos + block_to_check_pos_delta;
 
-     Quad_t quad = {0, 0, BLOCK_SOLID_SIZE, BLOCK_SOLID_SIZE};
+     Quad_t quad = {0, 0, TILE_SIZE, TILE_SIZE};
 
      for(S16 i = 0; i < block_count; i++){
           Block_t* block = blocks[i];
@@ -422,9 +422,9 @@ Block_t* block_inside_block_list(Position_t block_to_check_pos, Vec_t block_to_c
           auto pos_diff = final_block_pos - final_block_to_check_pos;
           auto check_vec = pos_to_vec(pos_diff);
 
-          Quad_t quad_to_check = {check_vec.x, check_vec.y, check_vec.x + BLOCK_SOLID_SIZE, check_vec.y + BLOCK_SOLID_SIZE};
+          Quad_t quad_to_check = {check_vec.x, check_vec.y, check_vec.x + TILE_SIZE, check_vec.y + TILE_SIZE};
 
-          if(quad_in_quad(&quad, &quad_to_check)){
+          if(quad_in_quad_high_range_exclusive(&quad, &quad_to_check)){
                *collided_with = final_block_pos;
                collided_with->pixel += HALF_TILE_SIZE_PIXEL;
                return block;

@@ -26,7 +26,7 @@
 #define TOGGLE_BIT_FLAG(value, bit_flag){if(value & bit_flag){OFF_BIT_FLAG(value, bit_flag);}else{ON_BIT_FLAG(value, bit_flag);}}
 
 #define PIXEL_SIZE .00367647f
-#define TILE_SIZE (16.0f / 272.0f)
+#define TILE_SIZE (16.0f * PIXEL_SIZE)
 #define HALF_TILE_SIZE (TILE_SIZE * 0.5f)
 #define DOUBLE_TILE_SIZE_IN_PIXELS (S16)(32)
 #define TILE_SIZE_IN_PIXELS (S16)(16)
