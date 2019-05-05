@@ -7,6 +7,7 @@
 #include "pixel.h"
 #include "coord.h"
 #include "rect.h"
+#include "carried_pos_delta.h"
 
 enum BlockCoast_t{
      BLOCK_COAST_NONE,
@@ -55,6 +56,8 @@ struct Block_t : public GridMotion_t{
      bool stopped_by_player_vertical = false;
 
      Vec_t accel_magnitudes;
+
+     CarriedPosDelta_t carried_pos_delta;
 };
 
 S16 get_object_x(Block_t* block);

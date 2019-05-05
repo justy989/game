@@ -5,6 +5,7 @@
 #include "coord.h"
 #include "direction.h"
 #include "rect.h"
+#include "carried_pos_delta.h"
 
 #define PLAYER_RADIUS_IN_SUB_PIXELS 3.5f
 #define PLAYER_RADIUS (PLAYER_RADIUS_IN_SUB_PIXELS / 272.0f)
@@ -57,9 +58,7 @@ struct Player_t : public Motion_t {
 
      bool        successfully_moved = false;
      bool        held_up = false;
-     S16         carried_by_block = -1;
-     Vec_t       carried_positive_pos_delta;
-     Vec_t       carried_negative_pos_delta;
+     CarriedPosDelta_t carried_pos_delta;
 };
 
 // rough estimate since player is 3.5 pixels radius
