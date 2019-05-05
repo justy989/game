@@ -841,7 +841,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
           }
 
           if(block_inside_index != block_index){
-               auto collided_block_move_mask = vec_direction_mask(block_inside_result.block->vel);
+               auto collided_block_move_mask = vec_direction_mask(block_inside_result.block->pos_delta);
 
                switch(move_direction){
                default:
@@ -1115,6 +1115,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
 
                     if(block_push(block_inside_result.block, first_direction, world, true, instant_vel)){
                          push_entangled_block(block_inside_result.block, world, first_direction, true, instant_vel);
+
                          if(blocks_are_entangled(block_inside_result.block - world->blocks.elements, block_index, &world->blocks)){
                               Block_t* block = world->blocks.elements + block_index;
                               auto rotations_between = direction_rotations_between(static_cast<Direction_t>(block_inside_result.block->rotation), static_cast<Direction_t>(block->rotation));
@@ -1142,6 +1143,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                          instant_vel = direction_is_horizontal(second_direction) ? save_vel.x : save_vel.y;
                          if(block_push(block_inside_result.block, second_direction, world, true, instant_vel)){
                               push_entangled_block(block_inside_result.block, world, second_direction, true, instant_vel);
+
                               if(blocks_are_entangled(block_inside_result.block - world->blocks.elements, block_index, &world->blocks)){
                                    Block_t* block = world->blocks.elements + block_index;
                                    auto rotations_between = direction_rotations_between(static_cast<Direction_t>(block_inside_result.block->rotation), static_cast<Direction_t>(block->rotation));

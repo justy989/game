@@ -14,7 +14,6 @@ Entanglement Puzzles:
 - rotated entangled puzzles where the centroid is on a portal destination coord
 
 Current bugs:
-- two entangled blocks on ice collided with 2 entangled blocks all on ice, it doesn't do the right thing (i believe)
 - pressure plates don't see blocks as 1 pixel too small on the right and top, so their activation is delayed in those directions
 - A block on the tile outside a portal pushed into the portal to clone, the clone has weird behavior and ends up on the portal block
 - When pushing a block through a portal that turns off, the block keeps going
@@ -31,11 +30,11 @@ Big Features:
      - entangled players on popups
      - if we put a popup on the other side of a portal and a block 1 interval high goes through the portal, will it work the way we expect?
      - Player stopping a tower of blocks
+- 'Bring Block Ice Collision to the Masses' - my favorite feature joke of the game
 - A way to tell which blocks are entangled
 - arrow kills player
 - arrow entanglement
 - Block splitting
-- 'Bring Block Ice Collision to the Masses' - my favorite feature joke of the game
 - Multiple players pushing blocks at once
 
 */
