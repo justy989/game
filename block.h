@@ -36,7 +36,6 @@ struct Block_t : public GridMotion_t{
 
      // these could all be flags one day when they grow up
      S8   held_up;
-     bool carried_by_block;
 
      bool       teleport;
      Position_t teleport_pos;

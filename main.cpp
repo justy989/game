@@ -1787,7 +1787,7 @@ int main(int argc, char** argv){
                     block->vel.y = calc_velocity_motion(block->vel.y, block->accel.y, dt);
 
                     block->teleport = false;
-                    block->carried_by_block = false;
+                    carried_pos_delta_reset(&block->carried_pos_delta);
                     block->held_up = BLOCK_HELD_BY_NONE;
 
                     block->coast_horizontal = BLOCK_COAST_NONE;
@@ -2616,7 +2616,7 @@ int main(int argc, char** argv){
 
                     for(S16 i = 0; i < world.blocks.count; i++){
                          auto block = world.blocks.elements + i;
-                         if(!block->carried_by_block){
+                         if(block->carried_pos_delta.block_index < 0){
                               auto result = block_held_up_by_another_block(block, world.block_qt, world.interactive_qt, &world.tilemap,
                                                                            BLOCK_FRICTION_AREA);
                               for(S16 b = 0; b < result.count; b++){
@@ -2632,7 +2632,7 @@ int main(int argc, char** argv){
                                              entangle_index = entangled_block->entangle_index;
                                         }
 
-                                        block->carried_by_block = true;
+                                        block->carried_pos_delta.block_index = get_block_index(&world, holder);
                                         repeat_collision = true;
                                    }
                               }
