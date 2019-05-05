@@ -285,7 +285,7 @@ S16 closest_grid_center_pixel(S16 grid_width, S16 v){
 }
 
 S16 closest_pixel(S16 pixel, F32 decimal){
-     if(decimal > PIXEL_SIZE / 2){
+     if(decimal > (PIXEL_SIZE / 2.0)){
           return pixel + 1;
      }
 

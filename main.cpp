@@ -1,4 +1,6 @@
 /*
+SHOTCUT Open Source Video Editting Program
+
 http://www.simonstalenhag.se/
 -Grant Sanderson 3blue1brown
 -Shane Hendrixson

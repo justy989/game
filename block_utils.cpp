@@ -853,10 +853,11 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                     default:
                          break;
                     case DIRECTION_LEFT:
-                         result.stop_on_pixel_x = collided_block_center.pixel.x + HALF_TILE_SIZE_IN_PIXELS;
+                         result.stop_on_pixel_x = closest_pixel(collided_block_center.pixel.x + HALF_TILE_SIZE_IN_PIXELS, collided_block_center.decimal.x);
                          break;
                     case DIRECTION_RIGHT:
-                         result.stop_on_pixel_x = (collided_block_center.pixel.x - HALF_TILE_SIZE_IN_PIXELS) - TILE_SIZE_IN_PIXELS;
+                         result.stop_on_pixel_x = closest_pixel((collided_block_center.pixel.x - HALF_TILE_SIZE_IN_PIXELS) - TILE_SIZE_IN_PIXELS,
+                                                                collided_block_center.decimal.x);
                          break;
                     }
 
@@ -864,10 +865,11 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                     default:
                          break;
                     case DIRECTION_DOWN:
-                         result.stop_on_pixel_y = collided_block_center.pixel.y + HALF_TILE_SIZE_IN_PIXELS;
+                         result.stop_on_pixel_y = closest_pixel(collided_block_center.pixel.y + HALF_TILE_SIZE_IN_PIXELS, collided_block_center.decimal.y);
                          break;
                     case DIRECTION_UP:
-                         result.stop_on_pixel_y = (collided_block_center.pixel.y - HALF_TILE_SIZE_IN_PIXELS) - TILE_SIZE_IN_PIXELS;
+                         result.stop_on_pixel_y = closest_pixel((collided_block_center.pixel.y - HALF_TILE_SIZE_IN_PIXELS) - TILE_SIZE_IN_PIXELS,
+                                                                collided_block_center.decimal.y);
                          break;
                     }
 
@@ -886,7 +888,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                } break;
                case MOVE_DIRECTION_LEFT:
                {
-                    result.stop_on_pixel_x = collided_block_center.pixel.x + HALF_TILE_SIZE_IN_PIXELS;
+                    result.stop_on_pixel_x = closest_pixel(collided_block_center.pixel.x + HALF_TILE_SIZE_IN_PIXELS, collided_block_center.decimal.x);
 
                     Position_t final_stop_pos = pixel_pos(Pixel_t{result.stop_on_pixel_x, 0});
                     Vec_t pos_delta = pos_to_vec(final_stop_pos - block_pos);
@@ -908,7 +910,8 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                } break;
                case MOVE_DIRECTION_RIGHT:
                {
-                    result.stop_on_pixel_x = (collided_block_center.pixel.x - HALF_TILE_SIZE_IN_PIXELS) - TILE_SIZE_IN_PIXELS;
+                    result.stop_on_pixel_x = closest_pixel((collided_block_center.pixel.x - HALF_TILE_SIZE_IN_PIXELS) - TILE_SIZE_IN_PIXELS,
+                                                           collided_block_center.decimal.x);
 
                     Position_t final_stop_pos = pixel_pos(Pixel_t{result.stop_on_pixel_x, 0});
                     Vec_t pos_delta = pos_to_vec(final_stop_pos - block_pos);
@@ -925,7 +928,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                } break;
                case MOVE_DIRECTION_DOWN:
                {
-                    result.stop_on_pixel_y = collided_block_center.pixel.y + HALF_TILE_SIZE_IN_PIXELS;
+                    result.stop_on_pixel_y = closest_pixel(collided_block_center.pixel.y + HALF_TILE_SIZE_IN_PIXELS, collided_block_center.decimal.y);
 
                     Position_t final_stop_pos = pixel_pos(Pixel_t{0, result.stop_on_pixel_y});
                     Vec_t pos_delta = pos_to_vec(final_stop_pos - block_pos);
@@ -942,7 +945,8 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                } break;
                case MOVE_DIRECTION_UP:
                {
-                    result.stop_on_pixel_y = (collided_block_center.pixel.y - HALF_TILE_SIZE_IN_PIXELS) - TILE_SIZE_IN_PIXELS;
+                    result.stop_on_pixel_y = closest_pixel((collided_block_center.pixel.y - HALF_TILE_SIZE_IN_PIXELS) - TILE_SIZE_IN_PIXELS,
+                                                           collided_block_center.decimal.y);
 
                     Position_t final_stop_pos = pixel_pos(Pixel_t{0, result.stop_on_pixel_y});
                     Vec_t pos_delta = pos_to_vec(final_stop_pos - block_pos);
