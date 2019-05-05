@@ -1076,7 +1076,7 @@ bool block_push(Block_t* block, MoveDirection_t move_direction, World_t* world, 
 
 bool block_push(Block_t* block, Direction_t direction, World_t* world, bool pushed_by_ice, F32 instant_vel){
      Direction_t collided_block_push_dir = DIRECTION_COUNT;
-     Block_t* collided_block = block_against_another_block(block->pos, direction, world->block_qt, world->interactive_qt,
+     Block_t* collided_block = block_against_another_block(block->pos + block->pos_delta, direction, world->block_qt, world->interactive_qt,
                                                            &world->tilemap, &collided_block_push_dir);
      if(collided_block){
           if(collided_block == block){

@@ -14,6 +14,7 @@ Entanglement Puzzles:
 - rotated entangled puzzles where the centroid is on a portal destination coord
 
 Current bugs:
+- two entangled blocks on ice collided with 2 entangled blocks all on ice, it doesn't do the right thing (i believe)
 - A block on the tile outside a portal pushed into the portal to clone, the clone has weird behavior and ends up on the portal block
 - When pushing a block through a portal that turns off, the block keeps going
 - Getting a block and it's rotated entangler to push into the centroid causes any other entangled blocks to alternate pushing
@@ -2261,6 +2262,7 @@ int main(int argc, char** argv){
                                                                       break;
                                                                  }
                                                             }
+
                                                             if(block_push(entangled_block, move_dir_to_stop, &world, true, block_instant_vel)){
                                                                  switch(move_dir_to_stop){
                                                                  default:
