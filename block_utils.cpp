@@ -886,26 +886,21 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                } break;
                case MOVE_DIRECTION_LEFT:
                {
+                    result.stop_on_pixel_x = collided_block_center.pixel.x + HALF_TILE_SIZE_IN_PIXELS;
+
+                    Position_t final_stop_pos = pixel_pos(Pixel_t{result.stop_on_pixel_x, 0});
+                    Vec_t pos_delta = pos_to_vec(final_stop_pos - block_pos);
+
+                    result.pos_delta.x = pos_delta.x;
+
                     // TODO: compress these cases
                     if(direction_in_mask(collided_block_move_mask, first_direction)){
                          // if the block is moving in the direction we collided, just move right up against it
                          // TODO: set the decimal portion so we are right up against the block
                          // TODO: this case probably means if they are both on ice they want to start moving as a
                          //       group at a speed in the middle of both of their original speeds?
-                         result.stop_on_pixel_x = collided_block_center.pixel.x + HALF_TILE_SIZE_IN_PIXELS;
-
-                         Position_t final_stop_pos = pixel_pos(Pixel_t{result.stop_on_pixel_x, 0});
-                         Vec_t pos_delta = pos_to_vec(final_stop_pos - block_pos);
-
-                         result.pos_delta.x = pos_delta.x;
                          result.vel.x = block_inside_result.block->vel.x;
                     }else{
-                         result.stop_on_pixel_x = collided_block_center.pixel.x + HALF_TILE_SIZE_IN_PIXELS;
-
-                         Position_t final_stop_pos = pixel_pos(Pixel_t{result.stop_on_pixel_x, 0});
-                         Vec_t pos_delta = pos_to_vec(final_stop_pos - block_pos);
-
-                         result.pos_delta.x = pos_delta.x;
                          result.vel.x = 0.0f;
                          result.accel.x = 0.0f;
                          result.horizontal_move.state = MOVE_STATE_IDLING;
@@ -913,22 +908,16 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                } break;
                case MOVE_DIRECTION_RIGHT:
                {
-                    // TODO: compress code between these if statements
+                    result.stop_on_pixel_x = (collided_block_center.pixel.x - HALF_TILE_SIZE_IN_PIXELS) - TILE_SIZE_IN_PIXELS;
+
+                    Position_t final_stop_pos = pixel_pos(Pixel_t{result.stop_on_pixel_x, 0});
+                    Vec_t pos_delta = pos_to_vec(final_stop_pos - block_pos);
+
+                    result.pos_delta.x = pos_delta.x;
+
                     if(direction_in_mask(collided_block_move_mask, first_direction)){
-                         result.stop_on_pixel_x = (collided_block_center.pixel.x - HALF_TILE_SIZE_IN_PIXELS) - TILE_SIZE_IN_PIXELS;
-
-                         Position_t final_stop_pos = pixel_pos(Pixel_t{result.stop_on_pixel_x, 0});
-                         Vec_t pos_delta = pos_to_vec(final_stop_pos - block_pos);
-
-                         result.pos_delta.x = pos_delta.x;
                          result.vel.x = block_inside_result.block->vel.x;
                     }else{
-                         result.stop_on_pixel_x = (collided_block_center.pixel.x - HALF_TILE_SIZE_IN_PIXELS) - TILE_SIZE_IN_PIXELS;
-
-                         Position_t final_stop_pos = pixel_pos(Pixel_t{result.stop_on_pixel_x, 0});
-                         Vec_t pos_delta = pos_to_vec(final_stop_pos - block_pos);
-
-                         result.pos_delta.x = pos_delta.x;
                          result.vel.x = 0.0f;
                          result.accel.x = 0.0f;
                          result.horizontal_move.state = MOVE_STATE_IDLING;
@@ -936,21 +925,16 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                } break;
                case MOVE_DIRECTION_DOWN:
                {
+                    result.stop_on_pixel_y = collided_block_center.pixel.y + HALF_TILE_SIZE_IN_PIXELS;
+
+                    Position_t final_stop_pos = pixel_pos(Pixel_t{0, result.stop_on_pixel_y});
+                    Vec_t pos_delta = pos_to_vec(final_stop_pos - block_pos);
+
+                    result.pos_delta.y = pos_delta.y;
+
                     if(direction_in_mask(collided_block_move_mask, first_direction)){
-                         result.stop_on_pixel_y = collided_block_center.pixel.y + HALF_TILE_SIZE_IN_PIXELS;
-
-                         Position_t final_stop_pos = pixel_pos(Pixel_t{0, result.stop_on_pixel_y});
-                         Vec_t pos_delta = pos_to_vec(final_stop_pos - block_pos);
-
-                         result.pos_delta.y = pos_delta.y;
                          result.vel.y = block_inside_result.block->vel.y;
                     }else{
-                         result.stop_on_pixel_y = collided_block_center.pixel.y + HALF_TILE_SIZE_IN_PIXELS;
-
-                         Position_t final_stop_pos = pixel_pos(Pixel_t{0, result.stop_on_pixel_y});
-                         Vec_t pos_delta = pos_to_vec(final_stop_pos - block_pos);
-
-                         result.pos_delta.y = pos_delta.y;
                          result.vel.y = 0.0f;
                          result.accel.y = 0.0f;
                          result.vertical_move.state = MOVE_STATE_IDLING;
@@ -958,21 +942,16 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                } break;
                case MOVE_DIRECTION_UP:
                {
+                    result.stop_on_pixel_y = (collided_block_center.pixel.y - HALF_TILE_SIZE_IN_PIXELS) - TILE_SIZE_IN_PIXELS;
+
+                    Position_t final_stop_pos = pixel_pos(Pixel_t{0, result.stop_on_pixel_y});
+                    Vec_t pos_delta = pos_to_vec(final_stop_pos - block_pos);
+
+                    result.pos_delta.y = pos_delta.y;
+
                     if(direction_in_mask(collided_block_move_mask, first_direction)){
-                         result.stop_on_pixel_y = (collided_block_center.pixel.y - HALF_TILE_SIZE_IN_PIXELS) - TILE_SIZE_IN_PIXELS;
-
-                         Position_t final_stop_pos = pixel_pos(Pixel_t{0, result.stop_on_pixel_y});
-                         Vec_t pos_delta = pos_to_vec(final_stop_pos - block_pos);
-
-                         result.pos_delta.y = pos_delta.y;
                          result.vel.y = block_inside_result.block->vel.y;
                     }else{
-                         result.stop_on_pixel_y = (collided_block_center.pixel.y - HALF_TILE_SIZE_IN_PIXELS) - TILE_SIZE_IN_PIXELS;
-
-                         Position_t final_stop_pos = pixel_pos(Pixel_t{0, result.stop_on_pixel_y});
-                         Vec_t pos_delta = pos_to_vec(final_stop_pos - block_pos);
-
-                         result.pos_delta.y = pos_delta.y;
                          result.vel.y = 0.0f;
                          result.accel.y = 0.0f;
                          result.vertical_move.state = MOVE_STATE_IDLING;

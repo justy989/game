@@ -177,36 +177,28 @@ void update_light_and_ice_detectors(Interactive_t* interactive, World_t* world){
      }
 }
 
-void stop_block_colliding_with_entangled(Block_t* block, Direction_t move_dir_to_stop, CheckBlockCollisionResult_t* result){
+void stop_block_colliding_with_entangled(Block_t* block, Direction_t move_dir_to_stop){
      switch(move_dir_to_stop){
      default:
           break;
      case DIRECTION_LEFT:
      case DIRECTION_RIGHT:
           block->pos_delta.x = 0;
-          block->pos_delta.y = result->pos_delta.y;
           block->vel.x = 0;
-          block->vel.y = result->vel.y;
           block->accel.x = 0;
-          block->accel.y = result->accel.y;
 
           block->stop_on_pixel_x = 0;
 
           reset_move(&block->horizontal_move);
-          block->vertical_move = result->vertical_move;
           break;
      case DIRECTION_UP:
      case DIRECTION_DOWN:
-          block->pos_delta.x = result->pos_delta.x;
           block->pos_delta.y = 0;
-          block->vel.x = result->vel.x;
           block->vel.y = 0;
-          block->accel.x = result->accel.x;
           block->accel.y = 0;
 
           block->stop_on_pixel_y = 0;
 
-          block->horizontal_move = result->horizontal_move;
           reset_move(&block->vertical_move);
           break;
      }
@@ -490,8 +482,8 @@ int main(int argc, char** argv){
           return 1;
      }
 
-     int window_width = 1400;
-     int window_height = 1400;
+     int window_width = 1024;
+     int window_height = 1024;
      SDL_Window* window = nullptr;
      SDL_GLContext opengl_context = nullptr;
      GLuint theme_texture = 0;
@@ -2116,22 +2108,6 @@ int main(int argc, char** argv){
                               if(collision_result.collided){
                                    repeat_collision = true;
 
-#if 0
-                                   if(frame_count == 248){// || frame_count == 248){
-                                        LOG("frame: %ld, attempted: %d, block %d collided with block %d\n", frame_count, collision_attempts, i, collision_result.collided_block_index);
-                                        auto final_pos = block->pos + block->pos_delta;
-                                        LOG("  block pos: %d, %d, %f, %f -> %d, %d, %f, %f\n", block->pos.pixel.x, block->pos.pixel.y, block->pos.decimal.x, block->pos.decimal.y,
-                                            block->pos.pixel.x + BLOCK_SOLID_SIZE_IN_PIXELS, block->pos.pixel.y + BLOCK_SOLID_SIZE_IN_PIXELS, block->pos.decimal.x, block->pos.decimal.y);
-                                        LOG("  block pos_delta: %f, %f\n", block->pos_delta.x, block->pos_delta.y);
-                                        LOG("    final block pos: %d, %d, %f, %f -> %d, %d, %f, %f\n", final_pos.pixel.x, final_pos.pixel.y, final_pos.decimal.x, final_pos.decimal.y,
-                                            final_pos.pixel.x + BLOCK_SOLID_SIZE_IN_PIXELS, final_pos.pixel.y + BLOCK_SOLID_SIZE_IN_PIXELS, final_pos.decimal.x, final_pos.decimal.y);
-                                        LOG("  result pos_delta: %f, %f\n", collision_result.pos_delta.x, collision_result.pos_delta.y);
-                                        final_pos = block->pos + collision_result.pos_delta;
-                                        LOG("    result final block pos: %d, %d, %f, %f -> %d, %d, %f, %f\n", final_pos.pixel.x, final_pos.pixel.y, final_pos.decimal.x, final_pos.decimal.y,
-                                            final_pos.pixel.x + BLOCK_SOLID_SIZE_IN_PIXELS, final_pos.pixel.y + BLOCK_SOLID_SIZE_IN_PIXELS, final_pos.decimal.x, final_pos.decimal.y);
-                                   }
-#endif
-
                                    if(collision_result.collided_block_index >= 0 && blocks_are_entangled(collision_result.collided_block_index, i, &world.blocks)){
                                         // TODO: I don't love indexing the blocks without checking the index is valid first
                                         auto* entangled_block = world.blocks.elements + collision_result.collided_block_index;
@@ -2142,7 +2118,7 @@ int main(int argc, char** argv){
                                         // the result collided position is the center of the block, so handle this
                                         entangled_block_pos.pixel -= HALF_TILE_SIZE_PIXEL;
 
-                                        auto final_block_pos = block->pos + collision_result.pos_delta;
+                                        auto final_block_pos = block->pos + block->pos_delta;
                                         auto pos_diff = pos_to_vec(final_block_pos - entangled_block_pos);
 
                                         U8 total_rotations = (block->rotation + entangled_block->rotation + collision_result.collided_portal_rotations) % (S8)(DIRECTION_COUNT);
@@ -2288,8 +2264,8 @@ int main(int argc, char** argv){
                                                        }else{
                                                             auto stop_entangled_dir = direction_rotate_clockwise(entangled_move_dir_to_stop, collision_result.collided_portal_rotations);
 
-                                                            stop_block_colliding_with_entangled(block, move_dir_to_stop, &collision_result);
-                                                            stop_block_colliding_with_entangled(entangled_block, stop_entangled_dir, &entangle_result);
+                                                            stop_block_colliding_with_entangled(block, move_dir_to_stop);
+                                                            stop_block_colliding_with_entangled(entangled_block, stop_entangled_dir);
 
                                                             // TODO: compress this code, it's definitely used elsewhere
                                                             for(S16 p = 0; p < world.players.count; p++){
@@ -2873,65 +2849,116 @@ int main(int argc, char** argv){
                               auto& entry = result.entries[e];
                               if(entry.block_pos.z == player->pos.z - HEIGHT_INTERVAL){
                                    bool no_change = false;
+                                   auto block_index = get_block_index(&world, entry.block);
                                    auto rotated_pos_delta = vec_rotate_quadrants_clockwise(entry.block->pos_delta, entry.portal_rotations);
-                                   for(S16 p = 0; p < world.players.count; p++){
-                                        auto tmp_player = world.players.elements + p;
-                                        auto block_index = get_block_index(&world, entry.block);
-                                        auto old_carried_pos_delta = tmp_player->carried_positive_pos_delta + tmp_player->carried_negative_pos_delta;
+                                   auto old_carried_pos_delta = player->carried_positive_pos_delta + player->carried_negative_pos_delta;
 
-                                        if(rotated_pos_delta.x > 0){
-                                             if(rotated_pos_delta.x > tmp_player->carried_positive_pos_delta.x){
-                                                  tmp_player->carried_positive_pos_delta.x = rotated_pos_delta.x;
-                                             }else if(tmp_player->carried_by_block == block_index &&
-                                                      rotated_pos_delta.x < tmp_player->carried_positive_pos_delta.x){
-                                                  tmp_player->carried_positive_pos_delta.x = rotated_pos_delta.x;
-                                             }else{
-                                                  no_change = true;
-                                             }
-                                        }else if(rotated_pos_delta.x < 0){
-                                             if(rotated_pos_delta.x < tmp_player->carried_negative_pos_delta.x){
-                                                  tmp_player->carried_negative_pos_delta.x = rotated_pos_delta.x;
-                                             }else if(tmp_player->carried_by_block == block_index &&
-                                                      rotated_pos_delta.x > tmp_player->carried_negative_pos_delta.x){
-                                                  tmp_player->carried_negative_pos_delta.x = rotated_pos_delta.x;
-                                             }else{
-                                                  no_change = true;
-                                             }
-                                        }
-
-                                        if(rotated_pos_delta.y > 0){
-                                             if(rotated_pos_delta.y > tmp_player->carried_positive_pos_delta.y){
-                                                  tmp_player->carried_positive_pos_delta.y = rotated_pos_delta.y;
-                                             }else if(tmp_player->carried_by_block == block_index &&
-                                                      rotated_pos_delta.y < tmp_player->carried_positive_pos_delta.y){
-                                                  tmp_player->carried_positive_pos_delta.y = rotated_pos_delta.y;
-                                             }else{
-                                                  no_change = true;
-                                             }
-                                        }else if(rotated_pos_delta.y < 0){
-                                             if(rotated_pos_delta.y < tmp_player->carried_negative_pos_delta.y){
-                                                  tmp_player->carried_negative_pos_delta.y = rotated_pos_delta.y;
-                                             }else if(tmp_player->carried_by_block == block_index &&
-                                                      rotated_pos_delta.y > tmp_player->carried_negative_pos_delta.y){
-                                                  tmp_player->carried_negative_pos_delta.y = rotated_pos_delta.y;
-                                             }else{
-                                                  no_change = true;
-                                             }
-                                        }
-
-                                        auto new_carried_pos_delta = tmp_player->carried_positive_pos_delta + tmp_player->carried_negative_pos_delta;
-
-                                        if(tmp_player->teleport){
-                                             tmp_player->teleport_pos_delta -= old_carried_pos_delta;
-                                             tmp_player->teleport_pos_delta += new_carried_pos_delta;
+                                   if(rotated_pos_delta.x > 0){
+                                        if(rotated_pos_delta.x > player->carried_positive_pos_delta.x){
+                                             player->carried_positive_pos_delta.x = rotated_pos_delta.x;
+                                        }else if(player->carried_by_block == block_index &&
+                                                 rotated_pos_delta.x < player->carried_positive_pos_delta.x){
+                                             player->carried_positive_pos_delta.x = rotated_pos_delta.x;
                                         }else{
-                                             tmp_player->pos_delta -= old_carried_pos_delta;
-                                             tmp_player->pos_delta += new_carried_pos_delta;
+                                             no_change = true;
+                                        }
+                                   }else if(rotated_pos_delta.x < 0){
+                                        if(rotated_pos_delta.x < player->carried_negative_pos_delta.x){
+                                             player->carried_negative_pos_delta.x = rotated_pos_delta.x;
+                                        }else if(player->carried_by_block == block_index &&
+                                                 rotated_pos_delta.x > player->carried_negative_pos_delta.x){
+                                             player->carried_negative_pos_delta.x = rotated_pos_delta.x;
+                                        }else{
+                                             no_change = true;
                                         }
                                    }
 
+                                   if(rotated_pos_delta.y > 0){
+                                        if(rotated_pos_delta.y > player->carried_positive_pos_delta.y){
+                                             player->carried_positive_pos_delta.y = rotated_pos_delta.y;
+                                        }else if(player->carried_by_block == block_index &&
+                                                 rotated_pos_delta.y < player->carried_positive_pos_delta.y){
+                                             player->carried_positive_pos_delta.y = rotated_pos_delta.y;
+                                        }else{
+                                             no_change = true;
+                                        }
+                                   }else if(rotated_pos_delta.y < 0){
+                                        if(rotated_pos_delta.y < player->carried_negative_pos_delta.y){
+                                             player->carried_negative_pos_delta.y = rotated_pos_delta.y;
+                                        }else if(player->carried_by_block == block_index &&
+                                                 rotated_pos_delta.y > player->carried_negative_pos_delta.y){
+                                             player->carried_negative_pos_delta.y = rotated_pos_delta.y;
+                                        }else{
+                                             no_change = true;
+                                        }
+                                   }
+
+                                   auto new_carried_pos_delta = player->carried_positive_pos_delta + player->carried_negative_pos_delta;
+
+                                   if(player->teleport){
+                                        player->teleport_pos_delta -= old_carried_pos_delta;
+                                        player->teleport_pos_delta += new_carried_pos_delta;
+                                   }else{
+                                        player->pos_delta -= old_carried_pos_delta;
+                                        player->pos_delta += new_carried_pos_delta;
+                                   }
+
                                    player->carried_by_block = get_block_index(&world, entry.block);
-                                   if(!no_change) repeat_collision = true;
+
+                                   if(!no_change){
+                                        for(S16 p = 0; p < world.players.count; p++){
+                                             if(i == p) continue;
+
+                                             auto tmp_player = world.players.elements + p;
+                                             auto relative_rotation = direction_rotations_between((Direction_t)(player->rotation), (Direction_t)(tmp_player->rotation));
+                                             auto local_pos_delta = vec_rotate_quadrants_clockwise(rotated_pos_delta, relative_rotation);
+                                             old_carried_pos_delta = tmp_player->carried_positive_pos_delta + tmp_player->carried_negative_pos_delta;
+
+                                             if(local_pos_delta.x > 0){
+                                                  if(local_pos_delta.x > tmp_player->carried_positive_pos_delta.x){
+                                                       tmp_player->carried_positive_pos_delta.x = local_pos_delta.x;
+                                                  }else if(tmp_player->carried_by_block == block_index &&
+                                                           local_pos_delta.x < tmp_player->carried_positive_pos_delta.x){
+                                                       tmp_player->carried_positive_pos_delta.x = local_pos_delta.x;
+                                                  }
+                                             }else if(local_pos_delta.x < 0){
+                                                  if(local_pos_delta.x < tmp_player->carried_negative_pos_delta.x){
+                                                       tmp_player->carried_negative_pos_delta.x = local_pos_delta.x;
+                                                  }else if(tmp_player->carried_by_block == block_index &&
+                                                           local_pos_delta.x > tmp_player->carried_negative_pos_delta.x){
+                                                       tmp_player->carried_negative_pos_delta.x = local_pos_delta.x;
+                                                  }
+                                             }
+
+                                             if(local_pos_delta.y > 0){
+                                                  if(local_pos_delta.y > tmp_player->carried_positive_pos_delta.y){
+                                                       tmp_player->carried_positive_pos_delta.y = local_pos_delta.y;
+                                                  }else if(tmp_player->carried_by_block == block_index &&
+                                                           local_pos_delta.y < tmp_player->carried_positive_pos_delta.y){
+                                                       tmp_player->carried_positive_pos_delta.y = local_pos_delta.y;
+                                                  }
+                                             }else if(local_pos_delta.y < 0){
+                                                  if(local_pos_delta.y < tmp_player->carried_negative_pos_delta.y){
+                                                       tmp_player->carried_negative_pos_delta.y = local_pos_delta.y;
+                                                  }else if(tmp_player->carried_by_block == block_index &&
+                                                           local_pos_delta.y > tmp_player->carried_negative_pos_delta.y){
+                                                       tmp_player->carried_negative_pos_delta.y = local_pos_delta.y;
+                                                  }
+                                             }
+
+                                             new_carried_pos_delta = tmp_player->carried_positive_pos_delta + tmp_player->carried_negative_pos_delta;
+
+                                             if(tmp_player->teleport){
+                                                  tmp_player->teleport_pos_delta -= old_carried_pos_delta;
+                                                  tmp_player->teleport_pos_delta += new_carried_pos_delta;
+                                             }else{
+                                                  tmp_player->pos_delta -= old_carried_pos_delta;
+                                                  tmp_player->pos_delta += new_carried_pos_delta;
+                                             }
+                                        }
+
+                                        repeat_collision = true;
+                                   }
                               }
                          }
                     }
