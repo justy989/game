@@ -276,7 +276,7 @@ void update_motion_grid_aligned(Move_t* move, MotionComponent_t* motion, bool co
      {
           move->distance += motion->pos_delta;
 
-          if((motion->prev_vel > 0 && motion->vel < 0) || (motion->prev_vel < 0 && motion->vel > 0)){
+          if((motion->prev_vel >= 0 && motion->vel <= 0) || (motion->prev_vel <= 0 && motion->vel >= 0)){
                move->state = MOVE_STATE_IDLING;
                move->sign = MOVE_SIGN_ZERO;
                move->distance = 0;

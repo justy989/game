@@ -551,7 +551,7 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
 
      if(collided_with_block){
           // this stops the block when it moves into the player
-          Vec_t rotated_vel = vec_rotate_quadrants_clockwise(collided_with_block->vel, collision_portal_rotations);
+          Vec_t rotated_pos_delta = vec_rotate_quadrants_clockwise(collided_with_block->pos_delta, collision_portal_rotations);
           bool even_rotations = (collision_portal_rotations % 2) == 0;
 
           auto* player = world->players.elements + player_index;
@@ -562,7 +562,7 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
           default:
                break;
           case DIRECTION_LEFT:
-               if(rotated_vel.x > 0.0f){
+               if(rotated_pos_delta.x > 0.0f){
                     result.pos_delta.x = 0;
 
                     bool would_squish = false;
@@ -607,7 +607,7 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                }
                break;
           case DIRECTION_RIGHT:
-               if(rotated_vel.x < 0.0f){
+               if(rotated_pos_delta.x < 0.0f){
                     result.pos_delta.x = 0;
 
                     bool would_squish = false;
@@ -649,7 +649,7 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                }
                break;
           case DIRECTION_UP:
-               if(rotated_vel.y < 0.0f){
+               if(rotated_pos_delta.y < 0.0f){
                     result.pos_delta.y = 0;
 
                     bool would_squish = false;
@@ -690,7 +690,7 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                }
                break;
           case DIRECTION_DOWN:
-               if(rotated_vel.y > 0.0f){
+               if(rotated_pos_delta.y > 0.0f){
                     result.pos_delta.y = 0;
 
                     bool would_squish = false;
