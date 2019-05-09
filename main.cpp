@@ -350,6 +350,7 @@ PlayerInBlockRectResult_t player_in_block_rect(Player_t* player, TileMap_t* tile
                               block_pos.pixel += pixel_rotate_quadrants_clockwise(block_portal_dst_offset.pixel, portal_rotations);
                               block_pos.pixel -= HALF_TILE_SIZE_PIXEL;
                               block_pos.decimal = vec_rotate_quadrants_clockwise(block_portal_dst_offset.decimal, portal_rotations);
+                              block_pos.z = block->pos.z;
                               canonicalize(&block_pos);
 
                               auto block_rect = block_get_rect(block_pos.pixel);

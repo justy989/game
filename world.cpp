@@ -1295,7 +1295,7 @@ void describe_player(World_t* world, Player_t* player){
      LOG("  vel: %f, %f accel: %f, %f pos_dt: %f, %f\n", player->vel.x, player->vel.y, player->accel.x, player->accel.y, player->pos_delta.x , player->pos_delta.y);
      LOG("  rot: %d, move_rot: L %d, U %d, R %d, D %d\n", player->rotation,
          player->move_rotation[DIRECTION_LEFT], player->move_rotation[DIRECTION_UP], player->move_rotation[DIRECTION_RIGHT], player->move_rotation[DIRECTION_DOWN]);
-     LOG("  carried by: pos: %f, %f neg: %f, %f\n", player->carried_pos_delta.positive.x, player->carried_pos_delta.positive.y,
+     LOG("  held_up: %d carried by: pos: %f, %f neg: %f, %f\n", player->held_up, player->carried_pos_delta.positive.x, player->carried_pos_delta.positive.y,
          player->carried_pos_delta.negative.x, player->carried_pos_delta.negative.y);
      LOG("\n");
 }

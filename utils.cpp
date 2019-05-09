@@ -151,10 +151,10 @@ Rect_t rect_surrounding_adjacent_coords(Coord_t coord){
 }
 
 Rect_t rect_to_check_surrounding_blocks(Pixel_t center){
-    return Rect_t{(S16)(center.x - DOUBLE_TILE_SIZE_IN_PIXELS),
-                   (S16)(center.y - DOUBLE_TILE_SIZE_IN_PIXELS),
-                   (S16)(center.x + DOUBLE_TILE_SIZE_IN_PIXELS),
-                   (S16)(center.y + DOUBLE_TILE_SIZE_IN_PIXELS)};
+    return Rect_t{(S16)(center.x - (TILE_SIZE_IN_PIXELS + 1)),
+                   (S16)(center.y - (TILE_SIZE_IN_PIXELS + 1)),
+                   (S16)(center.x + (TILE_SIZE_IN_PIXELS + 1)),
+                   (S16)(center.y + (TILE_SIZE_IN_PIXELS + 1))};
 }
 
 Interactive_t* quad_tree_interactive_find_at(QuadTreeNode_t<Interactive_t>* root, Coord_t coord){
