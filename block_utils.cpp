@@ -1113,6 +1113,32 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                          }
                     }
 
+                    switch(first_direction){
+                    default:
+                         break;
+                    case DIRECTION_LEFT:
+                    case DIRECTION_RIGHT:
+                         reset_move(&result.horizontal_move);
+                         break;
+                    case DIRECTION_DOWN:
+                    case DIRECTION_UP:
+                         reset_move(&result.vertical_move);
+                         break;
+                    }
+
+                    switch(second_direction){
+                    default:
+                         break;
+                    case DIRECTION_LEFT:
+                    case DIRECTION_RIGHT:
+                         reset_move(&result.horizontal_move);
+                         break;
+                    case DIRECTION_DOWN:
+                    case DIRECTION_UP:
+                         reset_move(&result.vertical_move);
+                         break;
+                    }
+
                     if(block_push(block_inside_result.block, first_direction, world, true, instant_vel)){
                          push_entangled_block(block_inside_result.block, world, first_direction, true, instant_vel);
 

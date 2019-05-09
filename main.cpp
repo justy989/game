@@ -26,11 +26,13 @@ Current bugs:
 - Something funky about level 76 taking forever to test the map
 
 Big Features:
+- 'Bring Block Ice Collision to the Masses' - my favorite feature joke of the game
+     - code to find groups of blocks involved in either side of the collision
+     - 1/2mv^2 formula to find resulting velocity
 - 3D
      - entangled players on popups
      - if we put a popup on the other side of a portal and a block 1 interval high goes through the portal, will it work the way we expect?
      - Player stopping a tower of blocks
-- 'Bring Block Ice Collision to the Masses' - my favorite feature joke of the game
 - A way to tell which blocks are entangled
 - arrow kills player
 - arrow entanglement

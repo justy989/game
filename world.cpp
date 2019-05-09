@@ -1082,10 +1082,46 @@ bool block_push(Block_t* block, Direction_t direction, World_t* world, bool push
           if(collided_block == block){
                // pass, this happens in a corner portal!
           }else if(pushed_by_ice && block_on_ice(collided_block->pos, collided_block->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt)){
-               if(block_push(collided_block, collided_block_push_dir, world, pushed_by_ice, instant_vel)){
-                    push_entangled_block(collided_block, world, collided_block_push_dir, pushed_by_ice, instant_vel);
+
+               // check if we are able to move or if we transfer our force to the block
+               bool transfers_force = true;
+               switch(collided_block_push_dir){
+               default:
+                    break;
+               case DIRECTION_LEFT:
+                    transfers_force = (collided_block->vel.x > -instant_vel);
+                    break;
+               case DIRECTION_UP:
+                    transfers_force = (collided_block->vel.y < instant_vel);
+                    break;
+               case DIRECTION_RIGHT:
+                    transfers_force = (collided_block->vel.x < instant_vel);
+                    break;
+               case DIRECTION_DOWN:
+                    transfers_force = (collided_block->vel.y > -instant_vel);
+                    break;
                }
-               return false;
+
+               if(transfers_force){
+                    if(block_push(collided_block, collided_block_push_dir, world, pushed_by_ice, instant_vel)){
+                         push_entangled_block(collided_block, world, collided_block_push_dir, pushed_by_ice, instant_vel);
+                    }
+
+                    switch(direction){
+                    default:
+                         break;
+                    case DIRECTION_LEFT:
+                    case DIRECTION_RIGHT:
+                         reset_move(&block->horizontal_move);
+                         break;
+                    case DIRECTION_UP:
+                    case DIRECTION_DOWN:
+                         reset_move(&block->vertical_move);
+                         break;
+                    }
+
+                    return false;
+               }
           }else if(blocks_are_entangled(collided_block, block, &world->blocks)){
                // if block is entangled with the block it collides with, check if the entangled block can move, this is kind of duplicate work
                bool only_against_entanglers = true;
