@@ -29,6 +29,7 @@ Big Features:
 - 'Bring Block Ice Collision to the Masses' - my favorite feature joke of the game
      - code to find groups of blocks involved in either side of the collision
      - 1/2mv^2 formula to find resulting velocity
+     - entangled blocks colliding into the same block at the same time should effectively double the mass
 - 3D
      - entangled players on popups
      - if we put a popup on the other side of a portal and a block 1 interval high goes through the portal, will it work the way we expect?

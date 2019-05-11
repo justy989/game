@@ -111,3 +111,10 @@ Position_t operator*(Position_t p, float scale){
 
 F32 pos_x_unit(Position_t p){return (F32)(p.pixel.x) * PIXEL_SIZE + p.decimal.x;}
 F32 pos_y_unit(Position_t p){return (F32)(p.pixel.y) * PIXEL_SIZE + p.decimal.y;}
+
+F32 distance_between(Position_t a, Position_t b){
+     Position_t diff = b - a;
+     F32 x_diff = (diff.pixel.x) * PIXEL_SIZE + diff.decimal.x;
+     F32 y_diff = (diff.pixel.y) * PIXEL_SIZE + diff.decimal.y;
+     return sqrt((x_diff * x_diff) + (y_diff * y_diff));
+}

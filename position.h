@@ -22,3 +22,4 @@ void operator-=(Position_t& a, Position_t b);
 Position_t operator*(Position_t p, float scale);
 F32 pos_x_unit(Position_t p);
 F32 pos_y_unit(Position_t p);
+F32 distance_between(Position_t a, Position_t b);
