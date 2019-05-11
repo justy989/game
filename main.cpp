@@ -2223,31 +2223,35 @@ int main(int argc, char** argv){
                                                             TransferMomentum_t entangled_block_momentum = get_block_momentum(&world, entangled_block, entangled_move_dir_to_stop);
 
                                                             if(block_push(block, entangled_move_dir_to_stop, &world, true, &entangled_block_momentum)){
+                                                                 F32 vel = elastic_transfer_momentum_to_block(&entangled_block_momentum, &world, block, entangled_move_dir_to_stop);
+
                                                                  switch(entangled_move_dir_to_stop){
                                                                  default:
                                                                       break;
                                                                  case DIRECTION_LEFT:
                                                                  case DIRECTION_RIGHT:
-                                                                      block->pos_delta.x = entangled_block_momentum.vel * dt;
+                                                                      block->pos_delta.x = vel * dt;
                                                                       break;
                                                                  case DIRECTION_UP:
                                                                  case DIRECTION_DOWN:
-                                                                      block->pos_delta.y = entangled_block_momentum.vel * dt;
+                                                                      block->pos_delta.y = vel * dt;
                                                                       break;
                                                                  }
                                                             }
 
                                                             if(block_push(entangled_block, move_dir_to_stop, &world, true, &block_momentum)){
+                                                                 F32 vel = elastic_transfer_momentum_to_block(&block_momentum, &world, entangled_block, move_dir_to_stop);
+
                                                                  switch(move_dir_to_stop){
                                                                  default:
                                                                       break;
                                                                  case DIRECTION_LEFT:
                                                                  case DIRECTION_RIGHT:
-                                                                      entangled_block->pos_delta.x = block_momentum.vel * dt;
+                                                                      entangled_block->pos_delta.x = vel * dt;
                                                                       break;
                                                                  case DIRECTION_UP:
                                                                  case DIRECTION_DOWN:
-                                                                      entangled_block->pos_delta.y = block_momentum.vel * dt;
+                                                                      entangled_block->pos_delta.y = vel * dt;
                                                                       break;
                                                                  }
                                                             }

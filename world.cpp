@@ -1206,8 +1206,8 @@ bool block_push(Block_t* block, Direction_t direction, World_t* world, bool push
                if(pushed_by_ice){
                     block->horizontal_move.state = MOVE_STATE_COASTING;
                     // the velocity may be going the wrong way, but we can fix it here
-                    F32 instant_vel = instant_momentum->vel;
-                    if(instant_momentum->vel > 0) instant_vel = -instant_momentum->vel;
+                    F32 instant_vel = elastic_transfer_momentum_to_block(instant_momentum, world, block, direction);
+                    if(instant_vel > 0) instant_vel = -instant_vel;
                     block->vel.x = instant_vel;
                }else{
                     block->horizontal_move.state = MOVE_STATE_STARTING;
@@ -1222,8 +1222,8 @@ bool block_push(Block_t* block, Direction_t direction, World_t* world, bool push
                block->horizontal_move.sign = MOVE_SIGN_POSITIVE;
                if(pushed_by_ice){
                     block->horizontal_move.state = MOVE_STATE_COASTING;
-                    F32 instant_vel = instant_momentum->vel;
-                    if(instant_momentum->vel < 0) instant_vel = -instant_momentum->vel;
+                    F32 instant_vel = elastic_transfer_momentum_to_block(instant_momentum, world, block, direction);
+                    if(instant_vel < 0) instant_vel = -instant_vel;
                     block->vel.x = instant_vel;
                }else{
                     block->horizontal_move.state = MOVE_STATE_STARTING;
@@ -1238,8 +1238,8 @@ bool block_push(Block_t* block, Direction_t direction, World_t* world, bool push
                block->vertical_move.sign = MOVE_SIGN_NEGATIVE;
                if(pushed_by_ice){
                     block->vertical_move.state = MOVE_STATE_COASTING;
-                    F32 instant_vel = instant_momentum->vel;
-                    if(instant_momentum->vel > 0) instant_vel = -instant_momentum->vel;
+                    F32 instant_vel = elastic_transfer_momentum_to_block(instant_momentum, world, block, direction);
+                    if(instant_vel > 0) instant_vel = -instant_vel;
                     block->vel.y = instant_vel;
                }else{
                     block->vertical_move.state = MOVE_STATE_STARTING;
@@ -1254,8 +1254,8 @@ bool block_push(Block_t* block, Direction_t direction, World_t* world, bool push
                block->vertical_move.sign = MOVE_SIGN_POSITIVE;
                if(pushed_by_ice){
                     block->vertical_move.state = MOVE_STATE_COASTING;
-                    F32 instant_vel = instant_momentum->vel;
-                    if(instant_momentum->vel < 0) instant_vel = -instant_momentum->vel;
+                    F32 instant_vel = elastic_transfer_momentum_to_block(instant_momentum, world, block, direction);
+                    if(instant_vel < 0) instant_vel = -instant_vel;
                     block->vel.y = instant_vel;
                }else{
                     block->vertical_move.state = MOVE_STATE_STARTING;
@@ -1692,4 +1692,33 @@ TransferMomentum_t get_block_momentum(World_t* world, Block_t* block, Direction_
      }
 
      return block_momentum;
+}
+
+static F32 momentum_term(F32 mass, F32 vel){
+     return 0.5 * mass * vel * vel;
+}
+
+static F32 momentum_term(TransferMomentum_t* transfer_momentum){
+     return momentum_term((F32)(transfer_momentum->mass), transfer_momentum->vel);
+}
+
+F32 elastic_transfer_momentum_to_block(TransferMomentum_t* first_transfer_momentum, World_t* world, Block_t* block, Direction_t direction){
+     F32 final_vel = 0;
+
+     auto second_block_momentum = get_block_momentum(world, block, direction);
+
+     // elastic collision
+     // 1/2mv1i^2 + 1/2mv2i^2 = 1/2mv1f^2 + 1/2mv2f^2
+     // 1 final momentum = 0
+     // 1/2mv1i^2 + 1/2mv2i^2 = 1/2mv2f^2
+     // (1/2mv1i^2 + 1/2mv2i^2) / 1/2m = v2f^2
+     // sqrt((1/2mv1i^2 + 1/2mv2i^2) / 1/2m) = v
+
+     F32 first_initial_vel = momentum_term(first_transfer_momentum);
+     F32 second_initial_vel = momentum_term(&second_block_momentum);
+
+     F32 vel_squared = (first_initial_vel + second_initial_vel) / (0.5f * (F32)(second_block_momentum.mass));
+     final_vel = sqrt(vel_squared);
+
+     return final_vel;
 }
