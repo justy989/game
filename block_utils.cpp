@@ -1096,20 +1096,21 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                }
 
                if(push){
-                    F32 instant_vel = 0;
+                    TransferMomentum_t instant_momentum;
+                    instant_momentum.mass = block_get_mass(world->blocks.elements + block_index);
 
                     // take into account direction and portal rotations before setting the instant vel
                     if(direction_is_horizontal(first_direction)){
                          if((block_inside_result.portal_rotations % 2)){
-                              instant_vel = save_vel.y;
+                              instant_momentum.vel = save_vel.y;
                          }else{
-                              instant_vel = save_vel.x;
+                              instant_momentum.vel = save_vel.x;
                          }
                     }else{
                          if((block_inside_result.portal_rotations % 2)){
-                              instant_vel = save_vel.x;
+                              instant_momentum.vel = save_vel.x;
                          }else{
-                              instant_vel = save_vel.y;
+                              instant_momentum.vel = save_vel.y;
                          }
                     }
 
@@ -1139,8 +1140,8 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                          break;
                     }
 
-                    if(block_push(block_inside_result.block, first_direction, world, true, instant_vel)){
-                         push_entangled_block(block_inside_result.block, world, first_direction, true, instant_vel);
+                    if(block_push(block_inside_result.block, first_direction, world, true, &instant_momentum)){
+                         push_entangled_block(block_inside_result.block, world, first_direction, true, &instant_momentum);
 
                          if(blocks_are_entangled(block_inside_result.block - world->blocks.elements, block_index, &world->blocks)){
                               Block_t* block = world->blocks.elements + block_index;
@@ -1166,9 +1167,9 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                     }
 
                     if(second_direction != DIRECTION_COUNT){
-                         instant_vel = direction_is_horizontal(second_direction) ? save_vel.x : save_vel.y;
-                         if(block_push(block_inside_result.block, second_direction, world, true, instant_vel)){
-                              push_entangled_block(block_inside_result.block, world, second_direction, true, instant_vel);
+                         instant_momentum.vel = direction_is_horizontal(second_direction) ? save_vel.x : save_vel.y;
+                         if(block_push(block_inside_result.block, second_direction, world, true, &instant_momentum)){
+                              push_entangled_block(block_inside_result.block, world, second_direction, true, &instant_momentum);
 
                               if(blocks_are_entangled(block_inside_result.block - world->blocks.elements, block_index, &world->blocks)){
                                    Block_t* block = world->blocks.elements + block_index;
@@ -1261,7 +1262,7 @@ Interactive_t* block_is_teleporting(Block_t* block, QuadTreeNode_t<Interactive_t
      return nullptr;
 }
 
-void push_entangled_block(Block_t* block, World_t* world, Direction_t push_dir, bool pushed_by_ice, F32 instant_vel){
+void push_entangled_block(Block_t* block, World_t* world, Direction_t push_dir, bool pushed_by_ice, TransferMomentum_t* instant_momentum){
      if(block->entangle_index < 0) return;
 
      S16 block_index = block - world->blocks.elements;
@@ -1271,7 +1272,7 @@ void push_entangled_block(Block_t* block, World_t* world, Direction_t push_dir, 
           if(!block_held_down_by_another_block(entangled_block, world->block_qt, world->interactive_qt, &world->tilemap).held()){
                auto rotations_between = direction_rotations_between(static_cast<Direction_t>(entangled_block->rotation), static_cast<Direction_t>(block->rotation));
                Direction_t rotated_dir = direction_rotate_clockwise(push_dir, rotations_between);
-               block_push(entangled_block, rotated_dir, world, pushed_by_ice, instant_vel);
+               block_push(entangled_block, rotated_dir, world, pushed_by_ice, instant_momentum);
           }
           entangle_index = entangled_block->entangle_index;
      }

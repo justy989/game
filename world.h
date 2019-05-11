@@ -64,8 +64,8 @@ void illuminate(Coord_t coord, U8 value, World_t* world, Coord_t from_portal = C
 void spread_ice(Coord_t center, S8 height, S16 radius, World_t* world, bool teleported = false);
 void melt_ice(Coord_t center, S8 height, S16 radius, World_t* world, bool teleported = false);
 
-bool block_push(Block_t* block, MoveDirection_t move_direction, World_t* world, bool pushed_by_ice, F32 instant_vel = 0);
-bool block_push(Block_t* block, Direction_t direction, World_t* world, bool pushed_by_ice, F32 instant_vel = 0);
+bool block_push(Block_t* block, MoveDirection_t move_direction, World_t* world, bool pushed_by_ice, TransferMomentum_t* instant_momentum = nullptr);
+bool block_push(Block_t* block, Direction_t direction, World_t* world, bool pushed_by_ice, TransferMomentum_t* instant_momentum = nullptr);
 bool reset_players(ObjectArray_t<Player_t>* players);
 
 void describe_player(World_t* world, Player_t* player);
@@ -78,3 +78,6 @@ bool setup_default_room(World_t* world);
 void reset_tilemap_light(World_t* world);
 
 bool block_in_height_range_of_player(Block_t* block, Position_t player);
+
+S16 get_block_stack_mass(World_t* world, Block_t* block);
+TransferMomentum_t get_block_momentum(World_t* world, Block_t* block, Direction_t direction);

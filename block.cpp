@@ -125,3 +125,8 @@ const char* block_coast_to_string(BlockCoast_t coast){
 S8 blocks_rotations_between(Block_t* a, Block_t* b){
      return direction_rotations_between(static_cast<Direction_t>(a->rotation), static_cast<Direction_t>(b->rotation));
 }
+
+S16 block_get_mass(Block_t* b){
+     (void)(b);
+     return TILE_SIZE_IN_PIXELS * TILE_SIZE_IN_PIXELS;
+}

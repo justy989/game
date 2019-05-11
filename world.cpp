@@ -1063,18 +1063,18 @@ void melt_ice(Coord_t center, S8 height, S16 radius, World_t* world, bool telepo
      impact_ice(center, height, radius, world, teleported, false);
 }
 
-bool block_push(Block_t* block, MoveDirection_t move_direction, World_t* world, bool pushed_by_ice, F32 instant_vel){
+bool block_push(Block_t* block, MoveDirection_t move_direction, World_t* world, bool pushed_by_ice, TransferMomentum_t* instant_momentum){
      Direction_t first;
      Direction_t second;
      move_direction_to_directions(move_direction, &first, &second);
 
-     bool a = block_push(block, first, world, pushed_by_ice, instant_vel);
-     bool b = block_push(block, second, world, pushed_by_ice, instant_vel);
+     bool a = block_push(block, first, world, pushed_by_ice, instant_momentum);
+     bool b = block_push(block, second, world, pushed_by_ice, instant_momentum);
 
      return a || b;
 }
 
-bool block_push(Block_t* block, Direction_t direction, World_t* world, bool pushed_by_ice, F32 instant_vel){
+bool block_push(Block_t* block, Direction_t direction, World_t* world, bool pushed_by_ice, TransferMomentum_t* instant_momentum){
      Direction_t collided_block_push_dir = DIRECTION_COUNT;
      Block_t* collided_block = block_against_another_block(block->pos + block->pos_delta, direction, world->block_qt, world->interactive_qt,
                                                            &world->tilemap, &collided_block_push_dir);
@@ -1085,26 +1085,28 @@ bool block_push(Block_t* block, Direction_t direction, World_t* world, bool push
 
                // check if we are able to move or if we transfer our force to the block
                bool transfers_force = true;
-               switch(collided_block_push_dir){
-               default:
-                    break;
-               case DIRECTION_LEFT:
-                    transfers_force = (collided_block->vel.x > -instant_vel);
-                    break;
-               case DIRECTION_UP:
-                    transfers_force = (collided_block->vel.y < instant_vel);
-                    break;
-               case DIRECTION_RIGHT:
-                    transfers_force = (collided_block->vel.x < instant_vel);
-                    break;
-               case DIRECTION_DOWN:
-                    transfers_force = (collided_block->vel.y > -instant_vel);
-                    break;
+               if(instant_momentum){
+                    switch(collided_block_push_dir){
+                    default:
+                         break;
+                    case DIRECTION_LEFT:
+                         transfers_force = (collided_block->vel.x > -instant_momentum->vel);
+                         break;
+                    case DIRECTION_UP:
+                         transfers_force = (collided_block->vel.y < instant_momentum->vel);
+                         break;
+                    case DIRECTION_RIGHT:
+                         transfers_force = (collided_block->vel.x < instant_momentum->vel);
+                         break;
+                    case DIRECTION_DOWN:
+                         transfers_force = (collided_block->vel.y > -instant_momentum->vel);
+                         break;
+                    }
                }
 
                if(transfers_force){
-                    if(block_push(collided_block, collided_block_push_dir, world, pushed_by_ice, instant_vel)){
-                         push_entangled_block(collided_block, world, collided_block_push_dir, pushed_by_ice, instant_vel);
+                    if(block_push(collided_block, collided_block_push_dir, world, pushed_by_ice, instant_momentum)){
+                         push_entangled_block(collided_block, world, collided_block_push_dir, pushed_by_ice, instant_momentum);
                     }
 
                     switch(direction){
@@ -1204,7 +1206,8 @@ bool block_push(Block_t* block, Direction_t direction, World_t* world, bool push
                if(pushed_by_ice){
                     block->horizontal_move.state = MOVE_STATE_COASTING;
                     // the velocity may be going the wrong way, but we can fix it here
-                    if(instant_vel > 0) instant_vel = -instant_vel;
+                    F32 instant_vel = instant_momentum->vel;
+                    if(instant_momentum->vel > 0) instant_vel = -instant_momentum->vel;
                     block->vel.x = instant_vel;
                }else{
                     block->horizontal_move.state = MOVE_STATE_STARTING;
@@ -1219,7 +1222,8 @@ bool block_push(Block_t* block, Direction_t direction, World_t* world, bool push
                block->horizontal_move.sign = MOVE_SIGN_POSITIVE;
                if(pushed_by_ice){
                     block->horizontal_move.state = MOVE_STATE_COASTING;
-                    if(instant_vel < 0) instant_vel = -instant_vel;
+                    F32 instant_vel = instant_momentum->vel;
+                    if(instant_momentum->vel < 0) instant_vel = -instant_momentum->vel;
                     block->vel.x = instant_vel;
                }else{
                     block->horizontal_move.state = MOVE_STATE_STARTING;
@@ -1234,7 +1238,8 @@ bool block_push(Block_t* block, Direction_t direction, World_t* world, bool push
                block->vertical_move.sign = MOVE_SIGN_NEGATIVE;
                if(pushed_by_ice){
                     block->vertical_move.state = MOVE_STATE_COASTING;
-                    if(instant_vel > 0) instant_vel = -instant_vel;
+                    F32 instant_vel = instant_momentum->vel;
+                    if(instant_momentum->vel > 0) instant_vel = -instant_momentum->vel;
                     block->vel.y = instant_vel;
                }else{
                     block->vertical_move.state = MOVE_STATE_STARTING;
@@ -1249,7 +1254,8 @@ bool block_push(Block_t* block, Direction_t direction, World_t* world, bool push
                block->vertical_move.sign = MOVE_SIGN_POSITIVE;
                if(pushed_by_ice){
                     block->vertical_move.state = MOVE_STATE_COASTING;
-                    if(instant_vel < 0) instant_vel = -instant_vel;
+                    F32 instant_vel = instant_momentum->vel;
+                    if(instant_momentum->vel < 0) instant_vel = -instant_momentum->vel;
                     block->vel.y = instant_vel;
                }else{
                     block->vertical_move.state = MOVE_STATE_STARTING;
@@ -1655,3 +1661,35 @@ bool block_in_height_range_of_player(Block_t* block, Position_t player_pos){
      return true;
 }
 
+S16 get_block_stack_mass(World_t* world, Block_t* block){
+     S16 mass = block_get_mass(block);
+
+     auto result = block_held_down_by_another_block(block, world->block_qt, world->interactive_qt, &world->tilemap);
+     for(S16 i = 0; i < result.count; i++){
+          mass += get_block_stack_mass(world, result.blocks_held[i].block);
+     }
+
+     return mass;
+}
+
+TransferMomentum_t get_block_momentum(World_t* world, Block_t* block, Direction_t direction){
+     TransferMomentum_t block_momentum;
+
+     block_momentum.vel = 0;
+     block_momentum.mass = get_block_stack_mass(world, block);
+
+     switch(direction){
+     default:
+          break;
+     case DIRECTION_LEFT:
+     case DIRECTION_RIGHT:
+          block_momentum.vel = block->vel.x;
+          break;
+     case DIRECTION_UP:
+     case DIRECTION_DOWN:
+          block_momentum.vel = block->vel.y;
+          break;
+     }
+
+     return block_momentum;
+}

@@ -22,6 +22,11 @@ enum BlockHeldBy_t{
      BLOCK_HELD_BY_ENTANGLE = 2,
 };
 
+struct TransferMomentum_t{
+     S16 mass;
+     F32 vel;
+};
+
 struct Block_t : public GridMotion_t{
      Position_t      pos;
      Element_t       element;
@@ -82,3 +87,5 @@ void block_stop_vertically(Block_t* block);
 const char* block_coast_to_string(BlockCoast_t coast);
 
 S8 blocks_rotations_between(Block_t* a, Block_t* b);
+
+S16 block_get_mass(Block_t* b);

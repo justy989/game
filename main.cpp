@@ -33,6 +33,8 @@ Big Features:
      - entangled players on popups
      - if we put a popup on the other side of a portal and a block 1 interval high goes through the portal, will it work the way we expect?
      - Player stopping a tower of blocks
+     - stack of blocks should be pushable on ice in it's entirety
+     - a block with ice on it shouldn't be able to carry a block
 - A way to tell which blocks are entangled
 - arrow kills player
 - arrow entanglement
@@ -2217,61 +2219,35 @@ int main(int argc, char** argv){
                                                             // TODO: handle this case for blocks not entangled on ice
                                                             // TODO: handle pushing blocks diagonally
 
-                                                            F32 block_instant_vel = 0;
-                                                            F32 entangled_block_instant_vel = 0;
+                                                            TransferMomentum_t block_momentum = get_block_momentum(&world, block, move_dir_to_stop);
+                                                            TransferMomentum_t entangled_block_momentum = get_block_momentum(&world, entangled_block, entangled_move_dir_to_stop);
 
-                                                            switch(move_dir_to_stop){
-                                                            default:
-                                                                 break;
-                                                            case DIRECTION_LEFT:
-                                                            case DIRECTION_RIGHT:
-                                                                 block_instant_vel = block->vel.x;
-                                                                 break;
-                                                            case DIRECTION_UP:
-                                                            case DIRECTION_DOWN:
-                                                                 block_instant_vel = block->vel.y;
-                                                                 break;
-                                                            }
-
-                                                            switch(entangled_move_dir_to_stop){
-                                                            default:
-                                                                 break;
-                                                            case DIRECTION_LEFT:
-                                                            case DIRECTION_RIGHT:
-                                                                 entangled_block_instant_vel = entangled_block->vel.x;
-                                                                 break;
-                                                            case DIRECTION_UP:
-                                                            case DIRECTION_DOWN:
-                                                                 entangled_block_instant_vel = entangled_block->vel.y;
-                                                                 break;
-                                                            }
-
-                                                            if(block_push(block, entangled_move_dir_to_stop, &world, true, entangled_block_instant_vel)){
+                                                            if(block_push(block, entangled_move_dir_to_stop, &world, true, &entangled_block_momentum)){
                                                                  switch(entangled_move_dir_to_stop){
                                                                  default:
                                                                       break;
                                                                  case DIRECTION_LEFT:
                                                                  case DIRECTION_RIGHT:
-                                                                      block->pos_delta.x = entangled_block_instant_vel * dt;
+                                                                      block->pos_delta.x = entangled_block_momentum.vel * dt;
                                                                       break;
                                                                  case DIRECTION_UP:
                                                                  case DIRECTION_DOWN:
-                                                                      block->pos_delta.y = entangled_block_instant_vel * dt;
+                                                                      block->pos_delta.y = entangled_block_momentum.vel * dt;
                                                                       break;
                                                                  }
                                                             }
 
-                                                            if(block_push(entangled_block, move_dir_to_stop, &world, true, block_instant_vel)){
+                                                            if(block_push(entangled_block, move_dir_to_stop, &world, true, &block_momentum)){
                                                                  switch(move_dir_to_stop){
                                                                  default:
                                                                       break;
                                                                  case DIRECTION_LEFT:
                                                                  case DIRECTION_RIGHT:
-                                                                      entangled_block->pos_delta.x = block_instant_vel * dt;
+                                                                      entangled_block->pos_delta.x = block_momentum.vel * dt;
                                                                       break;
                                                                  case DIRECTION_UP:
                                                                  case DIRECTION_DOWN:
-                                                                      entangled_block->pos_delta.y = block_instant_vel * dt;
+                                                                      entangled_block->pos_delta.y = block_momentum.vel * dt;
                                                                       break;
                                                                  }
                                                             }
