@@ -1258,67 +1258,97 @@ bool block_push(Block_t* block, Direction_t direction, World_t* world, bool push
           break;
      case DIRECTION_LEFT:
           if(block->horizontal_move.state == MOVE_STATE_IDLING){
-               block->horizontal_move.sign = MOVE_SIGN_NEGATIVE;
                if(pushed_by_ice){
                     block->horizontal_move.state = MOVE_STATE_COASTING;
                     // the velocity may be going the wrong way, but we can fix it here
                     F32 instant_vel = elastic_transfer_momentum_to_block(instant_momentum, world, block, direction);
                     if(instant_vel > 0) instant_vel = -instant_vel;
                     block->vel.x = instant_vel;
+                    block->horizontal_move.sign = move_sign_from_vel(block->vel.x);
                }else{
                     block->horizontal_move.state = MOVE_STATE_STARTING;
+                    block->horizontal_move.sign = MOVE_SIGN_NEGATIVE;
                     block->accel_magnitudes.x = BLOCK_ACCEL;
                }
                block->horizontal_move.distance = 0;
                block->started_on_pixel_x = block->pos.pixel.x;
+          }else if(pushed_by_ice){
+               block->horizontal_move.state = MOVE_STATE_COASTING;
+               // the velocity may be going the wrong way, but we can fix it here
+               F32 instant_vel = elastic_transfer_momentum_to_block(instant_momentum, world, block, direction);
+               if(instant_vel > 0) instant_vel = -instant_vel;
+               block->vel.x = instant_vel;
+               block->horizontal_move.sign = move_sign_from_vel(block->vel.x);
           }
           break;
      case DIRECTION_RIGHT:
           if(block->horizontal_move.state == MOVE_STATE_IDLING){
-               block->horizontal_move.sign = MOVE_SIGN_POSITIVE;
                if(pushed_by_ice){
                     block->horizontal_move.state = MOVE_STATE_COASTING;
                     F32 instant_vel = elastic_transfer_momentum_to_block(instant_momentum, world, block, direction);
                     if(instant_vel < 0) instant_vel = -instant_vel;
                     block->vel.x = instant_vel;
+                    block->horizontal_move.sign = move_sign_from_vel(block->vel.x);
                }else{
                     block->horizontal_move.state = MOVE_STATE_STARTING;
+                    block->horizontal_move.sign = MOVE_SIGN_POSITIVE;
                     block->accel_magnitudes.x = BLOCK_ACCEL;
                }
                block->horizontal_move.distance = 0;
                block->started_on_pixel_x = block->pos.pixel.x;
+          }else if(pushed_by_ice){
+               block->horizontal_move.state = MOVE_STATE_COASTING;
+               F32 instant_vel = elastic_transfer_momentum_to_block(instant_momentum, world, block, direction);
+               if(instant_vel < 0) instant_vel = -instant_vel;
+               block->vel.x = instant_vel;
+               block->horizontal_move.sign = move_sign_from_vel(block->vel.x);
           }
           break;
      case DIRECTION_DOWN:
           if(block->vertical_move.state == MOVE_STATE_IDLING){
-               block->vertical_move.sign = MOVE_SIGN_NEGATIVE;
                if(pushed_by_ice){
                     block->vertical_move.state = MOVE_STATE_COASTING;
                     F32 instant_vel = elastic_transfer_momentum_to_block(instant_momentum, world, block, direction);
                     if(instant_vel > 0) instant_vel = -instant_vel;
                     block->vel.y = instant_vel;
+                    block->vertical_move.sign = move_sign_from_vel(block->vel.y);
                }else{
                     block->vertical_move.state = MOVE_STATE_STARTING;
+                    block->vertical_move.sign = MOVE_SIGN_NEGATIVE;
                     block->accel_magnitudes.y = BLOCK_ACCEL;
                }
                block->vertical_move.distance = 0;
                block->started_on_pixel_y = block->pos.pixel.y;
+          }else if(pushed_by_ice){
+               block->vertical_move.state = MOVE_STATE_COASTING;
+               F32 instant_vel = elastic_transfer_momentum_to_block(instant_momentum, world, block, direction);
+               if(instant_vel > 0) instant_vel = -instant_vel;
+               block->vel.y = instant_vel;
+               block->vertical_move.sign = move_sign_from_vel(block->vel.y);
           }
           break;
      case DIRECTION_UP:
           if(block->vertical_move.state == MOVE_STATE_IDLING){
-               block->vertical_move.sign = MOVE_SIGN_POSITIVE;
                if(pushed_by_ice){
                     block->vertical_move.state = MOVE_STATE_COASTING;
                     F32 instant_vel = elastic_transfer_momentum_to_block(instant_momentum, world, block, direction);
                     if(instant_vel < 0) instant_vel = -instant_vel;
                     block->vel.y = instant_vel;
+                    block->vertical_move.sign = move_sign_from_vel(block->vel.y);
                }else{
                     block->vertical_move.state = MOVE_STATE_STARTING;
+                    block->vertical_move.sign = MOVE_SIGN_POSITIVE;
                     block->accel_magnitudes.y = BLOCK_ACCEL;
                }
+
                block->vertical_move.distance = 0;
                block->started_on_pixel_y = block->pos.pixel.y;
+          }else if(pushed_by_ice){
+               block->vertical_move.state = MOVE_STATE_COASTING;
+               F32 instant_vel = elastic_transfer_momentum_to_block(instant_momentum, world, block, direction);
+               if(instant_vel < 0) instant_vel = -instant_vel;
+               block->vel.y = instant_vel;
+               block->vertical_move.sign = move_sign_from_vel(block->vel.y);
           }
           break;
      }
@@ -1344,6 +1374,8 @@ void describe_block(World_t* world, Block_t* block){
          block->pos_delta.x, block->pos_delta.y);
      LOG(" hmove: %s %s %f\n", move_state_to_string(block->horizontal_move.state), move_sign_to_string(block->horizontal_move.sign), block->horizontal_move.distance);
      LOG(" vmove: %s %s %f\n", move_state_to_string(block->vertical_move.state), move_sign_to_string(block->vertical_move.sign), block->vertical_move.distance);
+     LOG(" hmomentum orig %f transferred %f\n", block->horizontal_original_momentum, block->horizontal_transferred_momentum);
+     LOG(" vmomentum orig %f transferred %f\n", block->vertical_original_momentum, block->vertical_transferred_momentum);
      LOG(" hcoast: %s vcoast: %s\n", block_coast_to_string(block->coast_horizontal), block_coast_to_string(block->coast_vertical));
      LOG(" flags: held_up: %d, carried_by_block: %d\n", block->held_up, block->carried_pos_delta.block_index);
      LOG("\n");
@@ -1717,6 +1749,14 @@ bool block_in_height_range_of_player(Block_t* block, Position_t player_pos){
      return true;
 }
 
+F32 momentum_term(F32 mass, F32 vel){
+     return 0.5 * mass * vel * vel;
+}
+
+F32 momentum_term(TransferMomentum_t* transfer_momentum){
+     return momentum_term((F32)(transfer_momentum->mass), transfer_momentum->vel);
+}
+
 S16 get_block_stack_mass(World_t* world, Block_t* block){
      S16 mass = block_get_mass(block);
 
@@ -1750,18 +1790,10 @@ TransferMomentum_t get_block_momentum(World_t* world, Block_t* block, Direction_
      return block_momentum;
 }
 
-static F32 momentum_term(F32 mass, F32 vel){
-     return 0.5 * mass * vel * vel;
-}
-
-static F32 momentum_term(TransferMomentum_t* transfer_momentum){
-     return momentum_term((F32)(transfer_momentum->mass), transfer_momentum->vel);
-}
-
 F32 elastic_transfer_momentum_to_block(TransferMomentum_t* first_transfer_momentum, World_t* world, Block_t* block, Direction_t direction){
      F32 final_vel = 0;
 
-     auto second_block_momentum = get_block_momentum(world, block, direction);
+     auto second_block_mass = get_block_stack_mass(world, block);
 
      // elastic collision
      // 1/2mv1i^2 + 1/2mv2i^2 = 1/2mv1f^2 + 1/2mv2f^2
@@ -1770,10 +1802,21 @@ F32 elastic_transfer_momentum_to_block(TransferMomentum_t* first_transfer_moment
      // (1/2mv1i^2 + 1/2mv2i^2) / 1/2m = v2f^2
      // sqrt((1/2mv1i^2 + 1/2mv2i^2) / 1/2m) = v
 
-     F32 first_initial_vel = momentum_term(first_transfer_momentum);
-     F32 second_initial_vel = momentum_term(&second_block_momentum);
+     F32 first_term = momentum_term(first_transfer_momentum);
 
-     F32 vel_squared = (first_initial_vel + second_initial_vel) / (0.5f * (F32)(second_block_momentum.mass));
+     F32 second_term = 0.0;
+
+     if(direction_is_horizontal(direction)){
+          second_term = block->horizontal_original_momentum;
+          first_term += block->horizontal_transferred_momentum;
+          block->horizontal_transferred_momentum = first_term;
+     }else{
+          second_term = block->vertical_original_momentum;
+          first_term += block->vertical_transferred_momentum;
+          block->vertical_transferred_momentum = first_term;
+     }
+
+     F32 vel_squared = (first_term + second_term) / (0.5f * (F32)(second_block_mass));
      final_vel = sqrt(vel_squared);
 
      return final_vel;

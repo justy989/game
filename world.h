@@ -80,5 +80,8 @@ void reset_tilemap_light(World_t* world);
 bool block_in_height_range_of_player(Block_t* block, Position_t player);
 
 S16 get_block_stack_mass(World_t* world, Block_t* block);
+
+F32 momentum_term(F32 mass, F32 vel);
+F32 momentum_term(TransferMomentum_t* transfer_momentum);
 TransferMomentum_t get_block_momentum(World_t* world, Block_t* block, Direction_t direction);
 F32 elastic_transfer_momentum_to_block(TransferMomentum_t* transfer_momentum, World_t* world, Block_t* block, Direction_t direction);

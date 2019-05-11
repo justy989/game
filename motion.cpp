@@ -357,6 +357,16 @@ void move_flip_sign(Move_t* move){
      }
 }
 
+MoveSign_t move_sign_from_vel(F32 vel){
+     if(vel > 0){
+          return MOVE_SIGN_POSITIVE;
+     }else if(vel < 0){
+          return MOVE_SIGN_NEGATIVE;
+     }
+
+     return MOVE_SIGN_ZERO;
+}
+
 bool grid_motion_moving_in_direction(GridMotion_t* grid_motion, Direction_t direction){
      switch(direction){
      default:

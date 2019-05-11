@@ -27,15 +27,15 @@ Current bugs:
 
 Big Features:
 - 'Bring Block Ice Collision to the Masses' - my favorite feature joke of the game
-     - code to find groups of blocks involved in either side of the collision
-     - 1/2mv^2 formula to find resulting velocity
      - entangled blocks colliding into the same block at the same time should effectively double the mass
+     - if a block is sliding on ice, and another block slides on top of it, it should slow down
+     - if the player is on a block should it slow down ? YES
 - 3D
-     - entangled players on popups
-     - if we put a popup on the other side of a portal and a block 1 interval high goes through the portal, will it work the way we expect?
-     - Player stopping a tower of blocks
      - stack of blocks should be pushable on ice in it's entirety
      - a block with ice on it shouldn't be able to carry a block
+     - entangled players on popups
+     - if we put a popup on the other side of a portal and a block 1 interval high goes through the portal, will it work the way we expect?
+     - Player stopping a tower of blocks with more momentum than the player can handle normally
 - A way to tell which blocks are entangled
 - arrow kills player
 - arrow entanglement
@@ -258,6 +258,9 @@ void copy_block_collision_results(Block_t* block, CheckBlockCollisionResult_t* r
 
      block->horizontal_move = result->horizontal_move;
      block->vertical_move = result->vertical_move;
+
+     block->horizontal_original_momentum = result->horizontal_momentum;
+     block->vertical_original_momentum = result->vertical_momentum;
 }
 
 void build_move_actions_from_player(PlayerAction_t* player_action, Player_t* player, bool* move_actions, S8 move_action_count)
@@ -1814,6 +1817,23 @@ int main(int argc, char** argv){
 
                     block->coast_horizontal = BLOCK_COAST_NONE;
                     block->coast_vertical = BLOCK_COAST_NONE;
+
+                    S16 mass = get_block_stack_mass(&world, block);
+
+                    if(block->vel.x != 0){
+                         block->horizontal_original_momentum = momentum_term(mass, block->vel.x);
+                    }else{
+                         block->horizontal_original_momentum = 0;
+                    }
+                    block->horizontal_transferred_momentum = 0;
+
+                    if(block->vel.y != 0){
+                         block->vertical_original_momentum = momentum_term(mass, block->vel.y);
+                    }else{
+                         block->vertical_original_momentum = 0;
+                    }
+
+                    block->vertical_transferred_momentum = 0;
                }
 
                // do multiple passes here so that entangled blocks know for sure if their entangled counterparts are coasting and index order doesn't matter
@@ -2096,6 +2116,8 @@ int main(int argc, char** argv){
                                                                                               block->stop_on_pixel_y,
                                                                                               block->teleport_horizontal_move,
                                                                                               block->teleport_vertical_move,
+                                                                                              block->horizontal_original_momentum,
+                                                                                              block->vertical_original_momentum,
                                                                                               i,
                                                                                               block->clone_start.x > 0,
                                                                                               &world);
@@ -2121,6 +2143,8 @@ int main(int argc, char** argv){
                                                                                               block->stop_on_pixel_y,
                                                                                               block->horizontal_move,
                                                                                               block->vertical_move,
+                                                                                              block->horizontal_original_momentum,
+                                                                                              block->vertical_original_momentum,
                                                                                               i, block->clone_start.x > 0,
                                                                                               &world);
                               }
@@ -2158,6 +2182,8 @@ int main(int argc, char** argv){
                                                                                                             entangled_block->stop_on_pixel_y,
                                                                                                             entangled_block->horizontal_move,
                                                                                                             entangled_block->vertical_move,
+                                                                                                            entangled_block->horizontal_original_momentum,
+                                                                                                            entangled_block->vertical_original_momentum,
                                                                                                             block->entangle_index,
                                                                                                             entangled_block->clone_start.x > 0,
                                                                                                             &world);

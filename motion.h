@@ -96,6 +96,7 @@ bool operator!=(const Move_t& a, const Move_t& b);
 
 void reset_move(Move_t* move);
 void move_flip_sign(Move_t* move);
+MoveSign_t move_sign_from_vel(F32 vel);
 
 const char* move_state_to_string(MoveState_t state);
 const char* move_sign_to_string(MoveSign_t sign);

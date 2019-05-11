@@ -62,6 +62,11 @@ struct Block_t : public GridMotion_t{
      Vec_t accel_magnitudes;
 
      CarriedPosDelta_t carried_pos_delta;
+
+     F32 horizontal_original_momentum;
+     F32 horizontal_transferred_momentum;
+     F32 vertical_original_momentum;
+     F32 vertical_transferred_momentum;
 };
 
 S16 get_object_x(Block_t* block);
