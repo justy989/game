@@ -791,8 +791,11 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
 
           auto rotated_player_face = direction_rotate_counter_clockwise(player_face, collision.portal_rotations);
 
+          bool held_down = block_held_down_by_another_block(collision.block, world->block_qt, world->interactive_qt, &world->tilemap).held();
+          bool on_ice = block_on_ice(collision.block->pos, collision.block->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt);
+
           if(use_this_collision && collision.dir == player_face && (player_vel.x != 0.0f || player_vel.y != 0.0f) &&
-             !block_held_down_by_another_block(collision.block, world->block_qt, world->interactive_qt, &world->tilemap).held()){
+             (!held_down || on_ice)){
                // check that we collide with exactly one block and that if we are pushing through a portal, it is not too high up
                if(!collision.through_portal || (collision.through_portal && collision.block->pos.z < PORTAL_MAX_HEIGHT)){ // also check that the player is actually pushing against the block
                     result.pushing_block = get_block_index(world, collision.block);

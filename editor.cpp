@@ -411,6 +411,18 @@ void apply_stamp(Stamp_t* stamp, Coord_t coord, TileMap_t* tilemap, ObjectArray_
      } break;
      case STAMP_TYPE_BLOCK:
      {
+          Rect_t coord_rect = rect_surrounding_coord(coord);
+
+          S8 z = 0;
+
+          for(S16 i = 0; i < block_array->count; i++){
+               auto block = block_array->elements + i;
+               Rect_t block_rect = block_get_rect(block);
+               if(block->pos.z + HEIGHT_INTERVAL > z && rect_in_rect(coord_rect, block_rect)){
+                    z = block->pos.z + HEIGHT_INTERVAL;
+               }
+          }
+
           int index = block_array->count;
           resize(block_array, block_array->count + (S16)(1));
           // TODO: Check if block is in the way with the quad tree
@@ -418,7 +430,7 @@ void apply_stamp(Stamp_t* stamp, Coord_t coord, TileMap_t* tilemap, ObjectArray_
           Block_t* block = block_array->elements + index;
           *block = {};
           block->pos = coord_to_pos(coord);
-          block->pos.z = stamp->block.z;
+          block->pos.z = z;
           block->vel = vec_zero();
           block->accel = vec_zero();
           block->element = stamp->block.element;

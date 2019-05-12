@@ -27,7 +27,6 @@ Current bugs:
 
 Big Features:
 - 'Bring Block Ice Collision to the Masses' - my favorite feature joke of the game
-     - entangled blocks colliding into the same block at the same time should effectively double the mass
      - if a block is sliding on ice, and another block slides on top of it, it should slow down
      - if the player is on a block should it slow down ? YES
 - 3D
