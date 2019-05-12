@@ -1054,11 +1054,13 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                               Position_t final_stop_pos = pixel_pos(Pixel_t{block_inside_result.block->stop_on_pixel_x, 0});
                               Vec_t pos_delta = pos_to_vec(final_stop_pos - block_inside_result.block->pos);
 
-                              block_inside_result.block->pos_delta.x = pos_delta.x;
-                              block_inside_result.block->accel.x = 0.0f;
-                              block_inside_result.block->vel.x = 0.0f;
-                              block_inside_result.block->horizontal_move.state = MOVE_STATE_IDLING;
-                              block_inside_result.block->horizontal_move.sign = MOVE_SIGN_ZERO;
+                              S16 collided_block_index = get_block_index(world, block_inside_result.block);
+
+                              result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_SET_POS_DELTA_X, pos_delta.x);
+                              result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_SET_ACCEL_X, 0.0f);
+                              result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_SET_VEL_X, 0.0f);
+                              result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_SET_HORIZONTAL_MOVE_STATE, MOVE_STATE_IDLING);
+                              result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_SET_HORIZONTAL_MOVE_SIGN, MOVE_SIGN_ZERO);
                               push = false;
                          }
                          break;
@@ -1069,11 +1071,13 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                               Position_t final_stop_pos = pixel_pos(Pixel_t{block_inside_result.block->stop_on_pixel_x, 0});
                               Vec_t pos_delta = pos_to_vec(final_stop_pos - block_inside_result.block->pos);
 
-                              block_inside_result.block->pos_delta.x = pos_delta.x;
-                              block_inside_result.block->accel.x = 0.0f;
-                              block_inside_result.block->vel.x = 0.0f;
-                              block_inside_result.block->horizontal_move.state = MOVE_STATE_IDLING;
-                              block_inside_result.block->horizontal_move.sign = MOVE_SIGN_ZERO;
+                              S16 collided_block_index = get_block_index(world, block_inside_result.block);
+
+                              result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_SET_POS_DELTA_X, pos_delta.x);
+                              result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_SET_ACCEL_X, 0.0f);
+                              result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_SET_VEL_X, 0.0f);
+                              result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_SET_HORIZONTAL_MOVE_STATE, MOVE_STATE_IDLING);
+                              result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_SET_HORIZONTAL_MOVE_SIGN, MOVE_SIGN_ZERO);
                               push = false;
                          }
                          break;
@@ -1084,11 +1088,13 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                               Position_t final_stop_pos = pixel_pos(Pixel_t{0, block_inside_result.block->stop_on_pixel_y});
                               Vec_t pos_delta = pos_to_vec(final_stop_pos - block_inside_result.block->pos);
 
-                              block_inside_result.block->pos_delta.y = pos_delta.y;
-                              block_inside_result.block->accel.y = 0.0f;
-                              block_inside_result.block->vel.y = 0.0f;
-                              block_inside_result.block->vertical_move.state = MOVE_STATE_IDLING;
-                              block_inside_result.block->vertical_move.sign = MOVE_SIGN_ZERO;
+                              S16 collided_block_index = get_block_index(world, block_inside_result.block);
+
+                              result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_SET_POS_DELTA_Y, pos_delta.y);
+                              result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_SET_ACCEL_Y, 0.0f);
+                              result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_SET_VEL_Y, 0.0f);
+                              result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_SET_VERTICAL_MOVE_STATE, MOVE_STATE_IDLING);
+                              result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_SET_VERTICAL_MOVE_SIGN, MOVE_SIGN_ZERO);
                               push = false;
                          }
                          break;
@@ -1099,11 +1105,13 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                               Position_t final_stop_pos = pixel_pos(Pixel_t{0, block_inside_result.block->stop_on_pixel_y});
                               Vec_t pos_delta = pos_to_vec(final_stop_pos - block_inside_result.block->pos);
 
-                              block_inside_result.block->pos_delta.y = pos_delta.y;
-                              block_inside_result.block->accel.y = 0.0f;
-                              block_inside_result.block->vel.y = 0.0f;
-                              block_inside_result.block->vertical_move.state = MOVE_STATE_IDLING;
-                              block_inside_result.block->vertical_move.sign = MOVE_SIGN_ZERO;
+                              S16 collided_block_index = get_block_index(world, block_inside_result.block);
+
+                              result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_SET_POS_DELTA_Y, pos_delta.y);
+                              result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_SET_ACCEL_Y, 0.0f);
+                              result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_SET_VEL_Y, 0.0f);
+                              result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_SET_VERTICAL_MOVE_STATE, MOVE_STATE_IDLING);
+                              result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_SET_VERTICAL_MOVE_SIGN, MOVE_SIGN_ZERO);
                               push = false;
                          }
                          break;
@@ -1170,14 +1178,17 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                     transfer_pos_delta = vec_rotate_quadrants_clockwise(transfer_pos_delta, block_inside_result.portal_rotations);
 
                     if(block_push(block_inside_result.block, first_direction, world, true, &instant_momentum)){
+                         S16 collided_block_index = get_block_index(world, block_inside_result.block);
+
                          // TODO: account for masses when setting pos_delta for this collision
                          if(second_direction != DIRECTION_COUNT){
-                              block_inside_result.block->pos_delta.x += transfer_pos_delta.x;
-                              block_inside_result.block->stop_on_pixel_x = 0;
+                              result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_MOD_POS_DELTA_X, transfer_pos_delta.x);
+                              result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_SET_STOP_ON_PIXEL_X, (S16)(0));
                          }else{
-                              block_inside_result.block->pos_delta += transfer_pos_delta;
-                              block_inside_result.block->stop_on_pixel_x = 0;
-                              block_inside_result.block->stop_on_pixel_y = 0;
+                              result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_MOD_POS_DELTA_X, transfer_pos_delta.x);
+                              result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_MOD_POS_DELTA_Y, transfer_pos_delta.y);
+                              result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_SET_STOP_ON_PIXEL_X, (S16)(0));
+                              result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_SET_STOP_ON_PIXEL_Y, (S16)(0));
                          }
 
                          push_entangled_block(block_inside_result.block, world, first_direction, true, &instant_momentum);
@@ -1212,13 +1223,26 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                                    result.stop_on_pixel_y = 0;
                               }
                          }
+
+#if 0
+                         // update all entangle block's pos_delta with this change
+                         S16 a_index = block_inside_result.block - world->blocks.elements;
+                         S16 entangle_index = block_inside_result.block->entangle_index;
+                         while(entangle_index != a_index && entangle_index >= 0){
+                              Block_t* entangled_block = world->blocks.elements + entangle_index;
+                              entangled_block->pos_delta += transfer_pos_delta;
+                              entangle_index = entangled_block->entangle_index;
+                         }
+#endif
                     }
 
                     if(second_direction != DIRECTION_COUNT){
                          instant_momentum.vel = direction_is_horizontal(second_direction) ? save_vel.x : save_vel.y;
                          if(block_push(block_inside_result.block, second_direction, world, true, &instant_momentum)){
-                              block_inside_result.block->pos_delta.y += transfer_pos_delta.y;
-                              block_inside_result.block->stop_on_pixel_y = 0;
+                              S16 collided_block_index = get_block_index(world, block_inside_result.block);
+
+                              result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_MOD_POS_DELTA_Y, transfer_pos_delta.y);
+                              result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_SET_STOP_ON_PIXEL_Y, (S16)(0));
 
                               push_entangled_block(block_inside_result.block, world, second_direction, true, &instant_momentum);
 
@@ -1333,5 +1357,54 @@ void push_entangled_block(Block_t* block, World_t* world, Direction_t push_dir, 
                block_push(entangled_block, rotated_dir, world, pushed_by_ice, instant_momentum);
           }
           entangle_index = entangled_block->entangle_index;
+     }
+}
+
+void apply_block_change(ObjectArray_t<Block_t>* blocks_array, BlockChange_t* change){
+     auto block = blocks_array->elements + change->block_index;
+
+     switch(change->type){
+     case BLOCK_CHANGE_TYPE_SET_POS_DELTA_X:
+          block->pos_delta.x = change->decimal;
+          break;
+     case BLOCK_CHANGE_TYPE_SET_POS_DELTA_Y:
+          block->pos_delta.y = change->decimal;
+          break;
+     case BLOCK_CHANGE_TYPE_MOD_POS_DELTA_X:
+          block->pos_delta.x += change->decimal;
+          break;
+     case BLOCK_CHANGE_TYPE_MOD_POS_DELTA_Y:
+          block->pos_delta.y += change->decimal;
+          break;
+     case BLOCK_CHANGE_TYPE_SET_VEL_X:
+          block->vel.x = change->decimal;
+          break;
+     case BLOCK_CHANGE_TYPE_SET_VEL_Y:
+          block->vel.y = change->decimal;
+          break;
+     case BLOCK_CHANGE_TYPE_SET_ACCEL_X:
+          block->accel.x = change->decimal;
+          break;
+     case BLOCK_CHANGE_TYPE_SET_ACCEL_Y:
+          block->accel.y = change->decimal;
+          break;
+     case BLOCK_CHANGE_TYPE_SET_HORIZONTAL_MOVE_STATE:
+          block->horizontal_move.state = change->move_state;
+          break;
+     case BLOCK_CHANGE_TYPE_SET_HORIZONTAL_MOVE_SIGN:
+          block->horizontal_move.sign = change->move_sign;
+          break;
+     case BLOCK_CHANGE_TYPE_SET_VERTICAL_MOVE_STATE:
+          block->vertical_move.state = change->move_state;
+          break;
+     case BLOCK_CHANGE_TYPE_SET_VERTICAL_MOVE_SIGN:
+          block->vertical_move.sign = change->move_sign;
+          break;
+     case BLOCK_CHANGE_TYPE_SET_STOP_ON_PIXEL_X:
+          block->stop_on_pixel_x = change->integer;
+          break;
+     case BLOCK_CHANGE_TYPE_SET_STOP_ON_PIXEL_Y:
+          block->stop_on_pixel_y = change->integer;
+          break;
      }
 }

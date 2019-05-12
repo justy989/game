@@ -15,6 +15,90 @@ struct BlockInsideResult_t{
      Coord_t dst_portal_coord;
 };
 
+enum BlockChangeType_t : S8{
+     BLOCK_CHANGE_TYPE_SET_POS_DELTA_X,
+     BLOCK_CHANGE_TYPE_SET_POS_DELTA_Y,
+     BLOCK_CHANGE_TYPE_MOD_POS_DELTA_X,
+     BLOCK_CHANGE_TYPE_MOD_POS_DELTA_Y,
+     BLOCK_CHANGE_TYPE_SET_VEL_X,
+     BLOCK_CHANGE_TYPE_SET_VEL_Y,
+     BLOCK_CHANGE_TYPE_SET_ACCEL_X,
+     BLOCK_CHANGE_TYPE_SET_ACCEL_Y,
+     BLOCK_CHANGE_TYPE_SET_HORIZONTAL_MOVE_STATE,
+     BLOCK_CHANGE_TYPE_SET_HORIZONTAL_MOVE_SIGN,
+     BLOCK_CHANGE_TYPE_SET_VERTICAL_MOVE_STATE,
+     BLOCK_CHANGE_TYPE_SET_VERTICAL_MOVE_SIGN,
+     BLOCK_CHANGE_TYPE_SET_STOP_ON_PIXEL_X,
+     BLOCK_CHANGE_TYPE_SET_STOP_ON_PIXEL_Y,
+};
+
+struct BlockChange_t{
+     S16 block_index;
+     BlockChangeType_t type;
+
+     union{
+          S16 integer;
+          F32 decimal;
+          MoveState_t move_state;
+          MoveSign_t move_sign;
+     };
+};
+
+#define MAX_BLOCK_CHANGES 32
+
+struct BlockChanges_t{
+     BlockChange_t changes[MAX_BLOCK_CHANGES];
+     S16 count;
+
+     bool add(BlockChange_t* change){
+          if(count < MAX_BLOCK_CHANGES){
+               changes[count] = *change;
+               count++;
+               return true;
+          }
+
+          return false;
+     }
+
+     bool add(S16 block_index, BlockChangeType_t type, S16 integer){
+          BlockChange_t change;
+          change.type = type;
+          change.block_index = block_index;
+          change.integer = integer;
+          return add(&change);
+     }
+
+     bool add(S16 block_index, BlockChangeType_t type, F32 decimal){
+          BlockChange_t change;
+          change.type = type;
+          change.block_index = block_index;
+          change.decimal = decimal;
+          return add(&change);
+     }
+
+     bool add(S16 block_index, BlockChangeType_t type, MoveState_t move_state){
+          BlockChange_t change;
+          change.type = type;
+          change.block_index = block_index;
+          change.move_state = move_state;
+          return add(&change);
+     }
+
+     bool add(S16 block_index, BlockChangeType_t type, MoveSign_t move_sign){
+          BlockChange_t change;
+          change.type = type;
+          change.block_index = block_index;
+          change.move_sign = move_sign;
+          return add(&change);
+     }
+
+     void merge(BlockChanges_t* block_changes){
+          for(S16 i = 0; i < block_changes->count; i++){
+               add(block_changes->changes + i);
+          }
+     }
+};
+
 struct CheckBlockCollisionResult_t{
      bool collided;
 
@@ -34,6 +118,8 @@ struct CheckBlockCollisionResult_t{
 
      F32 horizontal_momentum;
      F32 vertical_momentum;
+
+     BlockChanges_t block_changes;
 };
 
 struct BlockCollidesWithItselfResult_t{
@@ -117,5 +203,7 @@ Interactive_t* block_is_teleporting(Block_t* block, QuadTreeNode_t<Interactive_t
 void push_entangled_block(Block_t* block, World_t* world, Direction_t push_dir, bool pushed_by_ice, TransferMomentum_t* instant_momentum = nullptr);
 bool blocks_are_entangled(Block_t* a, Block_t* b, ObjectArray_t<Block_t>* blocks_array);
 bool blocks_are_entangled(S16 a_index, S16 b_index, ObjectArray_t<Block_t>* blocks_array);
+
+void apply_block_change(ObjectArray_t<Block_t>* blocks_array, BlockChange_t* change);
 
 extern Pixel_t g_collided_with_pixel;

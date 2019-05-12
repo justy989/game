@@ -67,6 +67,8 @@ struct Block_t : public GridMotion_t{
      F32 horizontal_transferred_momentum;
      F32 vertical_original_momentum;
      F32 vertical_transferred_momentum;
+
+     bool entangle_updated = false;
 };
 
 S16 get_object_x(Block_t* block);
