@@ -2609,14 +2609,14 @@ int main(int argc, char** argv){
 
                     for(S16 i = 0; i < update_blocks_count; i++){
                          auto block = world.blocks.elements + i;
-                         block->entangle_updated = false;
+                         block->done_collision_pass = false;
                     }
 
                     for(S16 i = 0; i < update_blocks_count; i++){
                          auto block = world.blocks.elements + i;
 
                          BlockChanges_t all_block_changes;
-                         if(!block->entangle_updated && block->entangle_index >= 0){
+                         if(!block->done_collision_pass && block->entangle_index >= 0){
                               S16 current_index = i;
 
                               do
@@ -2627,7 +2627,7 @@ int main(int argc, char** argv){
                                         repeat_collision = true;
                                    }
                                    all_block_changes.merge(&block_changes);
-                                   current_block->entangle_updated = true;
+                                   current_block->done_collision_pass = true;
                                    current_index = current_block->entangle_index;
                               }while(current_index != i && current_index >= 0);
 
@@ -2642,6 +2642,7 @@ int main(int argc, char** argv){
                     BlockChanges_t block_changes;
                     for(S16 i = 0; i < update_blocks_count; i++){
                          auto block = world.blocks.elements + i;
+                         if(block->done_collision_pass) continue;
                          if(do_block_collision(&world, block, dt, &update_blocks_count, &block_changes)){
                               repeat_collision = true;
                          }
