@@ -13,15 +13,26 @@
 #include <math.h>
 #include <stdlib.h>
 
-static int block_height_comparer(const void* a, const void* b){
+static int ascending_block_height_comparer(const void* a, const void* b){
+    Block_t* real_a = *(Block_t**)(a);
+    Block_t* real_b = *(Block_t**)(b);
+
+    return real_a->pos.z < real_b->pos.z;
+}
+
+static int descending_block_height_comparer(const void* a, const void* b){
     Block_t* real_a = *(Block_t**)(a);
     Block_t* real_b = *(Block_t**)(b);
 
     return real_a->pos.z > real_b->pos.z;
 }
 
-void sort_blocks_by_height(Block_t** blocks, S16 block_count){
-    qsort(blocks, block_count, sizeof(*blocks), block_height_comparer);
+void sort_blocks_by_ascending_height(Block_t** blocks, S16 block_count){
+    qsort(blocks, block_count, sizeof(*blocks), ascending_block_height_comparer);
+}
+
+void sort_blocks_by_descending_height(Block_t** blocks, S16 block_count){
+    qsort(blocks, block_count, sizeof(*blocks), descending_block_height_comparer);
 }
 
 bool load_map_number(S32 map_number, Coord_t* player_start, World_t* world){
@@ -496,7 +507,7 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
      auto player_check_rect = rect_surrounding_adjacent_coords(player_coord);
      quad_tree_find_in(world->block_qt, player_check_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
 
-     sort_blocks_by_height(blocks, block_count);
+     sort_blocks_by_ascending_height(blocks, block_count);
 
      PlayerBlockCollisions_t block_collisions;
 
@@ -547,7 +558,7 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
 
                          auto portal_dst_center_pixel = coord_to_pixel_at_center(portal_dst_coord);
 
-                         sort_blocks_by_height(blocks, block_count);
+                         sort_blocks_by_ascending_height(blocks, block_count);
 
                          for(S16 b = block_count - 1; b >= 0; b--){
                               Block_t* block = blocks[b];
@@ -606,6 +617,7 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
           auto* player = world->players.elements + player_index;
 
           // TODO: definitely heavily condense this
+          bool player_slowing_down = false;
 
           switch(collision.dir){
           default:
@@ -648,6 +660,7 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                          }else{
                               slow_block_toward_gridlock(world, collision.block, false, true);
                          }
+                         player_slowing_down = true;
                     }else{
                          use_this_collision = false;
                     }
@@ -692,6 +705,7 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                          }else{
                               slow_block_toward_gridlock(world, collision.block, false, false);
                          }
+                         player_slowing_down = true;
                     }else{
                          use_this_collision = false;
                     }
@@ -735,6 +749,7 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                          }else{
                               slow_block_toward_gridlock(world, collision.block, true, false);
                          }
+                         player_slowing_down = true;
                     }else{
                          use_this_collision = false;
                     }
@@ -778,6 +793,7 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                          }else{
                               slow_block_toward_gridlock(world, collision.block, true, true);
                          }
+                         player_slowing_down = true;
                     }else{
                          use_this_collision = false;
                     }
@@ -793,9 +809,9 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
 
           bool held_down = block_held_down_by_another_block(collision.block, world->block_qt, world->interactive_qt, &world->tilemap).held();
           bool on_ice = block_on_ice(collision.block->pos, collision.block->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt);
+          bool pushable = block_pushable(collision.block, rotated_player_face, world);
 
-          if(use_this_collision && collision.dir == player_face && (player_vel.x != 0.0f || player_vel.y != 0.0f) &&
-             (!held_down || on_ice)){
+          if(use_this_collision && collision.dir == player_face && (player_vel.x != 0.0f || player_vel.y != 0.0f) && (!held_down || (on_ice && pushable))){
                // check that we collide with exactly one block and that if we are pushing through a portal, it is not too high up
                if(!collision.through_portal || (collision.through_portal && collision.block->pos.z < PORTAL_MAX_HEIGHT)){ // also check that the player is actually pushing against the block
                     result.pushing_block = get_block_index(world, collision.block);
@@ -807,6 +823,8 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                     result.pushing_block_dir = DIRECTION_COUNT;
                     result.pushing_block_rotation = 0;
                }
+          }else if(held_down && (!on_ice || !pushable) && !player_slowing_down){
+               use_this_collision = false;
           }
      }
 
@@ -1355,6 +1373,33 @@ bool block_push(Block_t* block, Direction_t direction, World_t* world, bool push
           }
           break;
      }
+
+     return true;
+}
+
+bool block_pushable(Block_t* block, Direction_t direction, World_t* world){
+     Direction_t collided_block_push_dir = DIRECTION_COUNT;
+     Block_t* collided_block = block_against_another_block(block->pos + block->pos_delta, direction, world->block_qt, world->interactive_qt,
+                                                           &world->tilemap, &collided_block_push_dir);
+     if(collided_block){
+          if(collided_block == block){
+               // pass, this happens in a corner portal!
+          }else if(blocks_are_entangled(collided_block, block, &world->blocks)){
+               return block_pushable(collided_block, collided_block_push_dir, world);
+          }else{
+               return false;
+          }
+     }
+
+     if(block->entangle_index >= 0){
+          if(rotated_entangled_blocks_against_centroid(block, direction, world->block_qt, &world->blocks, world->interactive_qt, &world->tilemap)){
+               return false;
+          }
+     }
+
+     if(block_against_solid_tile(block, direction, &world->tilemap)) return false;
+     if(block_against_solid_interactive(block, direction, &world->tilemap, world->interactive_qt)) return false;
+     // if(block_against_player(block, direction, &world->players)) return false;
 
      return true;
 }

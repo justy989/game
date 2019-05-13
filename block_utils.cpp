@@ -1223,17 +1223,6 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                                    result.stop_on_pixel_y = 0;
                               }
                          }
-
-#if 0
-                         // update all entangle block's pos_delta with this change
-                         S16 a_index = block_inside_result.block - world->blocks.elements;
-                         S16 entangle_index = block_inside_result.block->entangle_index;
-                         while(entangle_index != a_index && entangle_index >= 0){
-                              Block_t* entangled_block = world->blocks.elements + entangle_index;
-                              entangled_block->pos_delta += transfer_pos_delta;
-                              entangle_index = entangled_block->entangle_index;
-                         }
-#endif
                     }
 
                     if(second_direction != DIRECTION_COUNT){
@@ -1351,7 +1340,9 @@ void push_entangled_block(Block_t* block, World_t* world, Direction_t push_dir, 
      S16 entangle_index = block->entangle_index;
      while(entangle_index != block_index && entangle_index >= 0){
           Block_t* entangled_block = world->blocks.elements + entangle_index;
-          if(!block_held_down_by_another_block(entangled_block, world->block_qt, world->interactive_qt, &world->tilemap).held()){
+          bool held_down = block_held_down_by_another_block(entangled_block, world->block_qt, world->interactive_qt, &world->tilemap).held();
+          bool on_ice = block_on_ice(entangled_block->pos, entangled_block->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt);
+          if(!held_down || on_ice){
                auto rotations_between = direction_rotations_between(static_cast<Direction_t>(entangled_block->rotation), static_cast<Direction_t>(block->rotation));
                Direction_t rotated_dir = direction_rotate_clockwise(push_dir, rotations_between);
                block_push(entangled_block, rotated_dir, world, pushed_by_ice, instant_momentum);

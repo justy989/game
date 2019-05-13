@@ -2310,34 +2310,17 @@ int main(int argc, char** argv){
                     }
                }
 
+               F32 baseline_block_mass = (F32)(TILE_SIZE_IN_PIXELS * TILE_SIZE_IN_PIXELS);
+
                // block movement
 
                // do a pass moving the block as far as possible, so that collision doesn't rely on order of blocks in the array
                for(S16 i = 0; i < world.blocks.count; i++){
                     Block_t* block = world.blocks.elements + i;
 
-                    block->prev_push_mask = block->cur_push_mask;
-                    block->cur_push_mask = DIRECTION_MASK_NONE;
-
-                    block->prev_vel = block->vel;
-
-                    block->accel.x = calc_accel_component_move(block->horizontal_move, block->accel_magnitudes.x);
-                    block->accel.y = calc_accel_component_move(block->vertical_move, block->accel_magnitudes.y);
-
-                    block->pos_delta.x = calc_position_motion(block->vel.x, block->accel.x, dt);
-                    block->vel.x = calc_velocity_motion(block->vel.x, block->accel.x, dt);
-
-                    block->pos_delta.y = calc_position_motion(block->vel.y, block->accel.y, dt);
-                    block->vel.y = calc_velocity_motion(block->vel.y, block->accel.y, dt);
-
-                    block->teleport = false;
-                    carried_pos_delta_reset(&block->carried_pos_delta);
-                    block->held_up = BLOCK_HELD_BY_NONE;
-
-                    block->coast_horizontal = BLOCK_COAST_NONE;
-                    block->coast_vertical = BLOCK_COAST_NONE;
-
                     S16 mass = get_block_stack_mass(&world, block);
+
+                    F32 mass_ratio = baseline_block_mass / mass;
 
                     if(block->vel.x != 0){
                          block->horizontal_original_momentum = momentum_term(mass, block->vel.x);
@@ -2353,6 +2336,27 @@ int main(int argc, char** argv){
                     }
 
                     block->vertical_transferred_momentum = 0;
+
+                    block->prev_push_mask = block->cur_push_mask;
+                    block->cur_push_mask = DIRECTION_MASK_NONE;
+
+                    block->prev_vel = block->vel;
+
+                    block->accel.x = calc_accel_component_move(block->horizontal_move, block->accel_magnitudes.x * mass_ratio);
+                    block->accel.y = calc_accel_component_move(block->vertical_move, block->accel_magnitudes.y * mass_ratio);
+
+                    block->pos_delta.x = calc_position_motion(block->vel.x, block->accel.x, dt);
+                    block->vel.x = calc_velocity_motion(block->vel.x, block->accel.x, dt);
+
+                    block->pos_delta.y = calc_position_motion(block->vel.y, block->accel.y, dt);
+                    block->vel.y = calc_velocity_motion(block->vel.y, block->accel.y, dt);
+
+                    block->teleport = false;
+                    carried_pos_delta_reset(&block->carried_pos_delta);
+                    block->held_up = BLOCK_HELD_BY_NONE;
+
+                    block->coast_horizontal = BLOCK_COAST_NONE;
+                    block->coast_vertical = BLOCK_COAST_NONE;
                }
 
                // do multiple passes here so that entangled blocks know for sure if their entangled counterparts are coasting and index order doesn't matter
@@ -3283,7 +3287,7 @@ int main(int argc, char** argv){
 
                                    quad_tree_find_in(world.block_qt, coord_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
                                    if(block_count){
-                                        sort_blocks_by_height(blocks, block_count);
+                                        sort_blocks_by_descending_height(blocks, block_count);
 
                                         draw_portal_blocks(blocks, block_count, portal_coord, coord, portal_rotations, camera_offset);
                                    }

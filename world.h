@@ -44,7 +44,8 @@ struct MovePlayerThroughWorldResult_t{
      S8 pushing_block_rotation;
 };
 
-void sort_blocks_by_height(Block_t** blocks, S16 block_count);
+void sort_blocks_by_ascending_height(Block_t** blocks, S16 block_count);
+void sort_blocks_by_descending_height(Block_t** blocks, S16 block_count);
 
 bool load_map_number(S32 map_number, Coord_t* player_start, World_t* world);
 void reset_map(Coord_t player_start, World_t* world, Undo_t* undo);
@@ -66,6 +67,7 @@ void melt_ice(Coord_t center, S8 height, S16 radius, World_t* world, bool telepo
 
 bool block_push(Block_t* block, MoveDirection_t move_direction, World_t* world, bool pushed_by_ice, TransferMomentum_t* instant_momentum = nullptr);
 bool block_push(Block_t* block, Direction_t direction, World_t* world, bool pushed_by_ice, TransferMomentum_t* instant_momentum = nullptr);
+bool block_pushable(Block_t* block, Direction_t direction, World_t* world);
 bool reset_players(ObjectArray_t<Player_t>* players);
 
 void describe_player(World_t* world, Player_t* player);

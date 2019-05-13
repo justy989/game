@@ -567,7 +567,7 @@ void draw_world_row_solids(S16 y, S16 x_start, S16 x_end, TileMap_t* tilemap, Qu
      Block_t* blocks[256]; // oh god i hope we don't need more than that?
      quad_tree_find_in(block_qt, search_rect, blocks, &block_count, 256);
 
-     sort_blocks_by_height(blocks, block_count);
+     sort_blocks_by_descending_height(blocks, block_count);
 
      for(S16 i = 0; i < block_count; i++){
           auto block = blocks[i];
