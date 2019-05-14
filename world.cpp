@@ -1230,8 +1230,6 @@ bool block_push(Block_t* block, Direction_t direction, World_t* world, bool push
                if(collided_block->rotation != block->rotation) return false; // only when the rotation is equal can we move with the block
                if(block_against_solid_tile(collided_block, direction, &world->tilemap)) return false;
                if(block_against_solid_interactive(collided_block, direction, &world->tilemap, world->interactive_qt)) return false;
-          }else{
-               return false;
           }
      }
 
