@@ -419,13 +419,74 @@ void hold_players(ObjectArray_t<Player_t>* players){
      }
 }
 
-// TODO: accumulate all blocks and reduce duplication of mass for entangled blocks
-S16 get_block_mass_in_direction(World_t* world, Block_t* block, Direction_t direction){
-     S16 mass = get_block_stack_mass(world, block);
+#define MAX_BLOCKS_IN_LIST 128
 
+struct BlockEntry_t{
+     Block_t* block = nullptr;
+     bool counted = false;
+};
+
+struct BlockList_t{
+     BlockEntry_t entries[MAX_BLOCKS_IN_LIST];
+     S16 count = 0;
+
+     bool add(Block_t* block){
+          if(count >= MAX_BLOCKS_IN_LIST) return false;
+          entries[count].block = block;
+          entries[count].counted = true;
+          count++;
+          return true;
+     }
+};
+
+void get_block_stack(World_t* world, Block_t* block, BlockList_t* block_list){
+     block_list->add(block);
+
+     auto result = block_held_down_by_another_block(block, world->block_qt, world->interactive_qt, &world->tilemap);
+     for(S16 i = 0; i < result.count; i++){
+          get_block_stack(world, result.blocks_held[i].block, block_list);
+     }
+}
+
+void get_touching_blocks_in_direction(World_t* world, Block_t* block, Direction_t direction, BlockList_t* block_list){
      auto result = block_against_other_blocks(block->pos, direction, world->block_qt, world->interactive_qt, &world->tilemap);
      for(S16 i = 0; i < result.count; i++){
-          mass += get_block_mass_in_direction(world, result.blocks[i], direction);
+          get_block_stack(world, result.blocks[i], block_list);
+          get_touching_blocks_in_direction(world, result.blocks[i], direction, block_list);
+     }
+}
+
+S16 get_block_mass_in_direction(World_t* world, Block_t* block, Direction_t direction){
+     BlockList_t block_list;
+     get_block_stack(world, block, &block_list);
+     get_touching_blocks_in_direction(world, block, direction, &block_list);
+
+     // accumulate all blocks mass but reduce duplication of mass for entangled blocks
+     // TODO: n^2 * m, if we sort the blocks we can speed this up using a binary search bringing it to n log n * m
+     for(S16 i = 0; i < block_list.count; i++){
+          auto* block_entry = block_list.entries + i;
+
+          S16 entangle_index = block_entry->block->entangle_index;
+          S16 prev_entangle_index = -1;
+          while(entangle_index != i && prev_entangle_index != entangle_index && entangle_index >= 0){
+               prev_entangle_index = entangle_index;
+               for(S16 j = i + 1; j < block_list.count; j++){
+                    auto* block_entry_itr = block_list.entries + j;
+                    if(entangle_index == get_block_index(world, block_entry_itr->block)){
+                         block_entry_itr->counted = false;
+                         entangle_index = block_entry_itr->block->entangle_index;
+                    }
+               }
+          }
+     }
+
+     S16 mass = 0;
+
+     for(S16 i = 0; i < block_list.count; i++){
+          auto* block_entry = block_list.entries + i;
+          if(block_entry->counted){
+               mass += block_get_mass(block_entry->block);
+          }
      }
 
      return mass;
