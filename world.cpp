@@ -1140,68 +1140,77 @@ void melt_ice(Coord_t center, S8 height, S16 radius, World_t* world, bool telepo
      impact_ice(center, height, radius, world, teleported, false);
 }
 
-bool block_push(Block_t* block, MoveDirection_t move_direction, World_t* world, bool pushed_by_ice, TransferMomentum_t* instant_momentum){
+bool block_push(Block_t* block, MoveDirection_t move_direction, World_t* world, bool pushed_by_ice, F32 force, TransferMomentum_t* instant_momentum){
      Direction_t first;
      Direction_t second;
      move_direction_to_directions(move_direction, &first, &second);
 
-     bool a = block_push(block, first, world, pushed_by_ice, instant_momentum);
-     bool b = block_push(block, second, world, pushed_by_ice, instant_momentum);
+     bool a = block_push(block, first, world, pushed_by_ice, force, instant_momentum);
+     bool b = block_push(block, second, world, pushed_by_ice, force, instant_momentum);
 
      return a || b;
 }
 
-bool block_push(Block_t* block, Direction_t direction, World_t* world, bool pushed_by_ice, TransferMomentum_t* instant_momentum){
+bool block_push(Block_t* block, Direction_t direction, World_t* world, bool pushed_by_ice, F32 force, TransferMomentum_t* instant_momentum){
      Direction_t collided_block_push_dir = DIRECTION_COUNT;
      Block_t* collided_block = block_against_another_block(block->pos + block->pos_delta, direction, world->block_qt, world->interactive_qt,
                                                            &world->tilemap, &collided_block_push_dir);
      if(collided_block){
           if(collided_block == block){
                // pass, this happens in a corner portal!
-          }else if(pushed_by_ice && block_on_ice(collided_block->pos, collided_block->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt)){
+          }else if(block_on_ice(collided_block->pos, collided_block->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt)){
+               if(pushed_by_ice){
+                    // check if we are able to move or if we transfer our force to the block
+                    bool transfers_force = true;
+                    if(instant_momentum){
+                         switch(collided_block_push_dir){
+                         default:
+                              break;
+                         case DIRECTION_LEFT:
+                              transfers_force = (collided_block->vel.x > -instant_momentum->vel);
+                              break;
+                         case DIRECTION_UP:
+                              transfers_force = (collided_block->vel.y < instant_momentum->vel);
+                              break;
+                         case DIRECTION_RIGHT:
+                              transfers_force = (collided_block->vel.x < instant_momentum->vel);
+                              break;
+                         case DIRECTION_DOWN:
+                              transfers_force = (collided_block->vel.y > -instant_momentum->vel);
+                              break;
+                         }
+                    }
 
-               // check if we are able to move or if we transfer our force to the block
-               bool transfers_force = true;
-               if(instant_momentum){
-                    switch(collided_block_push_dir){
-                    default:
-                         break;
-                    case DIRECTION_LEFT:
-                         transfers_force = (collided_block->vel.x > -instant_momentum->vel);
-                         break;
-                    case DIRECTION_UP:
-                         transfers_force = (collided_block->vel.y < instant_momentum->vel);
-                         break;
-                    case DIRECTION_RIGHT:
-                         transfers_force = (collided_block->vel.x < instant_momentum->vel);
-                         break;
-                    case DIRECTION_DOWN:
-                         transfers_force = (collided_block->vel.y > -instant_momentum->vel);
-                         break;
+                    if(transfers_force){
+                         if(block_push(collided_block, collided_block_push_dir, world, pushed_by_ice, force, instant_momentum)){
+                              push_entangled_block(collided_block, world, collided_block_push_dir, pushed_by_ice, force, instant_momentum);
+                         }
+
+                         switch(direction){
+                         default:
+                              break;
+                         case DIRECTION_LEFT:
+                         case DIRECTION_RIGHT:
+                              reset_move(&block->horizontal_move);
+                              break;
+                         case DIRECTION_UP:
+                         case DIRECTION_DOWN:
+                              reset_move(&block->vertical_move);
+                              break;
+                         }
+
+                         return false;
+                    }
+               }else if(block_on_ice(block->pos, block->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt)){
+                    if(block_push(collided_block, collided_block_push_dir, world, pushed_by_ice, force, instant_momentum)){
+                         push_entangled_block(collided_block, world, collided_block_push_dir, pushed_by_ice, force, instant_momentum);
+                    }else{
+                         return false;
                     }
                }
+          }
 
-               if(transfers_force){
-                    if(block_push(collided_block, collided_block_push_dir, world, pushed_by_ice, instant_momentum)){
-                         push_entangled_block(collided_block, world, collided_block_push_dir, pushed_by_ice, instant_momentum);
-                    }
-
-                    switch(direction){
-                    default:
-                         break;
-                    case DIRECTION_LEFT:
-                    case DIRECTION_RIGHT:
-                         reset_move(&block->horizontal_move);
-                         break;
-                    case DIRECTION_UP:
-                    case DIRECTION_DOWN:
-                         reset_move(&block->vertical_move);
-                         break;
-                    }
-
-                    return false;
-               }
-          }else if(blocks_are_entangled(collided_block, block, &world->blocks)){
+          if(blocks_are_entangled(collided_block, block, &world->blocks)){
                // if block is entangled with the block it collides with, check if the entangled block can move, this is kind of duplicate work
                bool only_against_entanglers = true;
                Block_t* entangled_collided_block = collided_block;
@@ -1289,7 +1298,7 @@ bool block_push(Block_t* block, Direction_t direction, World_t* world, bool push
                }else{
                     block->horizontal_move.state = MOVE_STATE_STARTING;
                     block->horizontal_move.sign = MOVE_SIGN_NEGATIVE;
-                    block->accel_magnitudes.x = BLOCK_ACCEL;
+                    block->accel_magnitudes.x = BLOCK_ACCEL * force;
                }
                block->horizontal_move.distance = 0;
                block->started_on_pixel_x = block->pos.pixel.x;
@@ -1313,7 +1322,7 @@ bool block_push(Block_t* block, Direction_t direction, World_t* world, bool push
                }else{
                     block->horizontal_move.state = MOVE_STATE_STARTING;
                     block->horizontal_move.sign = MOVE_SIGN_POSITIVE;
-                    block->accel_magnitudes.x = BLOCK_ACCEL;
+                    block->accel_magnitudes.x = BLOCK_ACCEL * force;
                }
                block->horizontal_move.distance = 0;
                block->started_on_pixel_x = block->pos.pixel.x;
@@ -1336,7 +1345,7 @@ bool block_push(Block_t* block, Direction_t direction, World_t* world, bool push
                }else{
                     block->vertical_move.state = MOVE_STATE_STARTING;
                     block->vertical_move.sign = MOVE_SIGN_NEGATIVE;
-                    block->accel_magnitudes.y = BLOCK_ACCEL;
+                    block->accel_magnitudes.y = BLOCK_ACCEL * force;
                }
                block->vertical_move.distance = 0;
                block->started_on_pixel_y = block->pos.pixel.y;
@@ -1359,7 +1368,7 @@ bool block_push(Block_t* block, Direction_t direction, World_t* world, bool push
                }else{
                     block->vertical_move.state = MOVE_STATE_STARTING;
                     block->vertical_move.sign = MOVE_SIGN_POSITIVE;
-                    block->accel_magnitudes.y = BLOCK_ACCEL;
+                    block->accel_magnitudes.y = BLOCK_ACCEL * force;
                }
 
                block->vertical_move.distance = 0;

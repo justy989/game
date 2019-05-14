@@ -418,6 +418,18 @@ void hold_players(ObjectArray_t<Player_t>* players){
      }
 }
 
+// TODO: accumulate all blocks and reduce duplication of mass for entangled blocks
+S16 get_block_mass_in_direction(World_t* world, Block_t* block, Direction_t direction){
+     S16 mass = get_block_stack_mass(world, block);
+
+     auto result = block_against_other_blocks(block->pos, direction, world->block_qt, world->interactive_qt, &world->tilemap);
+     for(S16 i = 0; i < result.count; i++){
+          mass += get_block_mass_in_direction(world, result.blocks[i], direction);
+     }
+
+     return mass;
+}
+
 bool do_block_collision(World_t* world, Block_t* block, F32 dt, S16* update_blocks_count, BlockChanges_t* block_changes){
      S16 block_index = get_block_index(world, block);
      bool repeat_collision = false;
@@ -582,7 +594,7 @@ bool do_block_collision(World_t* world, Block_t* block, F32 dt, S16* update_bloc
                                         TransferMomentum_t block_momentum = get_block_momentum(world, block, move_dir_to_stop);
                                         TransferMomentum_t entangled_block_momentum = get_block_momentum(world, entangled_block, entangled_move_dir_to_stop);
 
-                                        if(block_push(block, entangled_move_dir_to_stop, world, true, &entangled_block_momentum)){
+                                        if(block_push(block, entangled_move_dir_to_stop, world, true, 1.0f, &entangled_block_momentum)){
                                              F32 vel = elastic_transfer_momentum_to_block(&entangled_block_momentum, world, block, entangled_move_dir_to_stop);
 
                                              switch(entangled_move_dir_to_stop){
@@ -599,7 +611,7 @@ bool do_block_collision(World_t* world, Block_t* block, F32 dt, S16* update_bloc
                                              }
                                         }
 
-                                        if(block_push(entangled_block, move_dir_to_stop, world, true, &block_momentum)){
+                                        if(block_push(entangled_block, move_dir_to_stop, world, true, 1.0f, &block_momentum)){
                                              F32 vel = elastic_transfer_momentum_to_block(&block_momentum, world, entangled_block, move_dir_to_stop);
 
                                              switch(move_dir_to_stop){
@@ -3185,7 +3197,12 @@ int main(int argc, char** argv){
                                    // if this is the frame that causes the block to be pushed, make a commit
                                    if(save_push_time <= BLOCK_PUSH_TIME) undo_commit(&undo, &world.players, &world.tilemap, &world.blocks, &world.interactives);
 
-                                   bool pushed = block_push(block_to_push, push_block_dir, &world, false);
+                                   static const S16 baseline_block_mass = TILE_SIZE_IN_PIXELS * TILE_SIZE_IN_PIXELS;
+
+                                   auto total_block_mass = get_block_mass_in_direction(&world, block_to_push, push_block_dir);
+                                   auto mass_ratio = (F32)(baseline_block_mass) / (F32)(total_block_mass);
+
+                                   bool pushed = block_push(block_to_push, push_block_dir, &world, false, mass_ratio);
 
                                    if(!pushed){
                                         player->push_time = 0.0f;

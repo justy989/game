@@ -141,6 +141,7 @@ struct BlockHeldResult_t{
 };
 
 #define MAX_HELD_INTERACTIVES 4
+
 struct InteractiveHeld_t{
      Interactive_t* interactive = nullptr;
      Rect_t rect;
@@ -153,6 +154,20 @@ struct InteractiveHeldResult_t{
      bool held(){return count > 0;}
 };
 
+#define MAX_BLOCKS_AGAINST_BLOCK 4
+
+struct BlockAgainstOthersResult_t{
+     Block_t* blocks[MAX_BLOCKS_AGAINST_BLOCK];
+     S16 count = 0;
+
+     bool add(Block_t* block){
+          if(count >= MAX_BLOCKS_AGAINST_BLOCK) return false;
+          blocks[count] = block;
+          count++;
+          return true;
+     }
+};
+
 void add_block_held(BlockHeldResult_t* result, Block_t* block, Rect_t rect);
 void add_interactive_held(InteractiveHeldResult_t* result, Interactive_t* interactive, Rect_t rect);
 
@@ -161,6 +176,8 @@ bool block_adjacent_pixels_to_check(Position_t pos, Vec_t pos_delta, Direction_t
 Block_t* block_against_block_in_list(Position_t pos, Block_t** blocks, S16 block_count, Direction_t direction, Pixel_t* offsets);
 Block_t* block_against_another_block(Position_t pos, Direction_t direction, QuadTreeNode_t<Block_t>* block_qt,
                                      QuadTreeNode_t<Interactive_t>* interactive_quad_tree, TileMap_t* tilemap, Direction_t* push_dir);
+BlockAgainstOthersResult_t block_against_other_blocks(Position_t pos, Direction_t direction, QuadTreeNode_t<Block_t>* block_qt,
+                                                      QuadTreeNode_t<Interactive_t>* interactive_quad_tree, TileMap_t* tilemap);
 Block_t* rotated_entangled_blocks_against_centroid(Block_t* block, Direction_t direction, QuadTreeNode_t<Block_t>* block_qt,
                                                    ObjectArray_t<Block_t>* blocks_array,
                                                    QuadTreeNode_t<Interactive_t>* interactive_qt, TileMap_t* tilemap);
@@ -198,7 +215,7 @@ void search_portal_destination_for_blocks(QuadTreeNode_t<Block_t>* block_qt, Dir
 
 Interactive_t* block_is_teleporting(Block_t* block, QuadTreeNode_t<Interactive_t>* interactive_qt);
 
-void push_entangled_block(Block_t* block, World_t* world, Direction_t push_dir, bool pushed_by_ice, TransferMomentum_t* instant_momentum = nullptr);
+void push_entangled_block(Block_t* block, World_t* world, Direction_t push_dir, bool pushed_by_ice, F32 force = 1.0f, TransferMomentum_t* instant_momentum = nullptr);
 bool blocks_are_entangled(Block_t* a, Block_t* b, ObjectArray_t<Block_t>* blocks_array);
 bool blocks_are_entangled(S16 a_index, S16 b_index, ObjectArray_t<Block_t>* blocks_array);
 

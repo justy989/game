@@ -153,6 +153,61 @@ Block_t* block_against_block_in_list(Position_t pos, Block_t** blocks, S16 block
      return nullptr;
 }
 
+BlockAgainstOthersResult_t block_against_other_blocks(Position_t pos, Direction_t direction, QuadTreeNode_t<Block_t>* block_qt,
+                                                      QuadTreeNode_t<Interactive_t>* interactive_quad_tree, TileMap_t* tilemap){
+     BlockAgainstOthersResult_t result;
+
+     auto block_center = block_get_center(pos);
+     Rect_t surrounding_rect = rect_to_check_surrounding_blocks(block_center.pixel);
+
+     Pixel_t portal_offsets[BLOCK_QUAD_TREE_MAX_QUERY];
+     memset(portal_offsets, 0, sizeof(portal_offsets));
+
+     S16 block_count = 0;
+     Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
+     quad_tree_find_in(block_qt, surrounding_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
+
+     for(S16 i = 0; i < block_count; i++){
+          // lol at me misusing this function, but watevs
+          if(block_against_block_in_list(pos, blocks + i, 1, direction, portal_offsets)){
+               result.add(blocks[i]);
+          }
+     }
+
+     auto block_coord = pos_to_coord(block_center);
+     Coord_t min = block_coord - Coord_t{1, 1};
+     Coord_t max = block_coord + Coord_t{1, 1};
+
+     for(S16 y = min.y; y <= max.y; ++y){
+          for(S16 x = min.x; x <= max.x; ++x){
+               Coord_t src_coord = {x, y};
+
+               Interactive_t* interactive = quad_tree_interactive_find_at(interactive_quad_tree, src_coord);
+               if(is_active_portal(interactive)){
+                    auto portal_exits = find_portal_exits(src_coord, tilemap, interactive_quad_tree);
+                    for(S8 d = 0; d < DIRECTION_COUNT; d++){
+                         for(S8 p = 0; p < portal_exits.directions[d].count; p++){
+                              auto dst_coord = portal_exits.directions[d].coords[p];
+                              if(dst_coord == src_coord) continue;
+
+                              search_portal_destination_for_blocks(block_qt, interactive->portal.face, (Direction_t)(d), src_coord,
+                                                                   dst_coord, blocks, &block_count, portal_offsets);
+
+                              for(S16 b = 0; b < block_count; b++){
+                                   // lol at me misusing this function, but watevs
+                                   if(block_against_block_in_list(pos, blocks + b, 1, direction, portal_offsets)){
+                                        result.add(blocks[b]);
+                                   }
+                              }
+                         }
+                    }
+               }
+          }
+     }
+
+     return result;
+}
+
 Block_t* block_against_another_block(Position_t pos, Direction_t direction, QuadTreeNode_t<Block_t>* block_qt,
                                      QuadTreeNode_t<Interactive_t>* interactive_quad_tree, TileMap_t* tilemap, Direction_t* push_dir){
      auto block_center = block_get_center(pos);
@@ -1177,7 +1232,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
 
                     transfer_pos_delta = vec_rotate_quadrants_clockwise(transfer_pos_delta, block_inside_result.portal_rotations);
 
-                    if(block_push(block_inside_result.block, first_direction, world, true, &instant_momentum)){
+                    if(block_push(block_inside_result.block, first_direction, world, true, 1.0f, &instant_momentum)){
                          S16 collided_block_index = get_block_index(world, block_inside_result.block);
 
                          // TODO: account for masses when setting pos_delta for this collision
@@ -1191,7 +1246,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                               result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_STOP_ON_PIXEL_Y, (S16)(0));
                          }
 
-                         push_entangled_block(block_inside_result.block, world, first_direction, true, &instant_momentum);
+                         push_entangled_block(block_inside_result.block, world, first_direction, true, 1.0f, &instant_momentum);
 
                          if(blocks_are_entangled(block_inside_result.block - world->blocks.elements, block_index, &world->blocks)){
                               Block_t* block = world->blocks.elements + block_index;
@@ -1227,13 +1282,13 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
 
                     if(second_direction != DIRECTION_COUNT){
                          instant_momentum.vel = direction_is_horizontal(second_direction) ? save_vel.x : save_vel.y;
-                         if(block_push(block_inside_result.block, second_direction, world, true, &instant_momentum)){
+                         if(block_push(block_inside_result.block, second_direction, world, true, 1.0f, &instant_momentum)){
                               S16 collided_block_index = get_block_index(world, block_inside_result.block);
 
                               result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_POS_DELTA_Y, block_inside_result.block->pos_delta.y + transfer_pos_delta.y);
                               result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_STOP_ON_PIXEL_Y, (S16)(0));
 
-                              push_entangled_block(block_inside_result.block, world, second_direction, true, &instant_momentum);
+                              push_entangled_block(block_inside_result.block, world, second_direction, true, 1.0f, &instant_momentum);
 
                               if(blocks_are_entangled(block_inside_result.block - world->blocks.elements, block_index, &world->blocks)){
                                    Block_t* block = world->blocks.elements + block_index;
@@ -1333,7 +1388,7 @@ Interactive_t* block_is_teleporting(Block_t* block, QuadTreeNode_t<Interactive_t
      return nullptr;
 }
 
-void push_entangled_block(Block_t* block, World_t* world, Direction_t push_dir, bool pushed_by_ice, TransferMomentum_t* instant_momentum){
+void push_entangled_block(Block_t* block, World_t* world, Direction_t push_dir, bool pushed_by_ice, F32 force, TransferMomentum_t* instant_momentum){
      if(block->entangle_index < 0) return;
 
      S16 block_index = block - world->blocks.elements;
@@ -1345,7 +1400,7 @@ void push_entangled_block(Block_t* block, World_t* world, Direction_t push_dir, 
           if(!held_down || on_ice){
                auto rotations_between = direction_rotations_between(static_cast<Direction_t>(entangled_block->rotation), static_cast<Direction_t>(block->rotation));
                Direction_t rotated_dir = direction_rotate_clockwise(push_dir, rotations_between);
-               block_push(entangled_block, rotated_dir, world, pushed_by_ice, instant_momentum);
+               block_push(entangled_block, rotated_dir, world, pushed_by_ice, force, instant_momentum);
           }
           entangle_index = entangled_block->entangle_index;
      }
