@@ -926,17 +926,25 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                     default:
                          break;
                     case DIRECTION_LEFT:
-                         if(block_pos_delta.x < 0){
+                         if(!direction_in_mask(collided_block_move_mask, first_direction)){
                               result.stop_on_pixel_x = collided_block_center.pixel.x + HALF_TILE_SIZE_IN_PIXELS;
                          }else{
                               impact_pos_delta_horizontal = false;
+
+                              Position_t final_stop_pos = collided_block_center;
+                              final_stop_pos.pixel.x += HALF_TILE_SIZE_IN_PIXELS;
+                              result.pos_delta.x = pos_to_vec(final_stop_pos - block_pos).x;
                          }
                          break;
                     case DIRECTION_RIGHT:
-                         if(block_pos_delta.x > 0){
+                         if(!direction_in_mask(collided_block_move_mask, first_direction)){
                               result.stop_on_pixel_x = (collided_block_center.pixel.x - HALF_TILE_SIZE_IN_PIXELS) - TILE_SIZE_IN_PIXELS;
                          }else{
                               impact_pos_delta_horizontal = false;
+
+                              Position_t final_stop_pos = collided_block_center;
+                              final_stop_pos.pixel.x -= (HALF_TILE_SIZE_IN_PIXELS + TILE_SIZE_IN_PIXELS );
+                              result.pos_delta.x = pos_to_vec(final_stop_pos - block_pos).x;
                          }
                          break;
                     }
@@ -945,17 +953,25 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                     default:
                          break;
                     case DIRECTION_DOWN:
-                         if(block_pos_delta.y < 0){
+                         if(!direction_in_mask(collided_block_move_mask, second_direction)){
                               result.stop_on_pixel_y = collided_block_center.pixel.y + HALF_TILE_SIZE_IN_PIXELS;
                          }else{
                               impact_pos_delta_vertical = false;
+
+                              Position_t final_stop_pos = collided_block_center;
+                              final_stop_pos.pixel.y += HALF_TILE_SIZE_IN_PIXELS;
+                              result.pos_delta.y = pos_to_vec(final_stop_pos - block_pos).y;
                          }
                          break;
                     case DIRECTION_UP:
-                         if(block_pos_delta.y > 0){
+                         if(!direction_in_mask(collided_block_move_mask, second_direction)){
                               result.stop_on_pixel_y = (collided_block_center.pixel.y - HALF_TILE_SIZE_IN_PIXELS) - TILE_SIZE_IN_PIXELS;
                          }else{
                               impact_pos_delta_vertical = false;
+
+                              Position_t final_stop_pos = collided_block_center;
+                              final_stop_pos.pixel.y -= (HALF_TILE_SIZE_IN_PIXELS + TILE_SIZE_IN_PIXELS );
+                              result.pos_delta.y = pos_to_vec(final_stop_pos - block_pos).y;
                          }
                          break;
                     }
@@ -969,26 +985,18 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                          result.pos_delta.x = pos_delta.x;
                          result.vel.x = 0.0f;
                          result.accel.x = 0.0f;
-                         result.horizontal_move.state = MOVE_STATE_IDLING;
+                         reset_move(&result.horizontal_move);
                     }
 
                     if(impact_pos_delta_vertical){
                          result.pos_delta.y = pos_delta.y;
                          result.vel.y = 0.0f;
                          result.accel.y = 0.0f;
-                         result.vertical_move.state = MOVE_STATE_IDLING;
+                         reset_move(&result.vertical_move);
                     }
                } break;
                case MOVE_DIRECTION_LEFT:
                     if(block_pos_delta.x < 0){
-                         result.stop_on_pixel_x = collided_block_center.pixel.x + HALF_TILE_SIZE_IN_PIXELS;
-
-                         Position_t final_stop_pos = pixel_pos(Pixel_t{result.stop_on_pixel_x, 0});
-                         Vec_t pos_delta = pos_to_vec(final_stop_pos - block_pos);
-
-                         transfer_pos_delta.x = result.pos_delta.x - pos_delta.x;
-
-                         result.pos_delta.x = pos_delta.x;
 
                          // TODO: compress these cases
                          if(direction_in_mask(collided_block_move_mask, first_direction)){
@@ -997,70 +1005,97 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                               // TODO: this case probably means if they are both on ice they want to start moving as a
                               //       group at a speed in the middle of both of their original speeds?
                               result.vel.x = block_inside_result.block->vel.x;
+
+                              Position_t final_stop_pos = collided_block_center;
+                              final_stop_pos.pixel.x += HALF_TILE_SIZE_IN_PIXELS;
+                              auto new_pos_delta = pos_to_vec(final_stop_pos - block_pos);
+                              result.pos_delta.x = new_pos_delta.x;
                          }else{
+                              result.stop_on_pixel_x = collided_block_center.pixel.x + HALF_TILE_SIZE_IN_PIXELS;
+
+                              Position_t final_stop_pos = pixel_pos(Pixel_t{result.stop_on_pixel_x, 0});
+                              Vec_t pos_delta = pos_to_vec(final_stop_pos - block_pos);
+
+                              transfer_pos_delta.x = result.pos_delta.x - pos_delta.x;
+
+                              result.pos_delta.x = pos_delta.x;
+
                               result.vel.x = 0.0f;
                               result.accel.x = 0.0f;
-                              result.horizontal_move.state = MOVE_STATE_IDLING;
+                              reset_move(&result.horizontal_move);
                          }
                     }
                     break;
                case MOVE_DIRECTION_RIGHT:
                     if(block_pos_delta.x > 0){
-                         result.stop_on_pixel_x = (collided_block_center.pixel.x - HALF_TILE_SIZE_IN_PIXELS) - TILE_SIZE_IN_PIXELS;
-
-                         Position_t final_stop_pos = pixel_pos(Pixel_t{result.stop_on_pixel_x, 0});
-                         Vec_t pos_delta = pos_to_vec(final_stop_pos - block_pos);
-
-                         transfer_pos_delta.x = result.pos_delta.x - pos_delta.x;
-
-                         result.pos_delta.x = pos_delta.x;
-
                          if(direction_in_mask(collided_block_move_mask, first_direction)){
                               result.vel.x = block_inside_result.block->vel.x;
+
+                              Position_t final_stop_pos = collided_block_center;
+                              final_stop_pos.pixel.x -= (HALF_TILE_SIZE_IN_PIXELS + TILE_SIZE_IN_PIXELS);
+                              auto new_pos_delta = pos_to_vec(final_stop_pos - block_pos);
+                              result.pos_delta.x = new_pos_delta.x;
                          }else{
+                              result.stop_on_pixel_x = (collided_block_center.pixel.x - HALF_TILE_SIZE_IN_PIXELS) - TILE_SIZE_IN_PIXELS;
+
+                              Position_t final_stop_pos = pixel_pos(Pixel_t{result.stop_on_pixel_x, 0});
+                              Vec_t pos_delta = pos_to_vec(final_stop_pos - block_pos);
+
+                              transfer_pos_delta.x = result.pos_delta.x - pos_delta.x;
+
+                              result.pos_delta.x = pos_delta.x;
                               result.vel.x = 0.0f;
                               result.accel.x = 0.0f;
-                              result.horizontal_move.state = MOVE_STATE_IDLING;
+                              reset_move(&result.horizontal_move);
                          }
                     }
                     break;
                case MOVE_DIRECTION_DOWN:
                     if(block_pos_delta.y < 0){
-                         result.stop_on_pixel_y = collided_block_center.pixel.y + HALF_TILE_SIZE_IN_PIXELS;
-
-                         Position_t final_stop_pos = pixel_pos(Pixel_t{0, result.stop_on_pixel_y});
-                         Vec_t pos_delta = pos_to_vec(final_stop_pos - block_pos);
-
-                         transfer_pos_delta.y = result.pos_delta.y - pos_delta.y;
-
-                         result.pos_delta.y = pos_delta.y;
-
                          if(direction_in_mask(collided_block_move_mask, first_direction)){
                               result.vel.y = block_inside_result.block->vel.y;
+
+                              Position_t final_stop_pos = collided_block_center;
+                              final_stop_pos.pixel.y += HALF_TILE_SIZE_IN_PIXELS;
+                              auto new_pos_delta = pos_to_vec(final_stop_pos - block_pos);
+                              result.pos_delta.y = new_pos_delta.y;
                          }else{
+                              result.stop_on_pixel_y = collided_block_center.pixel.y + HALF_TILE_SIZE_IN_PIXELS;
+
+                              Position_t final_stop_pos = pixel_pos(Pixel_t{0, result.stop_on_pixel_y});
+                              Vec_t pos_delta = pos_to_vec(final_stop_pos - block_pos);
+
+                              transfer_pos_delta.y = result.pos_delta.y - pos_delta.y;
+
+                              result.pos_delta.y = pos_delta.y;
                               result.vel.y = 0.0f;
                               result.accel.y = 0.0f;
-                              result.vertical_move.state = MOVE_STATE_IDLING;
+                              reset_move(&result.vertical_move);
                          }
                     }
                     break;
                case MOVE_DIRECTION_UP:
                     if(block_pos_delta.y > 0){
-                         result.stop_on_pixel_y = (collided_block_center.pixel.y - HALF_TILE_SIZE_IN_PIXELS) - TILE_SIZE_IN_PIXELS;
-
-                         Position_t final_stop_pos = pixel_pos(Pixel_t{0, result.stop_on_pixel_y});
-                         Vec_t pos_delta = pos_to_vec(final_stop_pos - block_pos);
-
-                         transfer_pos_delta.y = result.pos_delta.y - pos_delta.y;
-
-                         result.pos_delta.y = pos_delta.y;
-
                          if(direction_in_mask(collided_block_move_mask, first_direction)){
                               result.vel.y = block_inside_result.block->vel.y;
+
+                              Position_t final_stop_pos = collided_block_center;
+                              final_stop_pos.pixel.y -= (HALF_TILE_SIZE_IN_PIXELS + TILE_SIZE_IN_PIXELS);
+                              auto new_pos_delta = pos_to_vec(final_stop_pos - block_pos);
+                              result.pos_delta.y = new_pos_delta.y;
                          }else{
+                              result.stop_on_pixel_y = (collided_block_center.pixel.y - HALF_TILE_SIZE_IN_PIXELS) - TILE_SIZE_IN_PIXELS;
+
+                              Position_t final_stop_pos = pixel_pos(Pixel_t{0, result.stop_on_pixel_y});
+                              Vec_t pos_delta = pos_to_vec(final_stop_pos - block_pos);
+
+                              transfer_pos_delta.y = result.pos_delta.y - pos_delta.y;
+
+                              result.pos_delta.y = pos_delta.y;
+
                               result.vel.y = 0.0f;
                               result.accel.y = 0.0f;
-                              result.vertical_move.state = MOVE_STATE_IDLING;
+                              reset_move(&result.vertical_move);
                          }
                     }
                     break;

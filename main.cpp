@@ -1098,8 +1098,6 @@ int main(int argc, char** argv){
           return -1;
      }
 
-     LOG("pixel size: %f\n", PIXEL_SIZE);
-
      if(test && !load_map_filepath && !suite){
           LOG("cannot test without specifying a map to load\n");
           return 1;
@@ -3215,6 +3213,7 @@ int main(int argc, char** argv){
 
                     // finalize position for each component, stopping on a pixel boundary if we have to
                     if(block->stop_on_pixel_x != 0){
+                         // LOG("block %d stop_on_pixel_x: %d\n", i, block->stop_on_pixel_x);
                          block->pos.pixel.x = block->stop_on_pixel_x;
                          block->pos.decimal.x = 0;
                          block->stop_on_pixel_x = 0;
