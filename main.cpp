@@ -456,8 +456,9 @@ void get_touching_blocks_in_direction(World_t* world, Block_t* block, Direction_
           Direction_t result_direction = direction;
           if(result.againsts[i].through_portal != DIRECTION_COUNT) result_direction = result.againsts[i].through_portal;
           auto result_block = result.againsts[i].block;
+
           if(block_on_ice(result_block->pos, result_block->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt)){
-               get_block_stack(world, result_block, block_list, result_direction);
+               get_block_stack(world, result_block, block_list, result.againsts[i].through_portal);
                get_touching_blocks_in_direction(world, result_block, result_direction, block_list);
           }
      }
@@ -482,7 +483,15 @@ S16 get_block_mass_in_direction(World_t* world, Block_t* block, Direction_t dire
                     for(S16 j = i + 1; j < block_list.count; j++){
                          auto* block_entry_itr = block_list.entries + j;
                          if(entangle_index == get_block_index(world, block_entry_itr->block)){
-                              auto final_rotation = block_entry_itr->block->rotation + (U8)(block_entry_itr->through_portal) - block_entry->block->rotation;
+                              auto final_rotation = block_entry_itr->block->rotation;
+                              if(block_entry_itr->through_portal != DIRECTION_COUNT){
+                                   final_rotation += (U8)(block_entry_itr->through_portal);
+                              }
+                              final_rotation -= block_entry->block->rotation;
+
+                              // LOG("initial rot: %d, entangled rot: %d, through_portal: %s, final: %d\n", block_entry_itr->block->rotation, block_entry->block->rotation,
+                              //     direction_to_string(block_entry_itr->through_portal), final_rotation);
+
                               if(final_rotation == 0){
                                    block_entry_itr->counted = false;
                                    entangle_index = block_entry_itr->block->entangle_index;
