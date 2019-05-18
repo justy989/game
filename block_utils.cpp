@@ -110,6 +110,7 @@ Block_t* block_against_block_in_list(Position_t pos, Block_t** blocks, S16 block
 
                auto block_pos = block->pos + block->pos_delta;
 
+
                Pixel_t pixel_to_check = block_pos.pixel + offsets[i];
                if(pixel_to_check.x == (pos.pixel.x + TILE_SIZE_IN_PIXELS) &&
                   pixel_to_check.y >= (pos.pixel.y - BLOCK_SOLID_SIZE_IN_PIXELS) &&
@@ -170,7 +171,9 @@ BlockAgainstOthersResult_t block_against_other_blocks(Position_t pos, Direction_
      for(S16 i = 0; i < block_count; i++){
           // lol at me misusing this function, but watevs
           if(block_against_block_in_list(pos, blocks + i, 1, direction, portal_offsets)){
-               result.add(blocks[i]);
+               BlockAgainstOther_t against_other;
+               against_other.block = blocks[i];
+               result.add(against_other);
           }
      }
 
@@ -186,17 +189,21 @@ BlockAgainstOthersResult_t block_against_other_blocks(Position_t pos, Direction_
                if(is_active_portal(interactive)){
                     auto portal_exits = find_portal_exits(src_coord, tilemap, interactive_quad_tree);
                     for(S8 d = 0; d < DIRECTION_COUNT; d++){
+                         Direction_t new_dir = (Direction_t)(d);
                          for(S8 p = 0; p < portal_exits.directions[d].count; p++){
                               auto dst_coord = portal_exits.directions[d].coords[p];
                               if(dst_coord == src_coord) continue;
 
-                              search_portal_destination_for_blocks(block_qt, interactive->portal.face, (Direction_t)(d), src_coord,
+                              search_portal_destination_for_blocks(block_qt, interactive->portal.face, new_dir, src_coord,
                                                                    dst_coord, blocks, &block_count, portal_offsets);
 
                               for(S16 b = 0; b < block_count; b++){
                                    // lol at me misusing this function, but watevs
-                                   if(block_against_block_in_list(pos, blocks + b, 1, direction, portal_offsets)){
-                                        result.add(blocks[b]);
+                                   if(block_against_block_in_list(pos, blocks + b, 1, direction, portal_offsets + b)){
+                                        BlockAgainstOther_t against_other;
+                                        against_other.block = blocks[b];
+                                        against_other.through_portal = direction_opposite(new_dir);
+                                        result.add(against_other);
                                    }
                               }
                          }
@@ -912,14 +919,25 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                case MOVE_DIRECTION_RIGHT_UP:
                case MOVE_DIRECTION_RIGHT_DOWN:
                {
+                    bool impact_pos_delta_horizontal = true;
+                    bool impact_pos_delta_vertical = true;
+
                     switch(first_direction){
                     default:
                          break;
                     case DIRECTION_LEFT:
-                         result.stop_on_pixel_x = collided_block_center.pixel.x + HALF_TILE_SIZE_IN_PIXELS;
+                         if(block_pos_delta.x < 0){
+                              result.stop_on_pixel_x = collided_block_center.pixel.x + HALF_TILE_SIZE_IN_PIXELS;
+                         }else{
+                              impact_pos_delta_horizontal = false;
+                         }
                          break;
                     case DIRECTION_RIGHT:
-                         result.stop_on_pixel_x = (collided_block_center.pixel.x - HALF_TILE_SIZE_IN_PIXELS) - TILE_SIZE_IN_PIXELS;
+                         if(block_pos_delta.x > 0){
+                              result.stop_on_pixel_x = (collided_block_center.pixel.x - HALF_TILE_SIZE_IN_PIXELS) - TILE_SIZE_IN_PIXELS;
+                         }else{
+                              impact_pos_delta_horizontal = false;
+                         }
                          break;
                     }
 
@@ -927,10 +945,18 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                     default:
                          break;
                     case DIRECTION_DOWN:
-                         result.stop_on_pixel_y = collided_block_center.pixel.y + HALF_TILE_SIZE_IN_PIXELS;
+                         if(block_pos_delta.y < 0){
+                              result.stop_on_pixel_y = collided_block_center.pixel.y + HALF_TILE_SIZE_IN_PIXELS;
+                         }else{
+                              impact_pos_delta_vertical = false;
+                         }
                          break;
                     case DIRECTION_UP:
-                         result.stop_on_pixel_y = (collided_block_center.pixel.y - HALF_TILE_SIZE_IN_PIXELS) - TILE_SIZE_IN_PIXELS;
+                         if(block_pos_delta.y > 0){
+                              result.stop_on_pixel_y = (collided_block_center.pixel.y - HALF_TILE_SIZE_IN_PIXELS) - TILE_SIZE_IN_PIXELS;
+                         }else{
+                              impact_pos_delta_vertical = false;
+                         }
                          break;
                     }
 
@@ -939,100 +965,105 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
 
                     transfer_pos_delta = result.pos_delta - pos_delta;
 
-                    result.pos_delta.x = pos_delta.x;
-                    result.vel.x = 0.0f;
-                    result.accel.x = 0.0f;
-                    result.horizontal_move.state = MOVE_STATE_IDLING;
+                    if(impact_pos_delta_horizontal){
+                         result.pos_delta.x = pos_delta.x;
+                         result.vel.x = 0.0f;
+                         result.accel.x = 0.0f;
+                         result.horizontal_move.state = MOVE_STATE_IDLING;
+                    }
 
-                    result.pos_delta.y = pos_delta.y;
-                    result.vel.y = 0.0f;
-                    result.accel.y = 0.0f;
-                    result.vertical_move.state = MOVE_STATE_IDLING;
+                    if(impact_pos_delta_vertical){
+                         result.pos_delta.y = pos_delta.y;
+                         result.vel.y = 0.0f;
+                         result.accel.y = 0.0f;
+                         result.vertical_move.state = MOVE_STATE_IDLING;
+                    }
                } break;
                case MOVE_DIRECTION_LEFT:
-               {
-                    result.stop_on_pixel_x = collided_block_center.pixel.x + HALF_TILE_SIZE_IN_PIXELS;
+                    if(block_pos_delta.x < 0){
+                         result.stop_on_pixel_x = collided_block_center.pixel.x + HALF_TILE_SIZE_IN_PIXELS;
 
-                    Position_t final_stop_pos = pixel_pos(Pixel_t{result.stop_on_pixel_x, 0});
-                    Vec_t pos_delta = pos_to_vec(final_stop_pos - block_pos);
+                         Position_t final_stop_pos = pixel_pos(Pixel_t{result.stop_on_pixel_x, 0});
+                         Vec_t pos_delta = pos_to_vec(final_stop_pos - block_pos);
 
-                    transfer_pos_delta.x = result.pos_delta.x - pos_delta.x;
+                         transfer_pos_delta.x = result.pos_delta.x - pos_delta.x;
 
-                    result.pos_delta.x = pos_delta.x;
+                         result.pos_delta.x = pos_delta.x;
 
-                    // TODO: compress these cases
-                    if(direction_in_mask(collided_block_move_mask, first_direction)){
-                         // if the block is moving in the direction we collided, just move right up against it
-                         // TODO: set the decimal portion so we are right up against the block
-                         // TODO: this case probably means if they are both on ice they want to start moving as a
-                         //       group at a speed in the middle of both of their original speeds?
-                         result.vel.x = block_inside_result.block->vel.x;
-                    }else{
-                         result.vel.x = 0.0f;
-                         result.accel.x = 0.0f;
-                         result.horizontal_move.state = MOVE_STATE_IDLING;
+                         // TODO: compress these cases
+                         if(direction_in_mask(collided_block_move_mask, first_direction)){
+                              // if the block is moving in the direction we collided, just move right up against it
+                              // TODO: set the decimal portion so we are right up against the block
+                              // TODO: this case probably means if they are both on ice they want to start moving as a
+                              //       group at a speed in the middle of both of their original speeds?
+                              result.vel.x = block_inside_result.block->vel.x;
+                         }else{
+                              result.vel.x = 0.0f;
+                              result.accel.x = 0.0f;
+                              result.horizontal_move.state = MOVE_STATE_IDLING;
+                         }
                     }
-               } break;
+                    break;
                case MOVE_DIRECTION_RIGHT:
-               {
-                    result.stop_on_pixel_x = (collided_block_center.pixel.x - HALF_TILE_SIZE_IN_PIXELS) - TILE_SIZE_IN_PIXELS;
+                    if(block_pos_delta.x > 0){
+                         result.stop_on_pixel_x = (collided_block_center.pixel.x - HALF_TILE_SIZE_IN_PIXELS) - TILE_SIZE_IN_PIXELS;
 
-                    Position_t final_stop_pos = pixel_pos(Pixel_t{result.stop_on_pixel_x, 0});
-                    Vec_t pos_delta = pos_to_vec(final_stop_pos - block_pos);
+                         Position_t final_stop_pos = pixel_pos(Pixel_t{result.stop_on_pixel_x, 0});
+                         Vec_t pos_delta = pos_to_vec(final_stop_pos - block_pos);
 
-                    transfer_pos_delta.x = result.pos_delta.x - pos_delta.x;
+                         transfer_pos_delta.x = result.pos_delta.x - pos_delta.x;
 
-                    result.pos_delta.x = pos_delta.x;
+                         result.pos_delta.x = pos_delta.x;
 
-                    if(direction_in_mask(collided_block_move_mask, first_direction)){
-                         result.vel.x = block_inside_result.block->vel.x;
-                    }else{
-                         result.vel.x = 0.0f;
-                         result.accel.x = 0.0f;
-                         result.horizontal_move.state = MOVE_STATE_IDLING;
+                         if(direction_in_mask(collided_block_move_mask, first_direction)){
+                              result.vel.x = block_inside_result.block->vel.x;
+                         }else{
+                              result.vel.x = 0.0f;
+                              result.accel.x = 0.0f;
+                              result.horizontal_move.state = MOVE_STATE_IDLING;
+                         }
                     }
-               } break;
+                    break;
                case MOVE_DIRECTION_DOWN:
-               {
-                    result.stop_on_pixel_y = collided_block_center.pixel.y + HALF_TILE_SIZE_IN_PIXELS;
+                    if(block_pos_delta.y < 0){
+                         result.stop_on_pixel_y = collided_block_center.pixel.y + HALF_TILE_SIZE_IN_PIXELS;
 
-                    Position_t final_stop_pos = pixel_pos(Pixel_t{0, result.stop_on_pixel_y});
-                    Vec_t pos_delta = pos_to_vec(final_stop_pos - block_pos);
+                         Position_t final_stop_pos = pixel_pos(Pixel_t{0, result.stop_on_pixel_y});
+                         Vec_t pos_delta = pos_to_vec(final_stop_pos - block_pos);
 
-                    transfer_pos_delta.y = result.pos_delta.y - pos_delta.y;
+                         transfer_pos_delta.y = result.pos_delta.y - pos_delta.y;
 
-                    result.pos_delta.y = pos_delta.y;
+                         result.pos_delta.y = pos_delta.y;
 
-                    if(direction_in_mask(collided_block_move_mask, first_direction)){
-                         result.vel.y = block_inside_result.block->vel.y;
-                    }else{
-                         result.vel.y = 0.0f;
-                         result.accel.y = 0.0f;
-                         result.vertical_move.state = MOVE_STATE_IDLING;
+                         if(direction_in_mask(collided_block_move_mask, first_direction)){
+                              result.vel.y = block_inside_result.block->vel.y;
+                         }else{
+                              result.vel.y = 0.0f;
+                              result.accel.y = 0.0f;
+                              result.vertical_move.state = MOVE_STATE_IDLING;
+                         }
                     }
-               } break;
+                    break;
                case MOVE_DIRECTION_UP:
-               {
-                    result.stop_on_pixel_y = (collided_block_center.pixel.y - HALF_TILE_SIZE_IN_PIXELS) - TILE_SIZE_IN_PIXELS;
+                    if(block_pos_delta.y > 0){
+                         result.stop_on_pixel_y = (collided_block_center.pixel.y - HALF_TILE_SIZE_IN_PIXELS) - TILE_SIZE_IN_PIXELS;
 
-                    // LOG("block %d colliding with block %d (%d %f) stopping on y pixel %d\n", block_index, result.collided_block_index,
-                    //     (collided_block_center.pixel.y - HALF_TILE_SIZE_IN_PIXELS) - TILE_SIZE_IN_PIXELS, collided_block_center.decimal.y, result.stop_on_pixel_y);
+                         Position_t final_stop_pos = pixel_pos(Pixel_t{0, result.stop_on_pixel_y});
+                         Vec_t pos_delta = pos_to_vec(final_stop_pos - block_pos);
 
-                    Position_t final_stop_pos = pixel_pos(Pixel_t{0, result.stop_on_pixel_y});
-                    Vec_t pos_delta = pos_to_vec(final_stop_pos - block_pos);
+                         transfer_pos_delta.y = result.pos_delta.y - pos_delta.y;
 
-                    transfer_pos_delta.y = result.pos_delta.y - pos_delta.y;
+                         result.pos_delta.y = pos_delta.y;
 
-                    result.pos_delta.y = pos_delta.y;
-
-                    if(direction_in_mask(collided_block_move_mask, first_direction)){
-                         result.vel.y = block_inside_result.block->vel.y;
-                    }else{
-                         result.vel.y = 0.0f;
-                         result.accel.y = 0.0f;
-                         result.vertical_move.state = MOVE_STATE_IDLING;
+                         if(direction_in_mask(collided_block_move_mask, first_direction)){
+                              result.vel.y = block_inside_result.block->vel.y;
+                         }else{
+                              result.vel.y = 0.0f;
+                              result.accel.y = 0.0f;
+                              result.vertical_move.state = MOVE_STATE_IDLING;
+                         }
                     }
-               } break;
+                    break;
                }
           }
 

@@ -423,6 +423,7 @@ void hold_players(ObjectArray_t<Player_t>* players){
 
 struct BlockEntry_t{
      Block_t* block = nullptr;
+     Direction_t through_portal = DIRECTION_COUNT;
      bool counted = false;
 };
 
@@ -430,51 +431,63 @@ struct BlockList_t{
      BlockEntry_t entries[MAX_BLOCKS_IN_LIST];
      S16 count = 0;
 
-     bool add(Block_t* block){
+     bool add(Block_t* block, Direction_t through_portal){
           if(count >= MAX_BLOCKS_IN_LIST) return false;
           entries[count].block = block;
+          entries[count].through_portal = through_portal;
           entries[count].counted = true;
           count++;
           return true;
      }
 };
 
-void get_block_stack(World_t* world, Block_t* block, BlockList_t* block_list){
-     block_list->add(block);
+void get_block_stack(World_t* world, Block_t* block, BlockList_t* block_list, Direction_t through_portal){
+     block_list->add(block, through_portal);
 
      auto result = block_held_down_by_another_block(block, world->block_qt, world->interactive_qt, &world->tilemap);
      for(S16 i = 0; i < result.count; i++){
-          get_block_stack(world, result.blocks_held[i].block, block_list);
+          get_block_stack(world, result.blocks_held[i].block, block_list, through_portal);
      }
 }
 
 void get_touching_blocks_in_direction(World_t* world, Block_t* block, Direction_t direction, BlockList_t* block_list){
      auto result = block_against_other_blocks(block->pos, direction, world->block_qt, world->interactive_qt, &world->tilemap);
      for(S16 i = 0; i < result.count; i++){
-          get_block_stack(world, result.blocks[i], block_list);
-          get_touching_blocks_in_direction(world, result.blocks[i], direction, block_list);
+          Direction_t result_direction = direction;
+          if(result.againsts[i].through_portal != DIRECTION_COUNT) result_direction = result.againsts[i].through_portal;
+          auto result_block = result.againsts[i].block;
+          if(block_on_ice(result_block->pos, result_block->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt)){
+               get_block_stack(world, result_block, block_list, result_direction);
+               get_touching_blocks_in_direction(world, result_block, result_direction, block_list);
+          }
      }
 }
 
 S16 get_block_mass_in_direction(World_t* world, Block_t* block, Direction_t direction){
      BlockList_t block_list;
-     get_block_stack(world, block, &block_list);
-     get_touching_blocks_in_direction(world, block, direction, &block_list);
+     get_block_stack(world, block, &block_list, DIRECTION_COUNT);
 
-     // accumulate all blocks mass but reduce duplication of mass for entangled blocks
-     // TODO: n^2 * m, if we sort the blocks we can speed this up using a binary search bringing it to n log n * m
-     for(S16 i = 0; i < block_list.count; i++){
-          auto* block_entry = block_list.entries + i;
+     if(block_on_ice(block->pos, block->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt)){
+          get_touching_blocks_in_direction(world, block, direction, &block_list);
 
-          S16 entangle_index = block_entry->block->entangle_index;
-          S16 prev_entangle_index = -1;
-          while(entangle_index != i && prev_entangle_index != entangle_index && entangle_index >= 0){
-               prev_entangle_index = entangle_index;
-               for(S16 j = i + 1; j < block_list.count; j++){
-                    auto* block_entry_itr = block_list.entries + j;
-                    if(entangle_index == get_block_index(world, block_entry_itr->block)){
-                         block_entry_itr->counted = false;
-                         entangle_index = block_entry_itr->block->entangle_index;
+          // accumulate all blocks mass but reduce duplication of mass for entangled blocks
+          // TODO: n^2 * m, if we sort the blocks we can speed this up using a binary search bringing it to n log n * m
+          for(S16 i = 0; i < block_list.count; i++){
+               auto* block_entry = block_list.entries + i;
+
+               S16 entangle_index = block_entry->block->entangle_index;
+               S16 prev_entangle_index = -1;
+               while(entangle_index != i && prev_entangle_index != entangle_index && entangle_index >= 0){
+                    prev_entangle_index = entangle_index;
+                    for(S16 j = i + 1; j < block_list.count; j++){
+                         auto* block_entry_itr = block_list.entries + j;
+                         if(entangle_index == get_block_index(world, block_entry_itr->block)){
+                              auto final_rotation = block_entry_itr->block->rotation + (U8)(block_entry_itr->through_portal) - block_entry->block->rotation;
+                              if(final_rotation == 0){
+                                   block_entry_itr->counted = false;
+                                   entangle_index = block_entry_itr->block->entangle_index;
+                              }
+                         }
                     }
                }
           }
@@ -3262,6 +3275,9 @@ int main(int argc, char** argv){
                                    static const S16 baseline_block_mass = TILE_SIZE_IN_PIXELS * TILE_SIZE_IN_PIXELS;
 
                                    auto total_block_mass = get_block_mass_in_direction(&world, block_to_push, push_block_dir);
+
+                                   // LOG("push block %d %s mass %d\n", get_block_index(&world, block_to_push), direction_to_string(push_block_dir), total_block_mass);
+
                                    auto mass_ratio = (F32)(baseline_block_mass) / (F32)(total_block_mass);
 
                                    bool pushed = block_push(block_to_push, push_block_dir, &world, false, mass_ratio);

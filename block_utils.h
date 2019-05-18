@@ -156,13 +156,18 @@ struct InteractiveHeldResult_t{
 
 #define MAX_BLOCKS_AGAINST_BLOCK 4
 
+struct BlockAgainstOther_t{
+     Block_t* block = nullptr;
+     Direction_t through_portal = DIRECTION_COUNT;
+};
+
 struct BlockAgainstOthersResult_t{
-     Block_t* blocks[MAX_BLOCKS_AGAINST_BLOCK];
+     BlockAgainstOther_t againsts[MAX_BLOCKS_AGAINST_BLOCK];
      S16 count = 0;
 
-     bool add(Block_t* block){
+     bool add(BlockAgainstOther_t against_other){
           if(count >= MAX_BLOCKS_AGAINST_BLOCK) return false;
-          blocks[count] = block;
+          againsts[count] = against_other;
           count++;
           return true;
      }

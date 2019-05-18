@@ -1281,6 +1281,8 @@ bool block_push(Block_t* block, Direction_t direction, World_t* world, bool push
           }
      }
 
+     // LOG("block %d pushed %s with force %f\n", get_block_index(world, block), direction_to_string(direction), force);
+
      switch(direction){
      default:
           break;
