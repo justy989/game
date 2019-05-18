@@ -1155,6 +1155,7 @@ bool block_push(Block_t* block, Direction_t direction, World_t* world, bool push
      Direction_t collided_block_push_dir = DIRECTION_COUNT;
      Block_t* collided_block = block_against_another_block(block->pos + block->pos_delta, direction, world->block_qt, world->interactive_qt,
                                                            &world->tilemap, &collided_block_push_dir);
+     bool both_on_ice = false;
      if(collided_block){
           if(collided_block == block){
                // pass, this happens in a corner portal!
@@ -1202,8 +1203,9 @@ bool block_push(Block_t* block, Direction_t direction, World_t* world, bool push
                          return false;
                     }
                }else if(block_on_ice(block->pos, block->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt)){
+                    both_on_ice = true;
                     if(block_push(collided_block, collided_block_push_dir, world, pushed_by_ice, force, instant_momentum)){
-                         push_entangled_block(collided_block, world, collided_block_push_dir, pushed_by_ice, force, instant_momentum);
+                         if(!blocks_are_entangled(block, collided_block, &world->blocks)) push_entangled_block(collided_block, world, collided_block_push_dir, pushed_by_ice, force, instant_momentum);
                     }else{
                          return false;
                     }
@@ -1227,7 +1229,9 @@ bool block_push(Block_t* block, Direction_t direction, World_t* world, bool push
                }
 
                if(!only_against_entanglers) return false;
-               if(collided_block->rotation != block->rotation) return false; // only when the rotation is equal can we move with the block
+               if(collided_block->rotation != block->rotation){
+                    if(!both_on_ice) return false; // only when the rotation is equal can we move with the block
+               }
                if(block_against_solid_tile(collided_block, direction, &world->tilemap)) return false;
                if(block_against_solid_interactive(collided_block, direction, &world->tilemap, world->interactive_qt)) return false;
           }
