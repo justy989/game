@@ -486,9 +486,6 @@ S16 get_block_mass_in_direction(World_t* world, Block_t* block, Direction_t dire
                               S8 final_rotation = block_entry_itr->block->rotation - block_entry_itr->rotations_through_portal;
                               S8 rotation_between = direction_rotations_between((Direction_t)(block_entry->block->rotation), (Direction_t)(final_rotation)) % DIRECTION_COUNT;
 
-                              // LOG("initial rot: %d, entangled rot: %d, rotations_through_portal: %d, final: %d\n", block_entry_itr->block->rotation, block_entry->block->rotation,
-                              //     block_entry_itr->rotations_through_portal, rotation_between);
-
                               if(rotation_between == 0){
                                    block_entry_itr->counted = false;
                                    entangle_index = block_entry_itr->block->entangle_index;
@@ -591,14 +588,15 @@ bool do_block_collision(World_t* world, Block_t* block, F32 dt, S16* update_bloc
                     auto final_block_pos = block->pos + block->pos_delta;
                     auto pos_diff = pos_to_vec(final_block_pos - entangled_block_pos);
 
-                    U8 total_rotations = (block->rotation + entangled_block->rotation + collision_result.collided_portal_rotations) % (S8)(DIRECTION_COUNT);
+                    S8 final_entangle_rotation = entangled_block->rotation - collision_result.collided_portal_rotations;
+                    S8 total_rotations_between = direction_rotations_between((Direction_t)(block->rotation), (Direction_t)(final_entangle_rotation));
 
                     // TODO: this 0.0001f is a hack, it used to be an equality check, but the
                     //       numbers were slightly off in the case of rotated portals but not rotated entangled blocks
                     auto pos_dimension_delta = fabs(fabs(pos_diff.x) - fabs(pos_diff.y));
 
                     // if positions are diagonal to each other and the rotation between them is odd, check if we are moving into each other
-                    if(pos_dimension_delta < 0.0001f && (total_rotations) % 2 == 1){
+                    if(pos_dimension_delta <= FLT_EPSILON && (total_rotations_between) % 2 == 1){
                          // TODO: switch to using block_inside_another_block() because that is actually what we care about
                          auto entangle_result = check_block_collision_with_other_blocks(entangled_block->pos,
                                                                                         entangled_block->pos_delta,
@@ -1109,8 +1107,8 @@ int main(int argc, char** argv){
           return 1;
      }
 
-     int window_width = 1024;
-     int window_height = 1024;
+     int window_width = 1440;
+     int window_height = 1440;
      SDL_Window* window = nullptr;
      SDL_GLContext opengl_context = nullptr;
      GLuint theme_texture = 0;
@@ -3219,7 +3217,6 @@ int main(int argc, char** argv){
 
                     // finalize position for each component, stopping on a pixel boundary if we have to
                     if(block->stop_on_pixel_x != 0){
-                         // LOG("block %d stop_on_pixel_x: %d\n", i, block->stop_on_pixel_x);
                          block->pos.pixel.x = block->stop_on_pixel_x;
                          block->pos.decimal.x = 0;
                          block->stop_on_pixel_x = 0;

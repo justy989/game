@@ -1231,9 +1231,11 @@ bool block_push(Block_t* block, Direction_t direction, World_t* world, bool push
                bool only_against_entanglers = true;
                Block_t* entangled_collided_block = collided_block;
                while(entangled_collided_block){
-                    auto next_collided_block = block_against_another_block(entangled_collided_block->pos, direction, world->block_qt,
+                    Direction_t check_direction = collided_block_push_dir;
+
+                    auto next_collided_block = block_against_another_block(entangled_collided_block->pos, check_direction, world->block_qt,
                                                                            world->interactive_qt, &world->tilemap,
-                                                                           &collided_block_push_dir);
+                                                                           &check_direction);
                     if(next_collided_block == nullptr) break;
                     if(!blocks_are_entangled(entangled_collided_block, next_collided_block, &world->blocks)){
                          only_against_entanglers = false;
@@ -1242,29 +1244,46 @@ bool block_push(Block_t* block, Direction_t direction, World_t* world, bool push
                     entangled_collided_block = next_collided_block;
                }
 
-               if(!only_against_entanglers) return false;
-               if(collided_block->rotation != block->rotation){
-                    if(!both_on_ice) return false; // only when the rotation is equal can we move with the block
+               if(!only_against_entanglers){
+                    return false;
                }
-               if(block_against_solid_tile(collided_block, direction, &world->tilemap)) return false;
-               if(block_against_solid_interactive(collided_block, direction, &world->tilemap, world->interactive_qt)) return false;
+
+               if(collided_block->rotation != block->rotation){
+                    if(!both_on_ice){
+                         return false; // only when the rotation is equal can we move with the block
+                    }
+               }
+               if(block_against_solid_tile(collided_block, direction, &world->tilemap)){
+                    return false;
+               }
+               if(block_against_solid_interactive(collided_block, direction, &world->tilemap, world->interactive_qt)){
+                    return false;
+               }
           }
      }
 
      if(!pushed_by_ice){
           collided_block = rotated_entangled_blocks_against_centroid(block, direction, world->block_qt, &world->blocks,
                                                                      world->interactive_qt, &world->tilemap);
-          if(collided_block) return false;
+          if(collided_block){
+               return false;
+          }
      }
 
-     if(block_against_solid_tile(block, direction, &world->tilemap)) return false;
-     if(block_against_solid_interactive(block, direction, &world->tilemap, world->interactive_qt)) return false;
+     if(block_against_solid_tile(block, direction, &world->tilemap)){
+          return false;
+     }
+     if(block_against_solid_interactive(block, direction, &world->tilemap, world->interactive_qt)){
+          return false;
+     }
      auto* player = block_against_player(block, direction, &world->players);
      if(player){
           player->stopping_block_from = direction_opposite(direction);
           player->stopping_block_from_time = PLAYER_STOP_IDLE_BLOCK_TIMER;
           return false;
      }
+
+     // LOG("block %d pushed %s with force %f\n", get_block_index(world, block), direction_to_string(direction), force);
 
      // if are sliding on ice and are pushed in the opposite direction then stop
      if(block_on_ice(block->pos, block->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt)){
@@ -1298,8 +1317,6 @@ bool block_push(Block_t* block, Direction_t direction, World_t* world, bool push
           }
           }
      }
-
-     // LOG("block %d pushed %s with force %f\n", get_block_index(world, block), direction_to_string(direction), force);
 
      switch(direction){
      default:

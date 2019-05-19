@@ -913,6 +913,18 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
           if(block_inside_index != block_index){
                auto collided_block_move_mask = vec_direction_mask(block_inside_result.block->pos_delta);
 
+               if(result.collided_portal_rotations){
+                    // auto save_mask = collided_block_move_mask;
+
+                    // unsure why this is correct, but we've proved it via example
+                    auto total_rotations = DIRECTION_COUNT - result.collided_portal_rotations;
+
+                    // TODO: make direction_mask_rotate_clockwise(mask, rotations) function
+                    for(S8 r = 0; r < total_rotations; r++){
+                         collided_block_move_mask = direction_mask_rotate_clockwise(collided_block_move_mask);
+                    }
+               }
+
                switch(move_direction){
                default:
                     break;
@@ -939,6 +951,9 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                                         result.vel.x = block_inside_result.block->vel.x;
                                    }
 
+                                   if(result.vel.x > 0) result.vel.x = -result.vel.x;
+                                   if(result.vel.x == 0) reset_move(&result.horizontal_move);
+
                                    Position_t final_stop_pos = collided_block_center;
                                    final_stop_pos.pixel.x += HALF_TILE_SIZE_IN_PIXELS;
                                    result.pos_delta.x = pos_to_vec(final_stop_pos - block_pos).x;
@@ -956,6 +971,8 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                                    }else{
                                         result.vel.x = block_inside_result.block->vel.x;
                                    }
+                                   if(result.vel.x < 0) result.vel.x = -result.vel.x;
+                                   if(result.vel.x == 0) reset_move(&result.horizontal_move);
 
                                    Position_t final_stop_pos = collided_block_center;
                                    final_stop_pos.pixel.x -= (HALF_TILE_SIZE_IN_PIXELS + TILE_SIZE_IN_PIXELS );
@@ -980,6 +997,9 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                                         result.vel.y = block_inside_result.block->vel.y;
                                    }
 
+                                   if(result.vel.y > 0) result.vel.y = -result.vel.y;
+                                   if(result.vel.y == 0) reset_move(&result.vertical_move);
+
                                    Position_t final_stop_pos = collided_block_center;
                                    final_stop_pos.pixel.y += HALF_TILE_SIZE_IN_PIXELS;
                                    result.pos_delta.y = pos_to_vec(final_stop_pos - block_pos).y;
@@ -997,6 +1017,9 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                                    }else{
                                         result.vel.y = block_inside_result.block->vel.y;
                                    }
+
+                                   if(result.vel.y < 0) result.vel.y = -result.vel.y;
+                                   if(result.vel.y == 0) reset_move(&result.vertical_move);
 
                                    Position_t final_stop_pos = collided_block_center;
                                    final_stop_pos.pixel.y -= (HALF_TILE_SIZE_IN_PIXELS + TILE_SIZE_IN_PIXELS );
@@ -1034,7 +1057,14 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                               // TODO: set the decimal portion so we are right up against the block
                               // TODO: this case probably means if they are both on ice they want to start moving as a
                               //       group at a speed in the middle of both of their original speeds?
-                              result.vel.x = block_inside_result.block->vel.x;
+                              if(odd_collided_portal_rotations){
+                                   result.vel.x = block_inside_result.block->vel.y;
+                              }else{
+                                   result.vel.x = block_inside_result.block->vel.x;
+                              }
+
+                              if(result.vel.x > 0) result.vel.x = -result.vel.x;
+                              if(result.vel.x == 0) reset_move(&result.horizontal_move);
 
                               Position_t final_stop_pos = collided_block_center;
                               final_stop_pos.pixel.x += HALF_TILE_SIZE_IN_PIXELS;
@@ -1059,7 +1089,14 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                case MOVE_DIRECTION_RIGHT:
                     if(block_pos_delta.x > 0){
                          if(direction_in_mask(collided_block_move_mask, first_direction)){
-                              result.vel.x = block_inside_result.block->vel.x;
+                              if(odd_collided_portal_rotations){
+                                   result.vel.x = block_inside_result.block->vel.y;
+                              }else{
+                                   result.vel.x = block_inside_result.block->vel.x;
+                              }
+
+                              if(result.vel.x < 0) result.vel.x = -result.vel.x;
+                              if(result.vel.x == 0) reset_move(&result.horizontal_move);
 
                               Position_t final_stop_pos = collided_block_center;
                               final_stop_pos.pixel.x -= (HALF_TILE_SIZE_IN_PIXELS + TILE_SIZE_IN_PIXELS);
@@ -1083,7 +1120,14 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                case MOVE_DIRECTION_DOWN:
                     if(block_pos_delta.y < 0){
                          if(direction_in_mask(collided_block_move_mask, first_direction)){
-                              result.vel.y = block_inside_result.block->vel.y;
+                              if(odd_collided_portal_rotations){
+                                   result.vel.y = block_inside_result.block->vel.x;
+                              }else{
+                                   result.vel.y = block_inside_result.block->vel.y;
+                              }
+
+                              if(result.vel.y > 0) result.vel.y = -result.vel.y;
+                              if(result.vel.y == 0) reset_move(&result.vertical_move);
 
                               Position_t final_stop_pos = collided_block_center;
                               final_stop_pos.pixel.y += HALF_TILE_SIZE_IN_PIXELS;
@@ -1107,7 +1151,14 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                case MOVE_DIRECTION_UP:
                     if(block_pos_delta.y > 0){
                          if(direction_in_mask(collided_block_move_mask, first_direction)){
-                              result.vel.y = block_inside_result.block->vel.y;
+                              if(odd_collided_portal_rotations){
+                                   result.vel.y = block_inside_result.block->vel.x;
+                              }else{
+                                   result.vel.y = block_inside_result.block->vel.y;
+                              }
+
+                              if(result.vel.y < 0) result.vel.y = -result.vel.y;
+                              if(result.vel.y == 0) reset_move(&result.vertical_move);
 
                               Position_t final_stop_pos = collided_block_center;
                               final_stop_pos.pixel.y -= (HALF_TILE_SIZE_IN_PIXELS + TILE_SIZE_IN_PIXELS);
