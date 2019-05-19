@@ -1152,13 +1152,21 @@ bool block_push(Block_t* block, MoveDirection_t move_direction, World_t* world, 
 }
 
 bool block_push(Block_t* block, Direction_t direction, World_t* world, bool pushed_by_ice, F32 force, TransferMomentum_t* instant_momentum){
+     return block_push(block, block->pos, block->pos_delta, direction, world, pushed_by_ice, force, instant_momentum);
+}
+
+bool block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Direction_t direction, World_t* world, bool pushed_by_ice, F32 force, TransferMomentum_t* instant_momentum){
      Direction_t collided_block_push_dir = DIRECTION_COUNT;
-     Block_t* collided_block = block_against_another_block(block->pos + block->pos_delta, direction, world->block_qt, world->interactive_qt,
+     Block_t* collided_block = block_against_another_block(pos + pos_delta, direction, world->block_qt, world->interactive_qt,
                                                            &world->tilemap, &collided_block_push_dir);
      bool both_on_ice = false;
      if(collided_block){
           if(collided_block == block){
-               // pass, this happens in a corner portal!
+               if(pushed_by_ice && block_on_ice(collided_block->pos, collided_block->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt)){
+                    // pass
+               }else{
+                    return false;
+               }
           }else if(block_on_ice(collided_block->pos, collided_block->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt)){
                if(pushed_by_ice){
                     // check if we are able to move or if we transfer our force to the block
@@ -1202,7 +1210,7 @@ bool block_push(Block_t* block, Direction_t direction, World_t* world, bool push
 
                          return false;
                     }
-               }else if(block_on_ice(block->pos, block->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt)){
+               }else if(block_on_ice(pos, pos_delta, &world->tilemap, world->interactive_qt, world->block_qt)){
                     both_on_ice = true;
                     bool are_entangled = blocks_are_entangled(block, collided_block, &world->blocks);
 
@@ -1270,7 +1278,7 @@ bool block_push(Block_t* block, Direction_t direction, World_t* world, bool push
           }
      }
 
-     if(block_against_solid_tile(block, direction, &world->tilemap)){
+     if(block_against_solid_tile(pos, pos_delta, direction, &world->tilemap)){
           return false;
      }
      if(block_against_solid_interactive(block, direction, &world->tilemap, world->interactive_qt)){
@@ -1286,7 +1294,7 @@ bool block_push(Block_t* block, Direction_t direction, World_t* world, bool push
      // LOG("block %d pushed %s with force %f\n", get_block_index(world, block), direction_to_string(direction), force);
 
      // if are sliding on ice and are pushed in the opposite direction then stop
-     if(block_on_ice(block->pos, block->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt)){
+     if(block_on_ice(pos, pos_delta, &world->tilemap, world->interactive_qt, world->block_qt)){
           switch(direction){
           default:
                break;
@@ -1336,7 +1344,7 @@ bool block_push(Block_t* block, Direction_t direction, World_t* world, bool push
                     block->accel_magnitudes.x = BLOCK_ACCEL * force;
                }
                block->horizontal_move.distance = 0;
-               block->started_on_pixel_x = block->pos.pixel.x;
+               block->started_on_pixel_x = pos.pixel.x;
           }else if(pushed_by_ice){
                block->horizontal_move.state = MOVE_STATE_COASTING;
                // the velocity may be going the wrong way, but we can fix it here
@@ -1360,7 +1368,7 @@ bool block_push(Block_t* block, Direction_t direction, World_t* world, bool push
                     block->accel_magnitudes.x = BLOCK_ACCEL * force;
                }
                block->horizontal_move.distance = 0;
-               block->started_on_pixel_x = block->pos.pixel.x;
+               block->started_on_pixel_x = pos.pixel.x;
           }else if(pushed_by_ice){
                block->horizontal_move.state = MOVE_STATE_COASTING;
                F32 instant_vel = elastic_transfer_momentum_to_block(instant_momentum, world, block, direction);
@@ -1383,7 +1391,7 @@ bool block_push(Block_t* block, Direction_t direction, World_t* world, bool push
                     block->accel_magnitudes.y = BLOCK_ACCEL * force;
                }
                block->vertical_move.distance = 0;
-               block->started_on_pixel_y = block->pos.pixel.y;
+               block->started_on_pixel_y = pos.pixel.y;
           }else if(pushed_by_ice){
                block->vertical_move.state = MOVE_STATE_COASTING;
                F32 instant_vel = elastic_transfer_momentum_to_block(instant_momentum, world, block, direction);
@@ -1407,7 +1415,7 @@ bool block_push(Block_t* block, Direction_t direction, World_t* world, bool push
                }
 
                block->vertical_move.distance = 0;
-               block->started_on_pixel_y = block->pos.pixel.y;
+               block->started_on_pixel_y = pos.pixel.y;
           }else if(pushed_by_ice){
                block->vertical_move.state = MOVE_STATE_COASTING;
                F32 instant_vel = elastic_transfer_momentum_to_block(instant_momentum, world, block, direction);

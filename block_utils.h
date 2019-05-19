@@ -124,6 +124,8 @@ struct BlockCollidesWithItselfResult_t{
      Direction_t push_dir;
      Vec_t vel;
      Vec_t accel;
+     S16 stop_on_pixel_x = -1;
+     S16 stop_on_pixel_y = -1;
 };
 
 #define MAX_HELD_BLOCKS 16
@@ -193,6 +195,7 @@ BlockInsideResult_t block_inside_another_block(Block_t* block_to_check, QuadTree
                                                QuadTreeNode_t<Interactive_t>* interactive_quad_tree, TileMap_t* tilemap,
                                                ObjectArray_t<Block_t>* block_array);
 Tile_t* block_against_solid_tile(Block_t* block_to_check, Direction_t direction, TileMap_t* tilemap);
+Tile_t* block_against_solid_tile(Position_t block_pos, Vec_t pos_delta, Direction_t direction, TileMap_t* tilemap);
 Player_t* block_against_player(Block_t* block_to_check, Direction_t direction, ObjectArray_t<Player_t>* players);
 
 InteractiveHeldResult_t block_held_up_by_popup(Position_t block_pos, QuadTreeNode_t<Interactive_t>* interactive_qt, S16 min_area = 0);
@@ -212,7 +215,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                                                                     S16 block_index, bool block_is_cloning, World_t* world);
 
 BlockCollidesWithItselfResult_t resolve_block_colliding_with_itself(Direction_t src_portal_dir, Direction_t dst_portal_dir, DirectionMask_t move_mask,
-                                                                    Vec_t block_vel, Vec_t block_accel, Direction_t check_horizontal, Direction_t check_vertical);
+                                                                    Vec_t block_vel, Vec_t block_accel, Position_t block_pos);
 
 void search_portal_destination_for_blocks(QuadTreeNode_t<Block_t>* block_qt, Direction_t src_portal_face,
                                           Direction_t dst_portal_face, Coord_t src_portal_coord,

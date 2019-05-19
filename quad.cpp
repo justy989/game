@@ -43,3 +43,8 @@ bool quad_in_quad_high_range_exclusive(const Quad_t* a, const Quad_t* b){
 
      return false;
 }
+
+bool operator==(const Quad_t& a, const Quad_t& b){
+     return (a.left == b.left && a.right == b.right &&
+             a.bottom == b.bottom && a.top == b.top);
+}

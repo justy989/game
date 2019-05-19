@@ -27,7 +27,6 @@ Current bugs:
 
 Big Features:
 - 'Bring Block Ice Collision to the Masses' - my favorite feature joke of the game
-     - 2 adjacent blocks on ice should be pushable if a 2 stack tower on ice is pushable
      - if a block is sliding on ice, and another block slides on top of it, it should slow down
      - if the player is on a block should it slow down ? YES
 - 3D
