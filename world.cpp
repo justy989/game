@@ -1204,8 +1204,22 @@ bool block_push(Block_t* block, Direction_t direction, World_t* world, bool push
                     }
                }else if(block_on_ice(block->pos, block->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt)){
                     both_on_ice = true;
+                    bool are_entangled = blocks_are_entangled(block, collided_block, &world->blocks);
+
+                    if(are_entangled){
+                         // if they are opposite entangled (potentially through a portal) then they just push into each other
+                         S8 total_collided_rotations = direction_rotations_between(direction, collided_block_push_dir) + collided_block->rotation;
+                         total_collided_rotations %= DIRECTION_COUNT;
+
+                         auto rotations_between =  direction_rotations_between((Direction_t)(total_collided_rotations), (Direction_t)(block->rotation));
+                         if(rotations_between == 2) return false;
+                    }
+
+
                     if(block_push(collided_block, collided_block_push_dir, world, pushed_by_ice, force, instant_momentum)){
-                         if(!blocks_are_entangled(block, collided_block, &world->blocks)) push_entangled_block(collided_block, world, collided_block_push_dir, pushed_by_ice, force, instant_momentum);
+                         if(!are_entangled){
+                             push_entangled_block(collided_block, world, collided_block_push_dir, pushed_by_ice, force, instant_momentum);
+                         }
                     }else{
                          return false;
                     }
