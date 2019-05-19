@@ -158,7 +158,7 @@ struct InteractiveHeldResult_t{
 
 struct BlockAgainstOther_t{
      Block_t* block = nullptr;
-     Direction_t through_portal = DIRECTION_COUNT;
+     S8 rotations_through_portal = 0;
 };
 
 struct BlockAgainstOthersResult_t{

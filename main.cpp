@@ -423,7 +423,7 @@ void hold_players(ObjectArray_t<Player_t>* players){
 
 struct BlockEntry_t{
      Block_t* block = nullptr;
-     Direction_t through_portal = DIRECTION_COUNT;
+     S8 rotations_through_portal = 0;
      bool counted = false;
 };
 
@@ -431,22 +431,22 @@ struct BlockList_t{
      BlockEntry_t entries[MAX_BLOCKS_IN_LIST];
      S16 count = 0;
 
-     bool add(Block_t* block, Direction_t through_portal){
+     bool add(Block_t* block, S8 rotations_through_portal){
           if(count >= MAX_BLOCKS_IN_LIST) return false;
           entries[count].block = block;
-          entries[count].through_portal = through_portal;
+          entries[count].rotations_through_portal = rotations_through_portal;
           entries[count].counted = true;
           count++;
           return true;
      }
 };
 
-void get_block_stack(World_t* world, Block_t* block, BlockList_t* block_list, Direction_t through_portal){
-     block_list->add(block, through_portal);
+void get_block_stack(World_t* world, Block_t* block, BlockList_t* block_list, S8 rotations_through_portal){
+     block_list->add(block, rotations_through_portal);
 
      auto result = block_held_down_by_another_block(block, world->block_qt, world->interactive_qt, &world->tilemap);
      for(S16 i = 0; i < result.count; i++){
-          get_block_stack(world, result.blocks_held[i].block, block_list, through_portal);
+          get_block_stack(world, result.blocks_held[i].block, block_list, rotations_through_portal);
      }
 }
 
@@ -454,11 +454,11 @@ void get_touching_blocks_in_direction(World_t* world, Block_t* block, Direction_
      auto result = block_against_other_blocks(block->pos, direction, world->block_qt, world->interactive_qt, &world->tilemap);
      for(S16 i = 0; i < result.count; i++){
           Direction_t result_direction = direction;
-          if(result.againsts[i].through_portal != DIRECTION_COUNT) result_direction = result.againsts[i].through_portal;
+          result_direction = direction_rotate_clockwise(result_direction, result.againsts[i].rotations_through_portal);
           auto result_block = result.againsts[i].block;
 
           if(block_on_ice(result_block->pos, result_block->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt)){
-               get_block_stack(world, result_block, block_list, result.againsts[i].through_portal);
+               get_block_stack(world, result_block, block_list, result.againsts[i].rotations_through_portal);
                get_touching_blocks_in_direction(world, result_block, result_direction, block_list);
           }
      }
@@ -483,16 +483,13 @@ S16 get_block_mass_in_direction(World_t* world, Block_t* block, Direction_t dire
                     for(S16 j = i + 1; j < block_list.count; j++){
                          auto* block_entry_itr = block_list.entries + j;
                          if(entangle_index == get_block_index(world, block_entry_itr->block)){
-                              auto final_rotation = block_entry_itr->block->rotation;
-                              if(block_entry_itr->through_portal != DIRECTION_COUNT){
-                                   final_rotation += (U8)(block_entry_itr->through_portal);
-                              }
-                              final_rotation -= block_entry->block->rotation;
+                              S8 final_rotation = block_entry_itr->block->rotation - block_entry_itr->rotations_through_portal;
+                              S8 rotation_between = direction_rotations_between((Direction_t)(block_entry->block->rotation), (Direction_t)(final_rotation)) % DIRECTION_COUNT;
 
-                              // LOG("initial rot: %d, entangled rot: %d, through_portal: %s, final: %d\n", block_entry_itr->block->rotation, block_entry->block->rotation,
-                              //     direction_to_string(block_entry_itr->through_portal), final_rotation);
+                              // LOG("initial rot: %d, entangled rot: %d, rotations_through_portal: %d, final: %d\n", block_entry_itr->block->rotation, block_entry->block->rotation,
+                              //     block_entry_itr->rotations_through_portal, rotation_between);
 
-                              if(final_rotation == 0){
+                              if(rotation_between == 0){
                                    block_entry_itr->counted = false;
                                    entangle_index = block_entry_itr->block->entangle_index;
                               }

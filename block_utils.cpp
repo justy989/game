@@ -202,7 +202,7 @@ BlockAgainstOthersResult_t block_against_other_blocks(Position_t pos, Direction_
                                    if(block_against_block_in_list(pos, blocks + b, 1, direction, portal_offsets + b)){
                                         BlockAgainstOther_t against_other;
                                         against_other.block = blocks[b];
-                                        against_other.through_portal = direction_opposite(new_dir);
+                                        against_other.rotations_through_portal = portal_rotations_between(interactive->portal.face, new_dir);
                                         result.add(against_other);
                                    }
                               }
@@ -865,6 +865,8 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
           result.collided_pos = block_inside_result.collision_pos;
           result.collided_portal_rotations = block_inside_result.portal_rotations;
 
+          bool odd_collided_portal_rotations = (result.collided_portal_rotations % 2) == 1;
+
           auto collided_block_center = block_inside_result.collision_pos;
 
           auto moved_block_pos = block_get_center(block_pos);
@@ -931,6 +933,12 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                                    impact_pos_delta_horizontal = true;
                                    result.stop_on_pixel_x = collided_block_center.pixel.x + HALF_TILE_SIZE_IN_PIXELS;
                               }else{
+                                   if(odd_collided_portal_rotations){
+                                        result.vel.x = block_inside_result.block->vel.y;
+                                   }else{
+                                        result.vel.x = block_inside_result.block->vel.x;
+                                   }
+
                                    Position_t final_stop_pos = collided_block_center;
                                    final_stop_pos.pixel.x += HALF_TILE_SIZE_IN_PIXELS;
                                    result.pos_delta.x = pos_to_vec(final_stop_pos - block_pos).x;
@@ -943,6 +951,12 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                                    impact_pos_delta_horizontal = true;
                                    result.stop_on_pixel_x = (collided_block_center.pixel.x - HALF_TILE_SIZE_IN_PIXELS) - TILE_SIZE_IN_PIXELS;
                               }else{
+                                   if(odd_collided_portal_rotations){
+                                        result.vel.x = block_inside_result.block->vel.y;
+                                   }else{
+                                        result.vel.x = block_inside_result.block->vel.x;
+                                   }
+
                                    Position_t final_stop_pos = collided_block_center;
                                    final_stop_pos.pixel.x -= (HALF_TILE_SIZE_IN_PIXELS + TILE_SIZE_IN_PIXELS );
                                    result.pos_delta.x = pos_to_vec(final_stop_pos - block_pos).x;
@@ -960,6 +974,12 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                                    impact_pos_delta_vertical = true;
                                    result.stop_on_pixel_y = collided_block_center.pixel.y + HALF_TILE_SIZE_IN_PIXELS;
                               }else{
+                                   if(odd_collided_portal_rotations){
+                                        result.vel.y = block_inside_result.block->vel.x;
+                                   }else{
+                                        result.vel.y = block_inside_result.block->vel.y;
+                                   }
+
                                    Position_t final_stop_pos = collided_block_center;
                                    final_stop_pos.pixel.y += HALF_TILE_SIZE_IN_PIXELS;
                                    result.pos_delta.y = pos_to_vec(final_stop_pos - block_pos).y;
@@ -972,6 +992,12 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                                    impact_pos_delta_vertical = true;
                                    result.stop_on_pixel_y = (collided_block_center.pixel.y - HALF_TILE_SIZE_IN_PIXELS) - TILE_SIZE_IN_PIXELS;
                               }else{
+                                   if(odd_collided_portal_rotations){
+                                        result.vel.y = block_inside_result.block->vel.x;
+                                   }else{
+                                        result.vel.y = block_inside_result.block->vel.y;
+                                   }
+
                                    Position_t final_stop_pos = collided_block_center;
                                    final_stop_pos.pixel.y -= (HALF_TILE_SIZE_IN_PIXELS + TILE_SIZE_IN_PIXELS );
                                    result.pos_delta.y = pos_to_vec(final_stop_pos - block_pos).y;
