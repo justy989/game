@@ -962,8 +962,6 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                               }else{
                                    Position_t final_stop_pos = collided_block_center;
                                    final_stop_pos.pixel.y += HALF_TILE_SIZE_IN_PIXELS;
-                                   LOG("DOWN adjust block %d pos_delta y from %f to %f against block %d\n", block_index, result.pos_delta.y, pos_to_vec(final_stop_pos - block_pos).y,
-                                       result.collided_block_index);
                                    result.pos_delta.y = pos_to_vec(final_stop_pos - block_pos).y;
                               }
                          }
@@ -976,8 +974,6 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                               }else{
                                    Position_t final_stop_pos = collided_block_center;
                                    final_stop_pos.pixel.y -= (HALF_TILE_SIZE_IN_PIXELS + TILE_SIZE_IN_PIXELS );
-                                   LOG("UP adjust block %d pos_delta y from %f to %f against block %d\n", block_index, result.pos_delta.y, pos_to_vec(final_stop_pos - block_pos).y,
-                                       result.collided_block_index);
                                    result.pos_delta.y = pos_to_vec(final_stop_pos - block_pos).y;
                               }
                          }
