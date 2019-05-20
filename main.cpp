@@ -27,8 +27,8 @@ Current bugs:
 
 Big Features:
 - 'Bring Block Ice Collision to the Masses' - my favorite feature joke of the game
-     - if a block is sliding on ice, and another block slides on top of it, it should slow down
      - if the player is on a block should it slow down ? YES
+     - Max momentum a player can stop? 2 blocks, maybe 2
 - 3D
      - stack of blocks should be pushable on ice in it's entirety
      - a block with ice on it shouldn't be able to carry a block
@@ -40,6 +40,11 @@ Big Features:
 - arrow entanglement
 - Block splitting
 - Multiple players pushing blocks at once
+
+Potential Board Game Idea around newton's cradle
+- N by N grid (maybe like chess?) that pieces can be dropped onto (creating height) or slide in from the side, attempting to impact
+- Use newtonian physics to decide the impact the outcome
+- maybe when both players are out of pieces, whoever has the most mass on the table wins?
 
 */
 
