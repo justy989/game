@@ -733,21 +733,21 @@ bool do_block_collision(World_t* world, Block_t* block, F32 dt, S16* update_bloc
      *block_changes = collision_result.block_changes;
 
      // check for adjacent walls
-     if(block->vel.x > 0.0f){
+     if(block->pos_delta.x > 0.0f){
           if(check_direction_from_block_for_adjacent_walls(block, &world->tilemap, world->interactive_qt, DIRECTION_RIGHT)){
                stop_on_boundary_x = true;
           }
-     }else if(block->vel.x < 0.0f){
+     }else if(block->pos_delta.x < 0.0f){
           if(check_direction_from_block_for_adjacent_walls(block, &world->tilemap, world->interactive_qt, DIRECTION_LEFT)){
                stop_on_boundary_x = true;
           }
      }
 
-     if(block->vel.y > 0.0f){
+     if(block->pos_delta.y > 0.0f){
           if(check_direction_from_block_for_adjacent_walls(block, &world->tilemap, world->interactive_qt, DIRECTION_UP)){
                stop_on_boundary_y = true;
           }
-     }else if(block->vel.y < 0.0f){
+     }else if(block->pos_delta.y < 0.0f){
           if(check_direction_from_block_for_adjacent_walls(block, &world->tilemap, world->interactive_qt, DIRECTION_DOWN)){
                stop_on_boundary_y = true;
           }
@@ -2809,22 +2809,25 @@ int main(int argc, char** argv){
                                              auto rotated_pos_delta = vec_rotate_quadrants_clockwise(holder->pos_delta, rotations_between);
 
                                              old_carried_pos_delta = entangled_block->carried_pos_delta.positive + entangled_block->carried_pos_delta.negative;
-                                             get_carried_noob(&entangled_block->carried_pos_delta, rotated_pos_delta, holder_index, true);
-                                             new_carried_pos_delta = entangled_block->carried_pos_delta.positive + entangled_block->carried_pos_delta.negative;
+                                             if(!get_carried_noob(&entangled_block->carried_pos_delta, rotated_pos_delta, holder_index, true)){
+                                                  new_carried_pos_delta = entangled_block->carried_pos_delta.positive + entangled_block->carried_pos_delta.negative;
 
-                                             if(entangled_block->teleport){
-                                                  entangled_block->teleport_pos_delta -= old_carried_pos_delta;
-                                                  entangled_block->teleport_pos_delta += new_carried_pos_delta;
-                                             }else{
-                                                  entangled_block->pos_delta -= old_carried_pos_delta;
-                                                  entangled_block->pos_delta += new_carried_pos_delta;
+                                                  if(entangled_block->teleport){
+                                                       entangled_block->teleport_pos_delta -= old_carried_pos_delta;
+                                                       entangled_block->teleport_pos_delta += new_carried_pos_delta;
+                                                  }else{
+                                                       entangled_block->pos_delta -= old_carried_pos_delta;
+                                                       entangled_block->pos_delta += new_carried_pos_delta;
+                                                  }
+
+                                                  repeat_collision = true;
                                              }
 
                                              entangle_index = entangled_block->entangle_index;
                                         }
-                                   }
 
-                                   repeat_collision = true;
+                                        repeat_collision = true;
+                                   }
                               }
                          }
                     }
