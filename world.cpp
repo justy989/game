@@ -1916,6 +1916,8 @@ F32 elastic_transfer_momentum_to_block(TransferMomentum_t* first_transfer_moment
           block->vertical_transferred_momentum = first_term;
      }
 
+     // TODO: check for 0 second_block_mass
+     // TODO: check for negative vel_squared
      F32 vel_squared = (first_term + second_term) / (0.5f * (F32)(second_block_mass));
      final_vel = sqrt(vel_squared);
 

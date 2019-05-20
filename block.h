@@ -66,6 +66,9 @@ struct Block_t : public GridMotion_t{
      F32 horizontal_original_momentum;
      F32 horizontal_transferred_momentum;
      F32 vertical_original_momentum;
+
+     S16 previous_mass;
+
      F32 vertical_transferred_momentum;
 
      bool done_collision_pass = false;

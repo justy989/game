@@ -2423,6 +2423,44 @@ int main(int argc, char** argv){
                          block->vertical_original_momentum = 0;
                     }
 
+                    if(block->previous_mass != mass){
+                         // 1/2mivi^2 = 1/2mfvf^2
+                         // (1/2mivi^2) / (1/2mf) = vf^2
+                         // sqrt((1/2mivi^2) / (1/2mf)) = vf
+
+                         if(block->vel.x != 0){
+                              F32 vel = block->vel.x;
+                              if(vel < 0) vel = -vel;
+
+                              F32 initial_momentum = momentum_term(block->previous_mass, vel);
+                              F32 vel_squared = initial_momentum / (0.5f * mass);
+                              F32 final_vel = sqrt(vel_squared);
+
+                              if(block->vel.x < 0){
+                                   block->vel.x = -final_vel;
+                              }else{
+                                   block->vel.x = final_vel;
+                              }
+                         }
+
+                         if(block->vel.y != 0){
+                              F32 vel = block->vel.y;
+                              if(vel < 0) vel = -vel;
+
+                              F32 initial_momentum = momentum_term(block->previous_mass, vel);
+                              F32 vel_squared = initial_momentum / (0.5f * mass);
+                              F32 final_vel = sqrt(vel_squared);
+
+                              if(block->vel.y < 0){
+                                   block->vel.y = -final_vel;
+                              }else{
+                                   block->vel.y = final_vel;
+                              }
+                         }
+                    }
+
+                    block->previous_mass = mass;
+
                     block->vertical_transferred_momentum = 0;
 
                     block->prev_push_mask = block->cur_push_mask;
