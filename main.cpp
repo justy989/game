@@ -30,11 +30,11 @@ Big Features:
      - if the player is on a block should it slow down ? YES
      - Max momentum a player can stop? 2 blocks, maybe 2
 - 3D
-     - stack of blocks should be pushable on ice in it's entirety
      - a block with ice on it shouldn't be able to carry a block
-     - entangled players on popups
      - if we put a popup on the other side of a portal and a block 1 interval high goes through the portal, will it work the way we expect?
-     - Player stopping a tower of blocks with more momentum than the player can handle normally
+     - how does a stack of entangled blocks move?
+- 2 non-entangled blocks colliding at a centroid on ice don't do the right thing
+- update get mass and block push to handle infinite mass cases
 - A way to tell which blocks are entangled
 - arrow kills player
 - arrow entanglement
@@ -1111,8 +1111,8 @@ int main(int argc, char** argv){
           return 1;
      }
 
-     int window_width = 1440;
-     int window_height = 1440;
+     int window_width = 1024;
+     int window_height = 1024;
      SDL_Window* window = nullptr;
      SDL_GLContext opengl_context = nullptr;
      GLuint theme_texture = 0;
@@ -1474,38 +1474,22 @@ int main(int argc, char** argv){
                               Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
                               quad_tree_find_in(world.block_qt, rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
 
-                              if(block_count > 1){
-                                   LOG("error: too man blocks in coord, unsure which one to entangle!\\n");
-                              }else if(block_count == 1){
-                                   S16 block_index = (S16)(blocks[0] - world.blocks.elements);
-                                   if(block_index >= 0 && block_index < world.blocks.count){
-                                        if(editor.block_entangle_index_save >= 0 && editor.block_entangle_index_save != block_index){
-                                             undo_commit(&undo, &world.players, &world.tilemap, &world.blocks, &world.interactives);
-
-                                             // the magic happens here
-                                             Block_t* other = world.blocks.elements + editor.block_entangle_index_save;
-
-                                             // TODO: Probably not what we want in the future when things are
-                                             //       circularly entangled, but fine for now
-                                             if(other->entangle_index >= 0){
-                                                  Block_t* other_other = world.blocks.elements + other->entangle_index;
-                                                  other_other->entangle_index = -1;
-                                             }
-
-                                             other->entangle_index = block_index;
-                                             blocks[0]->entangle_index = editor.block_entangle_index_save;
-
-                                             // reset once we are done
-                                             editor.block_entangle_index_save = -1;
-                                             LOG("editor: entangled: %d <-> %d\n", blocks[0]->entangle_index, block_index);
-                                        }else{
-                                             editor.block_entangle_index_save = block_index;
-                                             LOG("editor: entangle index save: %d\n", block_index);
+                              for(S16 i = 0; i < block_count; i++){
+                                   S16 block_index = get_block_index(&world, blocks[i]);
+                                   if(editor.entangle_indices.count > 1 && block_index == editor.entangle_indices.elements[0]){
+                                        for(S16 e = 0; e < editor.entangle_indices.count; e++){
+                                             S16 next_index = (e + 1) % editor.entangle_indices.count;
+                                             S16 entangle_index = editor.entangle_indices.elements[next_index];
+                                             Block_t* block = world.blocks.elements + editor.entangle_indices.elements[e];
+                                             block->entangle_index = entangle_index;
                                         }
+                                        break;
                                    }
-                              }else if(block_count == 0){
-                                   LOG("editor: clear entangle index save (was %d)\n", editor.block_entangle_index_save);
-                                   editor.block_entangle_index_save = -1;
+
+                                   S16 last_index = editor.entangle_indices.count;
+                                   resize(&editor.entangle_indices, editor.entangle_indices.count + 1);
+                                   editor.entangle_indices.elements[last_index] = block_index;
+                                   LOG("editor track entangle index %d\n", block_index);
                               }
                          }
                          break;
@@ -1524,13 +1508,28 @@ int main(int argc, char** argv){
                          break;
                     case SDL_SCANCODE_0:
                          if(editor.mode == EDITOR_MODE_CATEGORY_SELECT){
-                              for(S16 i = 0; i < world.players.count; i++){
-                                   describe_player(&world, world.players.elements + i);
+                              auto coord = mouse_select_world(mouse_screen, camera);
+                              auto rect = rect_surrounding_coord(coord);
+
+                              S16 block_count = 0;
+                              Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
+                              quad_tree_find_in(world.block_qt, rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
+
+                              for(S16 i = 0; i < block_count; i++){
+                                   Block_t* block = blocks[i];
+                                   if(block->entangle_index >= 0){
+                                        S16 block_index = get_block_index(&world, block);
+                                        S16 current_index = block_index;
+                                        do
+                                        {
+                                             Block_t* current_block = world.blocks.elements + current_index;
+                                             current_index = current_block->entangle_index;
+                                             current_block->entangle_index = -1;
+                                        }while(current_index != block_index && current_index >= 0);
+                                   }
                               }
 
-                              for(S16 i = 0; i < world.blocks.count; i++){
-                                   describe_block(&world, world.blocks.elements + i);
-                              }
+                              destroy(&editor.entangle_indices);
                          }
                          break;
                     // TODO: #ifdef DEBUG
@@ -1541,7 +1540,7 @@ int main(int argc, char** argv){
                               editor.mode = EDITOR_MODE_OFF;
                               editor.selection_start = {};
                               editor.selection_end = {};
-                              editor.block_entangle_index_save = -1;
+                              destroy(&editor.entangle_indices);
                          }
                          break;
                     case SDL_SCANCODE_TAB:

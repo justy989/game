@@ -8,7 +8,8 @@
 bool init(Editor_t* editor){
      memset(editor, 0, sizeof(*editor));
 
-     editor->block_entangle_index_save = -1;
+     editor->entangle_indices.elements = nullptr;
+     editor->entangle_indices.count = 0;
 
      init(&editor->category_array, EDITOR_CATEGORY_COUNT);
 

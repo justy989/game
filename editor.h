@@ -68,7 +68,8 @@ struct Editor_t{
 
      S32 category;
      S32 stamp;
-     S16 block_entangle_index_save;
+
+     ObjectArray_t<S16> entangle_indices;
 
      Coord_t selection_start;
      Coord_t selection_end;
