@@ -1857,12 +1857,28 @@ F32 momentum_term(TransferMomentum_t* transfer_momentum){
      return momentum_term((F32)(transfer_momentum->mass), transfer_momentum->vel);
 }
 
+static S16 get_player_mass_on_block(World_t* world, Block_t* block){
+     S16 mass = 0;
+     auto block_rect = block_get_rect(block);
+
+     for(S16 p = 0; p < world->players.count; p++){
+          auto player = world->players.elements + p;
+          if(player->pos.z == (block->pos.z + HEIGHT_INTERVAL) && pixel_in_rect(player->pos.pixel, block_rect)){
+               mass += (QUARTER_TILE_SIZE_IN_PIXELS * QUARTER_TILE_SIZE_IN_PIXELS);
+          }
+     }
+
+     return mass;
+}
+
 S16 get_block_stack_mass(World_t* world, Block_t* block){
      S16 mass = block_get_mass(block);
+     mass += get_player_mass_on_block(world, block);
 
      auto result = block_held_down_by_another_block(block, world->block_qt, world->interactive_qt, &world->tilemap);
      for(S16 i = 0; i < result.count; i++){
           mass += get_block_stack_mass(world, result.blocks_held[i].block);
+          mass += get_player_mass_on_block(world, result.blocks_held[i].block);
      }
 
      return mass;

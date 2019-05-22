@@ -32,6 +32,7 @@ Big Features:
      - a block with ice on it shouldn't be able to carry a block
      - if we put a popup on the other side of a portal and a block 1 interval high goes through the portal, will it work the way we expect?
      - how does a stack of entangled blocks move?
+- Players impact carry velocity until the block teleports
 - 2 non-entangled blocks colliding at a centroid on ice don't do the right thing
 - update get mass and block push to handle infinite mass cases
 - A way to tell which blocks are entangled
@@ -2410,15 +2411,6 @@ int main(int argc, char** argv){
                     Block_t* block = world.blocks.elements + i;
 
                     S16 mass = get_block_stack_mass(&world, block);
-
-                    auto block_rect = block_get_rect(block);
-
-                    for(S16 p = 0; p < world.players.count; p++){
-                         auto player = world.players.elements + p;
-                         if(player->pos.z == (block->pos.z + HEIGHT_INTERVAL) && pixel_in_rect(player->pos.pixel, block_rect)){
-                              mass += (QUARTER_TILE_SIZE_IN_PIXELS * QUARTER_TILE_SIZE_IN_PIXELS);
-                         }
-                    }
 
                     F32 mass_ratio = baseline_block_mass / mass;
 
