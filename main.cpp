@@ -53,6 +53,10 @@ Velocity Table: 1 block hits 2 blocks, hits 3 blocks etc etc.
 3 blocks: 0.097033
 4 blocks: 0.0840335
 
+Work = Force * Distance
+Kinetic Energy = 1/2 * mass * (velocity squared)
+Static Friction Force to Overcome = Static Friction Coefficient * Mass * Gravity
+
 */
 
 #include <iostream>
