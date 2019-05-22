@@ -32,6 +32,7 @@ Big Features:
      - a block with ice on it shouldn't be able to carry a block
      - if we put a popup on the other side of a portal and a block 1 interval high goes through the portal, will it work the way we expect?
      - how does a stack of entangled blocks move?
+- Being squished between blocks through a portal doesn't work
 - Players impact carry velocity until the block teleports
 - 2 non-entangled blocks colliding at a centroid on ice don't do the right thing
 - update get mass and block push to handle infinite mass cases
@@ -45,6 +46,12 @@ Potential Board Game Idea around newton's cradle
 - N by N grid (maybe like chess?) that pieces can be dropped onto (creating height) or slide in from the side, attempting to impact
 - Use newtonian physics to decide the impact the outcome
 - maybe when both players are out of pieces, whoever has the most mass on the table wins?
+
+Velocity Table: 1 block hits 2 blocks, hits 3 blocks etc etc.
+1 block : 0.168067
+2 blocks: 0.118841
+3 blocks: 0.097033
+4 blocks: 0.0840335
 
 */
 
@@ -3326,16 +3333,18 @@ int main(int argc, char** argv){
 
                                    auto mass_ratio = (F32)(baseline_block_mass) / (F32)(total_block_mass);
 
-                                   bool pushed = block_push(block_to_push, push_block_dir, &world, false, mass_ratio);
+                                   if(total_block_mass <= (2 * TILE_SIZE_IN_PIXELS * TILE_SIZE_IN_PIXELS)){
+                                        bool pushed = block_push(block_to_push, push_block_dir, &world, false, mass_ratio);
 
-                                   if(!pushed){
-                                        player->push_time = 0.0f;
-                                   }else if(block_to_push->entangle_index >= 0 && block_to_push->entangle_index < world.blocks.count){
-                                        player->pushing_block_dir = push_block_dir;
-                                        push_entangled_block(block_to_push, &world, push_block_dir, false);
+                                        if(!pushed){
+                                             player->push_time = 0.0f;
+                                        }else if(block_to_push->entangle_index >= 0 && block_to_push->entangle_index < world.blocks.count){
+                                             player->pushing_block_dir = push_block_dir;
+                                             push_entangled_block(block_to_push, &world, push_block_dir, false);
+                                        }
+
+                                        if(block_to_push->pos.z > 0) player->push_time = -0.5f; // TODO: wtf is this line?
                                    }
-
-                                   if(block_to_push->pos.z > 0) player->push_time = -0.5f; // TODO: wtf is this line?
                               }
                          }
                     }else{
