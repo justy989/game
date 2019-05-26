@@ -57,6 +57,9 @@ Work = Force * Distance
 Kinetic Energy = 1/2 * mass * (velocity squared)
 Static Friction Force to Overcome = Static Friction Coefficient * Mass * Gravity
 
+We can just make gravity = 1 in this world probably ?
+Ice Fs = Us * M
+
 */
 
 #include <iostream>
@@ -273,9 +276,6 @@ void copy_block_collision_results(Block_t* block, CheckBlockCollisionResult_t* r
 
      block->horizontal_move = result->horizontal_move;
      block->vertical_move = result->vertical_move;
-
-     block->horizontal_original_momentum = result->horizontal_momentum;
-     block->vertical_original_momentum = result->vertical_momentum;
 }
 
 void build_move_actions_from_player(PlayerAction_t* player_action, Player_t* player, bool* move_actions, S8 move_action_count)
@@ -554,8 +554,6 @@ bool do_block_collision(World_t* world, Block_t* block, F32 dt, S16* update_bloc
                                                                           block->stop_on_pixel_y,
                                                                           block->teleport_horizontal_move,
                                                                           block->teleport_vertical_move,
-                                                                          block->horizontal_original_momentum,
-                                                                          block->vertical_original_momentum,
                                                                           block_index,
                                                                           block->clone_start.x > 0,
                                                                           world);
@@ -581,8 +579,6 @@ bool do_block_collision(World_t* world, Block_t* block, F32 dt, S16* update_bloc
                                                                           block->stop_on_pixel_y,
                                                                           block->horizontal_move,
                                                                           block->vertical_move,
-                                                                          block->horizontal_original_momentum,
-                                                                          block->vertical_original_momentum,
                                                                           block_index, block->clone_start.x > 0,
                                                                           world);
           }
@@ -621,8 +617,6 @@ bool do_block_collision(World_t* world, Block_t* block, F32 dt, S16* update_bloc
                                                                                         entangled_block->stop_on_pixel_y,
                                                                                         entangled_block->horizontal_move,
                                                                                         entangled_block->vertical_move,
-                                                                                        entangled_block->horizontal_original_momentum,
-                                                                                        entangled_block->vertical_original_momentum,
                                                                                         block->entangle_index,
                                                                                         entangled_block->clone_start.x > 0,
                                                                                         world);
@@ -689,35 +683,35 @@ bool do_block_collision(World_t* world, Block_t* block, F32 dt, S16* update_bloc
                                         TransferMomentum_t entangled_block_momentum = get_block_momentum(world, entangled_block, entangled_move_dir_to_stop);
 
                                         if(block_push(block, entangled_move_dir_to_stop, world, true, 1.0f, &entangled_block_momentum)){
-                                             F32 vel = elastic_transfer_momentum_to_block(&entangled_block_momentum, world, block, entangled_move_dir_to_stop);
+                                             auto elastic_result = elastic_transfer_momentum_to_block(&entangled_block_momentum, world, block, entangled_move_dir_to_stop);
 
                                              switch(entangled_move_dir_to_stop){
                                              default:
                                                   break;
                                              case DIRECTION_LEFT:
                                              case DIRECTION_RIGHT:
-                                                  block->pos_delta.x = vel * dt;
+                                                  block->pos_delta.x = elastic_result.second_final_velocity * dt;
                                                   break;
                                              case DIRECTION_UP:
                                              case DIRECTION_DOWN:
-                                                  block->pos_delta.y = vel * dt;
+                                                  block->pos_delta.y = elastic_result.second_final_velocity * dt;
                                                   break;
                                              }
                                         }
 
                                         if(block_push(entangled_block, move_dir_to_stop, world, true, 1.0f, &block_momentum)){
-                                             F32 vel = elastic_transfer_momentum_to_block(&block_momentum, world, entangled_block, move_dir_to_stop);
+                                             auto elastic_result = elastic_transfer_momentum_to_block(&block_momentum, world, entangled_block, move_dir_to_stop);
 
                                              switch(move_dir_to_stop){
                                              default:
                                                   break;
                                              case DIRECTION_LEFT:
                                              case DIRECTION_RIGHT:
-                                                  entangled_block->pos_delta.x = vel * dt;
+                                                  entangled_block->pos_delta.x = elastic_result.second_final_velocity * dt;
                                                   break;
                                              case DIRECTION_UP:
                                              case DIRECTION_DOWN:
-                                                  entangled_block->pos_delta.y = vel * dt;
+                                                  entangled_block->pos_delta.y = elastic_result.second_final_velocity * dt;
                                                   break;
                                              }
                                         }
@@ -1115,6 +1109,36 @@ int main(int argc, char** argv){
      if(!Log_t::create(log_path)){
           fprintf(stderr, "failed to create log file: '%s'\n", log_path);
           return -1;
+     }
+
+     {
+          // static const F32 block_dt = 0.0166666f;
+          static const F32 player_force = BLOCK_ACCEL * ((F32)(TILE_SIZE_IN_PIXELS * TILE_SIZE_IN_PIXELS));
+
+          auto print_block_physics = [](S16 block_mass){
+               F32 block_accel = player_force / (F32)(block_mass);
+               F32 block_velocity = block_accel * BLOCK_ACCEL_TIME;
+               F32 block_impulse = (F32)(block_mass) * block_velocity;
+               F32 block_force = block_impulse / BLOCK_ACCEL_TIME;
+               F32 block_normal_force = (F32)(block_mass) * GRAVITY; // F = mg
+               F32 block_static_friction_force = block_normal_force * ICE_STATIC_FRICTION_COEFFICIENT;
+
+               LOG("Mass                    : %d\n", block_mass);
+               LOG("  Accel                 : %f\n", block_accel);
+               LOG("  Accel time            : %f\n", BLOCK_ACCEL_TIME);
+               LOG("  Velocity              : %f\n", block_velocity);
+               LOG("  dt Impulse            : %f\n", block_impulse);
+               LOG("  dt Force              : %f\n", block_force);
+               LOG("  Normal Force          : %f\n", block_normal_force);
+               LOG("  Mu                    : %f\n", block_force / block_normal_force);
+               LOG("  Static Friction Force : %f\n", block_static_friction_force);
+          };
+
+          print_block_physics(TILE_SIZE_IN_PIXELS * TILE_SIZE_IN_PIXELS);
+          print_block_physics(2 * TILE_SIZE_IN_PIXELS * TILE_SIZE_IN_PIXELS);
+          print_block_physics(2 * TILE_SIZE_IN_PIXELS * TILE_SIZE_IN_PIXELS + HALF_TILE_SIZE_IN_PIXELS * TILE_SIZE_IN_PIXELS);
+          print_block_physics(3 * TILE_SIZE_IN_PIXELS * TILE_SIZE_IN_PIXELS);
+          print_block_physics(4 * TILE_SIZE_IN_PIXELS * TILE_SIZE_IN_PIXELS);
      }
 
      if(test && !load_map_filepath && !suite){
@@ -2425,19 +2449,6 @@ int main(int argc, char** argv){
 
                     F32 mass_ratio = baseline_block_mass / mass;
 
-                    if(block->vel.x != 0){
-                         block->horizontal_original_momentum = momentum_term(mass, block->vel.x);
-                    }else{
-                         block->horizontal_original_momentum = 0;
-                    }
-                    block->horizontal_transferred_momentum = 0;
-
-                    if(block->vel.y != 0){
-                         block->vertical_original_momentum = momentum_term(mass, block->vel.y);
-                    }else{
-                         block->vertical_original_momentum = 0;
-                    }
-
                     if(block->previous_mass != mass){
                          // 1/2mivi^2 = 1/2mfvf^2
                          // (1/2mivi^2) / (1/2mf) = vf^2
@@ -2475,8 +2486,6 @@ int main(int argc, char** argv){
                     }
 
                     block->previous_mass = mass;
-
-                    block->vertical_transferred_momentum = 0;
 
                     block->prev_push_mask = block->cur_push_mask;
                     block->cur_push_mask = DIRECTION_MASK_NONE;
@@ -3333,11 +3342,15 @@ int main(int argc, char** argv){
 
                                    auto total_block_mass = get_block_mass_in_direction(&world, block_to_push, push_block_dir);
 
-                                   // LOG("push block %d %s mass %d\n", get_block_index(&world, block_to_push), direction_to_string(push_block_dir), total_block_mass);
-
                                    auto mass_ratio = (F32)(baseline_block_mass) / (F32)(total_block_mass);
 
-                                   if(total_block_mass <= (2 * TILE_SIZE_IN_PIXELS * TILE_SIZE_IN_PIXELS)){
+                                   // player applies a force to accelerate the block by BLOCK_ACCEL
+                                   F32 applied_force = (F32)(total_block_mass) * (mass_ratio * BLOCK_ACCEL) / dt;
+                                   F32 static_friction = get_block_static_friction(total_block_mass);
+
+                                   if(applied_force >= static_friction){
+                                        // LOG("push block %d %s mass %d\n", get_block_index(&world, block_to_push), direction_to_string(push_block_dir), total_block_mass);
+
                                         bool pushed = block_push(block_to_push, push_block_dir, &world, false, mass_ratio);
 
                                         if(!pushed){

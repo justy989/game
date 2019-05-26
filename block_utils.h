@@ -211,7 +211,6 @@ bool block_on_air(Block_t* block, QuadTreeNode_t<Interactive_t>* interactive_qt,
 CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t block_pos, Vec_t block_pos_delta, Vec_t block_vel,
                                                                     Vec_t block_accel, S16 block_stop_on_pixel_x, S16 block_stop_on_pixel_y,
                                                                     Move_t block_horizontal_move, Move_t block_vertical_move,
-                                                                    F32 block_horizontal_momentum, F32 block_vertical_momentum,
                                                                     S16 block_index, bool block_is_cloning, World_t* world);
 
 BlockCollidesWithItselfResult_t resolve_block_colliding_with_itself(Direction_t src_portal_dir, Direction_t dst_portal_dir, DirectionMask_t move_mask,

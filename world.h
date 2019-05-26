@@ -44,6 +44,11 @@ struct MovePlayerThroughWorldResult_t{
      S8 pushing_block_rotation;
 };
 
+struct ElasticCollisionResult_t{
+     F32 first_final_velocity;
+     F32 second_final_velocity;
+};
+
 void sort_blocks_by_ascending_height(Block_t** blocks, S16 block_count);
 void sort_blocks_by_descending_height(Block_t** blocks, S16 block_count);
 
@@ -87,4 +92,7 @@ S16 get_block_stack_mass(World_t* world, Block_t* block);
 F32 momentum_term(F32 mass, F32 vel);
 F32 momentum_term(TransferMomentum_t* transfer_momentum);
 TransferMomentum_t get_block_momentum(World_t* world, Block_t* block, Direction_t direction);
-F32 elastic_transfer_momentum_to_block(TransferMomentum_t* transfer_momentum, World_t* world, Block_t* block, Direction_t direction);
+ElasticCollisionResult_t elastic_transfer_momentum(F32 mass_1, F32 vel_i_1, F32 mass_2, F32 vel_i_2);
+ElasticCollisionResult_t elastic_transfer_momentum_to_block(TransferMomentum_t* transfer_momentum, World_t* world, Block_t* block, Direction_t direction);
+
+F32 get_block_static_friction(S16 mass);
