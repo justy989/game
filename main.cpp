@@ -60,6 +60,10 @@ Static Friction Force to Overcome = Static Friction Coefficient * Mass * Gravity
 We can just make gravity = 1 in this world probably ?
 Ice Fs = Us * M
 
+Thanks GDB:
+(gdb) watch world.blocks.elements[1].accel.x == -nan
+Argument to negate operation not a number.
+
 */
 
 #include <iostream>
@@ -532,13 +536,11 @@ bool do_block_collision(World_t* world, Block_t* block, F32 dt, S16* update_bloc
 
      // if we are being stopped by the player and have moved more than the player radius (which is
      // a check to ensure we don't stop a block instantaneously) then stop on the coordinate boundaries
-     if(block->stopped_by_player_horizontal &&
-        block->horizontal_move.distance > PLAYER_RADIUS){
+     if(block->stopped_by_player_horizontal && block->vel.x != 0){
           stop_on_boundary_x = true;
      }
 
-     if(block->stopped_by_player_vertical &&
-        block->vertical_move.distance > PLAYER_RADIUS){
+     if(block->stopped_by_player_vertical && block->vel.y != 0){
           stop_on_boundary_y = true;
      }
 
@@ -832,10 +834,6 @@ bool do_block_collision(World_t* world, Block_t* block, F32 dt, S16* update_bloc
                          }
                          break;
                     }
-               }else{
-                    if(block->vel.x != 0){
-                         stop_on_boundary_x = true;
-                    }
                }
 
                if(coast_vertical == BLOCK_COAST_PLAYER){
@@ -880,12 +878,7 @@ bool do_block_collision(World_t* world, Block_t* block, F32 dt, S16* update_bloc
                          }
                          break;
                     }
-               }else{
-                    if(block->vel.y != 0) stop_on_boundary_y = true;
                }
-          }else{
-               if(block->vel.x != 0) stop_on_boundary_x = true;
-               if(block->vel.y != 0) stop_on_boundary_y = true;
           }
      }
 
@@ -2438,8 +2431,6 @@ int main(int argc, char** argv){
                     }
                }
 
-               F32 baseline_block_mass = (F32)(TILE_SIZE_IN_PIXELS * TILE_SIZE_IN_PIXELS);
-
                // block movement
 
                // do a pass moving the block as far as possible, so that collision doesn't rely on order of blocks in the array
@@ -2447,8 +2438,6 @@ int main(int argc, char** argv){
                     Block_t* block = world.blocks.elements + i;
 
                     S16 mass = get_block_stack_mass(&world, block);
-
-                    F32 mass_ratio = baseline_block_mass / mass;
 
                     if(block->previous_mass != mass){
                          // 1/2mivi^2 = 1/2mfvf^2
@@ -2492,9 +2481,6 @@ int main(int argc, char** argv){
                     block->cur_push_mask = DIRECTION_MASK_NONE;
 
                     block->prev_vel = block->vel;
-
-                    block->accel.x = calc_accel_component_move(block->horizontal_move, block->accel_magnitudes.x * mass_ratio);
-                    block->accel.y = calc_accel_component_move(block->vertical_move, block->accel_magnitudes.y * mass_ratio);
 
                     block->pos_delta.x = calc_position_motion(block->vel.x, block->accel.x, dt);
                     block->vel.x = calc_velocity_motion(block->vel.x, block->accel.x, dt);
@@ -3273,12 +3259,6 @@ int main(int argc, char** argv){
                          // reset started_on_pixel since we teleported and no longer want to follow those as a rule
                          block->started_on_pixel_x = 0;
                          block->started_on_pixel_y = 0;
-
-                         if(block->rotation % 2 != 0){
-                              F32 tmp = block->accel_magnitudes.x;
-                              block->accel_magnitudes.x = block->accel_magnitudes.y;
-                              block->accel_magnitudes.y = tmp;
-                         }
                     }else{
                          final_pos = block->pos + block->pos_delta;
                     }

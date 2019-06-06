@@ -98,6 +98,8 @@ Motion_t copy_motion_from_component(MotionComponent_t* motion);
 float calc_accel_from_stop(float distance, float time);
 DecelToStopResult_t calc_decel_to_stop(float initial_pos, float final_pos, float initial_velocity);
 
+float begin_stopping_grid_aligned_motion(MotionComponent_t* motion, float pos);
+
 void update_motion_free_form(Move_t* move, MotionComponent_t* motion, bool positive_key_down, bool negative_key_down,
                              float dt, float accel, float accel_distance);
 void update_motion_grid_aligned(Move_t* move, MotionComponent_t* motion, bool coast, float dt, float pos);

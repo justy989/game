@@ -59,8 +59,6 @@ struct Block_t : public GridMotion_t{
      bool stopped_by_player_horizontal = false;
      bool stopped_by_player_vertical = false;
 
-     Vec_t accel_magnitudes;
-
      CarriedPosDelta_t carried_pos_delta;
 
      S16 previous_mass;

@@ -45,7 +45,7 @@ DecelToStopResult_t calc_decel_to_stop(float initial_pos, float final_pos, float
      // pf = pi + 0.5(vf + vi)t
      // (pf - pi) = 0.5(vf + vi)t
      // (pf - pi) / 0.5(vf + vi) = t
-     result.time = (final_pos - initial_pos) / (0.5 * (initial_velocity));
+     result.time = (final_pos - initial_pos) / (0.5 * initial_velocity);
 
      // vf = at + vi
      // (vf - vi) / t = a
@@ -216,6 +216,36 @@ void update_motion_free_form(Move_t* move, MotionComponent_t* motion, bool posit
      }
 }
 
+float begin_stopping_grid_aligned_motion(MotionComponent_t* motion, float pos){
+     float final_pos = pos + motion->ref->pos_delta;
+
+     bool positive = motion->ref->vel >= 0;
+     float goal = closest_grid_center_pixel(TILE_SIZE_IN_PIXELS, (S16)(final_pos / PIXEL_SIZE)) * PIXEL_SIZE;
+
+     if(positive){
+          if(goal < final_pos){
+               goal += TILE_SIZE;
+          }
+
+          // TODO: if we are coasting too close to our target, go to the next target
+          // if(fabs(goal - final_pos) < (0.25f * TILE_SIZE)){
+          //      goal += TILE_SIZE;
+          // }
+     }else{
+          if(goal > final_pos){
+               goal -= TILE_SIZE;
+          }
+
+          // TODO: if we are coasting too close to our target, go to the next target
+          // if(fabs(goal - final_pos) < (0.25f * TILE_SIZE)){
+          //      goal -= TILE_SIZE;
+          // }
+     }
+
+     auto decel_result = calc_decel_to_stop(final_pos, goal, motion->ref->vel);
+     return decel_result.accel;
+}
+
 void update_motion_grid_aligned(Move_t* move, MotionComponent_t* motion, bool coast, float dt, float pos){
      switch(move->state){
      default:
@@ -223,30 +253,9 @@ void update_motion_grid_aligned(Move_t* move, MotionComponent_t* motion, bool co
           break;
      case MOVE_STATE_COASTING:
      {
-          float final_pos = pos + motion->ref->pos_delta;
-          float pre_move_grid_offset = fmod(pos, TILE_SIZE);
-          float post_move_grid_offset = fmod(final_pos, TILE_SIZE);
-
-          // if we have crossed over a grid boundary
-          if(pre_move_grid_offset > post_move_grid_offset){
-               if(!coast){
-                    bool positive = motion->ref->vel >= 0;
-                    // float goal = grid_destination(constants->grid_section_width, final_pos - 0.5 * constants->grid_section_width, positive) + 0.5 * constants->grid_section_width;
-                    float goal = closest_grid_center_pixel(TILE_SIZE_IN_PIXELS, (S16)(pos / PIXEL_SIZE)) * PIXEL_SIZE;
-
-                    // if we are too close to a goal, then just go to the next goal, this is a gameplay feel thing
-                    if(fabs(goal - final_pos) < (0.25 * TILE_SIZE)){
-                         if(positive){
-                              goal += TILE_SIZE;
-                         }else{
-                              goal -= TILE_SIZE;
-                         }
-                    }
-
-                    auto decel_result = calc_decel_to_stop(final_pos, goal, motion->ref->vel);
-                    motion->ref->accel = decel_result.accel;
-                    move->state = MOVE_STATE_STOPPING;
-               }
+          if(!coast){
+               motion->ref->accel = begin_stopping_grid_aligned_motion(motion, pos);
+               move->state = MOVE_STATE_STOPPING;
           }
      } break;
      case MOVE_STATE_STARTING:
@@ -269,7 +278,6 @@ void update_motion_grid_aligned(Move_t* move, MotionComponent_t* motion, bool co
                }
 
                sim_motion.ref->vel = sim_motion.ref->prev_vel;
-               // sim_motion.ref->pos_delta = mass_move_component_delta(sim_motion.ref->vel, sim_motion.ref->accel, save_time_left);
                sim_motion.ref->pos_delta = calc_position_motion(sim_motion.ref->vel, sim_motion.ref->accel, save_time_left);
                sim_motion.ref->vel = calc_velocity_motion(sim_motion.ref->vel, sim_motion.ref->accel, save_time_left);
 
@@ -278,14 +286,7 @@ void update_motion_grid_aligned(Move_t* move, MotionComponent_t* motion, bool co
                MoveState_t new_move_state = MOVE_STATE_COASTING;
 
                if(!coast){
-                    float final_pos = pos + sim_motion.ref->pos_delta;
-                    // bool positive = sim_motion.ref->vel >= 0;
-
-                    // float goal = grid_destination(constants->grid_section_width, final_pos - 0.5 * constants->grid_section_width, positive) + 0.5 * constants->grid_section_width;
-                    float goal = closest_grid_center_pixel(TILE_SIZE_IN_PIXELS, (S16)(pos / PIXEL_SIZE)) * PIXEL_SIZE;
-
-                    auto decel_result = calc_decel_to_stop(final_pos, goal, sim_motion.ref->vel);
-                    new_accel = decel_result.accel;
+                    new_accel = begin_stopping_grid_aligned_motion(&sim_motion, pos);
                     new_move_state = MOVE_STATE_STOPPING;
                }
 

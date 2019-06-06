@@ -323,7 +323,7 @@ void slow_block_toward_gridlock(World_t* world, Block_t* block, bool horizontal,
 
      Move_t* move = horizontal ? &block->horizontal_move : &block->vertical_move;
 
-     if(move->state == MOVE_STATE_STOPPING) return;
+     if(move->state == MOVE_STATE_STOPPING || move->state == MOVE_STATE_IDLING) return;
 
      move->state = MOVE_STATE_STOPPING;
      move->distance = 0;
@@ -369,14 +369,16 @@ void slow_block_toward_gridlock(World_t* world, Block_t* block, bool horizontal,
      // (d - vt) = 1/2at^2
      // (d - vt) / 1/2t^2 = a
 
+     auto pos = pos_to_vec(block->pos);
+
      if(horizontal){
-          F32 time = distance_to_stop.x / (0.5f * block->vel.x);
           block->stopped_by_player_horizontal = true;
-          block->accel_magnitudes.x = fabs(block->vel.x / (time - 0.01666667)); // adjust by one tick since we missed this update
+          auto motion = motion_x_component(block);
+          block->accel.x = begin_stopping_grid_aligned_motion(&motion, pos.x); // adjust by one tick since we missed this update
      }else{
-          F32 time = distance_to_stop.y / (0.5f * block->vel.y);
           block->stopped_by_player_vertical = true;
-          block->accel_magnitudes.y = fabs(block->vel.y / (time - 0.01666667)); // adjust by one tick since we missed this update
+          auto motion = motion_y_component(block);
+          block->accel.y = begin_stopping_grid_aligned_motion(&motion, pos.y); // adjust by one tick since we missed this update
      }
 }
 
@@ -1291,8 +1293,6 @@ bool block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Direction_t dir
           return false;
      }
 
-     // LOG("block %d pushed %s with force %f\n", get_block_index(world, block), direction_to_string(direction), force);
-
      // if are sliding on ice and are pushed in the opposite direction then stop
      if(block_on_ice(pos, pos_delta, &world->tilemap, world->interactive_qt, world->block_qt)){
           switch(direction){
@@ -1342,7 +1342,7 @@ bool block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Direction_t dir
                }else{
                     block->horizontal_move.state = MOVE_STATE_STARTING;
                     block->horizontal_move.sign = MOVE_SIGN_NEGATIVE;
-                    block->accel_magnitudes.x = calc_accel_from_stop(BLOCK_ACCEL_DISTANCE, BLOCK_ACCEL_TIME) * force;
+                    block->accel.x = -calc_accel_from_stop(BLOCK_ACCEL_DISTANCE, BLOCK_ACCEL_TIME) * force;
                }
                block->horizontal_move.time_left = BLOCK_ACCEL_TIME;
                block->started_on_pixel_x = pos.pixel.x;
@@ -1368,7 +1368,7 @@ bool block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Direction_t dir
                }else{
                     block->horizontal_move.state = MOVE_STATE_STARTING;
                     block->horizontal_move.sign = MOVE_SIGN_POSITIVE;
-                    block->accel_magnitudes.x = calc_accel_from_stop(BLOCK_ACCEL_DISTANCE, BLOCK_ACCEL_TIME) * force;
+                    block->accel.x = calc_accel_from_stop(BLOCK_ACCEL_DISTANCE, BLOCK_ACCEL_TIME) * force;
                }
                block->horizontal_move.time_left = BLOCK_ACCEL_TIME;
                block->started_on_pixel_x = pos.pixel.x;
@@ -1393,7 +1393,7 @@ bool block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Direction_t dir
                }else{
                     block->vertical_move.state = MOVE_STATE_STARTING;
                     block->vertical_move.sign = MOVE_SIGN_NEGATIVE;
-                    block->accel_magnitudes.y = calc_accel_from_stop(BLOCK_ACCEL_DISTANCE, BLOCK_ACCEL_TIME) * force;
+                    block->accel.y = -calc_accel_from_stop(BLOCK_ACCEL_DISTANCE, BLOCK_ACCEL_TIME) * force;
                }
                block->vertical_move.time_left = BLOCK_ACCEL_TIME;
                block->started_on_pixel_y = pos.pixel.y;
@@ -1418,7 +1418,7 @@ bool block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Direction_t dir
                }else{
                     block->vertical_move.state = MOVE_STATE_STARTING;
                     block->vertical_move.sign = MOVE_SIGN_POSITIVE;
-                    block->accel_magnitudes.y = calc_accel_from_stop(BLOCK_ACCEL_DISTANCE, BLOCK_ACCEL_TIME) * force;
+                    block->accel.y = calc_accel_from_stop(BLOCK_ACCEL_DISTANCE, BLOCK_ACCEL_TIME) * force;
                }
 
                block->vertical_move.time_left = BLOCK_ACCEL_TIME;
@@ -1478,8 +1478,7 @@ void describe_block(World_t* world, Block_t* block){
          block->pos.decimal.x, block->pos.decimal.y,
          block->rotation, element_to_string(block->element),
          block->entangle_index, block->clone_id);
-     LOG(" vel: %f, %f accel: %f, %f accel_mag: %f, %f pos_delta: %f, %f\n", block->vel.x, block->vel.y, block->accel.x, block->accel.y, block->accel_magnitudes.x, block->accel_magnitudes.y,
-         block->pos_delta.x, block->pos_delta.y);
+     LOG(" vel: %f, %f accel: %f, %f pos_delta: %f, %f\n", block->vel.x, block->vel.y, block->accel.x, block->accel.y, block->pos_delta.x, block->pos_delta.y);
      LOG(" hmove: %s %s %f\n", move_state_to_string(block->horizontal_move.state), move_sign_to_string(block->horizontal_move.sign), block->horizontal_move.distance);
      LOG(" vmove: %s %s %f\n", move_state_to_string(block->vertical_move.state), move_sign_to_string(block->vertical_move.sign), block->vertical_move.distance);
      LOG(" hcoast: %s vcoast: %s\n", block_coast_to_string(block->coast_horizontal), block_coast_to_string(block->coast_vertical));
