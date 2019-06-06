@@ -5,13 +5,62 @@
 #include "conversion.h"
 
 #include <math.h>
+#include <string.h>
 
-MotionComponent_t* motion_x_component(Motion_t* motion){
-     return (MotionComponent_t*)(motion);
+MotionComponent_t motion_x_component(Motion_t* motion){
+     MotionComponent_t comp;
+     comp.ref = (MotionComponentRef_t*)(motion);
+     comp.is_x = true;
+     return comp;
 }
 
-MotionComponent_t* motion_y_component(Motion_t* motion){
-     return (MotionComponent_t*)((char*)(motion) + sizeof(float));
+MotionComponent_t motion_y_component(Motion_t* motion){
+     MotionComponent_t comp;
+     comp.ref = (MotionComponentRef_t*)((char*)(motion) + sizeof(float));
+     comp.is_x = false;
+     return comp;
+}
+
+Motion_t copy_motion_from_component(MotionComponent_t* motion){
+     Motion_t result;
+     memset(&result, 0, sizeof(result));
+
+     if(motion->is_x){
+          result.pos_delta.x = motion->ref->pos_delta;
+          result.prev_vel.x = motion->ref->prev_vel;
+          result.vel.x = motion->ref->vel;
+          result.accel.x = motion->ref->accel;
+     }else{
+          result.pos_delta.y = motion->ref->pos_delta;
+          result.prev_vel.y = motion->ref->prev_vel;
+          result.vel.y = motion->ref->vel;
+          result.accel.y = motion->ref->accel;
+     }
+
+     return result;
+}
+
+DecelToStopResult_t calc_decel_to_stop(float initial_pos, float final_pos, float initial_velocity){
+     DecelToStopResult_t result;
+     // pf = pi + 0.5(vf + vi)t
+     // (pf - pi) = 0.5(vf + vi)t
+     // (pf - pi) / 0.5(vf + vi) = t
+     result.time = (final_pos - initial_pos) / (0.5 * (initial_velocity));
+
+     // vf = at + vi
+     // (vf - vi) / t = a
+     result.accel = -initial_velocity / result.time;
+
+     return result;
+}
+
+float calc_accel_from_stop(float distance, float time){
+     // pf = pi + vft + 1/2at^2
+     // d = pf - pi
+     // d = vft + 1/2at^2
+     // vft = 0
+     // d / 1/2t^2 = a
+     return distance / (0.5f * time * time);
 }
 
 float calc_accel_component_move(Move_t move, float accel){
@@ -60,20 +109,20 @@ void update_motion_free_form(Move_t* move, MotionComponent_t* motion, bool posit
      case MOVE_STATE_IDLING:
           break;
      case MOVE_STATE_STARTING:
-          move->distance += motion->pos_delta;
+          move->distance += motion->ref->pos_delta;
 
           if(positive_key_down && negative_key_down){
-               motion->accel = -motion->accel;
+               motion->ref->accel = -motion->ref->accel;
                move->state = MOVE_STATE_STOPPING;
                break;
           }
 
           if((!positive_key_down && move->sign == MOVE_SIGN_POSITIVE) ||
              (!negative_key_down && move->sign == MOVE_SIGN_NEGATIVE)){
-               motion->accel = -motion->accel;
+               motion->ref->accel = -motion->ref->accel;
                move->state = MOVE_STATE_STOPPING;
           }else if(fabs(move->distance) > accel_distance){
-               F32 new_accel = -motion->accel;
+               F32 new_accel = -motion->ref->accel;
                MoveState_t new_push_state = MOVE_STATE_STOPPING;
 
                if((positive_key_down && move->sign == MOVE_SIGN_POSITIVE) ||
@@ -88,10 +137,10 @@ void update_motion_free_form(Move_t* move, MotionComponent_t* motion, bool posit
                default:
                     break;
                case MOVE_SIGN_POSITIVE:
-                    motion->pos_delta -= distance_over;
+                    motion->ref->pos_delta -= distance_over;
                     break;
                case MOVE_SIGN_NEGATIVE:
-                    motion->pos_delta += distance_over;
+                    motion->ref->pos_delta += distance_over;
                     break;
                }
 
@@ -107,26 +156,26 @@ void update_motion_free_form(Move_t* move, MotionComponent_t* motion, bool posit
                // t = sqrt(c + dx/0.5a) - b
                // Anthony told me this is just the quadratic formula, which I should have realized
 
-               F32 b = motion->vel / motion->accel;
+               F32 b = motion->ref->vel / motion->ref->accel;
                F32 c = b * b;
-               F32 dt_consumed = sqrt(c + motion->pos_delta / (0.5f * motion->accel)) - b;
+               F32 dt_consumed = sqrt(c + motion->ref->pos_delta / (0.5f * motion->ref->accel)) - b;
                F32 dt_leftover = dt - dt_consumed;
 
                // simulate up until the point distance we want
-               F32 new_vel = motion->prev_vel;
-               motion->pos_delta = calc_position_motion(new_vel, motion->accel, dt_consumed);
-               new_vel = calc_velocity_motion(new_vel, motion->accel, dt_consumed);
+               F32 new_vel = motion->ref->prev_vel;
+               motion->ref->pos_delta = calc_position_motion(new_vel, motion->ref->accel, dt_consumed);
+               new_vel = calc_velocity_motion(new_vel, motion->ref->accel, dt_consumed);
 
-               // motion->pos_delta = mass_move_component_delta(new_vel, motion->accel, dt_consumed);
-               // new_vel += motion->accel * dt_consumed;
+               // motion->ref->pos_delta = mass_move_component_delta(new_vel, motion->ref->accel, dt_consumed);
+               // new_vel += motion->ref->accel * dt_consumed;
 
                // reverse the accel and simulate for the reset of the dt
-               motion->accel = new_accel;
-               F32 stop_delta = calc_position_motion(new_vel, motion->accel, dt_leftover);
-               new_vel = calc_velocity_motion(new_vel, motion->accel, dt_leftover);
+               motion->ref->accel = new_accel;
+               F32 stop_delta = calc_position_motion(new_vel, motion->ref->accel, dt_leftover);
+               new_vel = calc_velocity_motion(new_vel, motion->ref->accel, dt_leftover);
 
-               motion->pos_delta += stop_delta;
-               motion->vel = new_vel;
+               motion->ref->pos_delta += stop_delta;
+               motion->ref->vel = new_vel;
 
                move->distance = stop_delta;
                move->state = new_push_state;
@@ -137,154 +186,132 @@ void update_motion_free_form(Move_t* move, MotionComponent_t* motion, bool posit
                move->state = MOVE_STATE_STOPPING;
                move->distance = 0;
 
-               motion->accel = -accel;
+               motion->ref->accel = -accel;
           }else if(!negative_key_down && move->sign == MOVE_SIGN_NEGATIVE){
                move->state = MOVE_STATE_STOPPING;
                move->distance = 0;
 
-               motion->accel = accel;
+               motion->ref->accel = accel;
           }else if(positive_key_down && negative_key_down){
                move->state = MOVE_STATE_STOPPING;
                move->distance = 0;
 
                if(move->sign == MOVE_SIGN_POSITIVE){
-                    motion->accel = -accel;
+                    motion->ref->accel = -accel;
                }else if(move->sign == MOVE_SIGN_POSITIVE){
-                    motion->accel = accel;
+                    motion->ref->accel = accel;
                }
           }
           break;
      case MOVE_STATE_STOPPING:
-          if((motion->prev_vel >= 0 && motion->vel <= 0) || (motion->prev_vel <= 0 && motion->vel >= 0)){
+          if((motion->ref->prev_vel >= 0 && motion->ref->vel <= 0) || (motion->ref->prev_vel <= 0 && motion->ref->vel >= 0)){
                move->state = MOVE_STATE_IDLING;
                move->sign = MOVE_SIGN_ZERO;
                move->distance = 0;
 
-               motion->vel = 0;
-               motion->accel = 0;
+               motion->ref->vel = 0;
+               motion->ref->accel = 0;
           }
           break;
      }
 }
 
-void update_motion_grid_aligned(Move_t* move, MotionComponent_t* motion, bool coast, float dt, float accel,
-                                float accel_distance, float pos){
+void update_motion_grid_aligned(Move_t* move, MotionComponent_t* motion, bool coast, float dt, float pos){
      switch(move->state){
      default:
      case MOVE_STATE_IDLING:
           break;
      case MOVE_STATE_COASTING:
-          move->distance += motion->pos_delta;
+     {
+          float final_pos = pos + motion->ref->pos_delta;
+          float pre_move_grid_offset = fmod(pos, TILE_SIZE);
+          float post_move_grid_offset = fmod(final_pos, TILE_SIZE);
 
-          if(fabs(move->distance) > accel_distance){
-               if(coast){
-                    move->distance = fmod(move->distance, accel_distance);
-               }else{
-                    float distance_over = fabs(move->distance) - accel_distance;
+          // if we have crossed over a grid boundary
+          if(pre_move_grid_offset > post_move_grid_offset){
+               if(!coast){
+                    bool positive = motion->ref->vel >= 0;
+                    // float goal = grid_destination(constants->grid_section_width, final_pos - 0.5 * constants->grid_section_width, positive) + 0.5 * constants->grid_section_width;
+                    float goal = closest_grid_center_pixel(TILE_SIZE_IN_PIXELS, (S16)(pos / PIXEL_SIZE)) * PIXEL_SIZE;
 
-                    switch(move->sign){
-                    default:
-                         break;
-                    case MOVE_SIGN_POSITIVE:
-                         motion->pos_delta -= distance_over;
-                         motion->accel = -accel;
-                         break;
-                    case MOVE_SIGN_NEGATIVE:
-                         motion->pos_delta += distance_over;
-                         motion->accel = accel;
-                         break;
+                    // if we are too close to a goal, then just go to the next goal, this is a gameplay feel thing
+                    if(fabs(goal - final_pos) < (0.25 * TILE_SIZE)){
+                         if(positive){
+                              goal += TILE_SIZE;
+                         }else{
+                              goal -= TILE_SIZE;
+                         }
                     }
 
-                    // dx = vt
-                    // dx / v = t
-                    float dt_consumed = motion->pos_delta / motion->vel;
-
-                    // simulate with reverse accel for the reset of the dt
-                    float dt_leftover = dt - dt_consumed;
-                    float stop_delta = calc_position_motion(motion->vel, motion->accel, dt_leftover);
-
-                    motion->vel += motion->accel * dt_leftover;
-                    motion->pos_delta += stop_delta;
-
-                    move->distance = stop_delta;
+                    auto decel_result = calc_decel_to_stop(final_pos, goal, motion->ref->vel);
+                    motion->ref->accel = decel_result.accel;
                     move->state = MOVE_STATE_STOPPING;
                }
           }
-          break;
+     } break;
      case MOVE_STATE_STARTING:
      {
-          // how far have we moved last frame?
-          move->distance += motion->pos_delta;
+          float save_time_left = move->time_left;
 
-          if(fabs(move->distance) > accel_distance){
-               float new_accel = -motion->accel;
-               MoveState_t new_move_state = MOVE_STATE_STOPPING;
+          move->time_left -= dt;
 
-               if(coast){
-                    new_accel = 0;
-                    new_move_state = MOVE_STATE_COASTING;
+          if(move->time_left <= 0){
+               float dt_leftover = dt - save_time_left;
+
+               // simulate until time 0 with the current accel
+               Motion_t sim_move = copy_motion_from_component(motion);
+               MotionComponent_t sim_motion;
+
+               if(motion->is_x){
+                    sim_motion = motion_x_component(&sim_move);
+               }else{
+                    sim_motion = motion_y_component(&sim_move);
                }
 
-               float distance_over = fabs(move->distance) - accel_distance;
+               sim_motion.ref->vel = sim_motion.ref->prev_vel;
+               // sim_motion.ref->pos_delta = mass_move_component_delta(sim_motion.ref->vel, sim_motion.ref->accel, save_time_left);
+               sim_motion.ref->pos_delta = calc_position_motion(sim_motion.ref->vel, sim_motion.ref->accel, save_time_left);
+               sim_motion.ref->vel = calc_velocity_motion(sim_motion.ref->vel, sim_motion.ref->accel, save_time_left);
 
-               switch(move->sign){
-               default:
-                    break;
-               case MOVE_SIGN_POSITIVE:
-                    motion->pos_delta -= distance_over;
-                    break;
-               case MOVE_SIGN_NEGATIVE:
-                    motion->pos_delta += distance_over;
-                    break;
+               // calculate the new acceleration that will stop us or leave us coasting
+               float new_accel = 0;
+               MoveState_t new_move_state = MOVE_STATE_COASTING;
+
+               if(!coast){
+                    float final_pos = pos + sim_motion.ref->pos_delta;
+                    // bool positive = sim_motion.ref->vel >= 0;
+
+                    // float goal = grid_destination(constants->grid_section_width, final_pos - 0.5 * constants->grid_section_width, positive) + 0.5 * constants->grid_section_width;
+                    float goal = closest_grid_center_pixel(TILE_SIZE_IN_PIXELS, (S16)(pos / PIXEL_SIZE)) * PIXEL_SIZE;
+
+                    auto decel_result = calc_decel_to_stop(final_pos, goal, sim_motion.ref->vel);
+                    new_accel = decel_result.accel;
+                    new_move_state = MOVE_STATE_STOPPING;
                }
 
-               // xf = x0 + vt + 1/2at^2
-               // xf - x0 = vt + 1/2at^2
-               // dx = vt + 1/2at^2
-               // dx / 0.5a = (vt / 0.5a) + t^2
-               // complete the square
-               // b = (0.5(v/0.5a))
-               // c = b^2
-               // (t^2 + (vt / 0.5a) + c) - c - (dx / 0.5a) = 0
-               // (t + b)^2 = c + dx/0.5a
-               // t = sqrt(c + dx/0.5a) - b
-               // Anthony told me this is just the quadratic formula, which I should have realized
-
-               float b = motion->vel / motion->accel;
-               float c = b * b;
-               float dt_consumed = sqrt(c + motion->pos_delta / (0.5f * motion->accel)) - b;
-               float dt_leftover = dt - dt_consumed;
-
-               // simulate up until the point distance we want
-               float new_vel = motion->prev_vel;
-               motion->pos_delta = calc_position_motion(new_vel, motion->accel, dt_consumed);
-               new_vel += motion->accel * dt_consumed;
-
-               // reverse the accel and simulate for the reset of the dt
-               motion->accel = new_accel;
-               float stop_delta = calc_position_motion(new_vel, motion->accel, dt_leftover);
-
-               new_vel += motion->accel * dt_leftover;
-               motion->pos_delta += stop_delta;
-               motion->vel = new_vel;
-
-               move->distance = stop_delta;
+               // simulate until the end of dt with the new accel
                move->state = new_move_state;
+
+               sim_motion.ref->accel = new_accel;
+               // sim_motion.ref->pos_delta += mass_move_component_delta(sim_motion.ref->vel, sim_motion.ref->accel, dt_leftover);
+               sim_motion.ref->pos_delta += calc_position_motion(sim_motion.ref->vel, sim_motion.ref->accel, dt_leftover);
+               sim_motion.ref->vel = calc_velocity_motion(sim_motion.ref->vel, sim_motion.ref->accel, dt_leftover);
+
+               motion->ref->pos_delta = sim_motion.ref->pos_delta;
+               motion->ref->vel = sim_motion.ref->vel;
+               motion->ref->accel = sim_motion.ref->accel;
           }
      } break;
      case MOVE_STATE_STOPPING:
      {
-          move->distance += motion->pos_delta;
-
-          if((motion->prev_vel >= 0 && motion->vel <= 0) || (motion->prev_vel <= 0 && motion->vel >= 0)){
+          if((motion->ref->prev_vel >= 0 && motion->ref->vel <= 0) || (motion->ref->prev_vel <= 0 && motion->ref->vel >= 0)){
                move->state = MOVE_STATE_IDLING;
                move->sign = MOVE_SIGN_ZERO;
-               move->distance = 0;
 
-               motion->stop_on_pixel = closest_grid_center_pixel(TILE_SIZE_IN_PIXELS, (S16)(pos / PIXEL_SIZE));
-               motion->pos_delta = (motion->stop_on_pixel * PIXEL_SIZE) - pos;
-               motion->vel = 0.0;
-               motion->accel = 0.0;
+               motion->ref->stop_on_pixel = closest_grid_center_pixel(TILE_SIZE_IN_PIXELS, (S16)(pos / PIXEL_SIZE));
+               motion->ref->pos_delta = (motion->ref->stop_on_pixel * PIXEL_SIZE) - pos;
+               motion->ref->vel = 0.0;
+               motion->ref->accel = 0.0;
           }
      } break;
      }

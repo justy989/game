@@ -1112,20 +1112,21 @@ int main(int argc, char** argv){
      }
 
      {
-          // static const F32 block_dt = 0.0166666f;
+          static const F32 block_dt = 0.0166666f;
           static const F32 player_force = BLOCK_ACCEL * ((F32)(TILE_SIZE_IN_PIXELS * TILE_SIZE_IN_PIXELS));
 
           auto print_block_physics = [](S16 block_mass){
                F32 block_accel = player_force / (F32)(block_mass);
                F32 block_velocity = block_accel * BLOCK_ACCEL_TIME;
                F32 block_impulse = (F32)(block_mass) * block_velocity;
-               F32 block_force = block_impulse / BLOCK_ACCEL_TIME;
+               F32 block_force = block_impulse / block_dt;
                F32 block_normal_force = (F32)(block_mass) * GRAVITY; // F = mg
                F32 block_static_friction_force = block_normal_force * ICE_STATIC_FRICTION_COEFFICIENT;
 
                LOG("Mass                    : %d\n", block_mass);
                LOG("  Accel                 : %f\n", block_accel);
                LOG("  Accel time            : %f\n", BLOCK_ACCEL_TIME);
+               LOG("  dt                    : %f\n", block_dt);
                LOG("  Velocity              : %f\n", block_velocity);
                LOG("  dt Impulse            : %f\n", block_impulse);
                LOG("  dt Force              : %f\n", block_force);
@@ -2667,13 +2668,16 @@ int main(int argc, char** argv){
                     // TODO: creating this potentially big vector could lead to precision issues
                     Vec_t pos_vec = pos_to_vec(block->pos);
 
-                    update_motion_grid_aligned(&block->horizontal_move, motion_x_component(block),
-                                               block->coast_horizontal != BLOCK_COAST_NONE, dt, block->accel.x,
-                                               BLOCK_ACCEL_DISTANCE, pos_vec.x);
+                    MotionComponent_t x_component = motion_x_component(block);
+                    MotionComponent_t y_component = motion_y_component(block);
 
-                    update_motion_grid_aligned(&block->vertical_move, motion_y_component(block),
-                                               block->coast_vertical != BLOCK_COAST_NONE, dt, block->accel.y,
-                                               BLOCK_ACCEL_DISTANCE, pos_vec.y);
+                    update_motion_grid_aligned(&block->horizontal_move, &x_component,
+                                               block->coast_horizontal != BLOCK_COAST_NONE, dt,
+                                               pos_vec.x);
+
+                    update_motion_grid_aligned(&block->vertical_move, &y_component,
+                                               block->coast_vertical != BLOCK_COAST_NONE, dt,
+                                               pos_vec.y);
                }
 
                // TODO: for these next 2 passes, do we need to care about teleport position? Probably just the next loop?

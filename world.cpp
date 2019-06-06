@@ -1342,9 +1342,9 @@ bool block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Direction_t dir
                }else{
                     block->horizontal_move.state = MOVE_STATE_STARTING;
                     block->horizontal_move.sign = MOVE_SIGN_NEGATIVE;
-                    block->accel_magnitudes.x = BLOCK_ACCEL * force;
+                    block->accel_magnitudes.x = calc_accel_from_stop(BLOCK_ACCEL_DISTANCE, BLOCK_ACCEL_TIME) * force;
                }
-               block->horizontal_move.distance = 0;
+               block->horizontal_move.time_left = BLOCK_ACCEL_TIME;
                block->started_on_pixel_x = pos.pixel.x;
           }else if(pushed_by_ice){
                block->horizontal_move.state = MOVE_STATE_COASTING;
@@ -1368,9 +1368,9 @@ bool block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Direction_t dir
                }else{
                     block->horizontal_move.state = MOVE_STATE_STARTING;
                     block->horizontal_move.sign = MOVE_SIGN_POSITIVE;
-                    block->accel_magnitudes.x = BLOCK_ACCEL * force;
+                    block->accel_magnitudes.x = calc_accel_from_stop(BLOCK_ACCEL_DISTANCE, BLOCK_ACCEL_TIME) * force;
                }
-               block->horizontal_move.distance = 0;
+               block->horizontal_move.time_left = BLOCK_ACCEL_TIME;
                block->started_on_pixel_x = pos.pixel.x;
           }else if(pushed_by_ice){
                block->horizontal_move.state = MOVE_STATE_COASTING;
@@ -1393,9 +1393,9 @@ bool block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Direction_t dir
                }else{
                     block->vertical_move.state = MOVE_STATE_STARTING;
                     block->vertical_move.sign = MOVE_SIGN_NEGATIVE;
-                    block->accel_magnitudes.y = BLOCK_ACCEL * force;
+                    block->accel_magnitudes.y = calc_accel_from_stop(BLOCK_ACCEL_DISTANCE, BLOCK_ACCEL_TIME) * force;
                }
-               block->vertical_move.distance = 0;
+               block->vertical_move.time_left = BLOCK_ACCEL_TIME;
                block->started_on_pixel_y = pos.pixel.y;
           }else if(pushed_by_ice){
                block->vertical_move.state = MOVE_STATE_COASTING;
@@ -1418,10 +1418,10 @@ bool block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Direction_t dir
                }else{
                     block->vertical_move.state = MOVE_STATE_STARTING;
                     block->vertical_move.sign = MOVE_SIGN_POSITIVE;
-                    block->accel_magnitudes.y = BLOCK_ACCEL * force;
+                    block->accel_magnitudes.y = calc_accel_from_stop(BLOCK_ACCEL_DISTANCE, BLOCK_ACCEL_TIME) * force;
                }
 
-               block->vertical_move.distance = 0;
+               block->vertical_move.time_left = BLOCK_ACCEL_TIME;
                block->started_on_pixel_y = pos.pixel.y;
           }else if(pushed_by_ice){
                block->vertical_move.state = MOVE_STATE_COASTING;

@@ -31,7 +31,11 @@ enum MoveDirection_t :U8{
 struct Move_t{
      MoveState_t state;
      MoveSign_t sign;
-     F32 distance;
+
+     union{
+          F32 distance;
+          F32 time_left;
+     };
 };
 
 struct Motion_t{
@@ -62,7 +66,7 @@ struct GridMotion_t : public Motion_t{
      Move_t vertical_move;
 };
 
-struct MotionComponent_t{
+struct MotionComponentRef_t{
      F32 pos_delta;
      F32 padding_0;
      F32 prev_vel;
@@ -76,13 +80,27 @@ struct MotionComponent_t{
      S16 stop_on_pixel;
 };
 
-MotionComponent_t* motion_x_component(Motion_t* motion);
-MotionComponent_t* motion_y_component(Motion_t* motion);
+struct MotionComponent_t{
+     MotionComponentRef_t* ref = nullptr;
+     bool is_x = false;
+};
+
+struct DecelToStopResult_t{
+     float accel = 0;
+     float time = 0;
+};
+
+MotionComponent_t motion_x_component(Motion_t* motion);
+MotionComponent_t motion_y_component(Motion_t* motion);
+
+Motion_t copy_motion_from_component(MotionComponent_t* motion);
+
+float calc_accel_from_stop(float distance, float time);
+DecelToStopResult_t calc_decel_to_stop(float initial_pos, float final_pos, float initial_velocity);
 
 void update_motion_free_form(Move_t* move, MotionComponent_t* motion, bool positive_key_down, bool negative_key_down,
                              float dt, float accel, float accel_distance);
-void update_motion_grid_aligned(Move_t* move, MotionComponent_t* motion, bool coast, float dt, float accel,
-                                float accel_distance, float pos);
+void update_motion_grid_aligned(Move_t* move, MotionComponent_t* motion, bool coast, float dt, float pos);
 
 float calc_position_motion(float v, float a, float dt);
 float calc_velocity_motion(float v, float a, float dt);
