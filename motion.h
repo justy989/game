@@ -44,6 +44,8 @@ struct Motion_t{
      Vec_t vel;
      Vec_t accel;
 
+     Vec_t coast_vel; // when we want to start coasting, continue accelerating until we reach this velocity
+
      // if you add fields to the end of this struct, you need to update MotionComponent_t
 };
 
@@ -75,8 +77,10 @@ struct MotionComponentRef_t{
      F32 padding_3;
      F32 accel;
      F32 padding_4;
-     S16 start_on_pixel;
+     F32 coast_vel;
      F32 padding_5;
+     S16 start_on_pixel;
+     F32 padding_6;
      S16 stop_on_pixel;
 };
 

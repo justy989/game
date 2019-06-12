@@ -30,11 +30,13 @@ Motion_t copy_motion_from_component(MotionComponent_t* motion){
           result.prev_vel.x = motion->ref->prev_vel;
           result.vel.x = motion->ref->vel;
           result.accel.x = motion->ref->accel;
+          result.coast_vel.x = motion->ref->coast_vel;
      }else{
           result.pos_delta.y = motion->ref->pos_delta;
           result.prev_vel.y = motion->ref->prev_vel;
           result.vel.y = motion->ref->vel;
           result.accel.y = motion->ref->accel;
+          result.coast_vel.y = motion->ref->coast_vel;
      }
 
      return result;
@@ -285,7 +287,17 @@ void update_motion_grid_aligned(Move_t* move, MotionComponent_t* motion, bool co
                float new_accel = 0;
                MoveState_t new_move_state = MOVE_STATE_COASTING;
 
-               if(!coast){
+               if(coast){
+                    if(fabs(sim_motion.ref->coast_vel) > fabs(sim_motion.ref->vel)){
+                         new_move_state = MOVE_STATE_STARTING;
+
+                         // vf = vi + at
+                         // at = vf - vi
+                         // t = (vf - vi) / a
+                         move->time_left = (sim_motion.ref->coast_vel - sim_motion.ref->vel) / sim_motion.ref->accel;
+                         new_accel = sim_motion.ref->accel;
+                    }
+               }else{
                     new_accel = begin_stopping_grid_aligned_motion(&sim_motion, pos);
                     new_move_state = MOVE_STATE_STOPPING;
                }

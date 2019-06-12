@@ -1379,6 +1379,9 @@ bool block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Direction_t dir
                     F32 half_distance_to_next_grid_center = calc_half_distance_to_next_grid_center(block->pos.pixel.x, block->pos.decimal.x, false, true);
 
                     block->accel.x = -calc_accel_from_stop(half_distance_to_next_grid_center, BLOCK_ACCEL_TIME) * force;
+
+                    F32 ideal_accel = -calc_accel_from_stop(BLOCK_ACCEL_DISTANCE, BLOCK_ACCEL_TIME) * force;
+                    block->coast_vel.x = calc_velocity_motion(0, ideal_accel, BLOCK_ACCEL_TIME);
                }
                block->horizontal_move.time_left = BLOCK_ACCEL_TIME;
                block->started_on_pixel_x = pos.pixel.x;
@@ -1407,6 +1410,9 @@ bool block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Direction_t dir
                     F32 half_distance_to_next_grid_center = calc_half_distance_to_next_grid_center(block->pos.pixel.x, block->pos.decimal.x, true, true);
 
                     block->accel.x = calc_accel_from_stop(half_distance_to_next_grid_center, BLOCK_ACCEL_TIME) * force;
+
+                    F32 ideal_accel = calc_accel_from_stop(BLOCK_ACCEL_DISTANCE, BLOCK_ACCEL_TIME) * force;
+                    block->coast_vel.x = calc_velocity_motion(0, ideal_accel, BLOCK_ACCEL_TIME);
                }
                block->horizontal_move.time_left = BLOCK_ACCEL_TIME;
                block->started_on_pixel_x = pos.pixel.x;
@@ -1434,6 +1440,9 @@ bool block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Direction_t dir
 
                     F32 half_distance_to_next_grid_center = calc_half_distance_to_next_grid_center(block->pos.pixel.y, block->pos.decimal.y, false, false);
                     block->accel.y = -calc_accel_from_stop(half_distance_to_next_grid_center, BLOCK_ACCEL_TIME) * force;
+
+                    F32 ideal_accel = -calc_accel_from_stop(BLOCK_ACCEL_DISTANCE, BLOCK_ACCEL_TIME) * force;
+                    block->coast_vel.y = calc_velocity_motion(0, ideal_accel, BLOCK_ACCEL_TIME);
                }
                block->vertical_move.time_left = BLOCK_ACCEL_TIME;
                block->started_on_pixel_y = pos.pixel.y;
@@ -1460,6 +1469,9 @@ bool block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Direction_t dir
                     block->vertical_move.sign = MOVE_SIGN_POSITIVE;
                     F32 half_distance_to_next_grid_center = calc_half_distance_to_next_grid_center(block->pos.pixel.y, block->pos.decimal.y, true, false);
                     block->accel.y = calc_accel_from_stop(half_distance_to_next_grid_center, BLOCK_ACCEL_TIME) * force;
+
+                    F32 ideal_accel = calc_accel_from_stop(BLOCK_ACCEL_DISTANCE, BLOCK_ACCEL_TIME) * force;
+                    block->coast_vel.y = calc_velocity_motion(0, ideal_accel, BLOCK_ACCEL_TIME);
                }
 
                block->vertical_move.time_left = BLOCK_ACCEL_TIME;
