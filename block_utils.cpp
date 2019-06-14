@@ -1405,26 +1405,30 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                          break;
                     }
 
-                    static const F32 block_dt = 0.0166666f;
-                    // static const F32 block_dt = BLOCK_ACCEL_TIME;
                     bool overcomes_static_friction = false;
                     ElasticCollisionResult_t elastic_result;
 
                     {
+                         static const F32 block_dt = 0.0166666f;
+                         // static const F32 block_dt = BLOCK_ACCEL_TIME;
+
                          auto collided_block_mass = get_block_stack_mass(world, block_inside_result.block);
                          elastic_result = elastic_transfer_momentum(instant_momentum.mass, instant_momentum.vel, collided_block_mass, current_collision_block_vel);
-                         LOG("m1: %d, v1: %f, m2: %d, v2: %f v1f: %f, v2f: %f\n",
-                             instant_momentum.mass, instant_momentum.vel, collided_block_mass, current_collision_block_vel,
-                             elastic_result.first_final_velocity, elastic_result.second_final_velocity);
 
                          F32 change_in_vel = fabs(current_collision_block_vel - elastic_result.second_final_velocity);
-                         F32 acceleration = change_in_vel / block_dt;
                          F32 impulse = (F32)(collided_block_mass) * change_in_vel;
                          F32 applied_force = impulse / block_dt;
                          F32 static_friction_force = get_block_static_friction(collided_block_mass);
                          overcomes_static_friction = applied_force >= static_friction_force;
 
+
+#if 0
+                         F32 acceleration = change_in_vel / block_dt;
                          F32 block_impulse = (F32)(collided_block_mass) * acceleration;
+
+                         LOG("m1: %d, v1: %f, m2: %d, v2: %f v1f: %f, v2f: %f\n",
+                             instant_momentum.mass, instant_momentum.vel, collided_block_mass, current_collision_block_vel,
+                             elastic_result.first_final_velocity, elastic_result.second_final_velocity);
 
                          LOG("Mass                    : %d\n", collided_block_mass);
                          LOG("  Accel                 : %f\n", acceleration);
@@ -1433,6 +1437,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                          LOG("  dt Impulse            : %f\n", block_impulse);
                          LOG("  dt Force              : %f\n", applied_force);
                          LOG("  Static Friction Force : %f\n", static_friction_force);
+#endif
                     }
 
                     if(overcomes_static_friction){

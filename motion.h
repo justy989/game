@@ -98,6 +98,7 @@ MotionComponent_t motion_x_component(Motion_t* motion);
 MotionComponent_t motion_y_component(Motion_t* motion);
 
 Motion_t copy_motion_from_component(MotionComponent_t* motion);
+float calc_coast_motion_time_left(MotionComponent_t* motion, float pos);
 
 float calc_accel_from_stop(float distance, float time);
 DecelToStopResult_t calc_decel_to_stop(float initial_pos, float final_pos, float initial_velocity);

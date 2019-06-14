@@ -4,6 +4,7 @@
 #include "utils.h"
 #include "conversion.h"
 
+#include <float.h>
 #include <math.h>
 #include <string.h>
 
@@ -248,18 +249,38 @@ float begin_stopping_grid_aligned_motion(MotionComponent_t* motion, float pos){
      return decel_result.accel;
 }
 
+static F32 find_next_grid_center(F32 pos, F32 vel){
+     // find the next grid center
+     S16 current_pixel = (pos / PIXEL_SIZE);
+     S16 offset = current_pixel % TILE_SIZE_IN_PIXELS;
+     S16 goal_pixel = current_pixel - offset;
+
+     // if we are moving to the right, get the next grid center, unless we are exactly on the start of the grid
+     // then just use it as is
+     if(vel > 0 && fabs(pos - (F32)(goal_pixel * PIXEL_SIZE)) > FLT_EPSILON) goal_pixel += TILE_SIZE_IN_PIXELS;
+
+     goal_pixel += HALF_TILE_SIZE_IN_PIXELS;
+
+     return (F32)(goal_pixel) * PIXEL_SIZE;
+}
+
+float calc_coast_motion_time_left(MotionComponent_t* motion, float pos){
+     // pf = pi + vt
+     // t = (pf - pi) / v
+     return (find_next_grid_center(pos, motion->ref->vel) - pos) / motion->ref->vel;
+}
+
 void update_motion_grid_aligned(Move_t* move, MotionComponent_t* motion, bool coast, float dt, float pos){
      switch(move->state){
      default:
      case MOVE_STATE_IDLING:
           break;
      case MOVE_STATE_COASTING:
-     {
           if(!coast){
                motion->ref->accel = begin_stopping_grid_aligned_motion(motion, pos);
                move->state = MOVE_STATE_STOPPING;
           }
-     } break;
+          break;
      case MOVE_STATE_STARTING:
      {
           float save_time_left = move->time_left;

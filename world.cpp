@@ -1372,6 +1372,10 @@ bool block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Direction_t dir
                     if(instant_vel > 0) instant_vel = -instant_vel;
                     block->vel.x = instant_vel;
                     block->horizontal_move.sign = move_sign_from_vel(block->vel.x);
+
+                    auto motion = motion_x_component(block);
+                    F32 x_pos = pos_to_vec(block->pos).x;
+                    block->horizontal_move.time_left = calc_coast_motion_time_left(&motion, x_pos);
                }else{
                     block->horizontal_move.state = MOVE_STATE_STARTING;
                     block->horizontal_move.sign = MOVE_SIGN_NEGATIVE;
@@ -1382,8 +1386,8 @@ bool block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Direction_t dir
 
                     F32 ideal_accel = -calc_accel_from_stop(BLOCK_ACCEL_DISTANCE, BLOCK_ACCEL_TIME) * force;
                     block->coast_vel.x = calc_velocity_motion(0, ideal_accel, BLOCK_ACCEL_TIME);
+                    block->horizontal_move.time_left = BLOCK_ACCEL_TIME;
                }
-               block->horizontal_move.time_left = BLOCK_ACCEL_TIME;
                block->started_on_pixel_x = pos.pixel.x;
           }else if(pushed_by_ice){
                block->horizontal_move.state = MOVE_STATE_COASTING;
@@ -1404,6 +1408,10 @@ bool block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Direction_t dir
                     if(instant_vel < 0) instant_vel = -instant_vel;
                     block->vel.x = instant_vel;
                     block->horizontal_move.sign = move_sign_from_vel(block->vel.x);
+
+                    auto motion = motion_x_component(block);
+                    F32 x_pos = pos_to_vec(block->pos).x;
+                    block->horizontal_move.time_left = calc_coast_motion_time_left(&motion, x_pos);
                }else{
                     block->horizontal_move.state = MOVE_STATE_STARTING;
                     block->horizontal_move.sign = MOVE_SIGN_POSITIVE;
@@ -1413,8 +1421,8 @@ bool block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Direction_t dir
 
                     F32 ideal_accel = calc_accel_from_stop(BLOCK_ACCEL_DISTANCE, BLOCK_ACCEL_TIME) * force;
                     block->coast_vel.x = calc_velocity_motion(0, ideal_accel, BLOCK_ACCEL_TIME);
+                    block->horizontal_move.time_left = BLOCK_ACCEL_TIME;
                }
-               block->horizontal_move.time_left = BLOCK_ACCEL_TIME;
                block->started_on_pixel_x = pos.pixel.x;
           }else if(pushed_by_ice){
                block->horizontal_move.state = MOVE_STATE_COASTING;
@@ -1434,6 +1442,10 @@ bool block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Direction_t dir
                     if(instant_vel > 0) instant_vel = -instant_vel;
                     block->vel.y = instant_vel;
                     block->vertical_move.sign = move_sign_from_vel(block->vel.y);
+
+                    auto motion = motion_y_component(block);
+                    F32 y_pos = pos_to_vec(block->pos).y;
+                    block->vertical_move.time_left = calc_coast_motion_time_left(&motion, y_pos);
                }else{
                     block->vertical_move.state = MOVE_STATE_STARTING;
                     block->vertical_move.sign = MOVE_SIGN_NEGATIVE;
@@ -1443,8 +1455,8 @@ bool block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Direction_t dir
 
                     F32 ideal_accel = -calc_accel_from_stop(BLOCK_ACCEL_DISTANCE, BLOCK_ACCEL_TIME) * force;
                     block->coast_vel.y = calc_velocity_motion(0, ideal_accel, BLOCK_ACCEL_TIME);
+                    block->vertical_move.time_left = BLOCK_ACCEL_TIME;
                }
-               block->vertical_move.time_left = BLOCK_ACCEL_TIME;
                block->started_on_pixel_y = pos.pixel.y;
           }else if(pushed_by_ice){
                block->vertical_move.state = MOVE_STATE_COASTING;
@@ -1464,6 +1476,10 @@ bool block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Direction_t dir
                     if(instant_vel < 0) instant_vel = -instant_vel;
                     block->vel.y = instant_vel;
                     block->vertical_move.sign = move_sign_from_vel(block->vel.y);
+
+                    auto motion = motion_y_component(block);
+                    F32 y_pos = pos_to_vec(block->pos).y;
+                    block->vertical_move.time_left = calc_coast_motion_time_left(&motion, y_pos);
                }else{
                     block->vertical_move.state = MOVE_STATE_STARTING;
                     block->vertical_move.sign = MOVE_SIGN_POSITIVE;
@@ -1472,9 +1488,9 @@ bool block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Direction_t dir
 
                     F32 ideal_accel = calc_accel_from_stop(BLOCK_ACCEL_DISTANCE, BLOCK_ACCEL_TIME) * force;
                     block->coast_vel.y = calc_velocity_motion(0, ideal_accel, BLOCK_ACCEL_TIME);
+                    block->vertical_move.time_left = BLOCK_ACCEL_TIME;
                }
 
-               block->vertical_move.time_left = BLOCK_ACCEL_TIME;
                block->started_on_pixel_y = pos.pixel.y;
           }else if(pushed_by_ice){
                block->vertical_move.state = MOVE_STATE_COASTING;

@@ -64,6 +64,9 @@ Thanks GDB:
 (gdb) watch world.blocks.elements[1].accel.x == -nan
 Argument to negate operation not a number.
 
+In order to communicate that the world doesn't work like this (Real objects don't stop grid aligned).
+Put in a special block that doesn't have the functionality of stopping grid aligned on purpose. Make it look like a regular rock. Make it not used for anything else.
+
 */
 
 #include <iostream>
@@ -1104,6 +1107,7 @@ int main(int argc, char** argv){
           return -1;
      }
 
+#if 0
      {
           static const F32 block_dt = 0.0166666f;
           static const F32 player_force = BLOCK_ACCEL * ((F32)(TILE_SIZE_IN_PIXELS * TILE_SIZE_IN_PIXELS));
@@ -1134,6 +1138,7 @@ int main(int argc, char** argv){
           print_block_physics(3 * TILE_SIZE_IN_PIXELS * TILE_SIZE_IN_PIXELS);
           print_block_physics(4 * TILE_SIZE_IN_PIXELS * TILE_SIZE_IN_PIXELS);
      }
+#endif
 
      if(test && !load_map_filepath && !suite){
           LOG("cannot test without specifying a map to load\n");
@@ -2644,6 +2649,28 @@ int main(int argc, char** argv){
                                         }
                                    }
                               }
+                         }
+
+                         if(block->coast_horizontal == BLOCK_COAST_NONE && block->vel.x != 0){
+                              Pixel_t block_center_pixel = block_get_center(block).pixel;
+                              Coord_t adjacent_tile;
+                              if(block->vel.x > 0){
+                                   adjacent_tile = pixel_to_coord(block_center_pixel + Pixel_t{HALF_TILE_SIZE_IN_PIXELS, 0});
+                              }else{
+                                   adjacent_tile = pixel_to_coord(block_center_pixel - Pixel_t{HALF_TILE_SIZE_IN_PIXELS, 0});
+                              }
+                              if(tilemap_is_iced(&world.tilemap, adjacent_tile)) block->coast_horizontal = BLOCK_COAST_ICE;
+                         }
+
+                         if(block->coast_vertical == BLOCK_COAST_NONE && block->vel.y != 0){
+                              Pixel_t block_center_pixel = block_get_center(block).pixel;
+                              Coord_t adjacent_tile;
+                              if(block->vel.y > 0){
+                                   adjacent_tile = pixel_to_coord(block_center_pixel + Pixel_t{0, HALF_TILE_SIZE_IN_PIXELS});
+                              }else{
+                                   adjacent_tile = pixel_to_coord(block_center_pixel - Pixel_t{0, HALF_TILE_SIZE_IN_PIXELS});
+                              }
+                              if(tilemap_is_iced(&world.tilemap, adjacent_tile)) block->coast_vertical = BLOCK_COAST_ICE;
                          }
                     }
                }
