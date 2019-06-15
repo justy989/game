@@ -893,7 +893,7 @@ void draw_editor(Editor_t* editor, World_t* world, Position_t screen_camera, Vec
           auto mouse_world = vec_to_pos(mouse_screen);
           auto mouse_coord = pos_to_coord(mouse_world);
           char buffer[64];
-          snprintf(buffer, 64, "M: %d,%d", mouse_coord.x, mouse_coord.y);
+          snprintf(buffer, 64, "M C: %d,%d P: %d,%d", mouse_coord.x, mouse_coord.y, mouse_world.pixel.x, mouse_world.pixel.y);
 
           Vec_t text_pos {0.005f, 0.965f};
 

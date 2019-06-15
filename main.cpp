@@ -67,6 +67,8 @@ Argument to negate operation not a number.
 In order to communicate that the world doesn't work like this (Real objects don't stop grid aligned).
 Put in a special block that doesn't have the functionality of stopping grid aligned on purpose. Make it look like a regular rock. Make it not used for anything else.
 
+Should we ice the under side of a block when it is in the air near an ice lit block?
+
 */
 
 #include <iostream>
@@ -1034,6 +1036,20 @@ bool do_block_collision(World_t* world, Block_t* block, F32 dt, S16* update_bloc
      return repeat_collision;
 }
 
+void draw_input_on_hud(char c, Vec_t pos, bool down){
+     char text[2];
+     text[1] = 0;
+     text[0] = c;
+
+     glColor3f(0.0f, 0.0f, 0.0f);
+     draw_text(text, pos + Vec_t{0.002f, -0.002f});
+
+     if(down){
+          glColor3f(1.0f, 1.0f, 1.0f);
+          draw_text(text, pos);
+     }
+}
+
 int main(int argc, char** argv){
      const char* load_map_filepath = nullptr;
      bool test = false;
@@ -1145,8 +1161,8 @@ int main(int argc, char** argv){
           return 1;
      }
 
-     int window_width = 1024;
-     int window_height = 1024;
+     int window_width = 800;
+     int window_height = 800;
      SDL_Window* window = nullptr;
      SDL_GLContext opengl_context = nullptr;
      GLuint theme_texture = 0;
@@ -2525,32 +2541,6 @@ int main(int argc, char** argv){
                          }else if(block_on_air(block, world.interactive_qt, world.block_qt, &world.tilemap)){
                               block->coast_horizontal = BLOCK_COAST_AIR;
                               block->coast_vertical = BLOCK_COAST_AIR;
-                         }else{
-                              if(block->horizontal_move.state == MOVE_STATE_STARTING ||
-                                 block->horizontal_move.state == MOVE_STATE_COASTING){
-                                   if(block->horizontal_move.sign == MOVE_SIGN_POSITIVE){
-                                        if(block->prev_push_mask & DIRECTION_MASK_RIGHT){
-                                             block->coast_horizontal = BLOCK_COAST_PLAYER;
-                                        }
-                                   }else if(block->horizontal_move.sign == MOVE_SIGN_NEGATIVE){
-                                        if(block->prev_push_mask & DIRECTION_MASK_LEFT){
-                                             block->coast_horizontal = BLOCK_COAST_PLAYER;
-                                        }
-                                   }
-                              }
-
-                              if(block->vertical_move.state == MOVE_STATE_STARTING ||
-                                 block->vertical_move.state == MOVE_STATE_COASTING){
-                                   if(block->vertical_move.sign == MOVE_SIGN_POSITIVE){
-                                        if(block->prev_push_mask & DIRECTION_MASK_UP){
-                                             block->coast_vertical = BLOCK_COAST_PLAYER;
-                                        }
-                                   }else if(block->vertical_move.sign == MOVE_SIGN_NEGATIVE){
-                                        if(block->prev_push_mask & DIRECTION_MASK_DOWN){
-                                             block->coast_vertical = BLOCK_COAST_PLAYER;
-                                        }
-                                   }
-                              }
                          }
 
                          if(block->coast_vertical <= BLOCK_COAST_ICE  || block->coast_horizontal <= BLOCK_COAST_ICE){
@@ -3524,7 +3514,7 @@ int main(int argc, char** argv){
 
           glEnd();
 
-#if 0
+#if 1
           // light
           glBindTexture(GL_TEXTURE_2D, 0);
           glBegin(GL_QUADS);
@@ -3574,11 +3564,20 @@ int main(int argc, char** argv){
 
                Vec_t text_pos {0.005f, 0.965f};
 
+               if(editor.mode) text_pos.y -= 0.09f;
+
                glColor3f(0.0f, 0.0f, 0.0f);
                draw_text(buffer, text_pos + Vec_t{0.002f, -0.002f});
 
                glColor3f(1.0f, 1.0f, 1.0f);
                draw_text(buffer, text_pos);
+
+               draw_input_on_hud('L', Vec_t{0.965f - (7.5f * TEXT_CHAR_WIDTH), 0.965f}, player_action.move[DIRECTION_LEFT]);
+               draw_input_on_hud('U', Vec_t{0.965f - (6.0f * TEXT_CHAR_WIDTH), 0.965f}, player_action.move[DIRECTION_UP]);
+               draw_input_on_hud('R', Vec_t{0.965f - (4.5f * TEXT_CHAR_WIDTH), 0.965f}, player_action.move[DIRECTION_RIGHT]);
+               draw_input_on_hud('D', Vec_t{0.965f - (3.0f * TEXT_CHAR_WIDTH), 0.965f}, player_action.move[DIRECTION_DOWN]);
+               draw_input_on_hud('A', Vec_t{0.965f - (1.5f * TEXT_CHAR_WIDTH), 0.965f}, player_action.activate);
+               draw_input_on_hud('B', Vec_t{0.965f - (0.0f * TEXT_CHAR_WIDTH), 0.965f}, player_action.activate);
 
                glEnd();
           }
