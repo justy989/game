@@ -533,7 +533,6 @@ S16 get_block_mass_in_direction(World_t* world, Block_t* block, Direction_t dire
 }
 
 bool do_block_collision(World_t* world, Block_t* block, F32 dt, S16* update_blocks_count, BlockChanges_t* block_changes){
-     (void)(dt);
      S16 block_index = get_block_index(world, block);
      bool repeat_collision = false;
 
@@ -2509,7 +2508,7 @@ int main(int argc, char** argv){
                }
 
                // do multiple passes here so that entangled blocks know for sure if their entangled counterparts are coasting and index order doesn't matter
-               for(S16 j = 0; j < 2; j++){
+               for(S16 j = 0; j < 2; j++){ // TODO: is this enough iterations or will we need more iterations for multiple entangled blocks?
                     for(S16 i = 0; i < world.blocks.count; i++){
                          Block_t* block = world.blocks.elements + i;
 
@@ -2654,7 +2653,11 @@ int main(int argc, char** argv){
                               }else{
                                    adjacent_tile = pixel_to_coord(block_center_pixel - Pixel_t{HALF_TILE_SIZE_IN_PIXELS, 0});
                               }
-                              if(tilemap_is_iced(&world.tilemap, adjacent_tile)) block->coast_horizontal = BLOCK_COAST_ICE;
+                              if(block->pos.z == 0){
+                                   if(tilemap_is_iced(&world.tilemap, adjacent_tile)) block->coast_horizontal = BLOCK_COAST_ICE;
+                              }else{
+
+                              }
                          }
 
                          if(block->coast_vertical == BLOCK_COAST_NONE && block->vel.y != 0){
@@ -2665,7 +2668,11 @@ int main(int argc, char** argv){
                               }else{
                                    adjacent_tile = pixel_to_coord(block_center_pixel - Pixel_t{0, HALF_TILE_SIZE_IN_PIXELS});
                               }
-                              if(tilemap_is_iced(&world.tilemap, adjacent_tile)) block->coast_vertical = BLOCK_COAST_ICE;
+                              if(block->pos.z == 0){
+                                   if(tilemap_is_iced(&world.tilemap, adjacent_tile)) block->coast_vertical = BLOCK_COAST_ICE;
+                              }else{
+
+                              }
                          }
                     }
                }
