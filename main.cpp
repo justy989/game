@@ -1161,8 +1161,8 @@ int main(int argc, char** argv){
           return 1;
      }
 
-     int window_width = 800;
-     int window_height = 800;
+     int window_width = 1024;
+     int window_height = 1024;
      SDL_Window* window = nullptr;
      SDL_GLContext opengl_context = nullptr;
      GLuint theme_texture = 0;
@@ -3523,7 +3523,7 @@ int main(int argc, char** argv){
 
           glEnd();
 
-#if 1
+#if 0
           // light
           glBindTexture(GL_TEXTURE_2D, 0);
           glBegin(GL_QUADS);

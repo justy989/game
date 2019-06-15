@@ -1086,7 +1086,10 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                               }
 
                               if(result.vel.x > 0) result.vel.x = -result.vel.x;
-                              if(result.vel.x == 0) reset_move(&result.horizontal_move);
+                              if(result.vel.x == 0){
+                                   result.accel.x = 0;
+                                   reset_move(&result.horizontal_move);
+                              }
 
                               Position_t final_stop_pos = collided_block_center;
                               final_stop_pos.pixel.x += HALF_TILE_SIZE_IN_PIXELS;
@@ -1118,7 +1121,10 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                               }
 
                               if(result.vel.x < 0) result.vel.x = -result.vel.x;
-                              if(result.vel.x == 0) reset_move(&result.horizontal_move);
+                              if(result.vel.x == 0){
+                                   result.accel.x = 0;
+                                   reset_move(&result.horizontal_move);
+                              }
 
                               Position_t final_stop_pos = collided_block_center;
                               final_stop_pos.pixel.x -= (HALF_TILE_SIZE_IN_PIXELS + TILE_SIZE_IN_PIXELS);
@@ -1149,7 +1155,10 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                               }
 
                               if(result.vel.y > 0) result.vel.y = -result.vel.y;
-                              if(result.vel.y == 0) reset_move(&result.vertical_move);
+                              if(result.vel.y == 0){
+                                   result.accel.x = 0;
+                                   reset_move(&result.vertical_move);
+                              }
 
                               Position_t final_stop_pos = collided_block_center;
                               final_stop_pos.pixel.y += HALF_TILE_SIZE_IN_PIXELS;
@@ -1180,7 +1189,10 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                               }
 
                               if(result.vel.y < 0) result.vel.y = -result.vel.y;
-                              if(result.vel.y == 0) reset_move(&result.vertical_move);
+                              if(result.vel.y == 0){
+                                   result.accel.x = 0;
+                                   reset_move(&result.vertical_move);
+                              }
 
                               Position_t final_stop_pos = collided_block_center;
                               final_stop_pos.pixel.y -= (HALF_TILE_SIZE_IN_PIXELS + TILE_SIZE_IN_PIXELS);
