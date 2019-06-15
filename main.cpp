@@ -14,6 +14,7 @@ Entanglement Puzzles:
 - rotated entangled puzzles where the centroid is on a portal destination coord
 
 Current bugs:
+- An entangled player caught between blocks against a portal gets crushed
 - pressure plates don't see blocks as 1 pixel too small on the right and top, so their activation is delayed in those directions
 - A block on the tile outside a portal pushed into the portal to clone, the clone has weird behavior and ends up on the portal block
 - When pushing a block through a portal that turns off, the block keeps going
@@ -2150,7 +2151,6 @@ int main(int argc, char** argv){
                                    break;
                               case INTERACTIVE_TYPE_POPUP:
                                    if(interactive->popup.lift.ticks > arrow->pos.z){
-                                        LOG("arrow z: %d, popup lift: %d\n", arrow->pos.z, interactive->popup.lift.ticks);
                                         arrow->stuck_time = dt;
                                         // TODO: stuck in popup
                                    }
@@ -2646,32 +2646,38 @@ int main(int argc, char** argv){
                          }
 
                          if(block->coast_horizontal == BLOCK_COAST_NONE && block->vel.x != 0){
-                              Pixel_t block_center_pixel = block_get_center(block).pixel;
-                              Coord_t adjacent_tile;
+                              Pixel_t block_pixel = block->pos.pixel;
                               if(block->vel.x > 0){
-                                   adjacent_tile = pixel_to_coord(block_center_pixel + Pixel_t{HALF_TILE_SIZE_IN_PIXELS, 0});
+                                   block_pixel += Pixel_t{HALF_TILE_SIZE_IN_PIXELS, 0};
                               }else{
-                                   adjacent_tile = pixel_to_coord(block_center_pixel - Pixel_t{HALF_TILE_SIZE_IN_PIXELS, 0});
+                                   block_pixel -= Pixel_t{HALF_TILE_SIZE_IN_PIXELS, 0};
                               }
-                              if(block->pos.z == 0){
-                                   if(tilemap_is_iced(&world.tilemap, adjacent_tile)) block->coast_horizontal = BLOCK_COAST_ICE;
-                              }else{
 
+                              auto check_block_pos = pixel_to_pos(block_pixel);
+                              check_block_pos.z = block->pos.z;
+
+                              if(block_on_ice(check_block_pos, Vec_t{}, &world.tilemap, world.interactive_qt, world.block_qt)){
+                                   block->coast_horizontal = BLOCK_COAST_ICE;
+                              }else if(block_on_air(check_block_pos, Vec_t{}, world.interactive_qt, world.block_qt, &world.tilemap)){
+                                   block->coast_horizontal = BLOCK_COAST_AIR;
                               }
                          }
 
                          if(block->coast_vertical == BLOCK_COAST_NONE && block->vel.y != 0){
-                              Pixel_t block_center_pixel = block_get_center(block).pixel;
-                              Coord_t adjacent_tile;
+                              Pixel_t block_pixel = block->pos.pixel;
                               if(block->vel.y > 0){
-                                   adjacent_tile = pixel_to_coord(block_center_pixel + Pixel_t{0, HALF_TILE_SIZE_IN_PIXELS});
+                                   block_pixel += Pixel_t{0, HALF_TILE_SIZE_IN_PIXELS};
                               }else{
-                                   adjacent_tile = pixel_to_coord(block_center_pixel - Pixel_t{0, HALF_TILE_SIZE_IN_PIXELS});
+                                   block_pixel -= Pixel_t{0, HALF_TILE_SIZE_IN_PIXELS};
                               }
-                              if(block->pos.z == 0){
-                                   if(tilemap_is_iced(&world.tilemap, adjacent_tile)) block->coast_vertical = BLOCK_COAST_ICE;
-                              }else{
 
+                              auto check_block_pos = pixel_to_pos(block_pixel);
+                              check_block_pos.z = block->pos.z;
+
+                              if(block_on_ice(check_block_pos, Vec_t{}, &world.tilemap, world.interactive_qt, world.block_qt)){
+                                   block->coast_vertical = BLOCK_COAST_ICE;
+                              }else if(block_on_air(check_block_pos, Vec_t{}, world.interactive_qt, world.block_qt, &world.tilemap)){
+                                   block->coast_vertical = BLOCK_COAST_AIR;
                               }
                          }
                     }

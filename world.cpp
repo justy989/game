@@ -646,6 +646,7 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                          reset_move(&collision.block->horizontal_move);
                          collision.block->vel.x = 0;
                          collision.block->accel.x = 0;
+                         collision.block->stopped_by_player_horizontal = false;
 
                          auto collided_pos_offset = collision.pos - collision.block->pos;
                          auto block_new_pos = collision.pos;
@@ -691,6 +692,7 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                          reset_move(&collision.block->horizontal_move);
                          collision.block->vel.x = 0;
                          collision.block->accel.x = 0;
+                         collision.block->stopped_by_player_horizontal = false;
 
                          auto collided_pos_offset = collision.pos - collision.block->pos;
                          auto block_new_pos = collision.pos;
@@ -735,6 +737,7 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                          reset_move(&collision.block->vertical_move);
                          collision.block->vel.y = 0;
                          collision.block->accel.y = 0;
+                         collision.block->stopped_by_player_vertical = false;
 
                          auto collided_pos_offset = collision.pos - collision.block->pos;
                          auto block_new_pos = collision.pos;
@@ -779,6 +782,7 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                          reset_move(&collision.block->vertical_move);
                          collision.block->vel.y = 0;
                          collision.block->accel.y = 0;
+                         collision.block->stopped_by_player_vertical = false;
 
                          auto collided_pos_offset = collision.pos - collision.block->pos;
                          auto block_new_pos = collision.pos;
@@ -1551,7 +1555,8 @@ void describe_block(World_t* world, Block_t* block){
      LOG(" hmove: %s %s %f\n", move_state_to_string(block->horizontal_move.state), move_sign_to_string(block->horizontal_move.sign), block->horizontal_move.distance);
      LOG(" vmove: %s %s %f\n", move_state_to_string(block->vertical_move.state), move_sign_to_string(block->vertical_move.sign), block->vertical_move.distance);
      LOG(" hcoast: %s vcoast: %s\n", block_coast_to_string(block->coast_horizontal), block_coast_to_string(block->coast_vertical));
-     LOG(" flags: held_up: %d, carried_by_block: %d\n", block->held_up, block->carried_pos_delta.block_index);
+     LOG(" flags: held_up: %d, carried_by_block: %d stopped_by_player_horizontal: %d, stopped_by_player_vertical: %d\n",
+         block->held_up, block->carried_pos_delta.block_index, block->stopped_by_player_horizontal, block->stopped_by_player_vertical);
      LOG("\n");
 }
 
