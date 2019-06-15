@@ -533,6 +533,7 @@ S16 get_block_mass_in_direction(World_t* world, Block_t* block, Direction_t dire
 }
 
 bool do_block_collision(World_t* world, Block_t* block, F32 dt, S16* update_blocks_count, BlockChanges_t* block_changes){
+     (void)(dt);
      S16 block_index = get_block_index(world, block);
      bool repeat_collision = false;
 
@@ -615,19 +616,9 @@ bool do_block_collision(World_t* world, Block_t* block, F32 dt, S16* update_bloc
 
                     // if positions are diagonal to each other and the rotation between them is odd, check if we are moving into each other
                     if(pos_dimension_delta <= FLT_EPSILON && (total_rotations_between) % 2 == 1){
-                         // TODO: switch to using block_inside_another_block() because that is actually what we care about
-                         auto entangle_result = check_block_collision_with_other_blocks(entangled_block->pos,
-                                                                                        entangled_block->pos_delta,
-                                                                                        entangled_block->vel,
-                                                                                        entangled_block->accel,
-                                                                                        entangled_block->stop_on_pixel_x,
-                                                                                        entangled_block->stop_on_pixel_y,
-                                                                                        entangled_block->horizontal_move,
-                                                                                        entangled_block->vertical_move,
-                                                                                        block->entangle_index,
-                                                                                        entangled_block->clone_start.x > 0,
-                                                                                        world);
-                         if(entangle_result.collided){
+                         auto entangle_inside_result = block_inside_another_block(entangled_block->pos, entangled_block->pos_delta, get_block_index(world, entangled_block),
+                                                                                  entangled_block->clone_id > 0, world->block_qt, world->interactive_qt, &world->tilemap, &world->blocks);
+                         if(entangle_inside_result.block == block){
                               // stop the blocks moving toward each other
                               static const VecMaskCollisionEntry_t table[] = {
                                    {static_cast<S8>(DIRECTION_MASK_RIGHT | DIRECTION_MASK_UP), DIRECTION_LEFT, DIRECTION_UP, DIRECTION_DOWN, DIRECTION_RIGHT},

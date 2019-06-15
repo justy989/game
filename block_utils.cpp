@@ -4,8 +4,9 @@
 #include "conversion.h"
 #include "portal_exit.h"
 
-#include <string.h>
+#include <float.h>
 #include <math.h>
+#include <string.h>
 
 void add_block_held(BlockHeldResult_t* result, Block_t* block, Rect_t rect){
      if(result->count < MAX_HELD_BLOCKS){
@@ -891,6 +892,18 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
 
           auto collided_block_center = block_inside_result.collision_pos;
 
+          // update collided block center if the block is stopping on a pixel this frame
+          // TODO: account for stop_on_pixel through a portal
+          if(block_inside_result.block->stop_on_pixel_x){
+               collided_block_center.pixel.x = block_inside_result.block->stop_on_pixel_x + HALF_TILE_SIZE_IN_PIXELS;
+               collided_block_center.decimal.x = 0;
+          }
+
+          if(block_inside_result.block->stop_on_pixel_y){
+               collided_block_center.pixel.y = block_inside_result.block->stop_on_pixel_y + HALF_TILE_SIZE_IN_PIXELS;
+               collided_block_center.decimal.y = 0;
+          }
+
           auto moved_block_pos = block_get_center(block_pos);
           auto move_direction = move_direction_between(moved_block_pos, block_inside_result.collision_pos);
           Direction_t first_direction;
@@ -918,8 +931,10 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                final_block_pos.pixel += HALF_TILE_SIZE_PIXEL;
                auto pos_diff = pos_to_vec(result.collided_pos - final_block_pos);
 
+               auto pos_dimension_delta = fabs(fabs(pos_diff.x) - fabs(pos_diff.y));
+
                // if positions are diagonal to each other and the rotation between them is odd, check if we are moving into each other
-               if(fabs(pos_diff.x) == fabs(pos_diff.y) && (block->rotation + entangled_block->rotation + result.collided_portal_rotations) % 2 == 1){
+               if(pos_dimension_delta <= FLT_EPSILON && (block->rotation + entangled_block->rotation + result.collided_portal_rotations) % 2 == 1){
                     // just gtfo if this happens, we handle this case outside this function
                     return result;
                }
@@ -974,7 +989,10 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                                    }
 
                                    if(result.vel.x > 0) result.vel.x = -result.vel.x;
-                                   if(result.vel.x == 0) reset_move(&result.horizontal_move);
+                                   if(result.vel.x == 0){
+                                        result.accel.x = 0;
+                                        reset_move(&result.horizontal_move);
+                                   }
 
                                    Position_t final_stop_pos = collided_block_center;
                                    final_stop_pos.pixel.x += HALF_TILE_SIZE_IN_PIXELS;
@@ -994,7 +1012,10 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                                         result.vel.x = block_inside_result.block->vel.x;
                                    }
                                    if(result.vel.x < 0) result.vel.x = -result.vel.x;
-                                   if(result.vel.x == 0) reset_move(&result.horizontal_move);
+                                   if(result.vel.x == 0){
+                                        result.accel.x = 0;
+                                        reset_move(&result.horizontal_move);
+                                   }
 
                                    Position_t final_stop_pos = collided_block_center;
                                    final_stop_pos.pixel.x -= (HALF_TILE_SIZE_IN_PIXELS + TILE_SIZE_IN_PIXELS );
@@ -1020,7 +1041,10 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                                    }
 
                                    if(result.vel.y > 0) result.vel.y = -result.vel.y;
-                                   if(result.vel.y == 0) reset_move(&result.vertical_move);
+                                   if(result.vel.y == 0){
+                                        result.accel.y = 0;
+                                        reset_move(&result.vertical_move);
+                                   }
 
                                    Position_t final_stop_pos = collided_block_center;
                                    final_stop_pos.pixel.y += HALF_TILE_SIZE_IN_PIXELS;
@@ -1041,7 +1065,10 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                                    }
 
                                    if(result.vel.y < 0) result.vel.y = -result.vel.y;
-                                   if(result.vel.y == 0) reset_move(&result.vertical_move);
+                                   if(result.vel.y == 0){
+                                        result.accel.y = 0;
+                                        reset_move(&result.vertical_move);
+                                   }
 
                                    Position_t final_stop_pos = collided_block_center;
                                    final_stop_pos.pixel.y -= (HALF_TILE_SIZE_IN_PIXELS + TILE_SIZE_IN_PIXELS );
