@@ -523,7 +523,7 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
           PlayerBlockCollision_t collision;
           collision.player_pos_delta = result.pos_delta;
 
-          Position_t block_pos = block->pos + block->pos_delta;
+          Position_t block_pos = block->teleport ? (block->teleport_pos + block->teleport_pos_delta) : (block->pos + block->pos_delta);
           bool collided = false;
           position_collide_with_rect(player_pos, block_pos, TILE_SIZE, &collision.player_pos_delta, &collided);
           if(collided){
@@ -569,7 +569,7 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
 
                               auto portal_rotations = direction_rotations_between(interactive->portal.face, direction_opposite((Direction_t)(pd)));
 
-                              auto block_portal_dst_offset = block->pos + block->pos_delta;
+                              auto block_portal_dst_offset = block->teleport ? (block->teleport_pos + block->teleport_pos_delta) : (block->pos + block->pos_delta);
                               block_portal_dst_offset.pixel += HALF_TILE_SIZE_PIXEL;
                               block_portal_dst_offset.pixel -= portal_dst_center_pixel;
 
@@ -1557,9 +1557,9 @@ void describe_block(World_t* world, Block_t* block){
 
 void describe_player(World_t* world, Player_t* player){
      S16 index = player - world->players.elements;
-     LOG("Player %d: pixel: %d, %d, %d, decimal %f, %f, face: %s push_block: %d\n", index,
+     LOG("Player %d: pixel: %d, %d, %d, decimal %f, %f, face: %s push_block: %d, push_block_dir: %s, push_block_rot: %d\n", index,
          player->pos.pixel.x, player->pos.pixel.y, player->pos.z, player->pos.decimal.x, player->pos.decimal.y,
-         direction_to_string(player->face), player->pushing_block);
+         direction_to_string(player->face), player->pushing_block, direction_to_string(player->pushing_block_dir), player->pushing_block_rotation);
      LOG("  vel: %f, %f accel: %f, %f pos_dt: %f, %f\n", player->vel.x, player->vel.y, player->accel.x, player->accel.y, player->pos_delta.x , player->pos_delta.y);
      LOG("  rot: %d, move_rot: L %d, U %d, R %d, D %d\n", player->rotation,
          player->move_rotation[DIRECTION_LEFT], player->move_rotation[DIRECTION_UP], player->move_rotation[DIRECTION_RIGHT], player->move_rotation[DIRECTION_DOWN]);

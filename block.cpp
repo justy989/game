@@ -3,10 +3,12 @@
 #include "conversion.h"
 
 S16 get_object_x(Block_t* block){
+     if(block->teleport) return block->teleport_pos.pixel.x + HALF_TILE_SIZE_IN_PIXELS;
      return block->pos.pixel.x + HALF_TILE_SIZE_IN_PIXELS;
 }
 
 S16 get_object_y(Block_t* block){
+     if(block->teleport) return block->teleport_pos.pixel.y + HALF_TILE_SIZE_IN_PIXELS;
      return block->pos.pixel.y + HALF_TILE_SIZE_IN_PIXELS;
 }
 

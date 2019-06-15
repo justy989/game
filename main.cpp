@@ -2544,7 +2544,6 @@ int main(int argc, char** argv){
                          }
 
                          if(block->coast_vertical <= BLOCK_COAST_ICE  || block->coast_horizontal <= BLOCK_COAST_ICE){
-                              // TODO: this logic isn't strictly correct when the block teleports, but I also don't think there is any harm right now?
                               for(S16 p = 0; p < world.players.count; p++){
                                    Player_t* player = world.players.elements + p;
 
@@ -2560,18 +2559,33 @@ int main(int argc, char** argv){
                                         case DIRECTION_RIGHT:
                                         {
                                              // only coast the block is actually moving
-                                             Vec_t block_horizontal_vel = {block->vel.x, 0};
-                                             if(player->face == vec_direction(block_horizontal_vel)){
-                                                  block->coast_horizontal = BLOCK_COAST_PLAYER;
+                                             Vec_t block_vel = {block->vel.x, 0};
+                                             if((player->pushing_block_rotation % 2)){
+                                                  block_vel = Vec_t{0, block->vel.y};
+
+                                                  if(player->pushing_block_dir == vec_direction(block_vel)){
+                                                       block->coast_vertical = BLOCK_COAST_PLAYER;
+                                                  }
+                                             }else{
+                                                  if(player->pushing_block_dir == vec_direction(block_vel)){
+                                                       block->coast_horizontal = BLOCK_COAST_PLAYER;
+                                                  }
                                              }
                                              break;
                                         }
                                         case DIRECTION_UP:
                                         case DIRECTION_DOWN:
                                         {
-                                             Vec_t block_vertical_vel = {0, block->vel.y};
-                                             if(player->face == vec_direction(block_vertical_vel)){
-                                                  block->coast_vertical = BLOCK_COAST_PLAYER;
+                                             Vec_t block_vel = {0, block->vel.y};
+                                             if((player->pushing_block_rotation % 2)){
+                                                  block_vel = Vec_t{block->vel.x, 0};
+                                                  if(player->pushing_block_dir == vec_direction(block_vel)){
+                                                       block->coast_horizontal = BLOCK_COAST_PLAYER;
+                                                  }
+                                             }else{
+                                                  if(player->pushing_block_dir == vec_direction(block_vel)){
+                                                       block->coast_vertical = BLOCK_COAST_PLAYER;
+                                                  }
                                              }
                                              break;
                                         }
@@ -2963,6 +2977,11 @@ int main(int argc, char** argv){
                                    }
                               }
 
+                              // TODO: maybe only do this one time per loop in case multiple blocks teleport in a frame
+                              // re-calculate the quad tree using the new teleported position for the block
+                              quad_tree_free(world.block_qt);
+                              world.block_qt = quad_tree_build(&world.blocks);
+
                               repeat_collision = true;
                          }
                     }
@@ -2977,22 +2996,9 @@ int main(int argc, char** argv){
                          MovePlayerThroughWorldResult_t move_result {};
 
                          if(player->teleport){
-                              auto pushing_block = player->pushing_block;
-                              auto pushing_block_dir = player->pushing_block_dir;
-                              auto pushing_block_rotation = player->pushing_block_rotation;
-
-                              // if we were pushing a block via teleporting in a previous iteration, keep it going
-                              // because in this or a future iteration we probably aren't colliding with a block anymore
-                              // but we wanna remember the block we are pushing
-                              if(player->teleport_pushing_block >= 0){
-                                   pushing_block = player->teleport_pushing_block;
-                                   pushing_block_dir = player->teleport_pushing_block_dir;
-                                   pushing_block_rotation = player->teleport_pushing_block_rotation;
-                              }
-
                               move_result = move_player_through_world(player->teleport_pos, player->teleport_vel, player->teleport_pos_delta, player->teleport_face,
-                                                                      player->clone_instance, i, pushing_block, pushing_block_dir, pushing_block_rotation,
-                                                                      &world);
+                                                                      player->clone_instance, i, player->teleport_pushing_block, player->teleport_pushing_block_dir,
+                                                                      player->teleport_pushing_block_rotation, &world);
 
                               if(move_result.collided) repeat_collision = true;
                               if(move_result.resetting) resetting = true;
@@ -3189,6 +3195,9 @@ int main(int argc, char** argv){
                               player->teleport_accel = vec_rotate_quadrants_clockwise(player->accel, teleport_result.results[teleport_clone_id].rotations);
                               player->teleport_rotation = teleport_result.results[teleport_clone_id].rotations;
                               player->teleport_face = direction_rotate_clockwise(player->face, teleport_result.results[teleport_clone_id].rotations);
+                              player->teleport_pushing_block = player->pushing_block;
+                              player->teleport_pushing_block_rotation = 0;
+                              player->teleport_pushing_block_dir = player->pushing_block_dir;
 
                               repeat_collision = true;
                          }
