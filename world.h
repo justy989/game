@@ -49,6 +49,19 @@ struct ElasticCollisionResult_t{
      F32 second_final_velocity;
 };
 
+struct BlockPushResult_t{
+     bool pushed = false;
+     S16 mass = 0;
+     F32 velocity = 0;
+
+     bool transferred_momentum_back(){return velocity != 0;}
+};
+
+struct BlockPushMoveDirectionResult_t{
+     BlockPushResult_t horizontal_result;
+     BlockPushResult_t vertical_result;
+};
+
 void sort_blocks_by_ascending_height(Block_t** blocks, S16 block_count);
 void sort_blocks_by_descending_height(Block_t** blocks, S16 block_count);
 
@@ -70,9 +83,9 @@ void illuminate(Coord_t coord, U8 value, World_t* world, Coord_t from_portal = C
 void spread_ice(Coord_t center, S8 height, S16 radius, World_t* world, bool teleported = false);
 void melt_ice(Coord_t center, S8 height, S16 radius, World_t* world, bool teleported = false);
 
-bool block_push(Block_t* block, MoveDirection_t move_direction, World_t* world, bool pushed_by_ice, F32 force = 1.0f, TransferMomentum_t* instant_momentum = nullptr);
-bool block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Direction_t direction, World_t* world, bool pushed_by_ice, F32 force = 1.0f, TransferMomentum_t* instant_momentum = nullptr);
-bool block_push(Block_t* block, Direction_t direction, World_t* world, bool pushed_by_ice, F32 force = 1.0f, TransferMomentum_t* instant_momentum = nullptr);
+BlockPushMoveDirectionResult_t block_push(Block_t* block, MoveDirection_t move_direction, World_t* world, bool pushed_by_ice, F32 force = 1.0f, TransferMomentum_t* instant_momentum = nullptr);
+BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Direction_t direction, World_t* world, bool pushed_by_ice, F32 force = 1.0f, TransferMomentum_t* instant_momentum = nullptr);
+BlockPushResult_t block_push(Block_t* block, Direction_t direction, World_t* world, bool pushed_by_ice, F32 force = 1.0f, TransferMomentum_t* instant_momentum = nullptr);
 bool block_pushable(Block_t* block, Direction_t direction, World_t* world);
 bool reset_players(ObjectArray_t<Player_t>* players);
 

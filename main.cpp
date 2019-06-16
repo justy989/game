@@ -65,6 +65,8 @@ Argument to negate operation not a number.
 
 In order to communicate that the world doesn't work like this (Real objects don't stop grid aligned).
 Put in a special block that doesn't have the functionality of stopping grid aligned on purpose. Make it look like a regular rock. Make it not used for anything else.
+It also bounces off of walls when colliding with them while on ice.
+You can use the normal blocks to guide the these realistic blocks for some sweet metapuzzle action.
 
 Should we ice the under side of a block when it is in the air near an ice lit block?
 
@@ -678,7 +680,7 @@ bool do_block_collision(World_t* world, Block_t* block, F32 dt, S16* update_bloc
                                         TransferMomentum_t block_momentum = get_block_momentum(world, block, move_dir_to_stop);
                                         TransferMomentum_t entangled_block_momentum = get_block_momentum(world, entangled_block, entangled_move_dir_to_stop);
 
-                                        if(block_push(block, entangled_move_dir_to_stop, world, true, 1.0f, &entangled_block_momentum)){
+                                        if(block_push(block, entangled_move_dir_to_stop, world, true, 1.0f, &entangled_block_momentum).pushed){
                                              auto elastic_result = elastic_transfer_momentum_to_block(&entangled_block_momentum, world, block, entangled_move_dir_to_stop);
 
                                              switch(entangled_move_dir_to_stop){
@@ -695,7 +697,7 @@ bool do_block_collision(World_t* world, Block_t* block, F32 dt, S16* update_bloc
                                              }
                                         }
 
-                                        if(block_push(entangled_block, move_dir_to_stop, world, true, 1.0f, &block_momentum)){
+                                        if(block_push(entangled_block, move_dir_to_stop, world, true, 1.0f, &block_momentum).pushed){
                                              auto elastic_result = elastic_transfer_momentum_to_block(&block_momentum, world, entangled_block, move_dir_to_stop);
 
                                              switch(move_dir_to_stop){
@@ -1150,8 +1152,8 @@ int main(int argc, char** argv){
           return 1;
      }
 
-     int window_width = 1024;
-     int window_height = 1024;
+     int window_width = 1080;
+     int window_height = 1080;
      SDL_Window* window = nullptr;
      SDL_GLContext opengl_context = nullptr;
      GLuint theme_texture = 0;
@@ -3384,7 +3386,7 @@ int main(int argc, char** argv){
                                    if(applied_force >= static_friction){
                                         // LOG("push block %d %s mass %d\n", get_block_index(&world, block_to_push), direction_to_string(push_block_dir), total_block_mass);
 
-                                        bool pushed = block_push(block_to_push, push_block_dir, &world, false, mass_ratio);
+                                        bool pushed = block_push(block_to_push, push_block_dir, &world, false, mass_ratio).pushed;
 
                                         if(!pushed){
                                              player->push_time = 0.0f;
