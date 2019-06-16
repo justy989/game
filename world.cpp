@@ -1231,7 +1231,7 @@ bool block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Direction_t dir
 
                     if(transfers_force){
                          if(block_push(collided_block, collided_block_push_dir, world, pushed_by_ice, force, instant_momentum)){
-                              push_entangled_block(collided_block, world, collided_block_push_dir, pushed_by_ice, force, instant_momentum);
+                              push_entangled_block(collided_block, world, collided_block_push_dir, pushed_by_ice, instant_momentum);
                          }
 
                          switch(direction){
@@ -1265,7 +1265,7 @@ bool block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Direction_t dir
 
                     if(block_push(collided_block, collided_block_push_dir, world, pushed_by_ice, force, instant_momentum)){
                          if(!are_entangled){
-                             push_entangled_block(collided_block, world, collided_block_push_dir, pushed_by_ice, force, instant_momentum);
+                             push_entangled_block(collided_block, world, collided_block_push_dir, pushed_by_ice, instant_momentum);
                          }
                     }else{
                          return false;
@@ -2022,8 +2022,7 @@ ElasticCollisionResult_t elastic_transfer_momentum_to_block(TransferMomentum_t* 
           vel = block->vel.y;
      }
 
-     return elastic_transfer_momentum(first_transfer_momentum->mass, first_transfer_momentum->vel,
-                                      second_block_mass, block->vel.y);
+     return elastic_transfer_momentum(first_transfer_momentum->mass, first_transfer_momentum->vel, second_block_mass, vel);
 }
 
 F32 get_block_static_friction(S16 mass){

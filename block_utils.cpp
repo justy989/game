@@ -1429,44 +1429,78 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                          push_pos_delta = result.pos_delta;
                     }
 
+                    bool overcomes_static_friction = false;
 
                     F32 current_collision_block_vel = 0;
+                    F32 current_pos_delta = 0;
+
                     switch(first_direction){
                     default:
                          break;
                     case DIRECTION_LEFT:
                     case DIRECTION_RIGHT:
                          current_collision_block_vel = block_inside_result.block->vel.x;
+                         current_pos_delta = block_inside_result.block->pos_delta.x;
+
+                         // if the block is moving in our direction at all (even negative) then there is no static friction to overcome
+                         if(current_collision_block_vel != 0) overcomes_static_friction = true;
                          break;
                     case DIRECTION_UP:
                     case DIRECTION_DOWN:
                          current_collision_block_vel = block_inside_result.block->vel.y;
+                         current_pos_delta = block_inside_result.block->pos_delta.y;
                          break;
                     }
 
-                    bool overcomes_static_friction = false;
                     ElasticCollisionResult_t elastic_result;
+
+                    if(current_collision_block_vel != 0){
+                         overcomes_static_friction = true;
+                    }
 
                     {
                          static const F32 block_dt = 0.0166666f;
                          // static const F32 block_dt = BLOCK_ACCEL_TIME;
 
                          auto collided_block_mass = get_block_stack_mass(world, block_inside_result.block);
+
+                         // If the block has velocity but hasn't moved yet, then it has been collided with another block during this frame.
+                         // Thus, the collisions happened at the same time.
+                         if(current_collision_block_vel != 0 && current_pos_delta == 0){
+                              // steal the momentum from the collided block to mimic the collisions happening as a simultaneous mass
+                              auto fake_elastic_addition = elastic_transfer_momentum(collided_block_mass, current_collision_block_vel, instant_momentum.mass, 0);
+                              instant_momentum.vel += fake_elastic_addition.second_final_velocity;
+
+                              // kill the collided blocks velocity so that the it transfers all of the momentum
+                              switch(first_direction){
+                              default:
+                                   break;
+                              case DIRECTION_LEFT:
+                              case DIRECTION_RIGHT:
+                                   block_inside_result.block->vel.x = 0;
+                                   break;
+                              case DIRECTION_UP:
+                              case DIRECTION_DOWN:
+                                   block_inside_result.block->vel.y = 0;
+                                   break;
+                              }
+                              current_collision_block_vel = 0;
+                         }
+
                          elastic_result = elastic_transfer_momentum(instant_momentum.mass, instant_momentum.vel, collided_block_mass, current_collision_block_vel);
 
                          F32 change_in_vel = fabs(current_collision_block_vel - elastic_result.second_final_velocity);
                          F32 impulse = (F32)(collided_block_mass) * change_in_vel;
                          F32 applied_force = impulse / block_dt;
                          F32 static_friction_force = get_block_static_friction(collided_block_mass);
-                         overcomes_static_friction = applied_force >= static_friction_force;
-
+                         if(!overcomes_static_friction) overcomes_static_friction = applied_force >= static_friction_force;
 
 #if 0
                          F32 acceleration = change_in_vel / block_dt;
                          F32 block_impulse = (F32)(collided_block_mass) * acceleration;
 
-                         LOG("m1: %d, v1: %f, m2: %d, v2: %f v1f: %f, v2f: %f\n",
-                             instant_momentum.mass, instant_momentum.vel, collided_block_mass, current_collision_block_vel,
+                         LOG("block %d m1: %d, v1: %f, block %d m2: %d, v2: %f v1f: %f, v2f: %f\n",
+                             block_index, instant_momentum.mass, instant_momentum.vel, get_block_index(world, block_inside_result.block), collided_block_mass, current_collision_block_vel,
                              elastic_result.first_final_velocity, elastic_result.second_final_velocity);
 
                          LOG("Mass                    : %d\n", collided_block_mass);
@@ -1505,7 +1539,6 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                          }
 
                          if(block_push(block_inside_result.block, push_pos, push_pos_delta, first_direction, world, true, 1.0f, &instant_momentum)){
-
                               // TODO: should we apply this to second_direction logic?
                               // update result move states based on push if we pushed ourselves
                               if(block_inside_index == block_index){
@@ -1529,7 +1562,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                                    }
                               }
 
-                              push_entangled_block(block_inside_result.block, world, first_direction, true, 1.0f, &instant_momentum);
+                              push_entangled_block(block_inside_result.block, world, first_direction, true, &instant_momentum);
 
                               if(blocks_are_entangled(block_inside_result.block - world->blocks.elements, block_index, &world->blocks)){
                                    Block_t* block = world->blocks.elements + block_index;
@@ -1570,7 +1603,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                               result.block_changes.add(block_inside_index, BLOCK_CHANGE_TYPE_POS_DELTA_Y, block_inside_result.block->pos_delta.y + transfer_pos_delta.y);
                               result.block_changes.add(block_inside_index, BLOCK_CHANGE_TYPE_STOP_ON_PIXEL_Y, (S16)(0));
 
-                              push_entangled_block(block_inside_result.block, world, second_direction, true, 1.0f, &instant_momentum);
+                              push_entangled_block(block_inside_result.block, world, second_direction, true, &instant_momentum);
 
                               if(blocks_are_entangled(block_inside_result.block - world->blocks.elements, block_index, &world->blocks)){
                                    Block_t* block = world->blocks.elements + block_index;
@@ -1687,8 +1720,9 @@ Interactive_t* block_is_teleporting(Block_t* block, QuadTreeNode_t<Interactive_t
      return nullptr;
 }
 
-void push_entangled_block(Block_t* block, World_t* world, Direction_t push_dir, bool pushed_by_ice, F32 force, TransferMomentum_t* instant_momentum){
+void push_entangled_block(Block_t* block, World_t* world, Direction_t push_dir, bool pushed_by_ice, TransferMomentum_t* instant_momentum){
      if(block->entangle_index < 0) return;
+
 
      S16 block_index = block - world->blocks.elements;
      S16 entangle_index = block->entangle_index;
@@ -1699,6 +1733,15 @@ void push_entangled_block(Block_t* block, World_t* world, Direction_t push_dir, 
           if(!held_down || on_ice){
                auto rotations_between = direction_rotations_between(static_cast<Direction_t>(entangled_block->rotation), static_cast<Direction_t>(block->rotation));
                Direction_t rotated_dir = direction_rotate_clockwise(push_dir, rotations_between);
+
+               F32 force = 1.0f;
+               if(!pushed_by_ice){
+                    // TODO: compress this with code where the player pushes a block
+                    static const S16 baseline_block_mass = TILE_SIZE_IN_PIXELS * TILE_SIZE_IN_PIXELS;
+                    auto total_block_mass = get_block_stack_mass(world, entangled_block);
+                    force = (F32)(baseline_block_mass) / (F32)(total_block_mass);
+               }
+
                block_push(entangled_block, rotated_dir, world, pushed_by_ice, force, instant_momentum);
           }
           entangle_index = entangled_block->entangle_index;

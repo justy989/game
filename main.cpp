@@ -14,7 +14,6 @@ Entanglement Puzzles:
 - rotated entangled puzzles where the centroid is on a portal destination coord
 
 Current bugs:
-- An entangled player caught between blocks against a portal gets crushed
 - pressure plates don't see blocks as 1 pixel too small on the right and top, so their activation is delayed in those directions
 - A block on the tile outside a portal pushed into the portal to clone, the clone has weird behavior and ends up on the portal block
 - When pushing a block through a portal that turns off, the block keeps going
@@ -27,8 +26,7 @@ Current bugs:
 - Something funky about level 76 taking forever to test the map
 
 Big Features:
-- 'Bring Block Ice Collision to the Masses' - my favorite feature joke of the game
-     - Max momentum a player can stop? 2 blocks, maybe 2
+- 1 block off-grid colliding with 2 perpendicular blocks on ice doesn't give each block half momentum
 - 3D
      - a block with ice on it shouldn't be able to carry a block
      - if we put a popup on the other side of a portal and a block 1 interval high goes through the portal, will it work the way we expect?

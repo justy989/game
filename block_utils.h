@@ -223,7 +223,7 @@ void search_portal_destination_for_blocks(QuadTreeNode_t<Block_t>* block_qt, Dir
 
 Interactive_t* block_is_teleporting(Block_t* block, QuadTreeNode_t<Interactive_t>* interactive_qt);
 
-void push_entangled_block(Block_t* block, World_t* world, Direction_t push_dir, bool pushed_by_ice, F32 force = 1.0f, TransferMomentum_t* instant_momentum = nullptr);
+void push_entangled_block(Block_t* block, World_t* world, Direction_t push_dir, bool pushed_by_ice, TransferMomentum_t* instant_momentum = nullptr);
 bool blocks_are_entangled(Block_t* a, Block_t* b, ObjectArray_t<Block_t>* blocks_array);
 bool blocks_are_entangled(S16 a_index, S16 b_index, ObjectArray_t<Block_t>* blocks_array);
 
