@@ -3269,6 +3269,27 @@ int main(int argc, char** argv){
                     world.players.elements[0].rotation = 0;
                }
 
+               // calculate stop_on_pixels for blocks carrying other blocks
+               for(S16 i = 0; i < world.blocks.count; i++){
+                    Block_t* block = world.blocks.elements + i;
+
+                    auto result = block_held_up_by_another_block(block, world.block_qt, world.interactive_qt, &world.tilemap,
+                                                                 BLOCK_FRICTION_AREA);
+                    for(S16 b = 0; b < result.count; b++){
+                         auto holder = result.blocks_held[b].block;
+
+                         if(block->stop_on_pixel_x == 0 && holder->stop_on_pixel_x != 0){
+                              S16 pixel_diff = (holder->pos.pixel.x - block->pos.pixel.x);
+                              block->stop_on_pixel_x = holder->stop_on_pixel_x + pixel_diff;
+                         }
+
+                         if(block->stop_on_pixel_y == 0 && holder->stop_on_pixel_y != 0){
+                              S16 pixel_diff = (holder->pos.pixel.y - block->pos.pixel.y);
+                              block->stop_on_pixel_y = holder->stop_on_pixel_y + pixel_diff;
+                         }
+                    }
+               }
+
                for(S16 i = 0; i < world.blocks.count; i++){
                     Block_t* block = world.blocks.elements + i;
 
