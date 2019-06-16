@@ -67,6 +67,7 @@ In order to communicate that the world doesn't work like this (Real objects don'
 Put in a special block that doesn't have the functionality of stopping grid aligned on purpose. Make it look like a regular rock. Make it not used for anything else.
 It also bounces off of walls when colliding with them while on ice.
 You can use the normal blocks to guide the these realistic blocks for some sweet metapuzzle action.
+It can be a more jaggy shape to represent how the real world is much messier
 
 Should we ice the under side of a block when it is in the air near an ice lit block?
 
@@ -1113,39 +1114,6 @@ int main(int argc, char** argv){
           fprintf(stderr, "failed to create log file: '%s'\n", log_path);
           return -1;
      }
-
-#if 0
-     {
-          static const F32 block_dt = 0.0166666f;
-          static const F32 player_force = BLOCK_ACCEL * ((F32)(TILE_SIZE_IN_PIXELS * TILE_SIZE_IN_PIXELS));
-
-          auto print_block_physics = [](S16 block_mass){
-               F32 block_accel = player_force / (F32)(block_mass);
-               F32 block_velocity = block_accel * BLOCK_ACCEL_TIME;
-               F32 block_impulse = (F32)(block_mass) * block_velocity;
-               F32 block_force = block_impulse / block_dt;
-               F32 block_normal_force = (F32)(block_mass) * GRAVITY; // F = mg
-               F32 block_static_friction_force = block_normal_force * ICE_STATIC_FRICTION_COEFFICIENT;
-
-               LOG("Mass                    : %d\n", block_mass);
-               LOG("  Accel                 : %f\n", block_accel);
-               LOG("  Accel time            : %f\n", BLOCK_ACCEL_TIME);
-               LOG("  dt                    : %f\n", block_dt);
-               LOG("  Velocity              : %f\n", block_velocity);
-               LOG("  dt Impulse            : %f\n", block_impulse);
-               LOG("  dt Force              : %f\n", block_force);
-               LOG("  Normal Force          : %f\n", block_normal_force);
-               LOG("  Mu                    : %f\n", block_force / block_normal_force);
-               LOG("  Static Friction Force : %f\n", block_static_friction_force);
-          };
-
-          print_block_physics(TILE_SIZE_IN_PIXELS * TILE_SIZE_IN_PIXELS);
-          print_block_physics(2 * TILE_SIZE_IN_PIXELS * TILE_SIZE_IN_PIXELS);
-          print_block_physics(2 * TILE_SIZE_IN_PIXELS * TILE_SIZE_IN_PIXELS + HALF_TILE_SIZE_IN_PIXELS * TILE_SIZE_IN_PIXELS);
-          print_block_physics(3 * TILE_SIZE_IN_PIXELS * TILE_SIZE_IN_PIXELS);
-          print_block_physics(4 * TILE_SIZE_IN_PIXELS * TILE_SIZE_IN_PIXELS);
-     }
-#endif
 
      if(test && !load_map_filepath && !suite){
           LOG("cannot test without specifying a map to load\n");
