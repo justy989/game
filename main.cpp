@@ -28,10 +28,8 @@ Current bugs:
 Big Features:
 - 1 block off-grid colliding with 2 perpendicular blocks on ice doesn't give each block half momentum
 - 3D
-     - a block with ice on it shouldn't be able to carry a block
      - if we put a popup on the other side of a portal and a block 1 interval high goes through the portal, will it work the way we expect?
      - how does a stack of entangled blocks move?
-- Being squished between blocks through a portal doesn't work
 - Players impact carry velocity until the block teleports
 - 2 non-entangled blocks colliding at a centroid on ice don't do the right thing
 - update get mass and block push to handle infinite mass cases
@@ -470,9 +468,11 @@ struct BlockList_t{
 void get_block_stack(World_t* world, Block_t* block, BlockList_t* block_list, S8 rotations_through_portal){
      block_list->add(block, rotations_through_portal);
 
-     auto result = block_held_down_by_another_block(block, world->block_qt, world->interactive_qt, &world->tilemap);
-     for(S16 i = 0; i < result.count; i++){
-          get_block_stack(world, result.blocks_held[i].block, block_list, rotations_through_portal);
+     if(block->element != ELEMENT_ICE && block->element != ELEMENT_ONLY_ICED){
+          auto result = block_held_down_by_another_block(block, world->block_qt, world->interactive_qt, &world->tilemap);
+          for(S16 i = 0; i < result.count; i++){
+               get_block_stack(world, result.blocks_held[i].block, block_list, rotations_through_portal);
+          }
      }
 }
 
@@ -2836,12 +2836,16 @@ int main(int argc, char** argv){
 
                     for(S16 i = 0; i < world.blocks.count; i++){
                          auto block = world.blocks.elements + i;
+
                          auto result = block_held_up_by_another_block(block, world.block_qt, world.interactive_qt, &world.tilemap,
                                                                       BLOCK_FRICTION_AREA);
                          for(S16 b = 0; b < result.count; b++){
                               auto holder = result.blocks_held[b].block;
-                              if(holder && holder->element != ELEMENT_ICE && holder->element != ELEMENT_ONLY_ICED &&
-                                 holder->pos_delta != vec_zero()){
+
+                              // a frictionless surface cannot carry a block
+                              if(holder->element == ELEMENT_ICE || holder->element == ELEMENT_ONLY_ICED) continue;
+
+                              if(holder && holder->pos_delta != vec_zero()){
                                    auto old_carried_pos_delta = block->carried_pos_delta.positive + block->carried_pos_delta.negative;
 
                                    auto holder_index = get_block_index(&world, holder);
