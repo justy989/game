@@ -455,10 +455,32 @@ bool blocks_are_entangled(S16 a_index, S16 b_index, ObjectArray_t<Block_t>* bloc
      return blocks_are_entangled(a, b, blocks_array);
 }
 
-Block_t* block_inside_block_list(Position_t block_to_check_pos, Vec_t block_to_check_pos_delta,
-                                 S16 block_to_check_index, bool block_to_check_cloning,
-                                 Block_t** blocks, S16 block_count, ObjectArray_t<Block_t>* blocks_array,
-                                 Position_t* collided_with, U8 portal_rotations, Pixel_t* portal_offsets){
+struct BlockInsideBlockResult_t{
+     Block_t* block = nullptr;
+     Position_t collided_pos;
+};
+
+#define MAX_BLOCK_INSIDE_BLOCK_COUNT 16
+
+struct BlockInsideBlockListResult_t{
+     BlockInsideBlockResult_t entries[MAX_BLOCK_INSIDE_BLOCK_COUNT];
+     S8 count = 0;
+
+     bool add(Block_t* block, Position_t collided_pos){
+          if(count >= MAX_BLOCK_INSIDE_BLOCK_COUNT) return false;
+          entries[count].block = block;
+          entries[count].collided_pos = collided_pos;
+          count++;
+          return true;
+     }
+};
+
+BlockInsideBlockListResult_t block_inside_block_list(Position_t block_to_check_pos, Vec_t block_to_check_pos_delta,
+                                                     S16 block_to_check_index, bool block_to_check_cloning,
+                                                     Block_t** blocks, S16 block_count, ObjectArray_t<Block_t>* blocks_array,
+                                                     U8 portal_rotations, Pixel_t* portal_offsets){
+     BlockInsideBlockListResult_t result;
+
      auto final_block_to_check_pos = block_to_check_pos + block_to_check_pos_delta;
 
      Quad_t quad = {0, 0, TILE_SIZE, TILE_SIZE};
@@ -493,13 +515,12 @@ Block_t* block_inside_block_list(Position_t block_to_check_pos, Vec_t block_to_c
           }
 
           if(quad_in_quad_high_range_exclusive(&quad, &quad_to_check)){
-               *collided_with = final_block_pos;
-               collided_with->pixel += HALF_TILE_SIZE_PIXEL;
-               return block;
+               final_block_pos.pixel += HALF_TILE_SIZE_PIXEL;
+               result.add(block, final_block_pos);
           }
      }
 
-     return nullptr;
+     return result;
 }
 
 BlockInsideResult_t block_inside_another_block(Position_t block_to_check_pos, Vec_t block_to_check_pos_delta, S16 block_to_check_index,
@@ -519,12 +540,13 @@ BlockInsideResult_t block_inside_another_block(Position_t block_to_check_pos, Ve
      Pixel_t portal_offsets[BLOCK_QUAD_TREE_MAX_QUERY];
      memset(portal_offsets, 0, sizeof(portal_offsets));
 
-     Block_t* collided_block = block_inside_block_list(block_to_check_pos, block_to_check_pos_delta,
+     auto inside_list_result = block_inside_block_list(block_to_check_pos, block_to_check_pos_delta,
                                                        block_to_check_index,
                                                        block_to_check_cloning, blocks, block_count,
-                                                       block_array, &result.collision_pos, 0, portal_offsets);
-     if(collided_block){
-          result.block = collided_block;
+                                                       block_array, 0, portal_offsets);
+     if(inside_list_result.count > 0){
+          result.block = inside_list_result.entries[0].block;
+          result.collision_pos = inside_list_result.entries[0].collided_pos;
           return result;
      }
 
@@ -550,13 +572,13 @@ BlockInsideResult_t block_inside_another_block(Position_t block_to_check_pos, Ve
                               search_portal_destination_for_blocks(block_qt, interactive->portal.face, (Direction_t)(d), src_coord,
                                                                    dst_coord, blocks, &block_count, portal_offsets);
 
-                              collided_block = block_inside_block_list(block_to_check_pos, block_to_check_pos_delta,
-                                                                       block_to_check_index,
-                                                                       block_to_check_cloning, blocks, block_count,
-                                                                       block_array, &result.collision_pos,
-                                                                       portal_rotations, portal_offsets);
-                              if(collided_block){
-                                   result.block = collided_block;
+                              inside_list_result = block_inside_block_list(block_to_check_pos, block_to_check_pos_delta,
+                                                                           block_to_check_index, block_to_check_cloning,
+                                                                           blocks, block_count, block_array, portal_rotations,
+                                                                           portal_offsets);
+                              if(inside_list_result.count > 0){
+                                   result.block = inside_list_result.entries[0].block;
+                                   result.collision_pos = inside_list_result.entries[0].collided_pos;
                                    result.portal_rotations = portal_rotations;
                                    result.src_portal_coord = src_coord;
                                    result.dst_portal_coord = dst_coord;

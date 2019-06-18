@@ -26,10 +26,13 @@ Current bugs:
 - Something funky about level 76 taking forever to test the map
 
 Big Features:
-- 1 block off-grid colliding with 2 perpendicular blocks on ice doesn't give each block half momentum
+- Momentum
+     - 1 block off-grid colliding with 2 perpendicular blocks on ice doesn't give each block half momentum
+     - Too much momentum squishing the player should reset the puzzle
+     - Right now we can push 3 adjacent connected blocks on ice, but we should only be able to push 2
 - 3D
      - if we put a popup on the other side of a portal and a block 1 interval high goes through the portal, will it work the way we expect?
-     - how does a stack of entangled blocks move?
+     - how does a stack of entangled blocks move? really f***ing weird right now tbh
 - Players impact carry velocity until the block teleports
 - 2 non-entangled blocks colliding at a centroid on ice don't do the right thing
 - update get mass and block push to handle infinite mass cases
