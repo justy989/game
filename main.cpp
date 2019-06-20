@@ -30,6 +30,7 @@ Big Features:
      - 1 block off-grid colliding with 2 perpendicular blocks on ice doesn't give each block half momentum
      - Too much momentum squishing the player should reset the puzzle
      - Right now we can push 3 adjacent connected blocks on ice, but we should only be able to push 2
+     - If a block is moving slowly, the player cant push it in the direction it is going
 - 3D
      - if we put a popup on the other side of a portal and a block 1 interval high goes through the portal, will it work the way we expect?
      - how does a stack of entangled blocks move? really f***ing weird right now tbh
