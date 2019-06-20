@@ -2,6 +2,7 @@
 #include "defines.h"
 
 #include <math.h>
+#include <stdlib.h>
 
 bool xy_in_rect(const Rect_t& rect, S16 x, S16 y){
      return (x >= rect.left && x <= rect.right &&
