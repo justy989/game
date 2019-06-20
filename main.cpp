@@ -43,6 +43,10 @@ Big Features:
 - Block splitting
 - Multiple players pushing blocks at once
 
+Cleanup:
+- Probably make a get_x_component(), get_y_component() for position as well ? That could help reduce code
+- Template the result structures that add results up to a certain count
+
 Potential Board Game Idea around newton's cradle
 - N by N grid (maybe like chess?) that pieces can be dropped onto (creating height) or slide in from the side, attempting to impact
 - Use newtonian physics to decide the impact the outcome
@@ -621,9 +625,9 @@ bool do_block_collision(World_t* world, Block_t* block, F32 dt, S16* update_bloc
 
                     // if positions are diagonal to each other and the rotation between them is odd, check if we are moving into each other
                     if(pos_dimension_delta <= FLT_EPSILON && (total_rotations_between) % 2 == 1){
-                         auto entangle_inside_result = block_inside_another_block(entangled_block->pos, entangled_block->pos_delta, get_block_index(world, entangled_block),
-                                                                                  entangled_block->clone_id > 0, world->block_qt, world->interactive_qt, &world->tilemap, &world->blocks);
-                         if(entangle_inside_result.block == block){
+                         auto entangle_inside_result = block_inside_others(entangled_block->pos, entangled_block->pos_delta, get_block_index(world, entangled_block),
+                                                                           entangled_block->clone_id > 0, world->block_qt, world->interactive_qt, &world->tilemap, &world->blocks);
+                         if(entangle_inside_result.count > 0 && entangle_inside_result.entries[0].block == block){
                               // stop the blocks moving toward each other
                               static const VecMaskCollisionEntry_t table[] = {
                                    {static_cast<S8>(DIRECTION_MASK_RIGHT | DIRECTION_MASK_UP), DIRECTION_LEFT, DIRECTION_UP, DIRECTION_DOWN, DIRECTION_RIGHT},

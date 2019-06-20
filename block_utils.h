@@ -7,12 +7,30 @@
 #include "quad_tree.h"
 #include "world.h"
 
-struct BlockInsideResult_t{
+struct BlockInsideBlockResult_t{
      Block_t* block;
      Position_t collision_pos;
      U8 portal_rotations;
      Coord_t src_portal_coord;
      Coord_t dst_portal_coord;
+};
+
+#define MAX_BLOCK_INSIDE_OTHERS_COUNT 16
+
+struct BlockInsideOthersResult_t{
+     BlockInsideBlockResult_t entries[MAX_BLOCK_INSIDE_OTHERS_COUNT];
+     S8 count = 0;
+
+     bool add(Block_t* block, Position_t collision_pos, U8 portal_rotations, Coord_t src_portal_coord, Coord_t dst_portal_coord){
+          if(count >= MAX_BLOCK_INSIDE_OTHERS_COUNT) return false;
+          entries[count].block = block;
+          entries[count].collision_pos = collision_pos;
+          entries[count].portal_rotations = portal_rotations;
+          entries[count].src_portal_coord = src_portal_coord;
+          entries[count].dst_portal_coord = dst_portal_coord;
+          count++;
+          return true;
+     }
 };
 
 enum BlockChangeType_t : S8{
@@ -191,7 +209,7 @@ Block_t* rotated_entangled_blocks_against_centroid(Block_t* block, Direction_t d
 Interactive_t* block_against_solid_interactive(Block_t* block_to_check, Direction_t direction,
                                                TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt);
 
-BlockInsideResult_t block_inside_another_block(Position_t block_to_check_pos, Vec_t block_to_check_pos_delta, S16 block_to_check_index,
+BlockInsideOthersResult_t block_inside_others(Position_t block_to_check_pos, Vec_t block_to_check_pos_delta, S16 block_to_check_index,
                                                bool block_to_check_cloning, QuadTreeNode_t<Block_t>* block_qt,
                                                QuadTreeNode_t<Interactive_t>* interactive_quad_tree, TileMap_t* tilemap,
                                                ObjectArray_t<Block_t>* block_array);

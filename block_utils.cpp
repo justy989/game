@@ -455,7 +455,7 @@ bool blocks_are_entangled(S16 a_index, S16 b_index, ObjectArray_t<Block_t>* bloc
      return blocks_are_entangled(a, b, blocks_array);
 }
 
-struct BlockInsideBlockResult_t{
+struct BlockInsideBlockInListResult_t{
      Block_t* block = nullptr;
      Position_t collided_pos;
 };
@@ -463,7 +463,7 @@ struct BlockInsideBlockResult_t{
 #define MAX_BLOCK_INSIDE_BLOCK_COUNT 16
 
 struct BlockInsideBlockListResult_t{
-     BlockInsideBlockResult_t entries[MAX_BLOCK_INSIDE_BLOCK_COUNT];
+     BlockInsideBlockInListResult_t entries[MAX_BLOCK_INSIDE_BLOCK_COUNT];
      S8 count = 0;
 
      bool add(Block_t* block, Position_t collided_pos){
@@ -523,11 +523,11 @@ BlockInsideBlockListResult_t block_inside_block_list(Position_t block_to_check_p
      return result;
 }
 
-BlockInsideResult_t block_inside_another_block(Position_t block_to_check_pos, Vec_t block_to_check_pos_delta, S16 block_to_check_index,
-                                               bool block_to_check_cloning, QuadTreeNode_t<Block_t>* block_qt,
-                                               QuadTreeNode_t<Interactive_t>* interactive_quad_tree, TileMap_t* tilemap,
-                                               ObjectArray_t<Block_t>* block_array){
-     BlockInsideResult_t result = {};
+BlockInsideOthersResult_t block_inside_others(Position_t block_to_check_pos, Vec_t block_to_check_pos_delta, S16 block_to_check_index,
+                                              bool block_to_check_cloning, QuadTreeNode_t<Block_t>* block_qt,
+                                              QuadTreeNode_t<Interactive_t>* interactive_quad_tree, TileMap_t* tilemap,
+                                              ObjectArray_t<Block_t>* block_array){
+     BlockInsideOthersResult_t result = {};
 
      auto block_to_check_center_pixel = block_center_pixel(block_to_check_pos);
 
@@ -545,9 +545,7 @@ BlockInsideResult_t block_inside_another_block(Position_t block_to_check_pos, Ve
                                                        block_to_check_cloning, blocks, block_count,
                                                        block_array, 0, portal_offsets);
      if(inside_list_result.count > 0){
-          result.block = inside_list_result.entries[0].block;
-          result.collision_pos = inside_list_result.entries[0].collided_pos;
-          return result;
+          result.add(inside_list_result.entries[0].block, inside_list_result.entries[0].collided_pos, 0, Coord_t{-1, -1}, Coord_t{-1, -1});
      }
 
      // find portals around the block to check
@@ -577,12 +575,8 @@ BlockInsideResult_t block_inside_another_block(Position_t block_to_check_pos, Ve
                                                                            blocks, block_count, block_array, portal_rotations,
                                                                            portal_offsets);
                               if(inside_list_result.count > 0){
-                                   result.block = inside_list_result.entries[0].block;
-                                   result.collision_pos = inside_list_result.entries[0].collided_pos;
-                                   result.portal_rotations = portal_rotations;
-                                   result.src_portal_coord = src_coord;
-                                   result.dst_portal_coord = dst_coord;
-                                   return result;
+                                   result.add(inside_list_result.entries[0].block, inside_list_result.entries[0].collided_pos,
+                                              portal_rotations, src_coord, dst_coord);
                               }
                          }
                     }
@@ -896,38 +890,38 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
      result.vertical_move = block_vertical_move;
      result.collided_block_index = -1;
 
-     BlockInsideResult_t block_inside_result = block_inside_another_block(block_pos,
-                                                                          result.pos_delta,
-                                                                          block_index,
-                                                                          block_is_cloning,
-                                                                          world->block_qt,
-                                                                          world->interactive_qt,
-                                                                          &world->tilemap,
-                                                                          &world->blocks);
-     if(block_inside_result.block){
+     auto block_inside_result = block_inside_others(block_pos,
+                                                    result.pos_delta,
+                                                    block_index,
+                                                    block_is_cloning,
+                                                    world->block_qt,
+                                                    world->interactive_qt,
+                                                    &world->tilemap,
+                                                    &world->blocks);
+     if(block_inside_result.count > 0){
           result.collided = true;
-          result.collided_block_index = get_block_index(world, block_inside_result.block);
-          result.collided_pos = block_inside_result.collision_pos;
-          result.collided_portal_rotations = block_inside_result.portal_rotations;
+          result.collided_block_index = get_block_index(world, block_inside_result.entries[0].block);
+          result.collided_pos = block_inside_result.entries[0].collision_pos;
+          result.collided_portal_rotations = block_inside_result.entries[0].portal_rotations;
 
           bool odd_collided_portal_rotations = (result.collided_portal_rotations % 2) == 1;
 
-          auto collided_block_center = block_inside_result.collision_pos;
+          auto collided_block_center = block_inside_result.entries[0].collision_pos;
 
           // update collided block center if the block is stopping on a pixel this frame
           // TODO: account for stop_on_pixel through a portal
-          if(block_inside_result.block->stop_on_pixel_x){
-               collided_block_center.pixel.x = block_inside_result.block->stop_on_pixel_x + HALF_TILE_SIZE_IN_PIXELS;
+          if(block_inside_result.entries[0].block->stop_on_pixel_x){
+               collided_block_center.pixel.x = block_inside_result.entries[0].block->stop_on_pixel_x + HALF_TILE_SIZE_IN_PIXELS;
                collided_block_center.decimal.x = 0;
           }
 
-          if(block_inside_result.block->stop_on_pixel_y){
-               collided_block_center.pixel.y = block_inside_result.block->stop_on_pixel_y + HALF_TILE_SIZE_IN_PIXELS;
+          if(block_inside_result.entries[0].block->stop_on_pixel_y){
+               collided_block_center.pixel.y = block_inside_result.entries[0].block->stop_on_pixel_y + HALF_TILE_SIZE_IN_PIXELS;
                collided_block_center.decimal.y = 0;
           }
 
           auto moved_block_pos = block_get_center(block_pos);
-          auto move_direction = move_direction_between(moved_block_pos, block_inside_result.collision_pos);
+          auto move_direction = move_direction_between(moved_block_pos, block_inside_result.entries[0].collision_pos);
           Direction_t first_direction;
           Direction_t second_direction;
           move_direction_to_directions(move_direction, &first_direction, &second_direction);
@@ -935,15 +929,15 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
           // check if they are on ice before we adjust the position on our block to check
           bool a_on_ice_or_air = block_on_ice(block_pos, result.pos_delta, &world->tilemap, world->interactive_qt, world->block_qt) ||
               block_on_air(block_pos, result.pos_delta, world->interactive_qt, world->block_qt, &world->tilemap);
-          bool b_on_ice_or_air = block_on_ice(block_inside_result.block->pos, block_inside_result.block->pos_delta,
+          bool b_on_ice_or_air = block_on_ice(block_inside_result.entries[0].block->pos, block_inside_result.entries[0].block->pos_delta,
                                        &world->tilemap, world->interactive_qt, world->block_qt) ||
-              block_on_air(block_inside_result.block->pos, block_inside_result.block->pos_delta, world->interactive_qt, world->block_qt, &world->tilemap);
+              block_on_air(block_inside_result.entries[0].block->pos, block_inside_result.entries[0].block->pos_delta, world->interactive_qt, world->block_qt, &world->tilemap);
 
           Vec_t save_vel = result.vel;
 
           S16 block_inside_index = -1;
-          if(block_inside_result.block){
-              block_inside_index = get_block_index(world, block_inside_result.block);
+          if(block_inside_result.entries[0].block){
+              block_inside_index = get_block_index(world, block_inside_result.entries[0].block);
           }
 
           if(blocks_are_entangled(result.collided_block_index, block_index, &world->blocks)){
@@ -967,7 +961,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                if(!direction_in_mask(pos_diff_dir_mask, pos_delta_dir)) return result;
           }
 
-          auto collided_block_move_mask = vec_direction_mask(block_inside_result.block->pos_delta);
+          auto collided_block_move_mask = vec_direction_mask(block_inside_result.entries[0].block->pos_delta);
 
           if(result.collided_portal_rotations){
                // auto save_mask = collided_block_move_mask;
@@ -1003,9 +997,9 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                                    result.stop_on_pixel_x = collided_block_center.pixel.x + HALF_TILE_SIZE_IN_PIXELS;
                               }else{
                                    if(odd_collided_portal_rotations){
-                                        result.vel.x = block_inside_result.block->vel.y;
+                                        result.vel.x = block_inside_result.entries[0].block->vel.y;
                                    }else{
-                                        result.vel.x = block_inside_result.block->vel.x;
+                                        result.vel.x = block_inside_result.entries[0].block->vel.x;
                                    }
 
                                    if(result.vel.x > 0) result.vel.x = -result.vel.x;
@@ -1027,9 +1021,9 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                                    result.stop_on_pixel_x = (collided_block_center.pixel.x - HALF_TILE_SIZE_IN_PIXELS) - TILE_SIZE_IN_PIXELS;
                               }else{
                                    if(odd_collided_portal_rotations){
-                                        result.vel.x = block_inside_result.block->vel.y;
+                                        result.vel.x = block_inside_result.entries[0].block->vel.y;
                                    }else{
-                                        result.vel.x = block_inside_result.block->vel.x;
+                                        result.vel.x = block_inside_result.entries[0].block->vel.x;
                                    }
                                    if(result.vel.x < 0) result.vel.x = -result.vel.x;
                                    if(result.vel.x == 0){
@@ -1055,9 +1049,9 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                                    result.stop_on_pixel_y = collided_block_center.pixel.y + HALF_TILE_SIZE_IN_PIXELS;
                               }else{
                                    if(odd_collided_portal_rotations){
-                                        result.vel.y = block_inside_result.block->vel.x;
+                                        result.vel.y = block_inside_result.entries[0].block->vel.x;
                                    }else{
-                                        result.vel.y = block_inside_result.block->vel.y;
+                                        result.vel.y = block_inside_result.entries[0].block->vel.y;
                                    }
 
                                    if(result.vel.y > 0) result.vel.y = -result.vel.y;
@@ -1079,9 +1073,9 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                                    result.stop_on_pixel_y = (collided_block_center.pixel.y - HALF_TILE_SIZE_IN_PIXELS) - TILE_SIZE_IN_PIXELS;
                               }else{
                                    if(odd_collided_portal_rotations){
-                                        result.vel.y = block_inside_result.block->vel.x;
+                                        result.vel.y = block_inside_result.entries[0].block->vel.x;
                                    }else{
-                                        result.vel.y = block_inside_result.block->vel.y;
+                                        result.vel.y = block_inside_result.entries[0].block->vel.y;
                                    }
 
                                    if(result.vel.y < 0) result.vel.y = -result.vel.y;
@@ -1125,9 +1119,9 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                               // TODO: this case probably means if they are both on ice they want to start moving as a
                               //       group at a speed in the middle of both of their original speeds?
                               if(odd_collided_portal_rotations){
-                                   result.vel.x = block_inside_result.block->vel.y;
+                                   result.vel.x = block_inside_result.entries[0].block->vel.y;
                               }else{
-                                   result.vel.x = block_inside_result.block->vel.x;
+                                   result.vel.x = block_inside_result.entries[0].block->vel.x;
                               }
 
                               if(result.vel.x > 0) result.vel.x = -result.vel.x;
@@ -1158,9 +1152,9 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                     if(block_pos_delta.x > 0){
                          if(direction_in_mask(collided_block_move_mask, first_direction)){
                               if(odd_collided_portal_rotations){
-                                   result.vel.x = block_inside_result.block->vel.y;
+                                   result.vel.x = block_inside_result.entries[0].block->vel.y;
                               }else{
-                                   result.vel.x = block_inside_result.block->vel.x;
+                                   result.vel.x = block_inside_result.entries[0].block->vel.x;
                               }
 
                               if(result.vel.x < 0) result.vel.x = -result.vel.x;
@@ -1190,9 +1184,9 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                     if(block_pos_delta.y < 0){
                          if(direction_in_mask(collided_block_move_mask, first_direction)){
                               if(odd_collided_portal_rotations){
-                                   result.vel.y = block_inside_result.block->vel.x;
+                                   result.vel.y = block_inside_result.entries[0].block->vel.x;
                               }else{
-                                   result.vel.y = block_inside_result.block->vel.y;
+                                   result.vel.y = block_inside_result.entries[0].block->vel.y;
                               }
 
                               if(result.vel.y > 0) result.vel.y = -result.vel.y;
@@ -1222,9 +1216,9 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                     if(block_pos_delta.y > 0){
                          if(direction_in_mask(collided_block_move_mask, first_direction)){
                               if(odd_collided_portal_rotations){
-                                   result.vel.y = block_inside_result.block->vel.x;
+                                   result.vel.y = block_inside_result.entries[0].block->vel.x;
                               }else{
-                                   result.vel.y = block_inside_result.block->vel.y;
+                                   result.vel.y = block_inside_result.entries[0].block->vel.y;
                               }
 
                               if(result.vel.y < 0) result.vel.y = -result.vel.y;
@@ -1254,8 +1248,8 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                }
           }else{
                Coord_t block_coord = block_get_coord(block_pos);
-               Direction_t src_portal_dir = direction_between(block_coord, block_inside_result.src_portal_coord);
-               Direction_t dst_portal_dir = direction_between(block_coord, block_inside_result.dst_portal_coord);
+               Direction_t src_portal_dir = direction_between(block_coord, block_inside_result.entries[0].src_portal_coord);
+               Direction_t dst_portal_dir = direction_between(block_coord, block_inside_result.entries[0].dst_portal_coord);
                DirectionMask_t move_mask = vec_direction_mask(result.vel);
 
                auto resolve_result = resolve_block_colliding_with_itself(src_portal_dir, dst_portal_dir, move_mask, block_vel,
@@ -1301,9 +1295,9 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                          return result;
                     }
 
-                    first_direction = direction_rotate_clockwise(first_direction, block_inside_result.portal_rotations);
+                    first_direction = direction_rotate_clockwise(first_direction, block_inside_result.entries[0].portal_rotations);
                     if(second_direction != DIRECTION_COUNT){
-                         second_direction = direction_rotate_clockwise(second_direction, block_inside_result.portal_rotations);
+                         second_direction = direction_rotate_clockwise(second_direction, block_inside_result.entries[0].portal_rotations);
                     }
 
                     // blocks heading towards each other will stop
@@ -1311,13 +1305,13 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                     default:
                          break;
                     case DIRECTION_LEFT:
-                         if(block_inside_result.block->vel.x > 0){
-                              block_inside_result.block->stop_on_pixel_x = closest_pixel(block_inside_result.block->pos.pixel.x, block_inside_result.block->pos.decimal.x);
+                         if(block_inside_result.entries[0].block->vel.x > 0){
+                              block_inside_result.entries[0].block->stop_on_pixel_x = closest_pixel(block_inside_result.entries[0].block->pos.pixel.x, block_inside_result.entries[0].block->pos.decimal.x);
 
-                              Position_t final_stop_pos = pixel_pos(Pixel_t{block_inside_result.block->stop_on_pixel_x, 0});
-                              Vec_t pos_delta = pos_to_vec(final_stop_pos - block_inside_result.block->pos);
+                              Position_t final_stop_pos = pixel_pos(Pixel_t{block_inside_result.entries[0].block->stop_on_pixel_x, 0});
+                              Vec_t pos_delta = pos_to_vec(final_stop_pos - block_inside_result.entries[0].block->pos);
 
-                              S16 collided_block_index = get_block_index(world, block_inside_result.block);
+                              S16 collided_block_index = get_block_index(world, block_inside_result.entries[0].block);
 
                               result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_POS_DELTA_X, pos_delta.x);
                               result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_ACCEL_X, 0.0f);
@@ -1328,13 +1322,13 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                          }
                          break;
                     case DIRECTION_RIGHT:
-                         if(block_inside_result.block->vel.x < 0){
-                              block_inside_result.block->stop_on_pixel_x = closest_pixel(block_inside_result.block->pos.pixel.x, block_inside_result.block->pos.decimal.x);
+                         if(block_inside_result.entries[0].block->vel.x < 0){
+                              block_inside_result.entries[0].block->stop_on_pixel_x = closest_pixel(block_inside_result.entries[0].block->pos.pixel.x, block_inside_result.entries[0].block->pos.decimal.x);
 
-                              Position_t final_stop_pos = pixel_pos(Pixel_t{block_inside_result.block->stop_on_pixel_x, 0});
-                              Vec_t pos_delta = pos_to_vec(final_stop_pos - block_inside_result.block->pos);
+                              Position_t final_stop_pos = pixel_pos(Pixel_t{block_inside_result.entries[0].block->stop_on_pixel_x, 0});
+                              Vec_t pos_delta = pos_to_vec(final_stop_pos - block_inside_result.entries[0].block->pos);
 
-                              S16 collided_block_index = get_block_index(world, block_inside_result.block);
+                              S16 collided_block_index = get_block_index(world, block_inside_result.entries[0].block);
 
                               result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_POS_DELTA_X, pos_delta.x);
                               result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_ACCEL_X, 0.0f);
@@ -1345,13 +1339,13 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                          }
                          break;
                     case DIRECTION_DOWN:
-                         if(block_inside_result.block->vel.y > 0){
-                              block_inside_result.block->stop_on_pixel_y = closest_pixel(block_inside_result.block->pos.pixel.y, block_inside_result.block->pos.decimal.y);
+                         if(block_inside_result.entries[0].block->vel.y > 0){
+                              block_inside_result.entries[0].block->stop_on_pixel_y = closest_pixel(block_inside_result.entries[0].block->pos.pixel.y, block_inside_result.entries[0].block->pos.decimal.y);
 
-                              Position_t final_stop_pos = pixel_pos(Pixel_t{0, block_inside_result.block->stop_on_pixel_y});
-                              Vec_t pos_delta = pos_to_vec(final_stop_pos - block_inside_result.block->pos);
+                              Position_t final_stop_pos = pixel_pos(Pixel_t{0, block_inside_result.entries[0].block->stop_on_pixel_y});
+                              Vec_t pos_delta = pos_to_vec(final_stop_pos - block_inside_result.entries[0].block->pos);
 
-                              S16 collided_block_index = get_block_index(world, block_inside_result.block);
+                              S16 collided_block_index = get_block_index(world, block_inside_result.entries[0].block);
 
                               result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_POS_DELTA_Y, pos_delta.y);
                               result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_ACCEL_Y, 0.0f);
@@ -1362,13 +1356,13 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                          }
                          break;
                     case DIRECTION_UP:
-                         if(block_inside_result.block->vel.y < 0){
-                              block_inside_result.block->stop_on_pixel_y = closest_pixel(block_inside_result.block->pos.pixel.y, block_inside_result.block->pos.decimal.y);
+                         if(block_inside_result.entries[0].block->vel.y < 0){
+                              block_inside_result.entries[0].block->stop_on_pixel_y = closest_pixel(block_inside_result.entries[0].block->pos.pixel.y, block_inside_result.entries[0].block->pos.decimal.y);
 
-                              Position_t final_stop_pos = pixel_pos(Pixel_t{0, block_inside_result.block->stop_on_pixel_y});
-                              Vec_t pos_delta = pos_to_vec(final_stop_pos - block_inside_result.block->pos);
+                              Position_t final_stop_pos = pixel_pos(Pixel_t{0, block_inside_result.entries[0].block->stop_on_pixel_y});
+                              Vec_t pos_delta = pos_to_vec(final_stop_pos - block_inside_result.entries[0].block->pos);
 
-                              S16 collided_block_index = get_block_index(world, block_inside_result.block);
+                              S16 collided_block_index = get_block_index(world, block_inside_result.entries[0].block);
 
                               result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_POS_DELTA_Y, pos_delta.y);
                               result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_ACCEL_Y, 0.0f);
@@ -1387,13 +1381,13 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
 
                     // take into account direction and portal rotations before setting the instant vel
                     if(direction_is_horizontal(first_direction)){
-                         if((block_inside_result.portal_rotations % 2)){
+                         if((block_inside_result.entries[0].portal_rotations % 2)){
                               instant_momentum.vel = save_vel.y;
                          }else{
                               instant_momentum.vel = save_vel.x;
                          }
                     }else{
-                         if((block_inside_result.portal_rotations % 2)){
+                         if((block_inside_result.entries[0].portal_rotations % 2)){
                               instant_momentum.vel = save_vel.x;
                          }else{
                               instant_momentum.vel = save_vel.y;
@@ -1428,8 +1422,8 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                          }
                     }
 
-                    auto push_pos = block_inside_result.block->pos;
-                    auto push_pos_delta = block_inside_result.block->pos_delta;
+                    auto push_pos = block_inside_result.entries[0].block->pos;
+                    auto push_pos_delta = block_inside_result.entries[0].block->pos_delta;
 
                     // if we collide with ourself, use the resulting pos_delta because we could have already moved
                     // passed a valid spot that we would have been able to push from
@@ -1447,21 +1441,21 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                          break;
                     case DIRECTION_LEFT:
                     case DIRECTION_RIGHT:
-                         current_collision_block_vel = block_inside_result.block->vel.x;
-                         current_pos_delta = block_inside_result.block->pos_delta.x;
+                         current_collision_block_vel = block_inside_result.entries[0].block->vel.x;
+                         current_pos_delta = block_inside_result.entries[0].block->pos_delta.x;
 
                          // if the block is moving in our direction at all (even negative) then there is no static friction to overcome
                          if(current_collision_block_vel != 0) overcomes_static_friction = true;
                          break;
                     case DIRECTION_UP:
                     case DIRECTION_DOWN:
-                         current_collision_block_vel = block_inside_result.block->vel.y;
-                         current_pos_delta = block_inside_result.block->pos_delta.y;
+                         current_collision_block_vel = block_inside_result.entries[0].block->vel.y;
+                         current_pos_delta = block_inside_result.entries[0].block->pos_delta.y;
                          break;
                     }
 
                     {
-                         auto collided_block_mass = get_block_stack_mass(world, block_inside_result.block);
+                         auto collided_block_mass = get_block_stack_mass(world, block_inside_result.entries[0].block);
 
                          // If the block has velocity but hasn't moved yet, then it has been collided with another block during this frame.
                          // Thus, the collisions happened at the same time.
@@ -1476,18 +1470,18 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                                    break;
                               case DIRECTION_LEFT:
                               case DIRECTION_RIGHT:
-                                   block_inside_result.block->vel.x = 0;
+                                   block_inside_result.entries[0].block->vel.x = 0;
                                    break;
                               case DIRECTION_UP:
                               case DIRECTION_DOWN:
-                                   block_inside_result.block->vel.y = 0;
+                                   block_inside_result.entries[0].block->vel.y = 0;
                                    break;
                               }
                               current_collision_block_vel = 0;
                          }
                     }
 
-                    auto push_result = block_push(block_inside_result.block, push_pos, push_pos_delta, first_direction, world, true, 1.0f, &instant_momentum);
+                    auto push_result = block_push(block_inside_result.entries[0].block, push_pos, push_pos_delta, first_direction, world, true, 1.0f, &instant_momentum);
 
                     switch(first_direction){
                     default:
@@ -1519,19 +1513,19 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                          // update result move states based on push if we pushed ourselves
                          if(block_inside_index == block_index){
                               if(direction_is_horizontal(first_direction)){
-                                   result.vel.x = block_inside_result.block->vel.x;
-                                   result.horizontal_move = block_inside_result.block->horizontal_move;
+                                   result.vel.x = block_inside_result.entries[0].block->vel.x;
+                                   result.horizontal_move = block_inside_result.entries[0].block->horizontal_move;
                               }else{
-                                   result.vel.y = block_inside_result.block->vel.y;
-                                   result.vertical_move = block_inside_result.block->vertical_move;
+                                   result.vel.y = block_inside_result.entries[0].block->vel.y;
+                                   result.vertical_move = block_inside_result.entries[0].block->vertical_move;
                               }
                          }
 
-                         push_entangled_block(block_inside_result.block, world, first_direction, true, &instant_momentum);
+                         push_entangled_block(block_inside_result.entries[0].block, world, first_direction, true, &instant_momentum);
 
-                         if(blocks_are_entangled(block_inside_result.block - world->blocks.elements, block_index, &world->blocks)){
+                         if(blocks_are_entangled(block_inside_result.entries[0].block - world->blocks.elements, block_index, &world->blocks)){
                               Block_t* block = world->blocks.elements + block_index;
-                              auto rotations_between = direction_rotations_between(static_cast<Direction_t>(block_inside_result.block->rotation), static_cast<Direction_t>(block->rotation));
+                              auto rotations_between = direction_rotations_between(static_cast<Direction_t>(block_inside_result.entries[0].block->rotation), static_cast<Direction_t>(block->rotation));
                               if(rotations_between % 2 == 0){
                                    if(direction_is_horizontal(first_direction)){
                                         result.vel.x = block->vel.x;
@@ -1563,15 +1557,15 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
 
                     if(second_direction != DIRECTION_COUNT){
                          instant_momentum.vel = direction_is_horizontal(second_direction) ? save_vel.x : save_vel.y;
-                         if(block_push(block_inside_result.block, second_direction, world, true, 1.0f, &instant_momentum).pushed){
-                              result.block_changes.add(block_inside_index, BLOCK_CHANGE_TYPE_POS_DELTA_Y, block_inside_result.block->pos_delta.y);
+                         if(block_push(block_inside_result.entries[0].block, second_direction, world, true, 1.0f, &instant_momentum).pushed){
+                              result.block_changes.add(block_inside_index, BLOCK_CHANGE_TYPE_POS_DELTA_Y, block_inside_result.entries[0].block->pos_delta.y);
                               result.block_changes.add(block_inside_index, BLOCK_CHANGE_TYPE_STOP_ON_PIXEL_Y, (S16)(0));
 
-                              push_entangled_block(block_inside_result.block, world, second_direction, true, &instant_momentum);
+                              push_entangled_block(block_inside_result.entries[0].block, world, second_direction, true, &instant_momentum);
 
-                              if(blocks_are_entangled(block_inside_result.block - world->blocks.elements, block_index, &world->blocks)){
+                              if(blocks_are_entangled(block_inside_result.entries[0].block - world->blocks.elements, block_index, &world->blocks)){
                                    Block_t* block = world->blocks.elements + block_index;
-                                   auto rotations_between = direction_rotations_between(static_cast<Direction_t>(block_inside_result.block->rotation), static_cast<Direction_t>(block->rotation));
+                                   auto rotations_between = direction_rotations_between(static_cast<Direction_t>(block_inside_result.entries[0].block->rotation), static_cast<Direction_t>(block->rotation));
                                    if(rotations_between % 2 == 0){
                                         if(direction_is_horizontal(second_direction)){
                                              result.vel.x = block->vel.x;
