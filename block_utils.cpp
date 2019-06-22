@@ -543,6 +543,8 @@ Block_t* pixel_inside_block(Pixel_t pixel, S8 z, TileMap_t* tilemap, QuadTreeNod
           }
      }
 
+     // TODO: handle portal logic in the same way
+
      return nullptr;
 }
 

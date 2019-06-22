@@ -24,6 +24,9 @@ struct BlockInsideOthersResult_t{
 
      bool add(Block_t* block, Position_t collision_pos, U8 portal_rotations, Coord_t src_portal_coord, Coord_t dst_portal_coord){
           if(count >= MAX_BLOCK_INSIDE_OTHERS_COUNT) return false;
+          for(S8 i = 0; i < count; i++){
+               if(block == entries[i].block) return false;
+          }
           entries[count].block = block;
           entries[count].collision_pos = collision_pos;
           entries[count].portal_rotations = portal_rotations;
