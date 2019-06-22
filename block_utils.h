@@ -13,6 +13,7 @@ struct BlockInsideBlockResult_t{
      U8 portal_rotations;
      Coord_t src_portal_coord;
      Coord_t dst_portal_coord;
+     bool invalidated;
 };
 
 #define MAX_BLOCK_INSIDE_OTHERS_COUNT 16
@@ -28,6 +29,7 @@ struct BlockInsideOthersResult_t{
           entries[count].portal_rotations = portal_rotations;
           entries[count].src_portal_coord = src_portal_coord;
           entries[count].dst_portal_coord = dst_portal_coord;
+          entries[count].invalidated = false;
           count++;
           return true;
      }
@@ -224,8 +226,8 @@ BlockHeldResult_t block_held_down_by_another_block(Block_t* block, QuadTreeNode_
 bool block_on_ice(Position_t pos, Vec_t pos_delta, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree,
                   QuadTreeNode_t<Block_t>* block_qt);
 
-bool block_on_air(Position_t pos, Vec_t pos_delta, QuadTreeNode_t<Interactive_t>* interactive_qt, QuadTreeNode_t<Block_t>* block_qt, TileMap_t* tilemap);
-bool block_on_air(Block_t* block, QuadTreeNode_t<Interactive_t>* interactive_qt, QuadTreeNode_t<Block_t>* block_qt, TileMap_t* tilemap);
+bool block_on_air(Position_t pos, Vec_t pos_delta, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt, QuadTreeNode_t<Block_t>* block_qt);
+bool block_on_air(Block_t* block, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt, QuadTreeNode_t<Block_t>* block_qt);
 
 CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t block_pos, Vec_t block_pos_delta, Vec_t block_vel,
                                                                     Vec_t block_accel, S16 block_stop_on_pixel_x, S16 block_stop_on_pixel_y,

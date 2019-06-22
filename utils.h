@@ -13,6 +13,7 @@
 Direction_t direction_between(Coord_t a, Coord_t b);
 bool directions_meet_expectations(Direction_t a, Direction_t b, Direction_t first_expectation, Direction_t second_expectation);
 DirectionMask_t vec_direction_mask(Vec_t vec);
+DirectionMask_t pixel_direction_mask_between(Pixel_t a, Pixel_t b);
 Direction_t vec_direction(Vec_t vec); // returns the first direction it finds, only use this with one component vectors
 U8 portal_rotations_between(Direction_t a, Direction_t b);
 Vec_t direction_to_vec(Direction_t d);
@@ -55,3 +56,5 @@ S16 passes_over_grid_pixel(S16 pixel_a, S16 pixel_b);
 S16 passes_over_pixel(S16 pixel_a, S16 pixel_b);
 
 void get_rect_coords(Rect_t rect, Coord_t* coords);
+
+Pixel_t closest_pixel_in_rect(Pixel_t pixel, Rect_t rect);

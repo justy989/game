@@ -590,8 +590,10 @@ bool do_block_collision(World_t* world, Block_t* block, F32 dt, S16* update_bloc
           }
      }else{
           if(block->pos_delta.x != 0.0f || block->pos_delta.y != 0.0f){
-               collision_result = check_block_collision_with_other_blocks(block->pos, block->pos_delta,
-                                                                          block->vel, block->accel,
+               collision_result = check_block_collision_with_other_blocks(block->pos,
+                                                                          block->pos_delta,
+                                                                          block->vel,
+                                                                          block->accel,
                                                                           block->stop_on_pixel_x,
                                                                           block->stop_on_pixel_y,
                                                                           block->horizontal_move,
@@ -677,10 +679,10 @@ bool do_block_collision(World_t* world, Block_t* block, F32 dt, S16* update_bloc
                                    copy_block_collision_results(block, &collision_result);
                               }else{
                                    bool block_on_ice_or_air = block_on_ice(block->pos, block->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt) ||
-                                   block_on_air(block->pos, block->pos_delta, world->interactive_qt, world->block_qt, &world->tilemap);
+                                   block_on_air(block->pos, block->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt);
 
                                    bool entangled_block_on_ice_or_air = block_on_ice(entangled_block->pos, entangled_block->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt) ||
-                                   block_on_air(entangled_block->pos, entangled_block->pos_delta, world->interactive_qt, world->block_qt, &world->tilemap);
+                                   block_on_air(entangled_block->pos, entangled_block->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt);
 
                                    if(block_on_ice_or_air && entangled_block_on_ice_or_air){
                                         // TODO: handle this case for blocks not entangled on ice
@@ -781,7 +783,7 @@ bool do_block_collision(World_t* world, Block_t* block, F32 dt, S16* update_bloc
 
      // this instance of last_block_pushed is to keep the pushing smooth and not have it stop at the tile boundaries
      if(block != block_pushed && !block_on_ice(block->pos, block->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt) &&
-        !block_on_air(block, world->interactive_qt, world->block_qt, &world->tilemap)){
+        !block_on_air(block, &world->tilemap, world->interactive_qt, world->block_qt)){
           if(block_pushed && blocks_are_entangled(block_pushed, block, &world->blocks)){
                Block_t* entangled_block = block_pushed;
 
@@ -2504,7 +2506,7 @@ int main(int argc, char** argv){
                          if(block_on_ice(block->pos, block->pos_delta, &world.tilemap, world.interactive_qt, world.block_qt) || would_teleport_onto_ice){
                               block->coast_horizontal = BLOCK_COAST_ICE;
                               block->coast_vertical = BLOCK_COAST_ICE;
-                         }else if(block_on_air(block, world.interactive_qt, world.block_qt, &world.tilemap)){
+                         }else if(block_on_air(block, &world.tilemap, world.interactive_qt, world.block_qt)){
                               block->coast_horizontal = BLOCK_COAST_AIR;
                               block->coast_vertical = BLOCK_COAST_AIR;
                          }
@@ -2634,7 +2636,7 @@ int main(int argc, char** argv){
 
                               if(block_on_ice(check_block_pos, Vec_t{}, &world.tilemap, world.interactive_qt, world.block_qt)){
                                    block->coast_horizontal = BLOCK_COAST_ICE;
-                              }else if(block_on_air(check_block_pos, Vec_t{}, world.interactive_qt, world.block_qt, &world.tilemap)){
+                              }else if(block_on_air(check_block_pos, Vec_t{}, &world.tilemap, world.interactive_qt, world.block_qt)){
                                    block->coast_horizontal = BLOCK_COAST_AIR;
                               }
                          }
@@ -2652,7 +2654,7 @@ int main(int argc, char** argv){
 
                               if(block_on_ice(check_block_pos, Vec_t{}, &world.tilemap, world.interactive_qt, world.block_qt)){
                                    block->coast_vertical = BLOCK_COAST_ICE;
-                              }else if(block_on_air(check_block_pos, Vec_t{}, world.interactive_qt, world.block_qt, &world.tilemap)){
+                              }else if(block_on_air(check_block_pos, Vec_t{}, &world.tilemap, world.interactive_qt, world.block_qt)){
                                    block->coast_vertical = BLOCK_COAST_AIR;
                               }
                          }

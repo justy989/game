@@ -46,6 +46,19 @@ DirectionMask_t vec_direction_mask(Vec_t vec){
      return mask;
 }
 
+DirectionMask_t pixel_direction_mask_between(Pixel_t a, Pixel_t b){
+     DirectionMask_t mask = DIRECTION_MASK_NONE;
+     S16 x_diff = b.x - a.x;
+     S16 y_diff = b.y - a.y;
+
+     if(x_diff > 0) mask = direction_mask_add(mask, DIRECTION_MASK_RIGHT);
+     if(x_diff < 0) mask = direction_mask_add(mask, DIRECTION_MASK_LEFT);
+     if(y_diff > 0) mask = direction_mask_add(mask, DIRECTION_MASK_UP);
+     if(y_diff < 0) mask = direction_mask_add(mask, DIRECTION_MASK_DOWN);
+
+     return mask;
+}
+
 Direction_t vec_direction(Vec_t vec){
      return direction_from_single_mask(vec_direction_mask(vec));
 }
@@ -324,4 +337,26 @@ void get_rect_coords(Rect_t rect, Coord_t* coords){
      coords[1] = pixel_to_coord(Pixel_t{rect.left, rect.top});
      coords[2] = pixel_to_coord(Pixel_t{rect.right, rect.bottom});
      coords[3] = pixel_to_coord(Pixel_t{rect.right, rect.top});
+}
+
+Pixel_t closest_pixel_in_rect(Pixel_t pixel, Rect_t rect){
+     Pixel_t result;
+
+     if(pixel.x < rect.left){
+          result.x = rect.left;
+     }else if(pixel.x > rect.right){
+          result.x = rect.right;
+     }else{
+          result.x = pixel.x;
+     }
+
+     if(pixel.y < rect.bottom){
+          result.y = rect.bottom;
+     }else if(pixel.y > rect.top){
+          result.y = rect.top;
+     }else{
+          result.y = pixel.y;
+     }
+
+     return result;
 }
