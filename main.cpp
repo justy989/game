@@ -27,13 +27,14 @@ Current bugs:
 
 Big Features:
 - Momentum
-     - 1 block off-grid colliding with 2 perpendicular blocks on ice doesn't give each block half momentum
      - Too much momentum squishing the player should reset the puzzle
      - Right now we can push 3 adjacent connected blocks on ice, but we should only be able to push 2
      - If a block is moving slowly, the player cant push it in the direction it is going
+     - if the player tries to stop 2 blocks sliding on the ice at once, the player gets caught inside of one of the blocks
 - 3D
      - if we put a popup on the other side of a portal and a block 1 interval high goes through the portal, will it work the way we expect?
      - how does a stack of entangled blocks move? really f***ing weird right now tbh
+- When pushing blocks against blocks that are off-grid (due to pushing against a player), sometimes the blocks can't move towards other off-grid blocks
 - Players impact carry velocity until the block teleports
 - 2 non-entangled blocks colliding at a centroid on ice don't do the right thing
 - update get mass and block push to handle infinite mass cases
