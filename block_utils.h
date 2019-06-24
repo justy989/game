@@ -24,6 +24,7 @@ struct BlockInsideOthersResult_t{
 
      bool add(Block_t* block, Position_t collision_pos, U8 portal_rotations, Coord_t src_portal_coord, Coord_t dst_portal_coord){
           if(count >= MAX_BLOCK_INSIDE_OTHERS_COUNT) return false;
+          // refuse duplicates
           for(S8 i = 0; i < count; i++){
                if(block == entries[i].block) return false;
           }
@@ -192,6 +193,10 @@ struct BlockAgainstOthersResult_t{
 
      bool add(BlockAgainstOther_t against_other){
           if(count >= MAX_BLOCKS_AGAINST_BLOCK) return false;
+          // refuse duplicates
+          for(S8 i = 0; i < count; i++){
+               if(againsts[i].block == against_other.block) return false;
+          }
           againsts[count] = against_other;
           count++;
           return true;

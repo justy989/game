@@ -14,6 +14,7 @@ Entanglement Puzzles:
 - rotated entangled puzzles where the centroid is on a portal destination coord
 
 Current bugs:
+- a saw a case where I pushed 2 adjacent touching blocks on ice and the went through a portal, I pushed one of them and ended up inside the other
 - pressure plates don't see blocks as 1 pixel too small on the right and top, so their activation is delayed in those directions
 - A block on the tile outside a portal pushed into the portal to clone, the clone has weird behavior and ends up on the portal block
 - When pushing a block through a portal that turns off, the block keeps going
@@ -28,9 +29,8 @@ Current bugs:
 Big Features:
 - Momentum
      - Too much momentum squishing the player should reset the puzzle
-     - Right now we can push 3 adjacent connected blocks on ice, but we should only be able to push 2
      - If a block is moving slowly, the player cant push it in the direction it is going
-     - if the player tries to stop 2 blocks sliding on the ice at once, the player gets caught inside of one of the blocks
+     - if the player tries to stop 2 adjacent blocks in the middle of them sliding on the ice at once, the player gets caught inside of one of the blocks
 - 3D
      - if we put a popup on the other side of a portal and a block 1 interval high goes through the portal, will it work the way we expect?
      - how does a stack of entangled blocks move? really f***ing weird right now tbh
@@ -532,7 +532,6 @@ S16 get_block_mass_in_direction(World_t* world, Block_t* block, Direction_t dire
      }
 
      S16 mass = 0;
-
      for(S16 i = 0; i < block_list.count; i++){
           auto* block_entry = block_list.entries + i;
           if(block_entry->counted){
@@ -3363,7 +3362,8 @@ int main(int argc, char** argv){
                                    auto mass_ratio = (F32)(baseline_block_mass) / (F32)(total_block_mass);
 
                                    // player applies a force to accelerate the block by BLOCK_ACCEL
-                                   F32 applied_force = (F32)(total_block_mass) * (mass_ratio * BLOCK_ACCEL) / dt;
+                                   F32 block_acceleration = (mass_ratio * BLOCK_ACCEL);
+                                   F32 applied_force = (F32)(total_block_mass) * block_acceleration / BLOCK_ACCEL_TIME;
                                    F32 static_friction = get_block_static_friction(total_block_mass);
 
                                    if(applied_force >= static_friction){
