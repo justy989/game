@@ -3004,7 +3004,6 @@ int main(int argc, char** argv){
                               player->pushing_block = move_result.pushing_block;
                               player->pushing_block_dir = move_result.pushing_block_dir;
                               player->pushing_block_rotation = move_result.pushing_block_rotation;
-
                          }
 
                          auto* portal = player_is_teleporting(player, world.interactive_qt);

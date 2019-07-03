@@ -3,6 +3,8 @@
 #include "types.h"
 #include "direction.h"
 
+#define SURROUNDING_COORD_COUNT 8
+
 struct Coord_t{
      S16 x;
      S16 y;
@@ -32,3 +34,5 @@ void coord_move_x(Coord_t* c, S16 dx);
 void coord_move_y(Coord_t* c, S16 dy);
 
 bool coord_after(Coord_t a, Coord_t b);
+
+void coords_surrounding(Coord_t* coords, S16 coord_count, Coord_t center);

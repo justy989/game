@@ -738,9 +738,12 @@ static BlockHeldResult_t block_at_height_in_block_rect(Pixel_t block_to_check_pi
 
      auto block_to_check_coord = pixel_to_coord(block_to_check_center);
 
+     Coord_t surrounding_coords[SURROUNDING_COORD_COUNT];
+     coords_surrounding(surrounding_coords, SURROUNDING_COORD_COUNT, block_to_check_coord);
+
      // TODO: compress this logic with move_player_through_world()
-     for(S8 d = 0; d < DIRECTION_COUNT; d++){
-          Coord_t check_coord = block_to_check_coord + (Direction_t)(d);
+     for(S8 d = 0; d < SURROUNDING_COORD_COUNT; d++){
+          Coord_t check_coord = surrounding_coords[d];
           auto portal_src_pixel = coord_to_pixel_at_center(check_coord);
           auto interactive = quad_tree_interactive_find_at(interactive_qt, check_coord);
 

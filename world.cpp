@@ -588,13 +588,17 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                collision.pos = block_pos;
                collision.dir = relative_quadrant(player_pos.pixel, block_pos.pixel + HALF_TILE_SIZE_PIXEL);
                collision.player_pos_delta_mag = vec_magnitude(collision.player_pos_delta);
+
                block_collisions.add(collision);
           }
      }
 
+     Coord_t surrounding_coords[SURROUNDING_COORD_COUNT];
+     coords_surrounding(surrounding_coords, SURROUNDING_COORD_COUNT, player_coord);
+
      // check if the block is in a portal and try to collide with it
-     for(S8 d = 0; d < DIRECTION_COUNT; d++){
-          Coord_t check_coord = player_coord + (Direction_t)(d);
+     for(S8 c = 0; c < SURROUNDING_COORD_COUNT; c++){
+          Coord_t check_coord = surrounding_coords[c];
           auto portal_src_pixel = coord_to_pixel_at_center(check_coord);
           Interactive_t* interactive = quad_tree_interactive_find_at(world->interactive_qt, check_coord);
 
@@ -1375,7 +1379,6 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
                          auto rotations_between =  direction_rotations_between((Direction_t)(total_collided_rotations), (Direction_t)(block->rotation));
                          if(rotations_between == 2) return result;
                     }
-
 
                     auto push_result = block_push(collided_block, collided_block_push_dir, world, pushed_by_ice, force, instant_momentum);
 

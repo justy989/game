@@ -53,3 +53,15 @@ void coord_move_x(Coord_t* c, S16 dx){c->x += dx;};
 void coord_move_y(Coord_t* c, S16 dy){c->y += dy;}
 
 bool coord_after(Coord_t a, Coord_t b){return b.y < a.y || (b.y == a.y && b.x < a.x);}
+
+void coords_surrounding(Coord_t* coords, S16 coord_count, Coord_t center){
+     assert(coord_count >= SURROUNDING_COORD_COUNT);
+     S8 index = 0;
+     for(S8 x = -1; x <= 1; x++){
+          for(S8 y = -1; y <= 1; y++){
+               if(x == 0 && y == 0) continue;
+               coords[index] = center + Coord_t{x, y};
+               index++;
+          }
+     }
+}
