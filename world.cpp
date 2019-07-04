@@ -714,8 +714,8 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                          block_new_pos -= collided_pos_offset;
                          collision.block->pos_delta.x = pos_to_vec(block_new_pos - collision.block->pos).x;
                     }else if(!(collision.block->pos.z > player->pos.z && block_held_up_by_another_block(collision.block, world->block_qt, world->interactive_qt, &world->tilemap).held())){
-                         auto new_pos = collision.block->pos + Vec_t{TILE_SIZE + PLAYER_RADIUS, 0};
-                         result.pos_delta.x = pos_to_vec(new_pos - player->pos).x;
+                         auto new_pos = collision.pos + Vec_t{TILE_SIZE + PLAYER_RADIUS, 0};
+                         result.pos_delta.x = pos_to_vec(new_pos - player_pos).x;
 
                          if(even_rotations){
                               slow_block_toward_gridlock(world, collision.block, true, true);
@@ -760,8 +760,8 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                          block_new_pos -= collided_pos_offset;
                          collision.block->pos_delta.x = pos_to_vec(block_new_pos - collision.block->pos).x;
                     }else if(!(collision.block->pos.z > player->pos.z && block_held_up_by_another_block(collision.block, world->block_qt, world->interactive_qt, &world->tilemap).held())){
-                         auto new_pos = collision.block->pos - Vec_t{PLAYER_RADIUS, 0};
-                         result.pos_delta.x = pos_to_vec(new_pos - player->pos).x;
+                         auto new_pos = collision.pos - Vec_t{PLAYER_RADIUS, 0};
+                         result.pos_delta.x = pos_to_vec(new_pos - player_pos).x;
 
                          if(even_rotations){
                               slow_block_toward_gridlock(world, collision.block, true, false);
@@ -805,8 +805,8 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                          block_new_pos -= collided_pos_offset;
                          collision.block->pos_delta.y = pos_to_vec(block_new_pos - collision.block->pos).y;
                     }else if(!(collision.block->pos.z > player->pos.z && block_held_up_by_another_block(collision.block, world->block_qt, world->interactive_qt, &world->tilemap).held())){
-                         auto new_pos = collision.block->pos - Vec_t{0, PLAYER_RADIUS};
-                         result.pos_delta.y = pos_to_vec(new_pos - player->pos).y;
+                         auto new_pos = collision.pos - Vec_t{0, PLAYER_RADIUS};
+                         result.pos_delta.y = pos_to_vec(new_pos - player_pos).y;
 
                          if(even_rotations){
                               slow_block_toward_gridlock(world, collision.block, false, false);
@@ -850,8 +850,8 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                          block_new_pos -= collided_pos_offset;
                          collision.block->pos_delta.y = pos_to_vec(block_new_pos - collision.block->pos).y;
                     }else if(!(collision.block->pos.z > player->pos.z && block_held_up_by_another_block(collision.block, world->block_qt, world->interactive_qt, &world->tilemap).held())){
-                         auto new_pos = collision.block->pos + Vec_t{0, TILE_SIZE + PLAYER_RADIUS};
-                         result.pos_delta.y = pos_to_vec(new_pos - player->pos).y;
+                         auto new_pos = collision.pos + Vec_t{0, TILE_SIZE + PLAYER_RADIUS};
+                         result.pos_delta.y = pos_to_vec(new_pos - player_pos).y;
 
                          if(even_rotations){
                               slow_block_toward_gridlock(world, collision.block, false, true);
