@@ -8,12 +8,12 @@
 #include "world.h"
 
 struct BlockInsideBlockResult_t{
-     Block_t* block;
+     Block_t* block = nullptr;
      Position_t collision_pos;
-     U8 portal_rotations;
+     U8 portal_rotations = 0;
      Coord_t src_portal_coord;
      Coord_t dst_portal_coord;
-     bool invalidated;
+     bool invalidated = false;
 };
 
 #define MAX_BLOCK_INSIDE_OTHERS_COUNT 16

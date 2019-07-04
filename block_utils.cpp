@@ -1029,12 +1029,14 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                // update collided block center if the block is stopping on a pixel this frame
                // TODO: account for stop_on_pixel through a portal
                if(block_inside_result.entries[i].block->stop_on_pixel_x){
-                    collided_block_center.pixel.x = block_inside_result.entries[i].block->stop_on_pixel_x + HALF_TILE_SIZE_IN_PIXELS;
+                    auto portal_pixel_offset = (block_inside_result.entries[i].collision_pos - (block_inside_result.entries[i].block->pos + block_inside_result.entries[i].block->pos_delta)).pixel.x - HALF_TILE_SIZE_IN_PIXELS;
+                    collided_block_center.pixel.x = block_inside_result.entries[i].block->stop_on_pixel_x + HALF_TILE_SIZE_IN_PIXELS + portal_pixel_offset;
                     collided_block_center.decimal.x = 0;
                }
 
                if(block_inside_result.entries[i].block->stop_on_pixel_y){
-                    collided_block_center.pixel.y = block_inside_result.entries[i].block->stop_on_pixel_y + HALF_TILE_SIZE_IN_PIXELS;
+                    auto portal_pixel_offset = (block_inside_result.entries[i].collision_pos - (block_inside_result.entries[i].block->pos + block_inside_result.entries[i].block->pos_delta)).pixel.y - HALF_TILE_SIZE_IN_PIXELS;
+                    collided_block_center.pixel.y = block_inside_result.entries[i].block->stop_on_pixel_y + HALF_TILE_SIZE_IN_PIXELS + portal_pixel_offset;
                     collided_block_center.decimal.y = 0;
                }
 
@@ -1423,7 +1425,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                          case DIRECTION_LEFT:
                               if(block_inside_result.entries[i].block->vel.x > 0){
                                    Position_t final_stop_pos = pixel_pos(Pixel_t{block_inside_result.entries[i].block->stop_on_pixel_x, 0});
-                                   Vec_t pos_delta = pos_to_vec(final_stop_pos - block_inside_result.entries[i].block->pos);
+                                   Vec_t pos_delta = pos_to_vec(final_stop_pos - block_inside_result.entries[i].collision_pos);
 
                                    S16 collided_block_index = get_block_index(world, block_inside_result.entries[i].block);
 
@@ -1439,7 +1441,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                          case DIRECTION_RIGHT:
                               if(block_inside_result.entries[i].block->vel.x < 0){
                                    Position_t final_stop_pos = pixel_pos(Pixel_t{block_inside_result.entries[i].block->stop_on_pixel_x, 0});
-                                   Vec_t pos_delta = pos_to_vec(final_stop_pos - block_inside_result.entries[i].block->pos);
+                                   Vec_t pos_delta = pos_to_vec(final_stop_pos - block_inside_result.entries[i].collision_pos);
 
                                    S16 collided_block_index = get_block_index(world, block_inside_result.entries[i].block);
 
@@ -1455,7 +1457,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                          case DIRECTION_DOWN:
                               if(block_inside_result.entries[i].block->vel.y > 0){
                                    Position_t final_stop_pos = pixel_pos(Pixel_t{0, block_inside_result.entries[i].block->stop_on_pixel_y});
-                                   Vec_t pos_delta = pos_to_vec(final_stop_pos - block_inside_result.entries[i].block->pos);
+                                   Vec_t pos_delta = pos_to_vec(final_stop_pos - block_inside_result.entries[i].collision_pos);
 
                                    S16 collided_block_index = get_block_index(world, block_inside_result.entries[i].block);
 
@@ -1471,7 +1473,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                          case DIRECTION_UP:
                               if(block_inside_result.entries[i].block->vel.y < 0){
                                    Position_t final_stop_pos = pixel_pos(Pixel_t{0, block_inside_result.entries[i].block->stop_on_pixel_y});
-                                   Vec_t pos_delta = pos_to_vec(final_stop_pos - block_inside_result.entries[i].block->pos);
+                                   Vec_t pos_delta = pos_to_vec(final_stop_pos - block_inside_result.entries[i].collision_pos);
 
                                    S16 collided_block_index = get_block_index(world, block_inside_result.entries[i].block);
 
