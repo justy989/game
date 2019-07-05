@@ -1229,7 +1229,6 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                     } break;
                     case MOVE_DIRECTION_LEFT:
                          if(block_pos_delta.x < 0){
-
                               // TODO: compress these cases
                               if(direction_in_mask(collided_block_move_mask, first_direction)){
                                    // if the block is moving in the direction we collided, just move right up against it
@@ -1424,7 +1423,8 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                               break;
                          case DIRECTION_LEFT:
                               if(block_inside_result.entries[i].block->vel.x > 0){
-                                   Position_t final_stop_pos = pixel_pos(Pixel_t{block_inside_result.entries[i].block->stop_on_pixel_x, 0});
+                                   S16 closest_pixel_x = closest_pixel(block_inside_result.entries[i].block->pos.pixel.x, block_inside_result.entries[i].block->pos.decimal.x);
+                                   Position_t final_stop_pos = pixel_pos(Pixel_t{closest_pixel_x, 0});
                                    Vec_t pos_delta = pos_to_vec(final_stop_pos - block_inside_result.entries[i].collision_pos);
 
                                    S16 collided_block_index = get_block_index(world, block_inside_result.entries[i].block);
@@ -1434,13 +1434,14 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                                    result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_VEL_X, 0.0f);
                                    result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_HORIZONTAL_MOVE_STATE, MOVE_STATE_IDLING);
                                    result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_HORIZONTAL_MOVE_SIGN, MOVE_SIGN_ZERO);
-                                   result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_STOP_ON_PIXEL_X, closest_pixel(block_inside_result.entries[i].block->pos.pixel.x, block_inside_result.entries[i].block->pos.decimal.x));
+                                   result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_STOP_ON_PIXEL_X, closest_pixel_x);
                                    push = false;
                               }
                               break;
                          case DIRECTION_RIGHT:
                               if(block_inside_result.entries[i].block->vel.x < 0){
-                                   Position_t final_stop_pos = pixel_pos(Pixel_t{block_inside_result.entries[i].block->stop_on_pixel_x, 0});
+                                   S16 closest_pixel_x = closest_pixel(block_inside_result.entries[i].block->pos.pixel.x, block_inside_result.entries[i].block->pos.decimal.x);
+                                   Position_t final_stop_pos = pixel_pos(Pixel_t{closest_pixel_x, 0});
                                    Vec_t pos_delta = pos_to_vec(final_stop_pos - block_inside_result.entries[i].collision_pos);
 
                                    S16 collided_block_index = get_block_index(world, block_inside_result.entries[i].block);
@@ -1450,13 +1451,14 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                                    result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_VEL_X, 0.0f);
                                    result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_HORIZONTAL_MOVE_STATE, MOVE_STATE_IDLING);
                                    result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_HORIZONTAL_MOVE_SIGN, MOVE_SIGN_ZERO);
-                                   result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_STOP_ON_PIXEL_X, closest_pixel(block_inside_result.entries[i].block->pos.pixel.x, block_inside_result.entries[i].block->pos.decimal.x));
+                                   result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_STOP_ON_PIXEL_X, closest_pixel_x);
                                    push = false;
                               }
                               break;
                          case DIRECTION_DOWN:
                               if(block_inside_result.entries[i].block->vel.y > 0){
-                                   Position_t final_stop_pos = pixel_pos(Pixel_t{0, block_inside_result.entries[i].block->stop_on_pixel_y});
+                                   S16 closest_pixel_y = closest_pixel(block_inside_result.entries[i].block->pos.pixel.y, block_inside_result.entries[i].block->pos.decimal.y);
+                                   Position_t final_stop_pos = pixel_pos(Pixel_t{0, closest_pixel_y});
                                    Vec_t pos_delta = pos_to_vec(final_stop_pos - block_inside_result.entries[i].collision_pos);
 
                                    S16 collided_block_index = get_block_index(world, block_inside_result.entries[i].block);
@@ -1466,13 +1468,14 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                                    result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_VEL_Y, 0.0f);
                                    result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_VERTICAL_MOVE_STATE, MOVE_STATE_IDLING);
                                    result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_VERTICAL_MOVE_SIGN, MOVE_SIGN_ZERO);
-                                   result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_STOP_ON_PIXEL_Y, closest_pixel(block_inside_result.entries[i].block->pos.pixel.y, block_inside_result.entries[i].block->pos.decimal.y));
+                                   result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_STOP_ON_PIXEL_Y, closest_pixel_y);
                                    push = false;
                               }
                               break;
                          case DIRECTION_UP:
                               if(block_inside_result.entries[i].block->vel.y < 0){
-                                   Position_t final_stop_pos = pixel_pos(Pixel_t{0, block_inside_result.entries[i].block->stop_on_pixel_y});
+                                   S16 closest_pixel_y = closest_pixel(block_inside_result.entries[i].block->pos.pixel.y, block_inside_result.entries[i].block->pos.decimal.y);
+                                   Position_t final_stop_pos = pixel_pos(Pixel_t{0, closest_pixel_y});
                                    Vec_t pos_delta = pos_to_vec(final_stop_pos - block_inside_result.entries[i].collision_pos);
 
                                    S16 collided_block_index = get_block_index(world, block_inside_result.entries[i].block);
@@ -1482,7 +1485,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                                    result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_VEL_Y, 0.0f);
                                    result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_VERTICAL_MOVE_STATE, MOVE_STATE_IDLING);
                                    result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_VERTICAL_MOVE_SIGN, MOVE_SIGN_ZERO);
-                                   result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_STOP_ON_PIXEL_Y, closest_pixel(block_inside_result.entries[i].block->pos.pixel.y, block_inside_result.entries[i].block->pos.decimal.y));
+                                   result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_STOP_ON_PIXEL_Y, closest_pixel_y);
                                    push = false;
                               }
                               break;

@@ -318,32 +318,25 @@ void activate(World_t* world, Coord_t coord){
      toggle_electricity(&world->tilemap, world->interactive_qt, coord, DIRECTION_DOWN, false, false);
 }
 
-void slow_block_toward_gridlock(World_t* world, Block_t* block, bool horizontal, bool negative){
+void slow_block_toward_gridlock(World_t* world, Block_t* block, Direction_t direction){
      if(!block_on_ice(block->pos, block->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt)) return;
 
-     Move_t* move = horizontal ? &block->horizontal_move : &block->vertical_move;
+     Move_t* move = direction_is_horizontal(direction) ? &block->horizontal_move : &block->vertical_move;
 
      if(move->state == MOVE_STATE_STOPPING || move->state == MOVE_STATE_IDLING) return;
 
      move->state = MOVE_STATE_STOPPING;
      move->distance = 0;
 
-     auto stop_coord = pos_to_coord(block->pos);
-     if(negative){
-          if(horizontal){
-               stop_coord.x++;
-          }else{
-               stop_coord.y++;
-          }
-     }
+     auto stop_coord = pos_to_coord(block_get_center(block));
 
      auto stop_position = coord_to_pos(stop_coord);
      Vec_t distance_to_stop = pos_to_vec(stop_position - block->pos);
 
-     if(horizontal){
+     if(direction_is_horizontal(direction)){
           // if we are too close to the tile boundary, have the block move to the next grid square, this is a design choice
           if(fabs(distance_to_stop.x) <= PLAYER_RADIUS){
-               if(negative){
+               if(direction == DIRECTION_RIGHT){
                     stop_coord.x++;
                }else{
                     stop_coord.x--;
@@ -353,7 +346,7 @@ void slow_block_toward_gridlock(World_t* world, Block_t* block, bool horizontal,
           }
      }else{
           if(fabs(distance_to_stop.y) <= PLAYER_RADIUS){
-               if(negative){
+               if(direction == DIRECTION_UP){
                     stop_coord.y++;
                }else{
                     stop_coord.y--;
@@ -371,7 +364,7 @@ void slow_block_toward_gridlock(World_t* world, Block_t* block, bool horizontal,
 
      auto pos = pos_to_vec(block->pos);
 
-     if(horizontal){
+     if(direction_is_horizontal(direction)){
           block->stopped_by_player_horizontal = true;
           auto motion = motion_x_component(block);
           block->accel.x = begin_stopping_grid_aligned_motion(&motion, pos.x); // adjust by one tick since we missed this update
@@ -379,6 +372,13 @@ void slow_block_toward_gridlock(World_t* world, Block_t* block, bool horizontal,
           block->stopped_by_player_vertical = true;
           auto motion = motion_y_component(block);
           block->accel.y = begin_stopping_grid_aligned_motion(&motion, pos.y); // adjust by one tick since we missed this update
+     }
+
+     Direction_t against_dir = DIRECTION_COUNT;
+     Block_t* against_block = block_against_another_block(block->pos + block->pos_delta, direction_opposite(direction), world->block_qt, world->interactive_qt,
+                                                          &world->tilemap, &against_dir);
+     if(against_block){
+          slow_block_toward_gridlock(world, against_block, direction);
      }
 }
 
@@ -673,7 +673,6 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
 
           // this stops the block when it moves into the player
           Vec_t rotated_pos_delta = vec_rotate_quadrants_clockwise(collision.block->pos_delta, collision.portal_rotations);
-          bool even_rotations = (collision.portal_rotations % 2) == 0;
 
           auto* player = world->players.elements + player_index;
 
@@ -717,11 +716,8 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                          auto new_pos = collision.pos + Vec_t{TILE_SIZE + PLAYER_RADIUS, 0};
                          result.pos_delta.x = pos_to_vec(new_pos - player_pos).x;
 
-                         if(even_rotations){
-                              slow_block_toward_gridlock(world, collision.block, true, true);
-                         }else{
-                              slow_block_toward_gridlock(world, collision.block, false, true);
-                         }
+                         auto slow_direction = direction_rotate_counter_clockwise(direction_opposite(collision.dir), collision.portal_rotations);
+                         slow_block_toward_gridlock(world, collision.block, slow_direction);
                          player_slowing_down = true;
                     }else{
                          use_this_collision = false;
@@ -763,11 +759,8 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                          auto new_pos = collision.pos - Vec_t{PLAYER_RADIUS, 0};
                          result.pos_delta.x = pos_to_vec(new_pos - player_pos).x;
 
-                         if(even_rotations){
-                              slow_block_toward_gridlock(world, collision.block, true, false);
-                         }else{
-                              slow_block_toward_gridlock(world, collision.block, false, false);
-                         }
+                         auto slow_direction = direction_rotate_counter_clockwise(direction_opposite(collision.dir), collision.portal_rotations);
+                         slow_block_toward_gridlock(world, collision.block, slow_direction);
                          player_slowing_down = true;
                     }else{
                          use_this_collision = false;
@@ -808,11 +801,8 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                          auto new_pos = collision.pos - Vec_t{0, PLAYER_RADIUS};
                          result.pos_delta.y = pos_to_vec(new_pos - player_pos).y;
 
-                         if(even_rotations){
-                              slow_block_toward_gridlock(world, collision.block, false, false);
-                         }else{
-                              slow_block_toward_gridlock(world, collision.block, true, false);
-                         }
+                         auto slow_direction = direction_rotate_counter_clockwise(direction_opposite(collision.dir), collision.portal_rotations);
+                         slow_block_toward_gridlock(world, collision.block, slow_direction);
                          player_slowing_down = true;
                     }else{
                          use_this_collision = false;
@@ -853,11 +843,8 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                          auto new_pos = collision.pos + Vec_t{0, TILE_SIZE + PLAYER_RADIUS};
                          result.pos_delta.y = pos_to_vec(new_pos - player_pos).y;
 
-                         if(even_rotations){
-                              slow_block_toward_gridlock(world, collision.block, false, true);
-                         }else{
-                              slow_block_toward_gridlock(world, collision.block, true, true);
-                         }
+                         auto slow_direction = direction_rotate_counter_clockwise(direction_opposite(collision.dir), collision.portal_rotations);
+                         slow_block_toward_gridlock(world, collision.block, slow_direction);
                          player_slowing_down = true;
                     }else{
                          use_this_collision = false;
@@ -1466,7 +1453,7 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
                auto moving_dir = vec_direction(horizontal_vel);
 
                if(direction_opposite(moving_dir) == direction){
-                    slow_block_toward_gridlock(world, block, true, (direction == DIRECTION_LEFT));
+                    slow_block_toward_gridlock(world, block, direction);
                     return result;
                }
                break;
@@ -1479,7 +1466,7 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
                auto moving_dir = vec_direction(vertical_vel);
 
                if(direction_opposite(moving_dir) == direction){
-                    slow_block_toward_gridlock(world, block, false, (direction == DIRECTION_DOWN));
+                    slow_block_toward_gridlock(world, block, direction);
                     return result;
                }
                break;
