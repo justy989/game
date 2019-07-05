@@ -1276,13 +1276,15 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
                                                            &world->tilemap, &collided_block_push_dir);
      bool both_on_ice = false;
      if(collided_block){
+          bool on_ice = false;
+
           if(collided_block == block){
                if(pushed_by_ice && block_on_ice(collided_block->pos, collided_block->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt)){
                     // pass
                }else{
                     return result;
                }
-          }else if(block_on_ice(collided_block->pos, collided_block->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt)){
+          }else if((on_ice = block_on_ice(collided_block->pos, collided_block->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt))){
                if(pushed_by_ice){
                     // check if we are able to move or if we transfer our force to the block
                     bool transfers_force = true;
@@ -1376,7 +1378,7 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
                          S8 total_collided_rotations = direction_rotations_between(direction, collided_block_push_dir) + collided_block->rotation;
                          total_collided_rotations %= DIRECTION_COUNT;
 
-                         auto rotations_between =  direction_rotations_between((Direction_t)(total_collided_rotations), (Direction_t)(block->rotation));
+                         auto rotations_between = direction_rotations_between((Direction_t)(total_collided_rotations), (Direction_t)(block->rotation));
                          if(rotations_between == 2) return result;
                     }
 
@@ -1403,7 +1405,8 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
                                                                            world->interactive_qt, &world->tilemap,
                                                                            &check_direction);
                     if(next_collided_block == nullptr) break;
-                    if(!blocks_are_entangled(entangled_collided_block, next_collided_block, &world->blocks)){
+                    if(!blocks_are_entangled(entangled_collided_block, next_collided_block, &world->blocks) &&
+                       !block_on_ice(next_collided_block->pos, entangled_collided_block->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt)){
                          only_against_entanglers = false;
                          break;
                     }
@@ -1425,6 +1428,8 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
                if(block_against_solid_interactive(collided_block, direction, &world->tilemap, world->interactive_qt)){
                     return result;
                }
+          }else if(!on_ice){
+               return result;
           }
      }
 
@@ -1674,7 +1679,6 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
      }
 
      result.pushed = true;
-
      return result;
 }
 

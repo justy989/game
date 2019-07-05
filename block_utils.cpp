@@ -1794,7 +1794,6 @@ Interactive_t* block_is_teleporting(Block_t* block, QuadTreeNode_t<Interactive_t
 void push_entangled_block(Block_t* block, World_t* world, Direction_t push_dir, bool pushed_by_ice, TransferMomentum_t* instant_momentum){
      if(block->entangle_index < 0) return;
 
-
      S16 block_index = block - world->blocks.elements;
      S16 entangle_index = block->entangle_index;
      while(entangle_index != block_index && entangle_index >= 0){
