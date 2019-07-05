@@ -686,15 +686,17 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                if(rotated_pos_delta.x > 0.0f){
                     result.pos_delta.x = 0;
 
+                    Direction_t check_dir = direction_rotate_counter_clockwise(direction_opposite(collision.dir), collision.portal_rotations);
+
                     bool would_squish = false;
-                    Block_t* squished_block = player_against_block(player, direction_opposite(collision.dir), world->block_qt, world->interactive_qt, &world->tilemap);
+                    Block_t* squished_block = player_against_block(player, check_dir, world->block_qt, world->interactive_qt, &world->tilemap);
                     would_squish = squished_block && squished_block->vel.x < collision.block->vel.x;
 
                     if(!would_squish){
-                         would_squish = player_against_solid_tile(player, direction_opposite(collision.dir), &world->tilemap);
+                         would_squish = player_against_solid_tile(player, check_dir, &world->tilemap);
                     }
                     if(!would_squish){
-                         would_squish = player_against_solid_interactive(player, direction_opposite(collision.dir), world->interactive_qt);
+                         would_squish = player_against_solid_interactive(player, check_dir, world->interactive_qt);
                     }
 
                     // only squish if the block we would be squished against is moving slower, do we stop the block we collided with
@@ -732,15 +734,17 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                if(rotated_pos_delta.x < 0.0f){
                     result.pos_delta.x = 0;
 
+                    Direction_t check_dir = direction_rotate_counter_clockwise(direction_opposite(collision.dir), collision.portal_rotations);
+
                     bool would_squish = false;
-                    Block_t* squished_block = player_against_block(player, direction_opposite(collision.dir), world->block_qt, world->interactive_qt, &world->tilemap);
+                    Block_t* squished_block = player_against_block(player, check_dir, world->block_qt, world->interactive_qt, &world->tilemap);
                     would_squish = squished_block && squished_block->vel.x > collision.block->vel.x;
 
                     if(!would_squish){
-                         would_squish = player_against_solid_tile(player, direction_opposite(collision.dir), &world->tilemap);
+                         would_squish = player_against_solid_tile(player, check_dir, &world->tilemap);
                     }
                     if(!would_squish){
-                         would_squish = player_against_solid_interactive(player, direction_opposite(collision.dir), world->interactive_qt);
+                         would_squish = player_against_solid_interactive(player, check_dir, world->interactive_qt);
                     }
 
                     if(would_squish){
@@ -775,14 +779,16 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                if(rotated_pos_delta.y < 0.0f){
                     result.pos_delta.y = 0;
 
+                    Direction_t check_dir = direction_rotate_counter_clockwise(direction_opposite(collision.dir), collision.portal_rotations);
+
                     bool would_squish = false;
-                    Block_t* squished_block = player_against_block(player, direction_opposite(collision.dir), world->block_qt, world->interactive_qt, &world->tilemap);
+                    Block_t* squished_block = player_against_block(player, check_dir, world->block_qt, world->interactive_qt, &world->tilemap);
                     would_squish = squished_block && squished_block->vel.y > collision.block->vel.y;
                     if(!would_squish){
-                         would_squish = player_against_solid_tile(player, direction_opposite(collision.dir), &world->tilemap);
+                         would_squish = player_against_solid_tile(player, check_dir, &world->tilemap);
                     }
                     if(!would_squish){
-                         would_squish = player_against_solid_interactive(player, direction_opposite(collision.dir), world->interactive_qt);
+                         would_squish = player_against_solid_interactive(player, check_dir, world->interactive_qt);
                     }
 
                     if(would_squish){
@@ -817,14 +823,16 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                if(rotated_pos_delta.y > 0.0f){
                     result.pos_delta.y = 0;
 
+                    Direction_t check_dir = direction_rotate_counter_clockwise(direction_opposite(collision.dir), collision.portal_rotations);
+
                     bool would_squish = false;
-                    Block_t* squished_block = player_against_block(player, direction_opposite(collision.dir), world->block_qt, world->interactive_qt, &world->tilemap);
+                    Block_t* squished_block = player_against_block(player, check_dir, world->block_qt, world->interactive_qt, &world->tilemap);
                     would_squish = squished_block && squished_block->vel.y < collision.block->vel.y;
                     if(!would_squish){
-                         would_squish = player_against_solid_tile(player, direction_opposite(collision.dir), &world->tilemap);
+                         would_squish = player_against_solid_tile(player, check_dir, &world->tilemap);
                     }
                     if(!would_squish){
-                         would_squish = player_against_solid_interactive(player, direction_opposite(collision.dir), world->interactive_qt);
+                         would_squish = player_against_solid_interactive(player, check_dir, world->interactive_qt);
                     }
 
                     if(would_squish){
