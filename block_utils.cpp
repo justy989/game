@@ -1510,7 +1510,8 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                               }
                          }
 
-                         instant_momentum.mass = (S16)((F32)(instant_momentum.mass) * (1.0f / (F32)(collided_with_blocks_on_ice)));
+                         auto block_mass_in_direction = get_block_mass_in_direction(world, world->blocks.elements + block_index, direction_opposite(first_direction));
+                         instant_momentum.mass = (S16)((F32)(block_mass_in_direction) * (1.0f / (F32)(collided_with_blocks_on_ice)));
 
                          if(block_inside_index != block_index){
                               switch(first_direction){
@@ -1573,7 +1574,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                          }
 
                          {
-                              auto collided_block_mass = get_block_stack_mass(world, block_inside_result.entries[i].block);
+                              auto collided_block_mass = get_block_mass_in_direction(world, block_inside_result.entries[i].block, direction_opposite(first_direction));
 
                               // If the block has velocity but hasn't moved yet, then it has been collided with another block during this frame.
                               // Thus, the collisions happened at the same time.

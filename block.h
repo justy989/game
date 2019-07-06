@@ -91,3 +91,25 @@ const char* block_coast_to_string(BlockCoast_t coast);
 S8 blocks_rotations_between(Block_t* a, Block_t* b);
 
 S16 block_get_mass(Block_t* b);
+
+#define MAX_BLOCKS_IN_LIST 128
+
+struct BlockEntry_t{
+     Block_t* block = nullptr;
+     S8 rotations_through_portal = 0;
+     bool counted = false;
+};
+
+struct BlockList_t{
+     BlockEntry_t entries[MAX_BLOCKS_IN_LIST];
+     S16 count = 0;
+
+     bool add(Block_t* block, S8 rotations_through_portal){
+          if(count >= MAX_BLOCKS_IN_LIST) return false;
+          entries[count].block = block;
+          entries[count].rotations_through_portal = rotations_through_portal;
+          entries[count].counted = true;
+          count++;
+          return true;
+     }
+};
