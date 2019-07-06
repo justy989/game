@@ -63,3 +63,4 @@ struct Player_t : public Motion_t {
 
 // rough estimate since player is 3.5 pixels radius
 void get_player_adjacent_positions(Player_t* player, Direction_t direction, Position_t* a, Position_t* b);
+Position_t get_player_adjacent_position(Player_t* player, Direction_t direction);

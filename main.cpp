@@ -2300,6 +2300,8 @@ int main(int argc, char** argv){
                     player->held_up = false;
 
                     player->teleport = false;
+                    player->teleport_pos = player->pos;
+                    player->teleport_pos_delta = player->pos_delta;
                     player->teleport_pushing_block = -1;
 
                     player->prev_vel = player->vel;
@@ -3145,13 +3147,32 @@ int main(int argc, char** argv){
                     // based on changing pos_deltas, determine if we are teleporting
                     for(S16 i = 0; i < update_player_count; i++){
                          auto player = world.players.elements + i;
-                         if(player->teleport) continue;
 
-                         auto player_prev_coord = pos_to_coord(player->pos);
-                         auto player_cur_coord = pos_to_coord(player->pos + player->pos_delta);
+                         auto player_pos = player->pos;
+                         auto player_pos_delta = player->pos_delta;
+
+                         if(player->teleport){
+                              player_pos = player->teleport_pos;
+                              player_pos_delta = player->teleport_pos_delta;
+                         }
+
+                         auto player_prev_coord = pos_to_coord(player_pos);
+                         auto player_cur_coord = pos_to_coord(player_pos + player_pos_delta);
+
+                         // if the player has teleported, but stays in the portal coord, undo the teleport and shorten
+                         // the pos_delta based on the collision that happened after teleporting
+                         if(player->teleport && player_prev_coord == player_cur_coord){
+                              player->teleport = false;
+                              auto unrotated_pos_delta = vec_rotate_quadrants_counter_clockwise(player->teleport_pos_delta, player->teleport_rotation);
+                              player->pos_delta = unrotated_pos_delta;
+                              player_pos = player->pos;
+                              player_pos_delta = player->pos_delta;
+                              player_prev_coord = pos_to_coord(player_pos);
+                              player_cur_coord = pos_to_coord(player_pos + player_pos_delta);
+                         }
 
                          // teleport position
-                         auto teleport_result = teleport_position_across_portal(player->pos, player->pos_delta, &world,
+                         auto teleport_result = teleport_position_across_portal(player_pos, player_pos_delta, &world,
                                                                                 player_prev_coord, player_cur_coord);
                          auto teleport_clone_id = player->clone_id;
                          if(player_cur_coord != player->clone_start){

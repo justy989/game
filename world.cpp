@@ -462,15 +462,9 @@ Block_t* player_against_block(Player_t* player, Direction_t direction, QuadTreeN
 }
 
 bool player_against_solid_tile(Player_t* player, Direction_t direction, TileMap_t* tilemap){
-     Position_t pos_a;
-     Position_t pos_b;
+     Position_t pos = get_player_adjacent_position(player, direction);
 
-     get_player_adjacent_positions(player, direction, &pos_a, &pos_b);
-
-     if(tilemap_is_solid(tilemap, pixel_to_coord(pos_a.pixel))) return true;
-     if(tilemap_is_solid(tilemap, pixel_to_coord(pos_b.pixel))) return true;
-
-     return false;
+     return tilemap_is_solid(tilemap, pixel_to_coord(pos.pixel));
 }
 
 bool player_against_solid_interactive(Player_t* player, Direction_t direction, QuadTreeNode_t<Interactive_t>* interactive_qt){
@@ -828,6 +822,7 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                     bool would_squish = false;
                     Block_t* squished_block = player_against_block(player, check_dir, world->block_qt, world->interactive_qt, &world->tilemap);
                     would_squish = squished_block && squished_block->vel.y < collision.block->vel.y;
+
                     if(!would_squish){
                          would_squish = player_against_solid_tile(player, check_dir, &world->tilemap);
                     }
