@@ -28,9 +28,7 @@ Current bugs:
 
 Big Features:
 - Momentum
-     - Too much momentum squishing the player should reset the puzzle
      - If a block is moving slowly, the player cant push it in the direction it is going
-     - If the player tries to stop 2 adjacent blocks in the middle of them sliding on the ice at once, the player gets caught inside of one of the blocks
      - Even if a block is iced, if there is a block on top of it, that should impact static friction but not collision impact velocities resolution
 - 3D
      - if we put a popup on the other side of a portal and a block 1 interval high goes through the portal, will it work the way we expect?

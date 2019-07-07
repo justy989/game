@@ -15,6 +15,9 @@
 #define PLAYER_BOW_DRAW_DELAY 0.3f
 #define PLAYER_STOP_IDLE_BLOCK_TIMER 0.2f
 
+// if a block is travelling at double speed, it should squish the player
+#define PLAYER_SQUISH_MOMENTUM (256.0f * 2.0f * 0.168067)
+
 struct Player_t : public Motion_t {
      Position_t  pos;
      Vec_t       pos_delta_save;

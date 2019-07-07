@@ -694,27 +694,35 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                     }
 
                     // only squish if the block we would be squished against is moving slower, do we stop the block we collided with
+                    auto group_mass = get_block_mass_in_direction(world, collision.block, collision.dir);
+                    auto momentum = (F32)group_mass * fabs(collision.block->vel.x);
 
                     // TODO: handle rotations
                     if(would_squish){
-                         reset_move(&collision.block->horizontal_move);
-                         collision.block->vel.x = 0;
-                         collision.block->accel.x = 0;
-                         collision.block->stopped_by_player_horizontal = false;
+                         if(momentum >= PLAYER_SQUISH_MOMENTUM){
+                              result.resetting = true;
+                         }else{
+                              reset_move(&collision.block->horizontal_move);
+                              collision.block->vel.x = 0;
+                              collision.block->accel.x = 0;
+                              collision.block->stopped_by_player_horizontal = false;
 
-                         auto collided_pos_offset = collision.pos - collision.block->pos;
-                         auto block_new_pos = collision.pos;
-                         block_new_pos.pixel.x--;
-                         block_new_pos.decimal.x = 0;
-                         block_new_pos -= collided_pos_offset;
-                         collision.block->pos_delta.x = pos_to_vec(block_new_pos - collision.block->pos).x;
+                              auto collided_pos_offset = collision.pos - collision.block->pos;
+                              auto block_new_pos = collision.pos;
+                              block_new_pos.pixel.x--;
+                              block_new_pos.decimal.x = 0;
+                              block_new_pos -= collided_pos_offset;
+                              collision.block->pos_delta.x = pos_to_vec(block_new_pos - collision.block->pos).x;
+                         }
                     }else if(!(collision.block->pos.z > player->pos.z && block_held_up_by_another_block(collision.block, world->block_qt, world->interactive_qt, &world->tilemap).held())){
                          auto new_pos = collision.pos + Vec_t{TILE_SIZE + PLAYER_RADIUS, 0};
                          result.pos_delta.x = pos_to_vec(new_pos - player_pos).x;
 
-                         auto slow_direction = direction_rotate_counter_clockwise(direction_opposite(collision.dir), collision.portal_rotations);
-                         slow_block_toward_gridlock(world, collision.block, slow_direction);
-                         player_slowing_down = true;
+                         if(momentum < PLAYER_SQUISH_MOMENTUM){
+                              auto slow_direction = direction_rotate_counter_clockwise(direction_opposite(collision.dir), collision.portal_rotations);
+                              slow_block_toward_gridlock(world, collision.block, slow_direction);
+                              player_slowing_down = true;
+                         }
                     }else{
                          use_this_collision = false;
                     }
@@ -741,25 +749,34 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                          would_squish = player_against_solid_interactive(player, check_dir, world->interactive_qt);
                     }
 
-                    if(would_squish){
-                         reset_move(&collision.block->horizontal_move);
-                         collision.block->vel.x = 0;
-                         collision.block->accel.x = 0;
-                         collision.block->stopped_by_player_horizontal = false;
+                    auto group_mass = get_block_mass_in_direction(world, collision.block, collision.dir);
+                    auto momentum = (F32)group_mass * fabs(collision.block->vel.x);
 
-                         auto collided_pos_offset = collision.pos - collision.block->pos;
-                         auto block_new_pos = collision.pos;
-                         block_new_pos.pixel.x++;
-                         block_new_pos.decimal.x = 0;
-                         block_new_pos -= collided_pos_offset;
-                         collision.block->pos_delta.x = pos_to_vec(block_new_pos - collision.block->pos).x;
+                    if(would_squish){
+                         if(momentum >= PLAYER_SQUISH_MOMENTUM){
+                              result.resetting = true;
+                         }else{
+                              reset_move(&collision.block->horizontal_move);
+                              collision.block->vel.x = 0;
+                              collision.block->accel.x = 0;
+                              collision.block->stopped_by_player_horizontal = false;
+
+                              auto collided_pos_offset = collision.pos - collision.block->pos;
+                              auto block_new_pos = collision.pos;
+                              block_new_pos.pixel.x++;
+                              block_new_pos.decimal.x = 0;
+                              block_new_pos -= collided_pos_offset;
+                              collision.block->pos_delta.x = pos_to_vec(block_new_pos - collision.block->pos).x;
+                         }
                     }else if(!(collision.block->pos.z > player->pos.z && block_held_up_by_another_block(collision.block, world->block_qt, world->interactive_qt, &world->tilemap).held())){
                          auto new_pos = collision.pos - Vec_t{PLAYER_RADIUS, 0};
                          result.pos_delta.x = pos_to_vec(new_pos - player_pos).x;
 
-                         auto slow_direction = direction_rotate_counter_clockwise(direction_opposite(collision.dir), collision.portal_rotations);
-                         slow_block_toward_gridlock(world, collision.block, slow_direction);
-                         player_slowing_down = true;
+                         if(momentum < PLAYER_SQUISH_MOMENTUM){
+                              auto slow_direction = direction_rotate_counter_clockwise(direction_opposite(collision.dir), collision.portal_rotations);
+                              slow_block_toward_gridlock(world, collision.block, slow_direction);
+                              player_slowing_down = true;
+                         }
                     }else{
                          use_this_collision = false;
                     }
@@ -785,25 +802,34 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                          would_squish = player_against_solid_interactive(player, check_dir, world->interactive_qt);
                     }
 
-                    if(would_squish){
-                         reset_move(&collision.block->vertical_move);
-                         collision.block->vel.y = 0;
-                         collision.block->accel.y = 0;
-                         collision.block->stopped_by_player_vertical = false;
+                    auto group_mass = get_block_mass_in_direction(world, collision.block, collision.dir);
+                    auto momentum = (F32)group_mass * fabs(collision.block->vel.y);
 
-                         auto collided_pos_offset = collision.pos - collision.block->pos;
-                         auto block_new_pos = collision.pos;
-                         block_new_pos.pixel.y++;
-                         block_new_pos.decimal.y = 0;
-                         block_new_pos -= collided_pos_offset;
-                         collision.block->pos_delta.y = pos_to_vec(block_new_pos - collision.block->pos).y;
+                    if(would_squish){
+                         if(momentum >= PLAYER_SQUISH_MOMENTUM){
+                              result.resetting = true;
+                         }else{
+                              reset_move(&collision.block->vertical_move);
+                              collision.block->vel.y = 0;
+                              collision.block->accel.y = 0;
+                              collision.block->stopped_by_player_vertical = false;
+
+                              auto collided_pos_offset = collision.pos - collision.block->pos;
+                              auto block_new_pos = collision.pos;
+                              block_new_pos.pixel.y++;
+                              block_new_pos.decimal.y = 0;
+                              block_new_pos -= collided_pos_offset;
+                              collision.block->pos_delta.y = pos_to_vec(block_new_pos - collision.block->pos).y;
+                         }
                     }else if(!(collision.block->pos.z > player->pos.z && block_held_up_by_another_block(collision.block, world->block_qt, world->interactive_qt, &world->tilemap).held())){
                          auto new_pos = collision.pos - Vec_t{0, PLAYER_RADIUS};
                          result.pos_delta.y = pos_to_vec(new_pos - player_pos).y;
 
-                         auto slow_direction = direction_rotate_counter_clockwise(direction_opposite(collision.dir), collision.portal_rotations);
-                         slow_block_toward_gridlock(world, collision.block, slow_direction);
-                         player_slowing_down = true;
+                         if(momentum < PLAYER_SQUISH_MOMENTUM){
+                              auto slow_direction = direction_rotate_counter_clockwise(direction_opposite(collision.dir), collision.portal_rotations);
+                              slow_block_toward_gridlock(world, collision.block, slow_direction);
+                              player_slowing_down = true;
+                         }
                     }else{
                          use_this_collision = false;
                     }
@@ -830,25 +856,34 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                          would_squish = player_against_solid_interactive(player, check_dir, world->interactive_qt);
                     }
 
-                    if(would_squish){
-                         reset_move(&collision.block->vertical_move);
-                         collision.block->vel.y = 0;
-                         collision.block->accel.y = 0;
-                         collision.block->stopped_by_player_vertical = false;
+                    auto group_mass = get_block_mass_in_direction(world, collision.block, collision.dir);
+                    auto momentum = (F32)group_mass * fabs(collision.block->vel.y);
 
-                         auto collided_pos_offset = collision.pos - collision.block->pos;
-                         auto block_new_pos = collision.pos;
-                         block_new_pos.pixel.y--;
-                         block_new_pos.decimal.y = 0;
-                         block_new_pos -= collided_pos_offset;
-                         collision.block->pos_delta.y = pos_to_vec(block_new_pos - collision.block->pos).y;
+                    if(would_squish){
+                         if(momentum >= PLAYER_SQUISH_MOMENTUM){
+                              result.resetting = true;
+                         }else{
+                              reset_move(&collision.block->vertical_move);
+                              collision.block->vel.y = 0;
+                              collision.block->accel.y = 0;
+                              collision.block->stopped_by_player_vertical = false;
+
+                              auto collided_pos_offset = collision.pos - collision.block->pos;
+                              auto block_new_pos = collision.pos;
+                              block_new_pos.pixel.y--;
+                              block_new_pos.decimal.y = 0;
+                              block_new_pos -= collided_pos_offset;
+                              collision.block->pos_delta.y = pos_to_vec(block_new_pos - collision.block->pos).y;
+                         }
                     }else if(!(collision.block->pos.z > player->pos.z && block_held_up_by_another_block(collision.block, world->block_qt, world->interactive_qt, &world->tilemap).held())){
                          auto new_pos = collision.pos + Vec_t{0, TILE_SIZE + PLAYER_RADIUS};
                          result.pos_delta.y = pos_to_vec(new_pos - player_pos).y;
 
-                         auto slow_direction = direction_rotate_counter_clockwise(direction_opposite(collision.dir), collision.portal_rotations);
-                         slow_block_toward_gridlock(world, collision.block, slow_direction);
-                         player_slowing_down = true;
+                         if(momentum < PLAYER_SQUISH_MOMENTUM){
+                              auto slow_direction = direction_rotate_counter_clockwise(direction_opposite(collision.dir), collision.portal_rotations);
+                              slow_block_toward_gridlock(world, collision.block, slow_direction);
+                              player_slowing_down = true;
+                         }
                     }else{
                          use_this_collision = false;
                     }
