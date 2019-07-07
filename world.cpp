@@ -1306,7 +1306,10 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
                          // check if the momentum transfer overcomes static friction
                          auto block_mass = get_block_stack_mass(world, block);
                          auto elastic_result = elastic_transfer_momentum(instant_momentum->mass, instant_momentum->vel, block_mass, block_vel);
-                         if(!collision_result_overcomes_friction(block_vel, elastic_result.second_final_velocity, block_mass)) return result;
+
+                         if(!collision_result_overcomes_friction(block_vel, elastic_result.second_final_velocity, block_mass)){
+                              return result;
+                         }
 
                          auto push_result = block_push(collided_block, collided_block_push_dir, world, pushed_by_ice, force, instant_momentum);
 
@@ -2194,7 +2197,7 @@ ElasticCollisionResult_t elastic_transfer_momentum_to_block(TransferMomentum_t* 
 }
 
 static void get_touching_blocks_in_direction(World_t* world, Block_t* block, Direction_t direction, BlockList_t* block_list){
-     auto result = block_against_other_blocks(block->pos, direction, world->block_qt, world->interactive_qt, &world->tilemap);
+     auto result = block_against_other_blocks(block->pos + block->pos_delta, direction, world->block_qt, world->interactive_qt, &world->tilemap);
      for(S16 i = 0; i < result.count; i++){
           Direction_t result_direction = direction;
           result_direction = direction_rotate_clockwise(result_direction, result.againsts[i].rotations_through_portal);
@@ -2250,6 +2253,7 @@ S16 get_block_mass_in_direction(World_t* world, Block_t* block, Direction_t dire
           }
      }
 
+     // count the rest of the blocks if allowed
      S16 mass = 0;
      for(S16 i = 0; i < block_list.count; i++){
           auto* block_entry = block_list.entries + i;

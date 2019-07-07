@@ -1510,8 +1510,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                               }
                          }
 
-                         auto block_mass_in_direction = get_block_mass_in_direction(world, world->blocks.elements + block_index, direction_opposite(first_direction));
-                         instant_momentum.mass = (S16)((F32)(block_mass_in_direction) * (1.0f / (F32)(collided_with_blocks_on_ice)));
+                         instant_momentum.mass = (S16)((F32)(instant_momentum.mass) * (1.0f / (F32)(collided_with_blocks_on_ice)));
 
                          if(block_inside_index != block_index){
                               switch(first_direction){
@@ -1573,34 +1572,50 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                               break;
                          }
 
-                         {
-                              auto collided_block_mass = get_block_mass_in_direction(world, block_inside_result.entries[i].block, direction_opposite(first_direction));
+                         // If the block has velocity but hasn't moved yet, then it has been collided with another block during this frame.
+                         // Thus, the collisions happened at the same time.
+                         if(current_collision_block_vel != 0 && current_pos_delta == 0){
+                              auto collided_block_mass = get_block_stack_mass(world, block_inside_result.entries[i].block);
 
-                              // If the block has velocity but hasn't moved yet, then it has been collided with another block during this frame.
-                              // Thus, the collisions happened at the same time.
-                              if(current_collision_block_vel != 0 && current_pos_delta == 0){
-                                   // steal the momentum from the collided block to mimic the collisions happening as a simultaneous mass
-                                   auto fake_elastic_addition = elastic_transfer_momentum(collided_block_mass, current_collision_block_vel, instant_momentum.mass, 0);
-                                   instant_momentum.vel += fake_elastic_addition.second_final_velocity;
+                              // steal the momentum from the collided block to mimic the collisions happening as a simultaneous mass
+                              auto fake_elastic_addition = elastic_transfer_momentum(collided_block_mass, current_collision_block_vel, instant_momentum.mass, 0);
+                              instant_momentum.vel += fake_elastic_addition.second_final_velocity;
 
-                                   // kill the collided blocks velocity so that the it transfers all of the momentum
-                                   switch(first_direction){
-                                   default:
-                                        break;
-                                   case DIRECTION_LEFT:
-                                   case DIRECTION_RIGHT:
-                                        block_inside_result.entries[i].block->vel.x = 0;
-                                        break;
-                                   case DIRECTION_UP:
-                                   case DIRECTION_DOWN:
-                                        block_inside_result.entries[i].block->vel.y = 0;
-                                        break;
-                                   }
-                                   current_collision_block_vel = 0;
+                              // kill the collided blocks velocity so that the it transfers all of the momentum
+                              switch(first_direction){
+                              default:
+                                   break;
+                              case DIRECTION_LEFT:
+                              case DIRECTION_RIGHT:
+                                   block_inside_result.entries[i].block->vel.x = 0;
+                                   break;
+                              case DIRECTION_UP:
+                              case DIRECTION_DOWN:
+                                   block_inside_result.entries[i].block->vel.y = 0;
+                                   break;
                               }
+                              current_collision_block_vel = 0;
                          }
 
                          auto push_result = block_push(block_inside_result.entries[i].block, push_pos, push_pos_delta, first_direction, world, true, 1.0f, &instant_momentum);
+
+                         auto adjacent_block = world->blocks.elements + block_index;
+                         auto current_block = adjacent_block;
+
+                         // TODO: handle multiple blocks we could be against
+                         // adjust the force back through the chain
+                         while(true)
+                         {
+                              current_block = adjacent_block;
+                              auto adjacent_results = block_against_other_blocks(current_block->pos + current_block->pos_delta, direction_opposite(first_direction), world->block_qt,
+                                                                                 world->interactive_qt, &world->tilemap);
+                              // ignore if we are against ourselves
+                              if(adjacent_results.count && adjacent_results.againsts[0].block != current_block){
+                                   adjacent_block = adjacent_results.againsts[0].block;
+                              }else{
+                                   break;
+                              }
+                         }
 
                          switch(first_direction){
                          default:
@@ -1608,9 +1623,19 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                          case DIRECTION_LEFT:
                          case DIRECTION_RIGHT:
                               if(push_result.transferred_momentum_back()){
-                                   result.vel.x = push_result.velocity;
-                                   result.horizontal_move.state = MOVE_STATE_COASTING;
-                                   result.horizontal_move.sign = move_sign_from_vel(result.vel.x);
+                                   if(current_block == world->blocks.elements + block_index){
+                                        result.vel.x = push_result.velocity;
+                                        result.horizontal_move.state = MOVE_STATE_COASTING;
+                                        result.horizontal_move.sign = move_sign_from_vel(result.vel.x);
+                                   }else{
+                                        reset_move(&result.horizontal_move);
+
+                                        auto adjacent_block_index = get_block_index(world, current_block);
+
+                                        result.block_changes.add(adjacent_block_index, BLOCK_CHANGE_TYPE_VEL_X, push_result.velocity);
+                                        result.block_changes.add(adjacent_block_index, BLOCK_CHANGE_TYPE_HORIZONTAL_MOVE_STATE, MOVE_STATE_COASTING);
+                                        result.block_changes.add(adjacent_block_index, BLOCK_CHANGE_TYPE_HORIZONTAL_MOVE_SIGN, move_sign_from_vel(result.vel.y));
+                                   }
                               }else{
                                    reset_move(&result.horizontal_move);
                               }
@@ -1618,9 +1643,19 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                          case DIRECTION_UP:
                          case DIRECTION_DOWN:
                               if(push_result.transferred_momentum_back()){
-                                   result.vel.y = push_result.velocity;
-                                   result.vertical_move.state = MOVE_STATE_COASTING;
-                                   result.vertical_move.sign = move_sign_from_vel(result.vel.y);
+                                   if(current_block == world->blocks.elements + block_index){
+                                        result.vel.y = push_result.velocity;
+                                        result.vertical_move.state = MOVE_STATE_COASTING;
+                                        result.vertical_move.sign = move_sign_from_vel(result.vel.y);
+                                   }else{
+                                        reset_move(&result.vertical_move);
+
+                                        auto adjacent_block_index = get_block_index(world, current_block);
+
+                                        result.block_changes.add(adjacent_block_index, BLOCK_CHANGE_TYPE_VEL_Y, push_result.velocity);
+                                        result.block_changes.add(adjacent_block_index, BLOCK_CHANGE_TYPE_VERTICAL_MOVE_STATE, MOVE_STATE_COASTING);
+                                        result.block_changes.add(adjacent_block_index, BLOCK_CHANGE_TYPE_VERTICAL_MOVE_SIGN, move_sign_from_vel(result.vel.y));
+                                   }
                               }else{
                                    reset_move(&result.vertical_move);
                               }
