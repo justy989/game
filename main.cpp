@@ -30,6 +30,7 @@ Big Features:
 - Momentum
      - If a block is moving slowly, the player cant push it in the direction it is going
      - Even if a block is iced, if there is a block on top of it, that should impact static friction but not collision impact velocities resolution
+     - Does the players mass impact block_utils collisions ?
 - 3D
      - if we put a popup on the other side of a portal and a block 1 interval high goes through the portal, will it work the way we expect?
      - how does a stack of entangled blocks move? really f***ing weird right now tbh
