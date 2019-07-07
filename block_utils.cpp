@@ -1632,9 +1632,10 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
 
                                         auto adjacent_block_index = get_block_index(world, current_block);
 
+                                        result.block_changes.add(adjacent_block_index, BLOCK_CHANGE_TYPE_POS_DELTA_X, 0.0f);
                                         result.block_changes.add(adjacent_block_index, BLOCK_CHANGE_TYPE_VEL_X, push_result.velocity);
                                         result.block_changes.add(adjacent_block_index, BLOCK_CHANGE_TYPE_HORIZONTAL_MOVE_STATE, MOVE_STATE_COASTING);
-                                        result.block_changes.add(adjacent_block_index, BLOCK_CHANGE_TYPE_HORIZONTAL_MOVE_SIGN, move_sign_from_vel(result.vel.y));
+                                        result.block_changes.add(adjacent_block_index, BLOCK_CHANGE_TYPE_HORIZONTAL_MOVE_SIGN, move_sign_from_vel(result.vel.x));
                                    }
                               }else{
                                    reset_move(&result.horizontal_move);
@@ -1652,6 +1653,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
 
                                         auto adjacent_block_index = get_block_index(world, current_block);
 
+                                        result.block_changes.add(adjacent_block_index, BLOCK_CHANGE_TYPE_POS_DELTA_Y, 0.0f);
                                         result.block_changes.add(adjacent_block_index, BLOCK_CHANGE_TYPE_VEL_Y, push_result.velocity);
                                         result.block_changes.add(adjacent_block_index, BLOCK_CHANGE_TYPE_VERTICAL_MOVE_STATE, MOVE_STATE_COASTING);
                                         result.block_changes.add(adjacent_block_index, BLOCK_CHANGE_TYPE_VERTICAL_MOVE_SIGN, move_sign_from_vel(result.vel.y));
