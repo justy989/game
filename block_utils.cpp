@@ -84,8 +84,8 @@ bool block_adjacent_pixels_to_check(Position_t pos, Vec_t pos_delta, Direction_t
      return false;
 }
 
-Block_t* block_against_block_in_list(Position_t pos, Block_t** blocks, S16 block_count, Direction_t direction, Pixel_t* offsets,
-                                     S8 rotations_between_portals){
+Block_t* block_against_block_in_list(Position_t pos, Block_t** blocks, S16 block_count, Direction_t direction, Pixel_t* offsets){
+     // intentionally use the original pos without pos_delta
      // TODO: account for block width/height
      switch(direction){
      default:
@@ -95,11 +95,9 @@ Block_t* block_against_block_in_list(Position_t pos, Block_t** blocks, S16 block
                Block_t* block = blocks[i];
                if(!blocks_at_collidable_height(pos.z, block->pos.z)) continue;
 
-               auto block_pos = block->pos + vec_rotate_quadrants_counter_clockwise(block->pos_delta, rotations_between_portals);
-
-               Pixel_t pixel_to_check = block_pos.pixel + offsets[i];
+               Pixel_t pixel_to_check = block->pos.pixel + offsets[i];
                if((pixel_to_check.x + TILE_SIZE_IN_PIXELS) == pos.pixel.x &&
-                  pixel_to_check.y >= (pos.pixel.y - BLOCK_SOLID_SIZE_IN_PIXELS) &&
+                  pixel_to_check.y > (pos.pixel.y - BLOCK_SOLID_SIZE_IN_PIXELS) &&
                   pixel_to_check.y < (pos.pixel.y + TILE_SIZE_IN_PIXELS)){
                     return block;
                }
@@ -110,11 +108,9 @@ Block_t* block_against_block_in_list(Position_t pos, Block_t** blocks, S16 block
                Block_t* block = blocks[i];
                if(!blocks_at_collidable_height(pos.z, block->pos.z)) continue;
 
-               auto block_pos = block->pos + vec_rotate_quadrants_counter_clockwise(block->pos_delta, rotations_between_portals);
-
-               Pixel_t pixel_to_check = block_pos.pixel + offsets[i];
+               Pixel_t pixel_to_check = block->pos.pixel + offsets[i];
                if(pixel_to_check.x == (pos.pixel.x + TILE_SIZE_IN_PIXELS) &&
-                  pixel_to_check.y >= (pos.pixel.y - BLOCK_SOLID_SIZE_IN_PIXELS) &&
+                  pixel_to_check.y > (pos.pixel.y - BLOCK_SOLID_SIZE_IN_PIXELS) &&
                   pixel_to_check.y < (pos.pixel.y + TILE_SIZE_IN_PIXELS)){
                     return block;
                }
@@ -125,11 +121,9 @@ Block_t* block_against_block_in_list(Position_t pos, Block_t** blocks, S16 block
                Block_t* block = blocks[i];
                if(!blocks_at_collidable_height(pos.z, block->pos.z)) continue;
 
-               auto block_pos = block->pos + vec_rotate_quadrants_counter_clockwise(block->pos_delta, rotations_between_portals);
-
-               Pixel_t pixel_to_check = block_pos.pixel + offsets[i];
+               Pixel_t pixel_to_check = block->pos.pixel + offsets[i];
                if((pixel_to_check.y + TILE_SIZE_IN_PIXELS) == pos.pixel.y &&
-                  pixel_to_check.x >= (pos.pixel.x - BLOCK_SOLID_SIZE_IN_PIXELS) &&
+                  pixel_to_check.x > (pos.pixel.x - BLOCK_SOLID_SIZE_IN_PIXELS) &&
                   pixel_to_check.x < (pos.pixel.x + TILE_SIZE_IN_PIXELS)){
                     return block;
                }
@@ -140,11 +134,9 @@ Block_t* block_against_block_in_list(Position_t pos, Block_t** blocks, S16 block
                Block_t* block = blocks[i];
                if(!blocks_at_collidable_height(pos.z, block->pos.z)) continue;
 
-               auto block_pos = block->pos + vec_rotate_quadrants_counter_clockwise(block->pos_delta, rotations_between_portals);
-
-               Pixel_t pixel_to_check = block_pos.pixel + offsets[i];
+               Pixel_t pixel_to_check = block->pos.pixel + offsets[i];
                if(pixel_to_check.y == (pos.pixel.y + TILE_SIZE_IN_PIXELS) &&
-                  pixel_to_check.x >= (pos.pixel.x - BLOCK_SOLID_SIZE_IN_PIXELS) &&
+                  pixel_to_check.x > (pos.pixel.x - BLOCK_SOLID_SIZE_IN_PIXELS) &&
                   pixel_to_check.x < (pos.pixel.x + TILE_SIZE_IN_PIXELS)){
                     return block;
                }
@@ -171,7 +163,7 @@ BlockAgainstOthersResult_t block_against_other_blocks(Position_t pos, Direction_
 
      for(S16 i = 0; i < block_count; i++){
           // lol at me misusing this function, but watevs
-          if(block_against_block_in_list(pos, blocks + i, 1, direction, portal_offsets, 0)){
+          if(block_against_block_in_list(pos, blocks + i, 1, direction, portal_offsets)){
                BlockAgainstOther_t against_other;
                against_other.block = blocks[i];
                result.add(against_other);
@@ -198,11 +190,9 @@ BlockAgainstOthersResult_t block_against_other_blocks(Position_t pos, Direction_
                               search_portal_destination_for_blocks(block_qt, interactive->portal.face, new_dir, src_coord,
                                                                    dst_coord, blocks, &block_count, portal_offsets);
 
-                              S8 rotations_between_portals = portal_rotations_between(interactive->portal.face, new_dir);
-
                               for(S16 b = 0; b < block_count; b++){
                                    // lol at me misusing this function, but watevs
-                                   if(block_against_block_in_list(pos, blocks + b, 1, direction, portal_offsets + b, rotations_between_portals)){
+                                   if(block_against_block_in_list(pos, blocks + b, 1, direction, portal_offsets + b)){
                                         BlockAgainstOther_t against_other;
                                         against_other.block = blocks[b];
                                         against_other.rotations_through_portal = portal_rotations_between(interactive->portal.face, new_dir);
@@ -230,7 +220,7 @@ Block_t* block_against_another_block(Position_t pos, Direction_t direction, Quad
      Pixel_t portal_offsets[BLOCK_QUAD_TREE_MAX_QUERY];
      memset(portal_offsets, 0, sizeof(portal_offsets));
 
-     Block_t* collided_block = block_against_block_in_list(pos, blocks, block_count, direction, portal_offsets, 0);
+     Block_t* collided_block = block_against_block_in_list(pos, blocks, block_count, direction, portal_offsets);
      if(collided_block){
           *push_dir = direction;
           return collided_block;
@@ -256,9 +246,7 @@ Block_t* block_against_another_block(Position_t pos, Direction_t direction, Quad
                               search_portal_destination_for_blocks(block_qt, interactive->portal.face, (Direction_t)(d), src_coord,
                                                                    dst_coord, blocks, &block_count, portal_offsets);
 
-                              S8 rotations_between_portals = portal_rotations_between(interactive->portal.face, (Direction_t)(d));
-
-                              collided_block = block_against_block_in_list(pos, blocks, block_count, direction, portal_offsets, rotations_between_portals);
+                              collided_block = block_against_block_in_list(pos, blocks, block_count, direction, portal_offsets);
                               if(collided_block){
                                    U8 rotations = portal_rotations_between(interactive->portal.face, (Direction_t)(d));
                                    *push_dir = direction_rotate_clockwise(direction, rotations);
@@ -1452,7 +1440,6 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                               }
                               break;
                          }
-
                     }
 
                     if(push){
@@ -1562,26 +1549,26 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
 
                          auto push_result = block_push(block_inside_result.entries[i].block, push_pos, push_pos_delta, first_direction, world, true, 1.0f, &instant_momentum);
 
-                         auto adjacent_block = world->blocks.elements + block_index;
-                         auto current_block = adjacent_block;
+                         auto current_block = world->blocks.elements + block_index;
                          auto direction_to_check = direction_opposite(first_direction);
                          direction_to_check = direction_rotate_counter_clockwise(direction_to_check, block_inside_result.entries[i].portal_rotations);
 
-                         // TODO: handle multiple blocks we could be against
-                         // adjust the force back through the chain
-                         while(true)
-                         {
-                              current_block = adjacent_block;
-                              auto current_block_pos = current_block->pos;
-                              if(current_block->teleport) current_block_pos = current_block->teleport_pos;
-                              auto adjacent_results = block_against_other_blocks(current_block_pos + result.pos_delta, direction_to_check, world->block_qt,
-                                                                                 world->interactive_qt, &world->tilemap);
-                              // ignore if we are against ourselves
-                              if(adjacent_results.count && adjacent_results.againsts[0].block != current_block){
-                                   adjacent_block = adjacent_results.againsts[0].block;
-                                   direction_to_check = direction_rotate_clockwise(direction_to_check, adjacent_results.againsts[0].rotations_through_portal);
-                              }else{
-                                   break;
+                         if(push_result.transferred_momentum_back()){
+                              // TODO: handle multiple blocks we could be against
+                              // adjust the force back through the chain
+                              while(true)
+                              {
+                                   auto current_block_pos = current_block->pos;
+                                   if(current_block->teleport) current_block_pos = current_block->teleport_pos;
+                                   auto adjacent_results = block_against_other_blocks(current_block_pos, direction_to_check, world->block_qt,
+                                                                                      world->interactive_qt, &world->tilemap);
+                                   // ignore if we are against ourselves
+                                   if(adjacent_results.count && adjacent_results.againsts[0].block != current_block){
+                                        current_block = adjacent_results.againsts[0].block;
+                                        direction_to_check = direction_rotate_clockwise(direction_to_check, adjacent_results.againsts[0].rotations_through_portal);
+                                   }else{
+                                        break;
+                                   }
                               }
                          }
 

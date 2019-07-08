@@ -375,7 +375,7 @@ void slow_block_toward_gridlock(World_t* world, Block_t* block, Direction_t dire
      }
 
      Direction_t against_dir = DIRECTION_COUNT;
-     Block_t* against_block = block_against_another_block(block->pos + block->pos_delta, direction_opposite(direction), world->block_qt, world->interactive_qt,
+     Block_t* against_block = block_against_another_block(block->pos, direction_opposite(direction), world->block_qt, world->interactive_qt,
                                                           &world->tilemap, &against_dir);
      if(against_block){
           slow_block_toward_gridlock(world, against_block, direction);
@@ -1297,7 +1297,7 @@ static bool collision_result_overcomes_friction(F32 original_vel, F32 final_vel,
 BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Direction_t direction, World_t* world, bool pushed_by_ice, F32 force, TransferMomentum_t* instant_momentum){
      BlockPushResult_t result {};
      Direction_t collided_block_push_dir = DIRECTION_COUNT;
-     Block_t* collided_block = block_against_another_block(pos + pos_delta, direction, world->block_qt, world->interactive_qt,
+     Block_t* collided_block = block_against_another_block(pos, direction, world->block_qt, world->interactive_qt,
                                                            &world->tilemap, &collided_block_push_dir);
      bool both_on_ice = false;
      if(collided_block){
@@ -1713,7 +1713,7 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
 
 bool block_pushable(Block_t* block, Direction_t direction, World_t* world){
      Direction_t collided_block_push_dir = DIRECTION_COUNT;
-     Block_t* collided_block = block_against_another_block(block->pos + block->pos_delta, direction, world->block_qt, world->interactive_qt,
+     Block_t* collided_block = block_against_another_block(block->pos, direction, world->block_qt, world->interactive_qt,
                                                            &world->tilemap, &collided_block_push_dir);
      if(collided_block){
           if(collided_block == block){
@@ -2232,7 +2232,7 @@ ElasticCollisionResult_t elastic_transfer_momentum_to_block(TransferMomentum_t* 
 }
 
 static void get_touching_blocks_in_direction(World_t* world, Block_t* block, Direction_t direction, BlockList_t* block_list){
-     auto result = block_against_other_blocks(block->pos + block->pos_delta, direction, world->block_qt, world->interactive_qt, &world->tilemap);
+     auto result = block_against_other_blocks(block->pos, direction, world->block_qt, world->interactive_qt, &world->tilemap);
      for(S16 i = 0; i < result.count; i++){
           Direction_t result_direction = direction;
           result_direction = direction_rotate_clockwise(result_direction, result.againsts[i].rotations_through_portal);
