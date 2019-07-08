@@ -1483,7 +1483,8 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
      }
 
      // if are sliding on ice and are pushed in the opposite direction then stop
-     if(block_on_ice(pos, pos_delta, &world->tilemap, world->interactive_qt, world->block_qt)){
+     if(block_on_ice(pos, pos_delta, &world->tilemap, world->interactive_qt, world->block_qt) &&
+        !instant_momentum){
           switch(direction){
           default:
                break;
@@ -1732,7 +1733,6 @@ bool block_pushable(Block_t* block, Direction_t direction, World_t* world){
 
      if(block_against_solid_tile(block, direction, &world->tilemap)) return false;
      if(block_against_solid_interactive(block, direction, &world->tilemap, world->interactive_qt)) return false;
-     // if(block_against_player(block, direction, &world->players)) return false;
 
      return true;
 }

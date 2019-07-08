@@ -1421,79 +1421,38 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                               second_direction = direction_rotate_clockwise(second_direction, block_inside_result.entries[i].portal_rotations);
                          }
 
-                         // blocks heading towards each other will stop
+                         // if blocks heading towards each other, stop the other one
+                         // TODO: handle portal rotations here
                          switch(first_direction){
                          default:
                               break;
                          case DIRECTION_LEFT:
                               if(block_inside_result.entries[i].block->vel.x > 0){
-                                   S16 closest_pixel_x = closest_pixel(block_inside_result.entries[i].block->pos.pixel.x, block_inside_result.entries[i].block->pos.decimal.x);
-                                   Position_t final_stop_pos = pixel_pos(Pixel_t{closest_pixel_x, 0});
-                                   Vec_t pos_delta = pos_to_vec(final_stop_pos - block_inside_result.entries[i].collision_pos);
-
                                    S16 collided_block_index = get_block_index(world, block_inside_result.entries[i].block);
-
-                                   result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_POS_DELTA_X, pos_delta.x);
-                                   result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_ACCEL_X, 0.0f);
-                                   result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_VEL_X, 0.0f);
-                                   result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_HORIZONTAL_MOVE_STATE, MOVE_STATE_IDLING);
-                                   result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_HORIZONTAL_MOVE_SIGN, MOVE_SIGN_ZERO);
-                                   result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_STOP_ON_PIXEL_X, closest_pixel_x);
-                                   push = false;
+                                   result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_POS_DELTA_X, 0.0f);
                               }
                               break;
                          case DIRECTION_RIGHT:
                               if(block_inside_result.entries[i].block->vel.x < 0){
-                                   S16 closest_pixel_x = closest_pixel(block_inside_result.entries[i].block->pos.pixel.x, block_inside_result.entries[i].block->pos.decimal.x);
-                                   Position_t final_stop_pos = pixel_pos(Pixel_t{closest_pixel_x, 0});
-                                   Vec_t pos_delta = pos_to_vec(final_stop_pos - block_inside_result.entries[i].collision_pos);
-
                                    S16 collided_block_index = get_block_index(world, block_inside_result.entries[i].block);
-
-                                   result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_POS_DELTA_X, pos_delta.x);
-                                   result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_ACCEL_X, 0.0f);
-                                   result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_VEL_X, 0.0f);
-                                   result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_HORIZONTAL_MOVE_STATE, MOVE_STATE_IDLING);
-                                   result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_HORIZONTAL_MOVE_SIGN, MOVE_SIGN_ZERO);
-                                   result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_STOP_ON_PIXEL_X, closest_pixel_x);
-                                   push = false;
+                                   result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_POS_DELTA_X, 0.0f);
                               }
                               break;
                          case DIRECTION_DOWN:
                               if(block_inside_result.entries[i].block->vel.y > 0){
-                                   S16 closest_pixel_y = closest_pixel(block_inside_result.entries[i].block->pos.pixel.y, block_inside_result.entries[i].block->pos.decimal.y);
-                                   Position_t final_stop_pos = pixel_pos(Pixel_t{0, closest_pixel_y});
-                                   Vec_t pos_delta = pos_to_vec(final_stop_pos - block_inside_result.entries[i].collision_pos);
-
                                    S16 collided_block_index = get_block_index(world, block_inside_result.entries[i].block);
-
-                                   result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_POS_DELTA_Y, pos_delta.y);
-                                   result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_ACCEL_Y, 0.0f);
-                                   result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_VEL_Y, 0.0f);
-                                   result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_VERTICAL_MOVE_STATE, MOVE_STATE_IDLING);
-                                   result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_VERTICAL_MOVE_SIGN, MOVE_SIGN_ZERO);
-                                   result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_STOP_ON_PIXEL_Y, closest_pixel_y);
-                                   push = false;
+                                   result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_POS_DELTA_Y, 0.0f);
                               }
                               break;
                          case DIRECTION_UP:
                               if(block_inside_result.entries[i].block->vel.y < 0){
-                                   S16 closest_pixel_y = closest_pixel(block_inside_result.entries[i].block->pos.pixel.y, block_inside_result.entries[i].block->pos.decimal.y);
-                                   Position_t final_stop_pos = pixel_pos(Pixel_t{0, closest_pixel_y});
-                                   Vec_t pos_delta = pos_to_vec(final_stop_pos - block_inside_result.entries[i].collision_pos);
-
                                    S16 collided_block_index = get_block_index(world, block_inside_result.entries[i].block);
 
-                                   result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_POS_DELTA_Y, pos_delta.y);
-                                   result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_ACCEL_Y, 0.0f);
-                                   result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_VEL_Y, 0.0f);
-                                   result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_VERTICAL_MOVE_STATE, MOVE_STATE_IDLING);
-                                   result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_VERTICAL_MOVE_SIGN, MOVE_SIGN_ZERO);
-                                   result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_STOP_ON_PIXEL_Y, closest_pixel_y);
-                                   push = false;
+                                   result.block_changes.add(collided_block_index, BLOCK_CHANGE_TYPE_POS_DELTA_Y, 0.0f);
                               }
                               break;
                          }
+
                     }
 
                     if(push){
@@ -1613,7 +1572,9 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                          while(true)
                          {
                               current_block = adjacent_block;
-                              auto adjacent_results = block_against_other_blocks(current_block->pos + result.pos_delta, direction_to_check, world->block_qt,
+                              auto current_block_pos = current_block->pos;
+                              if(current_block->teleport) current_block_pos = current_block->teleport_pos;
+                              auto adjacent_results = block_against_other_blocks(current_block_pos + result.pos_delta, direction_to_check, world->block_qt,
                                                                                  world->interactive_qt, &world->tilemap);
                               // ignore if we are against ourselves
                               if(adjacent_results.count && adjacent_results.againsts[0].block != current_block){
