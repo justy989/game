@@ -14,7 +14,7 @@ Entanglement Puzzles:
 - rotated entangled puzzles where the centroid is on a portal destination coord
 
 Current bugs:
-- a saw a case where I pushed 2 adjacent touching blocks on ice and the went through a portal, I pushed one of them and ended up inside the other
+- Players standing on blocks going through portals colliding on ice seem to gain speed over time
 - pressure plates don't see blocks as 1 pixel too small on the right and top, so their activation is delayed in those directions
 - A block on the tile outside a portal pushed into the portal to clone, the clone has weird behavior and ends up on the portal block
 - When pushing a block through a portal that turns off, the block keeps going

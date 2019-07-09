@@ -208,7 +208,7 @@ void add_interactive_held(InteractiveHeldResult_t* result, Interactive_t* intera
 
 bool block_adjacent_pixels_to_check(Position_t pos, Vec_t pos_delta, Direction_t direction, Pixel_t* a, Pixel_t* b);
 
-Block_t* block_against_block_in_list(Position_t pos, Block_t** blocks, S16 block_count, Direction_t direction, Pixel_t* offsets);
+Block_t* block_against_block_in_list(Position_t pos, Block_t** blocks, S16 block_count, Direction_t direction, Position_t* portal_offsets);
 Block_t* block_against_another_block(Position_t pos, Direction_t direction, QuadTreeNode_t<Block_t>* block_qt,
                                      QuadTreeNode_t<Interactive_t>* interactive_quad_tree, TileMap_t* tilemap, Direction_t* push_dir);
 BlockAgainstOthersResult_t block_against_other_blocks(Position_t pos, Direction_t direction, QuadTreeNode_t<Block_t>* block_qt,
@@ -247,7 +247,7 @@ BlockCollidesWithItselfResult_t resolve_block_colliding_with_itself(Direction_t 
 
 void search_portal_destination_for_blocks(QuadTreeNode_t<Block_t>* block_qt, Direction_t src_portal_face,
                                           Direction_t dst_portal_face, Coord_t src_portal_coord,
-                                          Coord_t dst_portal_coord, Block_t** blocks, S16* block_count, Pixel_t* offsets);
+                                          Coord_t dst_portal_coord, Block_t** blocks, S16* block_count, Position_t* offsets);
 
 Interactive_t* block_is_teleporting(Block_t* block, QuadTreeNode_t<Interactive_t>* interactive_qt);
 

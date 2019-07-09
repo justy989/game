@@ -84,7 +84,7 @@ bool block_adjacent_pixels_to_check(Position_t pos, Vec_t pos_delta, Direction_t
      return false;
 }
 
-Block_t* block_against_block_in_list(Position_t pos, Block_t** blocks, S16 block_count, Direction_t direction, Pixel_t* offsets){
+Block_t* block_against_block_in_list(Position_t pos, Block_t** blocks, S16 block_count, Direction_t direction, Position_t* portal_offsets){
      // intentionally use the original pos without pos_delta
      // TODO: account for block width/height
      switch(direction){
@@ -95,7 +95,7 @@ Block_t* block_against_block_in_list(Position_t pos, Block_t** blocks, S16 block
                Block_t* block = blocks[i];
                if(!blocks_at_collidable_height(pos.z, block->pos.z)) continue;
 
-               Pixel_t pixel_to_check = block->pos.pixel + offsets[i];
+               Pixel_t pixel_to_check = (block->pos + portal_offsets[i]).pixel;
                if((pixel_to_check.x + TILE_SIZE_IN_PIXELS) == pos.pixel.x &&
                   pixel_to_check.y > (pos.pixel.y - BLOCK_SOLID_SIZE_IN_PIXELS) &&
                   pixel_to_check.y < (pos.pixel.y + TILE_SIZE_IN_PIXELS)){
@@ -108,7 +108,7 @@ Block_t* block_against_block_in_list(Position_t pos, Block_t** blocks, S16 block
                Block_t* block = blocks[i];
                if(!blocks_at_collidable_height(pos.z, block->pos.z)) continue;
 
-               Pixel_t pixel_to_check = block->pos.pixel + offsets[i];
+               Pixel_t pixel_to_check = (block->pos + portal_offsets[i]).pixel;
                if(pixel_to_check.x == (pos.pixel.x + TILE_SIZE_IN_PIXELS) &&
                   pixel_to_check.y > (pos.pixel.y - BLOCK_SOLID_SIZE_IN_PIXELS) &&
                   pixel_to_check.y < (pos.pixel.y + TILE_SIZE_IN_PIXELS)){
@@ -121,7 +121,7 @@ Block_t* block_against_block_in_list(Position_t pos, Block_t** blocks, S16 block
                Block_t* block = blocks[i];
                if(!blocks_at_collidable_height(pos.z, block->pos.z)) continue;
 
-               Pixel_t pixel_to_check = block->pos.pixel + offsets[i];
+               Pixel_t pixel_to_check = (block->pos + portal_offsets[i]).pixel;
                if((pixel_to_check.y + TILE_SIZE_IN_PIXELS) == pos.pixel.y &&
                   pixel_to_check.x > (pos.pixel.x - BLOCK_SOLID_SIZE_IN_PIXELS) &&
                   pixel_to_check.x < (pos.pixel.x + TILE_SIZE_IN_PIXELS)){
@@ -134,7 +134,7 @@ Block_t* block_against_block_in_list(Position_t pos, Block_t** blocks, S16 block
                Block_t* block = blocks[i];
                if(!blocks_at_collidable_height(pos.z, block->pos.z)) continue;
 
-               Pixel_t pixel_to_check = block->pos.pixel + offsets[i];
+               Pixel_t pixel_to_check = (block->pos + portal_offsets[i]).pixel;
                if(pixel_to_check.y == (pos.pixel.y + TILE_SIZE_IN_PIXELS) &&
                   pixel_to_check.x > (pos.pixel.x - BLOCK_SOLID_SIZE_IN_PIXELS) &&
                   pixel_to_check.x < (pos.pixel.x + TILE_SIZE_IN_PIXELS)){
@@ -154,7 +154,7 @@ BlockAgainstOthersResult_t block_against_other_blocks(Position_t pos, Direction_
      auto block_center = block_get_center(pos);
      Rect_t surrounding_rect = rect_to_check_surrounding_blocks(block_center.pixel);
 
-     Pixel_t portal_offsets[BLOCK_QUAD_TREE_MAX_QUERY];
+     Position_t portal_offsets[BLOCK_QUAD_TREE_MAX_QUERY];
      memset(portal_offsets, 0, sizeof(portal_offsets));
 
      S16 block_count = 0;
@@ -217,7 +217,7 @@ Block_t* block_against_another_block(Position_t pos, Direction_t direction, Quad
      Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
      quad_tree_find_in(block_qt, rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
 
-     Pixel_t portal_offsets[BLOCK_QUAD_TREE_MAX_QUERY];
+     Position_t portal_offsets[BLOCK_QUAD_TREE_MAX_QUERY];
      memset(portal_offsets, 0, sizeof(portal_offsets));
 
      Block_t* collided_block = block_against_block_in_list(pos, blocks, block_count, direction, portal_offsets);
@@ -470,7 +470,7 @@ struct BlockInsideBlockListResult_t{
 BlockInsideBlockListResult_t block_inside_block_list(Position_t block_to_check_pos, Vec_t block_to_check_pos_delta,
                                                      S16 block_to_check_index, bool block_to_check_cloning,
                                                      Block_t** blocks, S16 block_count, ObjectArray_t<Block_t>* blocks_array,
-                                                     U8 portal_rotations, Pixel_t* portal_offsets){
+                                                     U8 portal_rotations, Position_t* portal_offsets){
      BlockInsideBlockListResult_t result;
 
      auto final_block_to_check_pos = block_to_check_pos + block_to_check_pos_delta;
@@ -489,10 +489,7 @@ BlockInsideBlockListResult_t block_inside_block_list(Position_t block_to_check_p
           if(!blocks_at_collidable_height(final_block_to_check_pos.z, block->pos.z)) continue;
 
           auto final_block_pos = block->pos;
-          final_block_pos.pixel += portal_offsets[i];
-
-          // account for portal rotations in decimal portals of position
-          final_block_pos.decimal = vec_rotate_quadrants_counter_clockwise(final_block_pos.decimal, portal_rotations);
+          final_block_pos += portal_offsets[i];
           final_block_pos += vec_rotate_quadrants_counter_clockwise(block->pos_delta, portal_rotations);
 
           auto pos_diff = final_block_pos - final_block_to_check_pos;
@@ -554,7 +551,7 @@ BlockInsideOthersResult_t block_inside_others(Position_t block_to_check_pos, Vec
      Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
      quad_tree_find_in(block_qt, surrounding_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
 
-     Pixel_t portal_offsets[BLOCK_QUAD_TREE_MAX_QUERY];
+     Position_t portal_offsets[BLOCK_QUAD_TREE_MAX_QUERY];
      memset(portal_offsets, 0, sizeof(portal_offsets));
 
      auto inside_list_result = block_inside_block_list(block_to_check_pos, block_to_check_pos_delta,
@@ -1771,18 +1768,19 @@ BlockCollidesWithItselfResult_t resolve_block_colliding_with_itself(Direction_t 
 
 void search_portal_destination_for_blocks(QuadTreeNode_t<Block_t>* block_qt, Direction_t src_portal_face,
                                           Direction_t dst_portal_face, Coord_t src_portal_coord,
-                                          Coord_t dst_portal_coord, Block_t** blocks, S16* block_count, Pixel_t* offsets){
+                                          Coord_t dst_portal_coord, Block_t** blocks, S16* block_count, Position_t* portal_offsets){
      U8 rotations_between_portals = portal_rotations_between(dst_portal_face, src_portal_face);
      Coord_t dst_coord = dst_portal_coord + direction_opposite(dst_portal_face);
-     Pixel_t src_portal_center_pixel = coord_to_pixel_at_center(src_portal_coord);
-     Pixel_t dst_center_pixel = coord_to_pixel_at_center(dst_coord);
+     Position_t src_portal_center_pos = pixel_to_pos(coord_to_pixel_at_center(src_portal_coord));
+     Position_t dst_center_pos = pixel_to_pos(coord_to_pixel_at_center(dst_coord));
      Rect_t rect = rect_surrounding_adjacent_coords(dst_coord);
      quad_tree_find_in(block_qt, rect, blocks, block_count, BLOCK_QUAD_TREE_MAX_QUERY);
 
      for(S8 o = 0; o < *block_count; o++){
-          Pixel_t dst_offset = block_center_pixel(blocks[o]) - dst_center_pixel;
-          Pixel_t src_fake_pixel = src_portal_center_pixel + pixel_rotate_quadrants_clockwise(dst_offset, rotations_between_portals);
-          offsets[o] = src_fake_pixel - block_center_pixel(blocks[o]);
+          Position_t block_center = block_get_center(blocks[o]);
+          Position_t dst_offset = block_center - dst_center_pos;
+          Position_t src_fake_pos = src_portal_center_pos + position_rotate_quadrants_clockwise(dst_offset, rotations_between_portals);
+          portal_offsets[o] = src_fake_pos - block_center;
      }
 }
 
