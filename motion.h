@@ -90,31 +90,32 @@ struct MotionComponent_t{
 };
 
 struct DecelToStopResult_t{
-     float accel = 0;
-     float time = 0;
+     F32 accel = 0;
+     F32 time = 0;
 };
 
 MotionComponent_t motion_x_component(Motion_t* motion);
 MotionComponent_t motion_y_component(Motion_t* motion);
 
 Motion_t copy_motion_from_component(MotionComponent_t* motion);
-float calc_coast_motion_time_left(MotionComponent_t* motion, float pos);
+F32 calc_coast_motion_time_left(MotionComponent_t* motion, F32 pos);
 
-float calc_accel_from_stop(float distance, float time);
-DecelToStopResult_t calc_decel_to_stop(float initial_pos, float final_pos, float initial_velocity);
+F32 calc_accel_from_stop(F32 distance, F32 time);
+F32 calc_accel_across_distance(F32 vel, F32 distance, F32 time);
+DecelToStopResult_t calc_decel_to_stop(F32 initial_pos, F32 final_pos, F32 initial_velocity);
 
-float begin_stopping_grid_aligned_motion(MotionComponent_t* motion, float pos);
+F32 begin_stopping_grid_aligned_motion(MotionComponent_t* motion, F32 pos);
 
 void update_motion_free_form(Move_t* move, MotionComponent_t* motion, bool positive_key_down, bool negative_key_down,
-                             float dt, float accel, float accel_distance);
-void update_motion_grid_aligned(Move_t* move, MotionComponent_t* motion, bool coast, float dt, float pos);
+                             F32 dt, F32 accel, F32 accel_distance);
+void update_motion_grid_aligned(Move_t* move, MotionComponent_t* motion, bool coast, F32 dt, F32 pos);
 
-float calc_position_motion(float v, float a, float dt);
-float calc_velocity_motion(float v, float a, float dt);
+F32 calc_position_motion(F32 v, F32 a, F32 dt);
+F32 calc_velocity_motion(F32 v, F32 a, F32 dt);
 
-float calc_accel_component_move(Move_t move, float accel);
+F32 calc_accel_component_move(Move_t move, F32 accel);
 
-float calc_distance_from_derivatives(float v, float a);
+F32 calc_distance_from_derivatives(F32 v, F32 a);
 
 bool operator==(const Move_t& a, const Move_t& b);
 bool operator!=(const Move_t& a, const Move_t& b);

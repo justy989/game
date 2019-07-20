@@ -28,9 +28,8 @@ Current bugs:
 
 Big Features:
 - Momentum
-     - If a block is moving slowly, the player cant push it in the direction it is going
      - Even if a block is iced, if there is a block on top of it, that should impact static friction but not collision impact velocities resolution
-     - Does the players mass impact block_utils collisions ?
+     - Does the players mass impact block_utils collisions ? I believe so, check get_block_stack_mass() and map 171 suggests yes.
 - 3D
      - if we put a popup on the other side of a portal and a block 1 interval high goes through the portal, will it work the way we expect?
      - how does a stack of entangled blocks move? really f***ing weird right now tbh
@@ -1041,8 +1040,8 @@ int main(int argc, char** argv){
           return 1;
      }
 
-     int window_width = 1080;
-     int window_height = 1080;
+     int window_width = 800;
+     int window_height = 800;
      SDL_Window* window = nullptr;
      SDL_GLContext opengl_context = nullptr;
      GLuint theme_texture = 0;
@@ -1180,7 +1179,7 @@ int main(int argc, char** argv){
                auto elapsed_milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(current_time - last_time);
                dt = (F32)(elapsed_seconds.count());
 
-               if(dt < 0.0166666f / demo.dt_scalar){
+               if(dt < FRAME_TIME / demo.dt_scalar){
                     if(elapsed_milliseconds.count() < 16){
                          std::this_thread::sleep_for(std::chrono::milliseconds(1));
                     }
@@ -1191,8 +1190,8 @@ int main(int argc, char** argv){
           last_time = current_time;
 
           // TODO: consider 30fps as minimum for random noobs computers
-          // if(demo.mode) dt = 0.0166666f; // the game always runs as if a 60th of a frame has occurred.
-          dt = 0.0166666f; // the game always runs as if a 60th of a frame has occurred.
+          // if(demo.mode) dt = FRAME_TIME; // the game always runs as if a 60th of a frame has occurred.
+          dt = FRAME_TIME; // the game always runs as if a 60th of a frame has occurred.
 
           quad_tree_free(world.block_qt);
           world.block_qt = quad_tree_build(&world.blocks);
@@ -3270,12 +3269,41 @@ int main(int argc, char** argv){
                          auto push_block_dir = player->pushing_block_dir;
                          if(block_to_push->teleport) push_block_dir = direction_rotate_clockwise(push_block_dir, block_to_push->teleport_rotation);
 
-                         if(direction_in_mask(direction_mask_opposite(block_move_dir_mask), push_block_dir)){
+                         if(direction_in_mask(block_move_dir_mask, push_block_dir)){
+                              block_to_push->cur_push_mask = direction_mask_add(block_to_push->cur_push_mask, push_block_dir);
+                         }
+
+                         auto total_block_mass = get_block_mass_in_direction(&world, block_to_push, push_block_dir);
+                         auto mass_ratio = (F32)(BLOCK_BASELINE_MASS) / (F32)(total_block_mass);
+
+                         auto expected_final_velocity = get_block_expected_player_push_velocity(&world, block_to_push, mass_ratio);
+                         bool already_moving_fast_enough = false;
+
+                         if(direction_in_mask(block_move_dir_mask, push_block_dir)){
+                              switch(push_block_dir){
+                              default:
+                                   break;
+                              case DIRECTION_LEFT:
+                                   already_moving_fast_enough = (expected_final_velocity <= block_to_push->vel.x);
+                                   break;
+                              case DIRECTION_RIGHT:
+                                   already_moving_fast_enough = (expected_final_velocity >= block_to_push->vel.x);
+                                   break;
+                              case DIRECTION_DOWN:
+                                   already_moving_fast_enough = (expected_final_velocity <= block_to_push->vel.y);
+                                   break;
+                              case DIRECTION_UP:
+                                   already_moving_fast_enough = (expected_final_velocity >= block_to_push->vel.y);
+                                   break;
+                              }
+                         }
+
+                         if(already_moving_fast_enough){
+                              // pass
+                         }else if(direction_in_mask(direction_mask_opposite(block_move_dir_mask), push_block_dir)){
                               // if the player is pushing against a block moving towards them, the block wins
                               player->push_time = 0;
                               player->pushing_block = -1;
-                         }else if(direction_in_mask(block_move_dir_mask, push_block_dir)){
-                              block_to_push->cur_push_mask = direction_mask_add(block_to_push->cur_push_mask, push_block_dir);
                          }else{
                               F32 save_push_time = player->push_time;
 
@@ -3286,23 +3314,21 @@ int main(int argc, char** argv){
                                    // if this is the frame that causes the block to be pushed, make a commit
                                    if(save_push_time <= BLOCK_PUSH_TIME) undo_commit(&undo, &world.players, &world.tilemap, &world.blocks, &world.interactives);
 
-                                   static const S16 baseline_block_mass = TILE_SIZE_IN_PIXELS * TILE_SIZE_IN_PIXELS;
-
-                                   auto total_block_mass = get_block_mass_in_direction(&world, block_to_push, push_block_dir);
-
-                                   auto mass_ratio = (F32)(baseline_block_mass) / (F32)(total_block_mass);
-
                                    // player applies a force to accelerate the block by BLOCK_ACCEL
                                    F32 block_acceleration = (mass_ratio * BLOCK_ACCEL);
                                    F32 applied_force = (F32)(total_block_mass) * block_acceleration / BLOCK_ACCEL_TIME;
-                                   F32 static_friction = get_block_static_friction(total_block_mass);
+                                   F32 static_friction = 0;
+
+                                   if(direction_is_horizontal(push_block_dir) && block_to_push->vel.x == 0){
+                                        static_friction = get_block_static_friction(total_block_mass);
+                                   }else if(!direction_is_horizontal(push_block_dir) && block_to_push->vel.y == 0){
+                                        static_friction = get_block_static_friction(total_block_mass);
+                                   }
 
                                    if(applied_force >= static_friction){
-                                        // LOG("push block %d %s mass %d\n", get_block_index(&world, block_to_push), direction_to_string(push_block_dir), total_block_mass);
+                                        auto push_result = block_push(block_to_push, push_block_dir, &world, false, mass_ratio);
 
-                                        bool pushed = block_push(block_to_push, push_block_dir, &world, false, mass_ratio).pushed;
-
-                                        if(!pushed){
+                                        if(!push_result.pushed && !push_result.busy){
                                              player->push_time = 0.0f;
                                         }else if(block_to_push->entangle_index >= 0 && block_to_push->entangle_index < world.blocks.count){
                                              player->pushing_block_dir = push_block_dir;

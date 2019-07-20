@@ -17,7 +17,7 @@ MotionComponent_t motion_x_component(Motion_t* motion){
 
 MotionComponent_t motion_y_component(Motion_t* motion){
      MotionComponent_t comp;
-     comp.ref = (MotionComponentRef_t*)((char*)(motion) + sizeof(float));
+     comp.ref = (MotionComponentRef_t*)((char*)(motion) + sizeof(F32));
      comp.is_x = false;
      return comp;
 }
@@ -43,7 +43,7 @@ Motion_t copy_motion_from_component(MotionComponent_t* motion){
      return result;
 }
 
-DecelToStopResult_t calc_decel_to_stop(float initial_pos, float final_pos, float initial_velocity){
+DecelToStopResult_t calc_decel_to_stop(F32 initial_pos, F32 final_pos, F32 initial_velocity){
      DecelToStopResult_t result;
      // pf = pi + 0.5(vf + vi)t
      // (pf - pi) = 0.5(vf + vi)t
@@ -57,7 +57,7 @@ DecelToStopResult_t calc_decel_to_stop(float initial_pos, float final_pos, float
      return result;
 }
 
-float calc_accel_from_stop(float distance, float time){
+F32 calc_accel_from_stop(F32 distance, F32 time){
      // pf = pi + vft + 1/2at^2
      // d = pf - pi
      // d = vft + 1/2at^2
@@ -66,7 +66,15 @@ float calc_accel_from_stop(float distance, float time){
      return distance / (0.5f * time * time);
 }
 
-float calc_accel_component_move(Move_t move, float accel){
+F32 calc_accel_across_distance(F32 vel, F32 distance, F32 time){
+     // pf = pi + vit + 1/2at^2
+     // d = pf - pi
+     // d = vit + 1/2at^2
+     // (d - vit) / 1/2t^2 = a
+     return (distance - (vel * time)) / (0.5f * time * time);
+}
+
+F32 calc_accel_component_move(Move_t move, F32 accel){
      switch(move.state){
      default:
      case MOVE_STATE_IDLING:
@@ -97,16 +105,16 @@ float calc_accel_component_move(Move_t move, float accel){
      return 0.0f;
 }
 
-float calc_position_motion(float v, float a, float dt){
+F32 calc_position_motion(F32 v, F32 a, F32 dt){
      return (v * dt) + (0.5f * a * dt * dt);
 }
 
-float calc_velocity_motion(float v, float a, float dt){
+F32 calc_velocity_motion(F32 v, F32 a, F32 dt){
      return v + a * dt;
 }
 
 void update_motion_free_form(Move_t* move, MotionComponent_t* motion, bool positive_key_down, bool negative_key_down,
-                             float dt, float accel, float accel_distance){
+                             F32 dt, F32 accel, F32 accel_distance){
      switch(move->state){
      default:
      case MOVE_STATE_IDLING:
@@ -134,7 +142,7 @@ void update_motion_free_form(Move_t* move, MotionComponent_t* motion, bool posit
                     new_push_state = MOVE_STATE_COASTING;
                }
 
-               float distance_over = fabs(move->distance) - accel_distance; // TODO: multiply by mass
+               F32 distance_over = fabs(move->distance) - accel_distance; // TODO: multiply by mass
 
                switch(move->sign){
                default:
@@ -219,11 +227,11 @@ void update_motion_free_form(Move_t* move, MotionComponent_t* motion, bool posit
      }
 }
 
-float begin_stopping_grid_aligned_motion(MotionComponent_t* motion, float pos){
-     float final_pos = pos + motion->ref->pos_delta;
+F32 begin_stopping_grid_aligned_motion(MotionComponent_t* motion, F32 pos){
+     F32 final_pos = pos + motion->ref->pos_delta;
 
      bool positive = motion->ref->vel >= 0;
-     float goal = closest_grid_center_pixel(TILE_SIZE_IN_PIXELS, (S16)(final_pos / PIXEL_SIZE)) * PIXEL_SIZE;
+     F32 goal = closest_grid_center_pixel(TILE_SIZE_IN_PIXELS, (S16)(final_pos / PIXEL_SIZE)) * PIXEL_SIZE;
 
      if(positive){
           if(goal < final_pos){
@@ -264,13 +272,13 @@ static F32 find_next_grid_center(F32 pos, F32 vel){
      return (F32)(goal_pixel) * PIXEL_SIZE;
 }
 
-float calc_coast_motion_time_left(MotionComponent_t* motion, float pos){
+F32 calc_coast_motion_time_left(MotionComponent_t* motion, F32 pos){
      // pf = pi + vt
      // t = (pf - pi) / v
      return (find_next_grid_center(pos, motion->ref->vel) - pos) / motion->ref->vel;
 }
 
-void update_motion_grid_aligned(Move_t* move, MotionComponent_t* motion, bool coast, float dt, float pos){
+void update_motion_grid_aligned(Move_t* move, MotionComponent_t* motion, bool coast, F32 dt, F32 pos){
      switch(move->state){
      default:
      case MOVE_STATE_IDLING:
@@ -283,12 +291,12 @@ void update_motion_grid_aligned(Move_t* move, MotionComponent_t* motion, bool co
           break;
      case MOVE_STATE_STARTING:
      {
-          float save_time_left = move->time_left;
+          F32 save_time_left = move->time_left;
 
           move->time_left -= dt;
 
           if(move->time_left <= 0){
-               float dt_leftover = dt - save_time_left;
+               F32 dt_leftover = dt - save_time_left;
 
                // simulate until time 0 with the current accel
                Motion_t sim_move = copy_motion_from_component(motion);
@@ -305,7 +313,7 @@ void update_motion_grid_aligned(Move_t* move, MotionComponent_t* motion, bool co
                sim_motion.ref->vel = calc_velocity_motion(sim_motion.ref->vel, sim_motion.ref->accel, save_time_left);
 
                // calculate the new acceleration that will stop us or leave us coasting
-               float new_accel = 0;
+               F32 new_accel = 0;
                MoveState_t new_move_state = MOVE_STATE_COASTING;
 
                if(coast){
@@ -351,8 +359,8 @@ void update_motion_grid_aligned(Move_t* move, MotionComponent_t* motion, bool co
      }
 }
 
-float calc_distance_from_derivatives(float v, float a){
-     float t = v / a;
+F32 calc_distance_from_derivatives(F32 v, F32 a){
+     F32 t = v / a;
      return v * t + 0.5f * a * (t * t);
 }
 

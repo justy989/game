@@ -808,7 +808,7 @@ BlockHeldResult_t block_held_up_by_another_block(Block_t* block, QuadTreeNode_t<
 }
 
 BlockHeldResult_t block_held_down_by_another_block(Block_t* block, QuadTreeNode_t<Block_t>* block_qt,
-                                          QuadTreeNode_t<Interactive_t>* interactive_qt, TileMap_t* tilemap, S16 min_area){
+                                                   QuadTreeNode_t<Interactive_t>* interactive_qt, TileMap_t* tilemap, S16 min_area){
      if(block->teleport){
           auto final_pos = block->teleport_pos + block->teleport_pos_delta;
           final_pos.pixel.x = passes_over_pixel(block->teleport_pos.pixel.x, final_pos.pixel.x);
@@ -822,6 +822,11 @@ BlockHeldResult_t block_held_down_by_another_block(Block_t* block, QuadTreeNode_
      final_pos.pixel.y = passes_over_pixel(block->pos.pixel.y, final_pos.pixel.y);
      return block_at_height_in_block_rect(final_pos.pixel, block_qt,
                                           block->pos.z + HEIGHT_INTERVAL, interactive_qt, tilemap, min_area);
+}
+
+BlockHeldResult_t block_held_down_by_another_block(Pixel_t block_pixel, S8 block_z, QuadTreeNode_t<Block_t>* block_qt,
+                                                   QuadTreeNode_t<Interactive_t>* interactive_qt, TileMap_t* tilemap, S16 min_area){
+     return block_at_height_in_block_rect(block_pixel, block_qt, block_z + HEIGHT_INTERVAL, interactive_qt, tilemap, min_area);
 }
 
 bool block_on_ice(Position_t pos, Vec_t pos_delta, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt,

@@ -51,6 +51,7 @@ struct ElasticCollisionResult_t{
 
 struct BlockPushResult_t{
      bool pushed = false;
+     bool busy = false;
      S16 mass = 0;
      F32 velocity = 0;
 
@@ -111,3 +112,4 @@ ElasticCollisionResult_t elastic_transfer_momentum(F32 mass_1, F32 vel_i_1, F32 
 ElasticCollisionResult_t elastic_transfer_momentum_to_block(TransferMomentum_t* transfer_momentum, World_t* world, Block_t* block, Direction_t direction);
 
 F32 get_block_static_friction(S16 mass);
+F32 get_block_expected_player_push_velocity(World_t* world, Block_t* block, F32 force = 1.0f);
