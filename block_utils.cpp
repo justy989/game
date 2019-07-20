@@ -1398,9 +1398,68 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                     }
                }
 
-               if(a_on_ice_or_air && b_on_ice_or_air){
-                    bool push = true;
+               bool push = true;
 
+               Block_t* last_block_in_chain = block_inside_result.entries[i].block;
+               Direction_t against_direction = first_direction;
+
+               while(true){
+                    // TODO: handle multiple against blocks
+                    auto against_result = block_against_other_blocks(last_block_in_chain->pos + last_block_in_chain->pos_delta, against_direction, world->block_qt,
+                                                                     world->interactive_qt, &world->tilemap);
+                    if(against_result.count > 0){
+                         last_block_in_chain = against_result.againsts[0].block;
+                         against_direction = direction_rotate_clockwise(against_direction, against_result.againsts[0].rotations_through_portal);
+                    }else{
+                         break;
+                    }
+               }
+
+               bool c_on_ice_or_air = block_on_ice(last_block_in_chain->pos, last_block_in_chain->pos_delta,
+                                                   &world->tilemap, world->interactive_qt, world->block_qt) ||
+                                      block_on_air(last_block_in_chain->pos, last_block_in_chain->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt);
+
+               // if the blocks are headed in the same direction but the block is slowing down, slow down with it
+               if(!c_on_ice_or_air){
+                    switch(first_direction){
+                    default:
+                         break;
+                    case DIRECTION_LEFT:
+                         if(block_vel.x < 0 &&
+                            block_inside_result.entries[i].block->vel.x < 0 &&
+                            block_vel.x < block_inside_result.entries[i].block->vel.x){
+                              result.vel.x = block_inside_result.entries[i].block->vel.x;
+                              push = false;
+                         }
+                         break;
+                    case DIRECTION_RIGHT:
+                         if(block_vel.x > 0 &&
+                            block_inside_result.entries[i].block->vel.x > 0 &&
+                            block_vel.x > block_inside_result.entries[i].block->vel.x){
+                              result.vel.x = block_inside_result.entries[i].block->vel.x;
+                              push = false;
+                         }
+                         break;
+                    case DIRECTION_DOWN:
+                         if(block_vel.y < 0 &&
+                            block_inside_result.entries[i].block->vel.y < 0 &&
+                            block_vel.y < block_inside_result.entries[i].block->vel.y){
+                              result.vel.y = block_inside_result.entries[i].block->vel.y;
+                              push = false;
+                         }
+                         break;
+                    case DIRECTION_UP:
+                         if(block_vel.y > 0 &&
+                            block_inside_result.entries[i].block->vel.y >= 0 &&
+                            block_vel.y > block_inside_result.entries[i].block->vel.y){
+                              result.vel.y = block_inside_result.entries[i].block->vel.y;
+                              push = false;
+                         }
+                         break;
+                    }
+               }
+
+               if(a_on_ice_or_air && b_on_ice_or_air){
                     if(block_inside_index != block_index){
                          if(!direction_in_mask(vec_direction_mask(block_pos_delta), first_direction)){
                               // although we collided, the other block is colliding into us, so let that block resolve this mess
@@ -1611,8 +1670,10 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                               }else{
                                    if(odd_rotations_between_colliders){
                                         reset_move(&result.vertical_move);
+                                        result.vel.y = 0;
                                    }else{
                                         reset_move(&result.horizontal_move);
+                                        result.vel.x = 0;
                                    }
                               }
                               break;
@@ -1640,8 +1701,10 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                               }else{
                                    if(odd_rotations_between_colliders){
                                         reset_move(&result.horizontal_move);
+                                        result.vel.x = 0;
                                    }else{
                                         reset_move(&result.vertical_move);
+                                        result.vel.y = 0;
                                    }
                               }
                               break;
