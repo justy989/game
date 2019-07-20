@@ -2338,6 +2338,11 @@ int main(int argc, char** argv){
                for(S16 i = 0; i < world.blocks.count; i++){
                     Block_t* block = world.blocks.elements + i;
 
+                    block->prev_vel = block->vel;
+
+                    block->prev_push_mask = block->cur_push_mask;
+                    block->cur_push_mask = DIRECTION_MASK_NONE;
+
                     S16 mass = get_block_stack_mass(&world, block);
 
                     if(block->previous_mass != mass){
@@ -2377,11 +2382,6 @@ int main(int argc, char** argv){
                     }
 
                     block->previous_mass = mass;
-
-                    block->prev_push_mask = block->cur_push_mask;
-                    block->cur_push_mask = DIRECTION_MASK_NONE;
-
-                    block->prev_vel = block->vel;
 
                     block->pos_delta.x = calc_position_motion(block->vel.x, block->accel.x, dt);
                     block->vel.x = calc_velocity_motion(block->vel.x, block->accel.x, dt);

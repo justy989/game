@@ -1738,7 +1738,8 @@ void describe_block(World_t* world, Block_t* block){
          block->pos.decimal.x, block->pos.decimal.y,
          block->rotation, element_to_string(block->element),
          block->entangle_index, block->clone_id);
-     LOG(" vel: %f, %f accel: %f, %f pos_delta: %f, %f\n", block->vel.x, block->vel.y, block->accel.x, block->accel.y, block->pos_delta.x, block->pos_delta.y);
+     LOG(" vel: %f, %f accel: %f, %f pos_delta: %f, %f, prev_vel: %f, %f\n", block->vel.x, block->vel.y, block->accel.x, block->accel.y, block->pos_delta.x, block->pos_delta.y,
+         block->prev_vel.x, block->prev_vel.y);
      LOG(" hmove: %s %s %f\n", move_state_to_string(block->horizontal_move.state), move_sign_to_string(block->horizontal_move.sign), block->horizontal_move.distance);
      LOG(" vmove: %s %s %f\n", move_state_to_string(block->vertical_move.state), move_sign_to_string(block->vertical_move.sign), block->vertical_move.distance);
      LOG(" hcoast: %s vcoast: %s\n", block_coast_to_string(block->coast_horizontal), block_coast_to_string(block->coast_vertical));

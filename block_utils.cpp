@@ -922,6 +922,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                                                     world->interactive_qt,
                                                     &world->tilemap,
                                                     &world->blocks);
+
      if(block_inside_result.count > 0 ){
           S16 collided_with_blocks_on_ice = 0;
 
@@ -1042,9 +1043,9 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
 
                // check if they are on ice before we adjust the position on our block to check
                bool a_on_ice_or_air = block_on_ice(block_pos, result.pos_delta, &world->tilemap, world->interactive_qt, world->block_qt) ||
-                   block_on_air(block_pos, result.pos_delta, &world->tilemap, world->interactive_qt, world->block_qt);
+                                      block_on_air(block_pos, result.pos_delta, &world->tilemap, world->interactive_qt, world->block_qt);
                bool b_on_ice_or_air = block_on_ice(block_inside_result.entries[i].block->pos, block_inside_result.entries[i].block->pos_delta,
-                                            &world->tilemap, world->interactive_qt, world->block_qt) ||
+                                                   &world->tilemap, world->interactive_qt, world->block_qt) ||
                    block_on_air(block_inside_result.entries[i].block->pos, block_inside_result.entries[i].block->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt);
 
                S16 block_inside_index = -1;
@@ -1070,7 +1071,9 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                     // if we are not moving towards the entangled block, it's on them to resolve the collision, so get outta here
                     DirectionMask_t pos_diff_dir_mask = vec_direction_mask(pos_diff);
                     auto pos_delta_dir = vec_direction(block->pos_delta);
-                    if(!direction_in_mask(pos_diff_dir_mask, pos_delta_dir)) return result;
+                    if(!direction_in_mask(pos_diff_dir_mask, pos_delta_dir)){
+                         return result;
+                    }
                }
 
                auto collided_block_move_mask = vec_direction_mask(block_inside_result.entries[i].block->pos_delta);
@@ -1252,7 +1255,6 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                                    Vec_t pos_delta = pos_to_vec(final_stop_pos - block_pos);
 
                                    result.pos_delta.x = pos_delta.x;
-
                                    result.vel.x = 0.0f;
                                    result.accel.x = 0.0f;
                                    reset_move(&result.horizontal_move);
@@ -1505,6 +1507,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
 
                          F32 current_collision_block_vel = 0;
                          F32 current_pos_delta = 0;
+                         F32 scale_push_velocity = 1.0f;
 
                          switch(first_direction){
                          default:
@@ -1513,9 +1516,6 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                          case DIRECTION_RIGHT:
                               current_collision_block_vel = block_inside_result.entries[i].block->vel.x;
                               current_pos_delta = block_inside_result.entries[i].block->pos_delta.x;
-
-                              // if the block is moving in our direction at all (even negative) then there is no static friction to overcome
-                              if(current_collision_block_vel != 0) overcomes_static_friction = true;
                               break;
                          case DIRECTION_UP:
                          case DIRECTION_DOWN:
@@ -1524,6 +1524,9 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                               break;
                          }
 
+                         // if the block is moving in our direction at all (even negative) then there is no static friction to overcome
+                         if(current_collision_block_vel != 0) overcomes_static_friction = true;
+
                          // If the block has velocity but hasn't moved yet, then it has been collided with another block during this frame.
                          // Thus, the collisions happened at the same time.
                          if(current_collision_block_vel != 0 && current_pos_delta == 0){
@@ -1531,6 +1534,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
 
                               // steal the momentum from the collided block to mimic the collisions happening as a simultaneous mass
                               auto fake_elastic_addition = elastic_transfer_momentum(collided_block_mass, current_collision_block_vel, instant_momentum.mass, 0);
+                              scale_push_velocity = instant_momentum.vel / (instant_momentum.vel + fake_elastic_addition.second_final_velocity);
                               instant_momentum.vel += fake_elastic_addition.second_final_velocity;
 
                               // kill the collided blocks velocity so that the it transfers all of the momentum
@@ -1546,6 +1550,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                                    block_inside_result.entries[i].block->vel.y = 0;
                                    break;
                               }
+
                               current_collision_block_vel = 0;
                          }
 
@@ -1583,7 +1588,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                          case DIRECTION_RIGHT:
                               if(push_result.transferred_momentum_back()){
                                    if(current_block == world->blocks.elements + block_index){
-                                        result.vel.x = push_result.velocity;
+                                        result.vel.x = push_result.velocity * scale_push_velocity;
                                         result.horizontal_move.state = MOVE_STATE_COASTING;
                                         result.horizontal_move.sign = move_sign_from_vel(result.vel.x);
                                    }else{
@@ -1599,7 +1604,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                                         auto adjacent_block_index = get_block_index(world, current_block);
 
                                         result.block_changes.add(adjacent_block_index, BLOCK_CHANGE_TYPE_POS_DELTA_X, 0.0f);
-                                        result.block_changes.add(adjacent_block_index, BLOCK_CHANGE_TYPE_VEL_X, push_result.velocity);
+                                        result.block_changes.add(adjacent_block_index, BLOCK_CHANGE_TYPE_VEL_X, push_result.velocity * scale_push_velocity);
                                         result.block_changes.add(adjacent_block_index, BLOCK_CHANGE_TYPE_HORIZONTAL_MOVE_STATE, MOVE_STATE_COASTING);
                                         result.block_changes.add(adjacent_block_index, BLOCK_CHANGE_TYPE_HORIZONTAL_MOVE_SIGN, move_sign_from_vel(result.vel.x));
                                    }
@@ -1615,7 +1620,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                          case DIRECTION_DOWN:
                               if(push_result.transferred_momentum_back()){
                                    if(current_block == world->blocks.elements + block_index){
-                                        result.vel.y = push_result.velocity;
+                                        result.vel.y = push_result.velocity * scale_push_velocity;
                                         result.vertical_move.state = MOVE_STATE_COASTING;
                                         result.vertical_move.sign = move_sign_from_vel(result.vel.y);
                                    }else{
@@ -1628,7 +1633,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                                         auto adjacent_block_index = get_block_index(world, current_block);
 
                                         result.block_changes.add(adjacent_block_index, BLOCK_CHANGE_TYPE_POS_DELTA_Y, 0.0f);
-                                        result.block_changes.add(adjacent_block_index, BLOCK_CHANGE_TYPE_VEL_Y, push_result.velocity);
+                                        result.block_changes.add(adjacent_block_index, BLOCK_CHANGE_TYPE_VEL_Y, push_result.velocity * scale_push_velocity);
                                         result.block_changes.add(adjacent_block_index, BLOCK_CHANGE_TYPE_VERTICAL_MOVE_STATE, MOVE_STATE_COASTING);
                                         result.block_changes.add(adjacent_block_index, BLOCK_CHANGE_TYPE_VERTICAL_MOVE_SIGN, move_sign_from_vel(result.vel.y));
                                    }
