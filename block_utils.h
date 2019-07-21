@@ -142,6 +142,18 @@ struct CheckBlockCollisionResult_t{
      F32 vertical_momentum;
 
      BlockChanges_t block_changes;
+
+     void stop_horizontally(){
+          reset_move(&horizontal_move);
+          vel.x = 0;
+          accel.x = 0;
+     }
+
+     void stop_vertically(){
+          reset_move(&vertical_move);
+          vel.y = 0;
+          accel.y = 0;
+     }
 };
 
 struct BlockCollidesWithItselfResult_t{

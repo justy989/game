@@ -1119,8 +1119,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
 
                                         if(result.vel.x > 0) result.vel.x = -result.vel.x;
                                         if(result.vel.x == 0){
-                                             result.accel.x = 0;
-                                             reset_move(&result.horizontal_move);
+                                             result.stop_horizontally();
                                         }
 
                                         Position_t final_stop_pos = collided_block_center;
@@ -1142,8 +1141,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                                         }
                                         if(result.vel.x < 0) result.vel.x = -result.vel.x;
                                         if(result.vel.x == 0){
-                                             result.accel.x = 0;
-                                             reset_move(&result.horizontal_move);
+                                             result.stop_horizontally();
                                         }
 
                                         Position_t final_stop_pos = collided_block_center;
@@ -1171,8 +1169,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
 
                                         if(result.vel.y > 0) result.vel.y = -result.vel.y;
                                         if(result.vel.y == 0){
-                                             result.accel.y = 0;
-                                             reset_move(&result.vertical_move);
+                                             result.stop_vertically();
                                         }
 
                                         Position_t final_stop_pos = collided_block_center;
@@ -1195,8 +1192,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
 
                                         if(result.vel.y < 0) result.vel.y = -result.vel.y;
                                         if(result.vel.y == 0){
-                                             result.accel.y = 0;
-                                             reset_move(&result.vertical_move);
+                                             result.stop_vertically();
                                         }
 
                                         Position_t final_stop_pos = collided_block_center;
@@ -1212,16 +1208,12 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
 
                          if(impact_pos_delta_horizontal){
                               result.pos_delta.x = pos_delta.x;
-                              result.vel.x = 0.0f;
-                              result.accel.x = 0.0f;
-                              reset_move(&result.horizontal_move);
+                              result.stop_horizontally();
                          }
 
                          if(impact_pos_delta_vertical){
                               result.pos_delta.y = pos_delta.y;
-                              result.vel.y = 0.0f;
-                              result.accel.y = 0.0f;
-                              reset_move(&result.vertical_move);
+                              result.stop_vertically();
                          }
                     } break;
                     case MOVE_DIRECTION_LEFT:
@@ -1240,8 +1232,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
 
                                    if(result.vel.x > 0) result.vel.x = -result.vel.x;
                                    if(result.vel.x == 0){
-                                        result.accel.x = 0;
-                                        reset_move(&result.horizontal_move);
+                                        result.stop_horizontally();
                                    }
 
                                    Position_t final_stop_pos = collided_block_center;
@@ -1255,9 +1246,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                                    Vec_t pos_delta = pos_to_vec(final_stop_pos - block_pos);
 
                                    result.pos_delta.x = pos_delta.x;
-                                   result.vel.x = 0.0f;
-                                   result.accel.x = 0.0f;
-                                   reset_move(&result.horizontal_move);
+                                   result.stop_horizontally();
                               }
                          }
                          break;
@@ -1272,8 +1261,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
 
                                    if(result.vel.x < 0) result.vel.x = -result.vel.x;
                                    if(result.vel.x == 0){
-                                        result.accel.x = 0;
-                                        reset_move(&result.horizontal_move);
+                                        result.stop_horizontally();
                                    }
 
                                    Position_t final_stop_pos = collided_block_center;
@@ -1287,9 +1275,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                                    Vec_t pos_delta = pos_to_vec(final_stop_pos - block_pos);
 
                                    result.pos_delta.x = pos_delta.x;
-                                   result.vel.x = 0.0f;
-                                   result.accel.x = 0.0f;
-                                   reset_move(&result.horizontal_move);
+                                   result.stop_horizontally();
                               }
                          }
                          break;
@@ -1304,8 +1290,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
 
                                    if(result.vel.y > 0) result.vel.y = -result.vel.y;
                                    if(result.vel.y == 0){
-                                        result.accel.x = 0;
-                                        reset_move(&result.vertical_move);
+                                        result.stop_vertically();
                                    }
 
                                    Position_t final_stop_pos = collided_block_center;
@@ -1319,9 +1304,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                                    Vec_t pos_delta = pos_to_vec(final_stop_pos - block_pos);
 
                                    result.pos_delta.y = pos_delta.y;
-                                   result.vel.y = 0.0f;
-                                   result.accel.y = 0.0f;
-                                   reset_move(&result.vertical_move);
+                                   result.stop_vertically();
                               }
                          }
                          break;
@@ -1336,8 +1319,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
 
                                    if(result.vel.y < 0) result.vel.y = -result.vel.y;
                                    if(result.vel.y == 0){
-                                        result.accel.x = 0;
-                                        reset_move(&result.vertical_move);
+                                        result.stop_vertically();
                                    }
 
                                    Position_t final_stop_pos = collided_block_center;
@@ -1352,9 +1334,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
 
                                    result.pos_delta.y = pos_delta.y;
 
-                                   result.vel.y = 0.0f;
-                                   result.accel.y = 0.0f;
-                                   reset_move(&result.vertical_move);
+                                   result.stop_vertically();
                               }
                          }
                          break;
@@ -1374,7 +1354,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
 
                          if(resolve_result.stop_on_pixel_x >= 0){
                               result.stop_on_pixel_x = resolve_result.stop_on_pixel_x;
-                              reset_move(&result.horizontal_move);
+                              result.stop_horizontally();
 
                               Position_t final_stop_pos = pixel_pos(Pixel_t{result.stop_on_pixel_x, 0});
                               Vec_t pos_delta = pos_to_vec(final_stop_pos - block_pos);
@@ -1382,7 +1362,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                          }
                          if(resolve_result.stop_on_pixel_y >= 0){
                               result.stop_on_pixel_y = resolve_result.stop_on_pixel_y;
-                              reset_move(&result.vertical_move);
+                              result.stop_vertically();
 
                               Position_t final_stop_pos = pixel_pos(Pixel_t{0, result.stop_on_pixel_y});
                               Vec_t pos_delta = pos_to_vec(final_stop_pos - block_pos);
@@ -1531,11 +1511,11 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                                    break;
                               case DIRECTION_LEFT:
                               case DIRECTION_RIGHT:
-                                   reset_move(&result.horizontal_move);
+                                   result.stop_horizontally();
                                    break;
                               case DIRECTION_DOWN:
                               case DIRECTION_UP:
-                                   reset_move(&result.vertical_move);
+                                   result.stop_vertically();
                                    break;
                               }
 
@@ -1544,11 +1524,11 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                                    break;
                               case DIRECTION_LEFT:
                               case DIRECTION_RIGHT:
-                                   reset_move(&result.horizontal_move);
+                                   result.stop_horizontally();
                                    break;
                               case DIRECTION_DOWN:
                               case DIRECTION_UP:
-                                   reset_move(&result.vertical_move);
+                                   result.stop_vertically();
                                    break;
                               }
                          }
@@ -1652,9 +1632,9 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                                         result.horizontal_move.sign = move_sign_from_vel(result.vel.x);
                                    }else{
                                         if(odd_rotations_between_colliders){
-                                             reset_move(&result.vertical_move);
+                                             result.stop_vertically();
                                         }else{
-                                             reset_move(&result.horizontal_move);
+                                             result.stop_horizontally();
                                         }
 
                                         if(direction_to_check == DIRECTION_LEFT && push_result.velocity > 0) push_result.velocity = -push_result.velocity;
@@ -1669,11 +1649,9 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                                    }
                               }else{
                                    if(odd_rotations_between_colliders){
-                                        reset_move(&result.vertical_move);
-                                        result.vel.y = 0;
+                                        result.stop_vertically();
                                    }else{
-                                        reset_move(&result.horizontal_move);
-                                        result.vel.x = 0;
+                                        result.stop_horizontally();
                                    }
                               }
                               break;
@@ -1686,9 +1664,9 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                                         result.vertical_move.sign = move_sign_from_vel(result.vel.y);
                                    }else{
                                         if(odd_rotations_between_colliders){
-                                             reset_move(&result.horizontal_move);
+                                             result.stop_horizontally();
                                         }else{
-                                             reset_move(&result.vertical_move);
+                                             result.stop_vertically();
                                         }
 
                                         auto adjacent_block_index = get_block_index(world, current_block);
@@ -1700,11 +1678,9 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                                    }
                               }else{
                                    if(odd_rotations_between_colliders){
-                                        reset_move(&result.horizontal_move);
-                                        result.vel.x = 0;
+                                        result.stop_horizontally();
                                    }else{
-                                        reset_move(&result.vertical_move);
-                                        result.vel.y = 0;
+                                        result.stop_vertically();
                                    }
                               }
                               break;
