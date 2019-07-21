@@ -63,6 +63,11 @@ struct BlockPushMoveDirectionResult_t{
      BlockPushResult_t vertical_result;
 };
 
+struct AllowedToPushResult_t{
+     bool push = false;
+     F32 mass_ratio = 0.0f;
+};
+
 void sort_blocks_by_ascending_height(Block_t** blocks, S16 block_count);
 void sort_blocks_by_descending_height(Block_t** blocks, S16 block_count);
 
@@ -113,3 +118,4 @@ ElasticCollisionResult_t elastic_transfer_momentum_to_block(TransferMomentum_t* 
 
 F32 get_block_static_friction(S16 mass);
 F32 get_block_expected_player_push_velocity(World_t* world, Block_t* block, F32 force = 1.0f);
+AllowedToPushResult_t allowed_to_push(World_t* world, Block_t* block, Direction_t direction);

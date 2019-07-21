@@ -14,7 +14,7 @@ Entanglement Puzzles:
 - rotated entangled puzzles where the centroid is on a portal destination coord
 
 Current bugs:
-- There is a case where blocks can collide on ice, and they will have velocity but also their move state will be MOVE_STATE_IDLING.
+- We can have a stack overflow in our quad tree queries for blocks, not sure how yet
 - Players standing on blocks going through portals colliding on ice seem to gain speed over time
 - pressure plates don't see blocks as 1 pixel too small on the right and top, so their activation is delayed in those directions
 - A block on the tile outside a portal pushed into the portal to clone, the clone has weird behavior and ends up on the portal block
@@ -2486,7 +2486,10 @@ int main(int argc, char** argv){
                                                        auto block_move_dir = vec_direction(block_horizontal_vel);
                                                        if(block_move_dir != DIRECTION_COUNT){
                                                             auto direction_to_push = direction_rotate_clockwise(block_move_dir, rotations_between);
-                                                            block_push(block, direction_to_push, &world, false);
+                                                            auto allowed_result = allowed_to_push(&world, block, direction_to_push);
+                                                            if(allowed_result.push){
+                                                                 block_push(block, direction_to_push, &world, false, allowed_result.mass_ratio);
+                                                            }
                                                        }
                                                   }
                                              }else{
@@ -2498,7 +2501,10 @@ int main(int argc, char** argv){
                                                        auto block_move_dir = vec_direction(block_horizontal_vel);
                                                        if(block_move_dir != DIRECTION_COUNT){
                                                             auto direction_to_push = direction_rotate_clockwise(block_move_dir, rotations_between);
-                                                            block_push(block, direction_to_push, &world, false);
+                                                            auto allowed_result = allowed_to_push(&world, block, direction_to_push);
+                                                            if(allowed_result.push){
+                                                                 block_push(block, direction_to_push, &world, false, allowed_result.mass_ratio);
+                                                            }
                                                        }
                                                   }
                                              }
@@ -2514,7 +2520,10 @@ int main(int argc, char** argv){
                                                        auto block_move_dir = vec_direction(block_vertical_vel);
                                                        if(block_move_dir != DIRECTION_COUNT){
                                                             auto direction_to_push = direction_rotate_clockwise(block_move_dir, rotations_between);
-                                                            block_push(block, direction_to_push, &world, false);
+                                                            auto allowed_result = allowed_to_push(&world, block, direction_to_push);
+                                                            if(allowed_result.push){
+                                                                 block_push(block, direction_to_push, &world, false, allowed_result.mass_ratio);
+                                                            }
                                                        }
                                                   }
                                              }else{
@@ -2526,7 +2535,10 @@ int main(int argc, char** argv){
                                                        auto block_move_dir = vec_direction(block_vertical_vel);
                                                        if(block_move_dir != DIRECTION_COUNT){
                                                             auto direction_to_push = direction_rotate_clockwise(block_move_dir, rotations_between);
-                                                            block_push(block, direction_to_push, &world, false);
+                                                            auto allowed_result = allowed_to_push(&world, block, direction_to_push);
+                                                            if(allowed_result.push){
+                                                                 block_push(block, direction_to_push, &world, false, allowed_result.mass_ratio);
+                                                            }
                                                        }
                                                   }
                                              }
@@ -3314,19 +3326,9 @@ int main(int argc, char** argv){
                                    // if this is the frame that causes the block to be pushed, make a commit
                                    if(save_push_time <= BLOCK_PUSH_TIME) undo_commit(&undo, &world.players, &world.tilemap, &world.blocks, &world.interactives);
 
-                                   // player applies a force to accelerate the block by BLOCK_ACCEL
-                                   F32 block_acceleration = (mass_ratio * BLOCK_ACCEL);
-                                   F32 applied_force = (F32)(total_block_mass) * block_acceleration / BLOCK_ACCEL_TIME;
-                                   F32 static_friction = 0;
-
-                                   if(direction_is_horizontal(push_block_dir) && block_to_push->vel.x == 0){
-                                        static_friction = get_block_static_friction(total_block_mass);
-                                   }else if(!direction_is_horizontal(push_block_dir) && block_to_push->vel.y == 0){
-                                        static_friction = get_block_static_friction(total_block_mass);
-                                   }
-
-                                   if(applied_force >= static_friction){
-                                        auto push_result = block_push(block_to_push, push_block_dir, &world, false, mass_ratio);
+                                   auto allowed_result = allowed_to_push(&world, block_to_push, push_block_dir);
+                                   if(allowed_result.push){
+                                        auto push_result = block_push(block_to_push, push_block_dir, &world, false, allowed_result.mass_ratio);
 
                                         if(!push_result.pushed && !push_result.busy){
                                              player->push_time = 0.0f;

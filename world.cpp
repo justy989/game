@@ -2291,3 +2291,29 @@ S16 get_block_mass_in_direction(World_t* world, Block_t* block, Direction_t dire
 
      return mass;
 }
+
+AllowedToPushResult_t allowed_to_push(World_t* world, Block_t* block, Direction_t direction){
+     AllowedToPushResult_t result;
+     result.push = true;
+
+     F32 total_block_mass = get_block_mass_in_direction(world, block, direction);
+     result.mass_ratio = (F32)(BLOCK_BASELINE_MASS) / (F32)(total_block_mass);
+
+     if(block_on_ice(block->pos, Vec_t{}, &world->tilemap, world->interactive_qt, world->block_qt)){
+
+          // player applies a force to accelerate the block by BLOCK_ACCEL
+          F32 block_acceleration = (result.mass_ratio * BLOCK_ACCEL);
+          F32 applied_force = (F32)(total_block_mass) * block_acceleration / BLOCK_ACCEL_TIME;
+          F32 static_friction = 0;
+
+          if(direction_is_horizontal(direction) && block->vel.x == 0){
+               static_friction = get_block_static_friction(total_block_mass);
+          }else if(!direction_is_horizontal(direction) && block->vel.y == 0){
+               static_friction = get_block_static_friction(total_block_mass);
+          }
+
+          if(applied_force < static_friction) result.push = false;
+     }
+
+     return result;
+}

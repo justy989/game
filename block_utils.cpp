@@ -1892,15 +1892,10 @@ void push_entangled_block(Block_t* block, World_t* world, Direction_t push_dir, 
                auto rotations_between = direction_rotations_between(static_cast<Direction_t>(entangled_block->rotation), static_cast<Direction_t>(block->rotation));
                Direction_t rotated_dir = direction_rotate_clockwise(push_dir, rotations_between);
 
-               F32 force = 1.0f;
-               if(!pushed_by_ice){
-                    // TODO: compress this with code where the player pushes a block
-                    static const S16 baseline_block_mass = TILE_SIZE_IN_PIXELS * TILE_SIZE_IN_PIXELS;
-                    auto total_block_mass = get_block_stack_mass(world, entangled_block);
-                    force = (F32)(baseline_block_mass) / (F32)(total_block_mass);
+               auto allowed_result = allowed_to_push(world, entangled_block, rotated_dir);
+               if(allowed_result.push){
+                    block_push(entangled_block, rotated_dir, world, pushed_by_ice, allowed_result.mass_ratio, instant_momentum);
                }
-
-               block_push(entangled_block, rotated_dir, world, pushed_by_ice, force, instant_momentum);
           }
           entangle_index = entangled_block->entangle_index;
      }
