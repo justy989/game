@@ -14,6 +14,7 @@
 #define PLAYER_IDLE_SPEED 0.0025f
 #define PLAYER_BOW_DRAW_DELAY 0.3f
 #define PLAYER_STOP_IDLE_BLOCK_TIMER 0.2f
+#define PLAYER_MASS (QUARTER_TILE_SIZE_IN_PIXELS * QUARTER_TILE_SIZE_IN_PIXELS)
 
 // if a block is travelling at double speed, it should squish the player
 #define PLAYER_SQUISH_MOMENTUM (256.0f * 2.0f * 0.168067)

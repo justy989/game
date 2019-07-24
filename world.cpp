@@ -1320,42 +1320,47 @@ static F32 get_block_velocity_ratio(World_t* world, Block_t* block, F32 vel, F32
 
 BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Direction_t direction, World_t* world, bool pushed_by_ice, F32 force, TransferMomentum_t* instant_momentum){
      BlockPushResult_t result {};
-     Direction_t collided_block_push_dir = DIRECTION_COUNT;
-     Block_t* collided_block = block_against_another_block(pos, direction, world->block_qt, world->interactive_qt,
-                                                           &world->tilemap, &collided_block_push_dir);
+     auto against_result = block_against_other_blocks(pos, direction, world->block_qt, world->interactive_qt,
+                                                           &world->tilemap);
      bool both_on_ice = false;
-     if(collided_block){
+     bool pushed_block_on_ice = block_on_ice(pos, pos_delta, &world->tilemap, world->interactive_qt, world->block_qt);
+     bool transfers_force = false;
+
+     // TODO: we have returns in this loop, how do we handle them?
+     for(S16 i = 0; i < against_result.count; i++){
+          Block_t* against_block = against_result.againsts[i].block;
+          Direction_t against_block_push_dir = direction_rotate_clockwise(direction, against_result.againsts[i].rotations_through_portal);
           bool on_ice = false;
 
-          if(collided_block == block){
-               if(pushed_by_ice && block_on_ice(collided_block->pos, collided_block->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt)){
+          if(against_block == block){
+               if(pushed_by_ice && block_on_ice(against_block->pos, against_block->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt)){
                     // pass
                }else{
                     return result;
                }
-          }else if((on_ice = block_on_ice(collided_block->pos, collided_block->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt))){
+          }else if((on_ice = block_on_ice(against_block->pos, against_block->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt))){
                if(pushed_by_ice){
                     // check if we are able to move or if we transfer our force to the block
-                    bool transfers_force = true;
+                    transfers_force = true;
                     F32 block_vel = 0;
                     if(instant_momentum){
-                         switch(collided_block_push_dir){
+                         switch(against_block_push_dir){
                          default:
                               break;
                          case DIRECTION_LEFT:
-                              transfers_force = (collided_block->vel.x > -instant_momentum->vel);
+                              transfers_force = (against_block->vel.x > -instant_momentum->vel);
                               block_vel = block->vel.x;
                               break;
                          case DIRECTION_UP:
-                              transfers_force = (collided_block->vel.y < instant_momentum->vel);
+                              transfers_force = (against_block->vel.y < instant_momentum->vel);
                               block_vel = block->vel.y;
                               break;
                          case DIRECTION_RIGHT:
-                              transfers_force = (collided_block->vel.x < instant_momentum->vel);
+                              transfers_force = (against_block->vel.x < instant_momentum->vel);
                               block_vel = block->vel.x;
                               break;
                          case DIRECTION_DOWN:
-                              transfers_force = (collided_block->vel.y > -instant_momentum->vel);
+                              transfers_force = (against_block->vel.y > -instant_momentum->vel);
                               block_vel = block->vel.y;
                               break;
                          }
@@ -1370,12 +1375,13 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
                               return result;
                          }
 
-                         auto push_result = block_push(collided_block, collided_block_push_dir, world, pushed_by_ice, force, instant_momentum);
+                         auto push_result = block_push(against_block, against_block_push_dir, world, pushed_by_ice, force, instant_momentum);
 
                          if(push_result.pushed){
-                              push_entangled_block(collided_block, world, collided_block_push_dir, pushed_by_ice, instant_momentum);
+                              push_entangled_block(against_block, world, against_block_push_dir, pushed_by_ice, instant_momentum);
                          }
 
+                         // TODO when transferring momentum, split up the mass by how many blocks we are against that are on ice
                          switch(direction){
                          default:
                               break;
@@ -1418,27 +1424,27 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
                               }
                               break;
                          }
-
-                         return result;
                     }
-               }else if(block_on_ice(pos, pos_delta, &world->tilemap, world->interactive_qt, world->block_qt)){
+               }else if(pushed_block_on_ice){
                     both_on_ice = true;
-                    bool are_entangled = blocks_are_entangled(block, collided_block, &world->blocks);
+                    bool are_entangled = blocks_are_entangled(block, against_block, &world->blocks);
 
                     if(are_entangled){
                          // if they are opposite entangled (potentially through a portal) then they just push into each other
-                         S8 total_collided_rotations = direction_rotations_between(direction, collided_block_push_dir) + collided_block->rotation;
+                         S8 total_collided_rotations = direction_rotations_between(direction, against_block_push_dir) + against_block->rotation;
                          total_collided_rotations %= DIRECTION_COUNT;
 
                          auto rotations_between = direction_rotations_between((Direction_t)(total_collided_rotations), (Direction_t)(block->rotation));
-                         if(rotations_between == 2) return result;
+                         if(rotations_between == 2){
+                              return result;
+                         }
                     }
 
-                    auto push_result = block_push(collided_block, collided_block_push_dir, world, pushed_by_ice, force, instant_momentum);
+                    auto push_result = block_push(against_block, against_block_push_dir, world, pushed_by_ice, force, instant_momentum);
 
                     if(push_result.pushed){
                          if(!are_entangled){
-                             push_entangled_block(collided_block, world, collided_block_push_dir, pushed_by_ice, instant_momentum);
+                             push_entangled_block(against_block, world, against_block_push_dir, pushed_by_ice, instant_momentum);
                          }
                     }else{
                          return result;
@@ -1446,38 +1452,38 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
                }
           }
 
-          if(blocks_are_entangled(collided_block, block, &world->blocks)){
+          if(blocks_are_entangled(against_block, block, &world->blocks)){
                // if block is entangled with the block it collides with, check if the entangled block can move, this is kind of duplicate work
                bool only_against_entanglers = true;
-               Block_t* entangled_collided_block = collided_block;
-               while(entangled_collided_block){
-                    Direction_t check_direction = collided_block_push_dir;
+               Block_t* entangled_against_block = against_block;
+               while(entangled_against_block){
+                    Direction_t check_direction = against_block_push_dir;
 
-                    auto next_collided_block = block_against_another_block(entangled_collided_block->pos, check_direction, world->block_qt,
+                    auto next_against_block = block_against_another_block(entangled_against_block->pos, check_direction, world->block_qt,
                                                                            world->interactive_qt, &world->tilemap,
                                                                            &check_direction);
-                    if(next_collided_block == nullptr) break;
-                    if(!blocks_are_entangled(entangled_collided_block, next_collided_block, &world->blocks) &&
-                       !block_on_ice(next_collided_block->pos, entangled_collided_block->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt)){
+                    if(next_against_block == nullptr) break;
+                    if(!blocks_are_entangled(entangled_against_block, next_against_block, &world->blocks) &&
+                       !block_on_ice(next_against_block->pos, entangled_against_block->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt)){
                          only_against_entanglers = false;
                          break;
                     }
-                    entangled_collided_block = next_collided_block;
+                    entangled_against_block = next_against_block;
                }
 
                if(!only_against_entanglers){
                     return result;
                }
 
-               if(collided_block->rotation != block->rotation){
+               if(against_block->rotation != block->rotation){
                     if(!both_on_ice){
                          return result; // only when the rotation is equal can we move with the block
                     }
                }
-               if(block_against_solid_tile(collided_block, direction, &world->tilemap)){
+               if(block_against_solid_tile(against_block, direction, &world->tilemap)){
                     return result;
                }
-               if(block_against_solid_interactive(collided_block, direction, &world->tilemap, world->interactive_qt)){
+               if(block_against_solid_interactive(against_block, direction, &world->tilemap, world->interactive_qt)){
                     return result;
                }
           }else if(!on_ice){
@@ -1485,10 +1491,12 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
           }
      }
 
+     if(transfers_force) return result;
+
      if(!pushed_by_ice){
-          collided_block = rotated_entangled_blocks_against_centroid(block, direction, world->block_qt, &world->blocks,
-                                                                     world->interactive_qt, &world->tilemap);
-          if(collided_block){
+          auto against_block = rotated_entangled_blocks_against_centroid(block, direction, world->block_qt, &world->blocks,
+                                                                         world->interactive_qt, &world->tilemap);
+          if(against_block){
                return result;
           }
      }
@@ -1501,14 +1509,27 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
      }
      auto* player = block_against_player(block, direction, &world->players);
      if(player){
-          player->stopping_block_from = direction_opposite(direction);
-          player->stopping_block_from_time = PLAYER_STOP_IDLE_BLOCK_TIMER;
-          return result;
+          bool player_should_stop_block = true;
+
+          if(pushed_by_ice){
+               // if the block was pushed by ice, then check how much momentum was behind it
+               auto block_momentum = instant_momentum ? instant_momentum->vel * instant_momentum->mass : 0;
+               if(block_momentum >= PLAYER_SQUISH_MOMENTUM) player_should_stop_block = false;
+
+               if(direction_in_vec(block->vel, direction)){
+                    player_should_stop_block = false;
+               }
+          }
+
+          if(player_should_stop_block){
+               player->stopping_block_from = direction_opposite(direction);
+               player->stopping_block_from_time = PLAYER_STOP_IDLE_BLOCK_TIMER;
+               return result;
+          }
      }
 
      // if are sliding on ice and are pushed in the opposite direction then stop
-     if(block_on_ice(pos, pos_delta, &world->tilemap, world->interactive_qt, world->block_qt) &&
-        !instant_momentum){
+     if(pushed_block_on_ice && !instant_momentum){
           switch(direction){
           default:
                break;
@@ -2137,7 +2158,7 @@ static S16 get_player_mass_on_block(World_t* world, Block_t* block){
      for(S16 p = 0; p < world->players.count; p++){
           auto player = world->players.elements + p;
           if(player->pos.z == (block->pos.z + HEIGHT_INTERVAL) && pixel_in_rect(player->pos.pixel, block_rect)){
-               mass += (QUARTER_TILE_SIZE_IN_PIXELS * QUARTER_TILE_SIZE_IN_PIXELS);
+               mass += PLAYER_MASS;
           }
      }
 
@@ -2286,13 +2307,16 @@ S16 get_block_mass_in_direction(World_t* world, Block_t* block, Direction_t dire
           auto* block_entry = block_list.entries + i;
           if(block_entry->counted){
                mass += block_get_mass(block_entry->block);
+
+               auto against_player = block_against_player(block_entry->block, direction, &world->players);
+               if(against_player) mass += PLAYER_MASS;
           }
      }
 
      return mass;
 }
 
-AllowedToPushResult_t allowed_to_push(World_t* world, Block_t* block, Direction_t direction){
+AllowedToPushResult_t allowed_to_push(World_t* world, Block_t* block, Direction_t direction, TransferMomentum_t* instant_momentum){
      AllowedToPushResult_t result;
      result.push = true;
 
@@ -2300,19 +2324,23 @@ AllowedToPushResult_t allowed_to_push(World_t* world, Block_t* block, Direction_
      result.mass_ratio = (F32)(BLOCK_BASELINE_MASS) / (F32)(total_block_mass);
 
      if(block_on_ice(block->pos, Vec_t{}, &world->tilemap, world->interactive_qt, world->block_qt)){
-
           // player applies a force to accelerate the block by BLOCK_ACCEL
-          F32 block_acceleration = (result.mass_ratio * BLOCK_ACCEL);
-          F32 applied_force = (F32)(total_block_mass) * block_acceleration / BLOCK_ACCEL_TIME;
-          F32 static_friction = 0;
+          if(instant_momentum){
+               auto elastic_result = elastic_transfer_momentum_to_block(instant_momentum, world, block, direction);
+               result.push = collision_result_overcomes_friction(block->vel.y, elastic_result.second_final_velocity, total_block_mass);
+          }else{
+               F32 block_acceleration = (result.mass_ratio * BLOCK_ACCEL);
+               F32 applied_force = (F32)(total_block_mass) * block_acceleration / BLOCK_ACCEL_TIME;
+               F32 static_friction = 0;
 
-          if(direction_is_horizontal(direction) && block->vel.x == 0){
-               static_friction = get_block_static_friction(total_block_mass);
-          }else if(!direction_is_horizontal(direction) && block->vel.y == 0){
-               static_friction = get_block_static_friction(total_block_mass);
+               if(direction_is_horizontal(direction) && block->vel.x == 0){
+                    static_friction = get_block_static_friction(total_block_mass);
+               }else if(!direction_is_horizontal(direction) && block->vel.y == 0){
+                    static_friction = get_block_static_friction(total_block_mass);
+               }
+
+               if(applied_force < static_friction) result.push = false;
           }
-
-          if(applied_force < static_friction) result.push = false;
      }
 
      return result;

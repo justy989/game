@@ -1542,8 +1542,6 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                               push_pos_delta = result.pos_delta;
                          }
 
-                         bool overcomes_static_friction = false;
-
                          F32 current_collision_block_vel = 0;
                          F32 current_pos_delta = 0;
                          F32 scale_push_velocity = 1.0f;
@@ -1562,9 +1560,6 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                               current_pos_delta = block_inside_result.entries[i].block->pos_delta.y;
                               break;
                          }
-
-                         // if the block is moving in our direction at all (even negative) then there is no static friction to overcome
-                         if(current_collision_block_vel != 0) overcomes_static_friction = true;
 
                          // If the block has velocity but hasn't moved yet, then it has been collided with another block during this frame.
                          // Thus, the collisions happened at the same time.
@@ -1593,9 +1588,17 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                               current_collision_block_vel = 0;
                          }
 
-                         auto push_result = block_push(block_inside_result.entries[i].block, push_pos, push_pos_delta, first_direction, world, true, 1.0f, &instant_momentum);
+#if 0
+                         LOG("block %d collides with block %d to push it %s\n",
+                             block_index, get_block_index(world, block_inside_result.entries[i].block), direction_to_string(first_direction));
+#endif
 
                          auto current_block = world->blocks.elements + block_index;
+                         auto save_current_block_horizontal_move_state = current_block->horizontal_move.state;
+                         auto save_current_block_vertical_move_state = current_block->vertical_move.state;
+
+                         auto push_result = block_push(block_inside_result.entries[i].block, push_pos, push_pos_delta, first_direction, world, true, 1.0f, &instant_momentum);
+
                          auto direction_to_check = direction_opposite(first_direction);
                          direction_to_check = direction_rotate_counter_clockwise(direction_to_check, block_inside_result.entries[i].portal_rotations);
 
@@ -1728,6 +1731,21 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                                         result.stop_on_pixel_x = 0;
                                         result.stop_on_pixel_y = 0;
                                    }
+                              }
+                         }
+
+                         // if, as a result of this push, this current block gets pushed, update the results
+                         if(current_block == world->blocks.elements + block_index){
+                              if(current_block->horizontal_move.state == MOVE_STATE_COASTING &&
+                                 save_current_block_horizontal_move_state == MOVE_STATE_IDLING){
+                                   result.vel.x = current_block->vel.x;
+                                   result.horizontal_move = current_block->horizontal_move;
+                              }
+
+                              if(current_block->vertical_move.state == MOVE_STATE_COASTING &&
+                                 save_current_block_vertical_move_state == MOVE_STATE_IDLING){
+                                   result.vel.y = current_block->vel.y;
+                                   result.vertical_move = current_block->vertical_move;
                               }
                          }
 
@@ -1868,7 +1886,7 @@ void push_entangled_block(Block_t* block, World_t* world, Direction_t push_dir, 
                auto rotations_between = direction_rotations_between(static_cast<Direction_t>(entangled_block->rotation), static_cast<Direction_t>(block->rotation));
                Direction_t rotated_dir = direction_rotate_clockwise(push_dir, rotations_between);
 
-               auto allowed_result = allowed_to_push(world, entangled_block, rotated_dir);
+               auto allowed_result = allowed_to_push(world, entangled_block, rotated_dir, instant_momentum);
                if(allowed_result.push){
                     block_push(entangled_block, rotated_dir, world, pushed_by_ice, allowed_result.mass_ratio, instant_momentum);
                }

@@ -360,3 +360,20 @@ Pixel_t closest_pixel_in_rect(Pixel_t pixel, Rect_t rect){
 
      return result;
 }
+
+bool direction_in_vec(Vec_t vec, Direction_t direction){
+     switch(direction){
+     default:
+          break;
+     case DIRECTION_LEFT:
+          return vec.x < 0;
+     case DIRECTION_RIGHT:
+          return vec.x > 0;
+     case DIRECTION_DOWN:
+          return vec.y < 0;
+     case DIRECTION_UP:
+          return vec.y > 0;
+     }
+
+     return false;
+}

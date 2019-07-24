@@ -58,3 +58,5 @@ S16 passes_over_pixel(S16 pixel_a, S16 pixel_b);
 void get_rect_coords(Rect_t rect, Coord_t* coords);
 
 Pixel_t closest_pixel_in_rect(Pixel_t pixel, Rect_t rect);
+
+bool direction_in_vec(Vec_t vec, Direction_t direction);

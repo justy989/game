@@ -14,6 +14,7 @@ Entanglement Puzzles:
 - rotated entangled puzzles where the centroid is on a portal destination coord
 
 Current bugs:
+- if a collision happens to an entangled block on ice, where the entangled block is moving towards the collider, the entangled block's entanglers do not get pushed
 - We can have a stack overflow in our quad tree queries for blocks, not sure how yet
 - Players standing on blocks going through portals colliding on ice seem to gain speed over time
 - pressure plates don't see blocks as 1 pixel too small on the right and top, so their activation is delayed in those directions
@@ -30,6 +31,7 @@ Current bugs:
 Big Features:
 - Momentum
      - Even if a block is iced, if there is a block on top of it, that should impact static friction but not collision impact velocities resolution
+     - if the player is stopping a block and another block collides with it, what happens ?
 - 3D
      - if we put a popup on the other side of a portal and a block 1 interval high goes through the portal, will it work the way we expect?
      - how does a stack of entangled blocks move? really f***ing weird right now tbh
