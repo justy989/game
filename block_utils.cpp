@@ -1707,9 +1707,13 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                                         result.vertical_move = block_inside_result.entries[i].block->vertical_move;
                                    }
                               }
+                         }
 
+                         if(push_result.pushed || push_result.force_flowed_through){
                               push_entangled_block(block_inside_result.entries[i].block, world, first_direction, true, &instant_momentum);
+                         }
 
+                         if(push_result.pushed){
                               if(blocks_are_entangled(block_inside_result.entries[i].block - world->blocks.elements, block_index, &world->blocks)){
                                    Block_t* block = world->blocks.elements + block_index;
                                    auto rotations_between = direction_rotations_between(static_cast<Direction_t>(block_inside_result.entries[i].block->rotation), static_cast<Direction_t>(block->rotation));
@@ -1892,9 +1896,35 @@ void push_entangled_block(Block_t* block, World_t* world, Direction_t push_dir, 
                auto rotations_between = direction_rotations_between(static_cast<Direction_t>(entangled_block->rotation), static_cast<Direction_t>(block->rotation));
                Direction_t rotated_dir = direction_rotate_clockwise(push_dir, rotations_between);
 
-               auto allowed_result = allowed_to_push(world, entangled_block, rotated_dir, instant_momentum);
-               if(allowed_result.push){
-                    block_push(entangled_block, rotated_dir, world, pushed_by_ice, allowed_result.mass_ratio, instant_momentum);
+               if(instant_momentum){
+                    auto rotated_instant_momentum = *instant_momentum;
+
+                    switch(rotated_dir){
+                    default:
+                         break;
+                    case DIRECTION_LEFT:
+                         if(rotated_instant_momentum.vel > 0) rotated_instant_momentum.vel = -rotated_instant_momentum.vel;
+                         break;
+                    case DIRECTION_RIGHT:
+                         if(rotated_instant_momentum.vel < 0) rotated_instant_momentum.vel = -rotated_instant_momentum.vel;
+                         break;
+                    case DIRECTION_DOWN:
+                         if(rotated_instant_momentum.vel > 0) rotated_instant_momentum.vel = -rotated_instant_momentum.vel;
+                         break;
+                    case DIRECTION_UP:
+                         if(rotated_instant_momentum.vel < 0) rotated_instant_momentum.vel = -rotated_instant_momentum.vel;
+                         break;
+                    }
+
+                    auto allowed_result = allowed_to_push(world, entangled_block, rotated_dir, &rotated_instant_momentum);
+                    if(allowed_result.push){
+                         block_push(entangled_block, rotated_dir, world, pushed_by_ice, allowed_result.mass_ratio, &rotated_instant_momentum, true);
+                    }
+               }else{
+                    auto allowed_result = allowed_to_push(world, entangled_block, rotated_dir);
+                    if(allowed_result.push){
+                         block_push(entangled_block, rotated_dir, world, pushed_by_ice, allowed_result.mass_ratio);
+                    }
                }
           }
           entangle_index = entangled_block->entangle_index;
