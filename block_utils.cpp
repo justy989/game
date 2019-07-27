@@ -682,11 +682,13 @@ InteractiveHeldResult_t block_held_up_by_popup(Position_t block_pos, QuadTreeNod
      get_rect_coords(block_rect, rect_coords);
      for(S8 i = 0; i < 4; i++){
           auto* interactive = quad_tree_interactive_find_at(interactive_qt, rect_coords[i]);
-          if(interactive && interactive->type == INTERACTIVE_TYPE_POPUP && block_pos.z == (interactive->popup.lift.ticks - 1)){
-               auto popup_rect = block_get_rect(coord_to_pixel(rect_coords[i]));
-               auto intserection_area = rect_intersecting_area(block_rect, popup_rect);
-               if(intserection_area >= min_area){
-                    add_interactive_held(&result, interactive, popup_rect);
+          if(interactive && interactive->type == INTERACTIVE_TYPE_POPUP){
+               if(block_pos.z == (interactive->popup.lift.ticks - 1)){
+                    auto popup_rect = block_get_rect(coord_to_pixel(rect_coords[i]));
+                    auto intserection_area = rect_intersecting_area(block_rect, popup_rect);
+                    if(intserection_area >= min_area){
+                         add_interactive_held(&result, interactive, popup_rect);
+                    }
                }
           }
      }
@@ -1633,6 +1635,8 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                                         result.vel.x = push_result.velocity * scale_push_velocity;
                                         result.horizontal_move.state = MOVE_STATE_COASTING;
                                         result.horizontal_move.sign = move_sign_from_vel(result.vel.x);
+                                        F32 x_pos = pos_to_vec(current_block->pos + current_block->pos_delta).x;
+                                        result.horizontal_move.time_left = calc_coast_motion_time_left(x_pos, current_block->vel.x);
                                    }else{
                                         if(odd_rotations_between_colliders){
                                              result.stop_vertically();
@@ -1665,6 +1669,8 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                                         result.vel.y = push_result.velocity * scale_push_velocity;
                                         result.vertical_move.state = MOVE_STATE_COASTING;
                                         result.vertical_move.sign = move_sign_from_vel(result.vel.y);
+                                        F32 y_pos = pos_to_vec(current_block->pos + current_block->pos_delta).y;
+                                        result.vertical_move.time_left = calc_coast_motion_time_left(y_pos, current_block->vel.y);
                                    }else{
                                         if(odd_rotations_between_colliders){
                                              result.stop_horizontally();

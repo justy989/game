@@ -3,15 +3,17 @@
 #include "defines.h"
 
 void lift_update(Lift_t* lift, float tick_delay, float dt, S8 min_tick, S8 max_tick){
-     lift->timer += dt;
-
-     if(lift->timer > tick_delay){
-          lift->timer -= tick_delay;
-
-          if(lift->up){
-               if(lift->ticks < max_tick) lift->ticks++;
-          }else{
-               if(lift->ticks > min_tick) lift->ticks--;
+     if(lift->up && lift->ticks < max_tick){
+          lift->timer += dt;
+          if(lift->timer > tick_delay){
+               lift->timer -= tick_delay;
+               lift->ticks++;
+          }
+     }else if(!lift->up && lift->ticks > min_tick){
+          lift->timer += dt;
+          if(lift->timer > tick_delay){
+               lift->timer -= tick_delay;
+               lift->ticks--;
           }
      }
 }

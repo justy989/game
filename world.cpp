@@ -1579,7 +1579,7 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
 
                     auto motion = motion_x_component(block);
                     F32 x_pos = pos_to_vec(block->pos).x;
-                    block->horizontal_move.time_left = calc_coast_motion_time_left(&motion, x_pos);
+                    block->horizontal_move.time_left = -calc_coast_motion_time_left(&motion, x_pos);
                     block->stopped_by_player_horizontal = false;
                }else{
                     return result;
@@ -1655,7 +1655,7 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
 
                     auto motion = motion_y_component(block);
                     F32 y_pos = pos_to_vec(block->pos).y;
-                    block->vertical_move.time_left = calc_coast_motion_time_left(&motion, y_pos);
+                    block->vertical_move.time_left = -calc_coast_motion_time_left(&motion, y_pos);
                     block->stopped_by_player_vertical = false;
                }else{
                     return result;
@@ -1842,7 +1842,8 @@ void describe_coord(Coord_t coord, World_t* world){
                break;
           case INTERACTIVE_TYPE_POPUP:
                type_string = "POPUP";
-               snprintf(info_string, info_string_len, "lift: ticks: %u, up: %d, iced: %d", interactive->popup.lift.ticks, interactive->popup.lift.up, interactive->popup.iced);
+               snprintf(info_string, info_string_len, "lift: ticks: %u, timer: %f, up: %d, iced: %d",
+                        interactive->popup.lift.ticks, interactive->popup.lift.timer, interactive->popup.lift.up, interactive->popup.iced);
                break;
           case INTERACTIVE_TYPE_LEVER:
                type_string = "LEVER";

@@ -14,6 +14,7 @@ enum BlockCoast_t{
      BLOCK_COAST_ICE,
      BLOCK_COAST_PLAYER,
      BLOCK_COAST_AIR, // lol coaster
+     BLOCK_COAST_ENTANGLED_PLAYER,
 };
 
 enum BlockHeldBy_t{

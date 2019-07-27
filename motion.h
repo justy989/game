@@ -99,6 +99,7 @@ MotionComponent_t motion_y_component(Motion_t* motion);
 
 Motion_t copy_motion_from_component(MotionComponent_t* motion);
 F32 calc_coast_motion_time_left(MotionComponent_t* motion, F32 pos);
+F32 calc_coast_motion_time_left(F32 pos, F32 vel);
 
 F32 calc_accel_from_stop(F32 distance, F32 time);
 F32 calc_accel_across_distance(F32 vel, F32 distance, F32 time);

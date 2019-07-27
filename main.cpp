@@ -14,6 +14,7 @@ Entanglement Puzzles:
 - rotated entangled puzzles where the centroid is on a portal destination coord
 
 Current bugs:
+- if an entangled block on ice gets hit, and it's entangler is not on ice, but against a block that is on ice, maybe the block against the entangler should be hit ? Maybe this should be a more general rule
 - if a collision happens to an entangled block on ice, where the entangled block is moving towards the collider, the entangled block's entanglers do not get pushed
 - We can have a stack overflow in our quad tree queries for blocks, not sure how yet
 - Players standing on blocks going through portals colliding on ice seem to gain speed over time
@@ -31,7 +32,6 @@ Current bugs:
 Big Features:
 - Momentum
      - Even if a block is iced, if there is a block on top of it, that should impact static friction but not collision impact velocities resolution
-     - if the player is stopping a block and another block collides with it, what happens ?
 - 3D
      - if we put a popup on the other side of a portal and a block 1 interval high goes through the portal, will it work the way we expect?
      - how does a stack of entangled blocks move? really f***ing weird right now tbh
@@ -964,6 +964,17 @@ void draw_input_on_hud(char c, Vec_t pos, bool down){
      }
 }
 
+Pixel_t get_corner_pixel_from_pos(Position_t pos, DirectionMask_t from_center){
+     Pixel_t result = pos.pixel;
+     if(from_center & DIRECTION_MASK_UP){
+          if(pos.decimal.y > FLT_EPSILON) result.y++;
+     }
+     if(from_center & DIRECTION_MASK_RIGHT){
+          if(pos.decimal.x > FLT_EPSILON) result.x++;
+     }
+     return result;
+}
+
 int main(int argc, char** argv){
      const char* load_map_filepath = nullptr;
      bool test = false;
@@ -1839,57 +1850,13 @@ int main(int argc, char** argv){
           if(!demo.paused || demo.seek_frame >= 0){
                reset_tilemap_light(&world);
 
-               // update interactives
+               // update time related interactives
                for(S16 i = 0; i < world.interactives.count; i++){
                     Interactive_t* interactive = world.interactives.elements + i;
                     if(interactive->type == INTERACTIVE_TYPE_POPUP){
                          lift_update(&interactive->popup.lift, POPUP_TICK_DELAY, dt, 1, POPUP_MAX_LIFT_TICKS);
                     }else if(interactive->type == INTERACTIVE_TYPE_DOOR){
                          lift_update(&interactive->door.lift, POPUP_TICK_DELAY, dt, 0, DOOR_MAX_HEIGHT);
-                    }else if(interactive->type == INTERACTIVE_TYPE_PRESSURE_PLATE){
-                         bool should_be_down = false;
-                         for(S16 p = 0; p < world.players.count; p++){
-                              if(world.players.elements[p].pos.z != 0) continue;
-                              Coord_t player_coord = pos_to_coord(world.players.elements[p].pos);
-                              if(interactive->coord == player_coord){
-                                   should_be_down = true;
-                                   break;
-                              }
-                         }
-
-                         if(!should_be_down){
-                              Tile_t* tile = tilemap_get_tile(&world.tilemap, interactive->coord);
-                              if(tile){
-                                   if(!tile_is_iced(tile)){
-                                        Rect_t rect = rect_to_check_surrounding_blocks(coord_to_pixel_at_center(interactive->coord));
-
-                                        S16 block_count = 0;
-                                        Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
-                                        quad_tree_find_in(world.block_qt, rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
-
-                                        for(S16 b = 0; b < block_count; b++){
-                                             if(blocks[b]->pos.z != 0) continue;
-
-                                             Coord_t bottom_left = pixel_to_coord(blocks[b]->pos.pixel);
-                                             Coord_t bottom_right = pixel_to_coord(block_bottom_right_pixel(blocks[b]->pos.pixel));
-                                             Coord_t top_left = pixel_to_coord(block_top_left_pixel(blocks[b]->pos.pixel));
-                                             Coord_t top_right = pixel_to_coord(block_top_right_pixel(blocks[b]->pos.pixel));
-                                             if(interactive->coord == bottom_left ||
-                                                interactive->coord == bottom_right ||
-                                                interactive->coord == top_left ||
-                                                interactive->coord == top_right){
-                                                  should_be_down = true;
-                                                  break;
-                                             }
-                                        }
-                                   }
-                              }
-                         }
-
-                         if(should_be_down != interactive->pressure_plate.down){
-                              activate(&world, interactive->coord);
-                              interactive->pressure_plate.down = should_be_down;
-                         }
                     }
                }
 
@@ -2399,6 +2366,80 @@ int main(int argc, char** argv){
                     block->coast_vertical = BLOCK_COAST_NONE;
                }
 
+               // TODO: for these next 2 passes, do we need to care about teleport position? Probably just the next loop?
+               for(S16 i = 0; i < world.blocks.count; i++){
+                    auto block = world.blocks.elements + i;
+
+                    auto result = block_held_up_by_another_block(block, world.block_qt, world.interactive_qt, &world.tilemap);
+                    if(result.held()){
+                         block->held_up |= BLOCK_HELD_BY_SOLID;
+                    }
+
+                    // TODO: should we care about the decimal component of the position ?
+                    Coord_t rect_coords[4];
+                    bool pushed_up = false;
+                    auto final_pos = block->pos + block->pos_delta;
+                    Pixel_t final_pixel = final_pos.pixel;
+
+                    // check if we pass over a grid aligned pixel, then use that one if so for both axis
+                    auto check_x_pixel = passes_over_grid_pixel(block->pos.pixel.x, final_pos.pixel.x);
+                    if(check_x_pixel >= 0) final_pixel.x = check_x_pixel;
+                    auto check_y_pixel = passes_over_grid_pixel(block->pos.pixel.y, final_pos.pixel.y);
+                    if(check_y_pixel >= 0) final_pixel.y = check_y_pixel;
+
+                    auto block_rect = block_get_rect(final_pixel);
+                    get_rect_coords(block_rect, rect_coords);
+                    for(S8 c = 0; c < 4; c++){
+                         auto* interactive = quad_tree_interactive_find_at(world.interactive_qt, rect_coords[c]);
+                         if(interactive){
+                              auto interactive_rect = block_get_rect(coord_to_pixel(rect_coords[c]));
+                              if(!rect_in_rect(block_rect, interactive_rect)) continue;
+
+                              if(interactive->type == INTERACTIVE_TYPE_POPUP){
+                                   if(!pushed_up && (block->pos.z == interactive->popup.lift.ticks - 2)){
+                                        raise_above_blocks(&world, block);
+
+                                        block->pos.z++;
+                                        block->held_up |= BLOCK_HELD_BY_SOLID;
+
+                                        raise_entangled_blocks(&world, block);
+
+                                        pushed_up = true;
+                                   }else if(!block->held_up && block->pos.z == (interactive->popup.lift.ticks - 1)){
+                                        block->held_up |= BLOCK_HELD_BY_SOLID;
+                                   }
+                              }
+                         }
+                    }
+               }
+
+               for(S16 i = 0; i < world.blocks.count; i++){
+                    auto block = world.blocks.elements + i;
+
+                    if(block->pos.z == 0) continue;
+
+                    if(block->entangle_index >= 0){
+                         S16 entangle_index = block->entangle_index;
+                         while(entangle_index != i && entangle_index >= 0){
+                              auto entangled_block = world.blocks.elements + entangle_index;
+                              if(entangled_block->held_up & BLOCK_HELD_BY_SOLID){
+                                   block->held_up |= BLOCK_HELD_BY_ENTANGLE;
+                                   break;
+                              }
+                              entangle_index = entangled_block->entangle_index;
+                         }
+                    }
+
+                    if(!block->held_up){
+                         block->fall_time -= dt;
+                         if(block->fall_time < 0){
+                              block->fall_time = FALL_TIME;
+                              block->pos.z--;
+                              block->fall_time = 0;
+                         }
+                    }
+               }
+
                // do multiple passes here so that entangled blocks know for sure if their entangled counterparts are coasting and index order doesn't matter
                for(S16 j = 0; j < 2; j++){ // TODO: is this enough iterations or will we need more iterations for multiple entangled blocks?
                     for(S16 i = 0; i < world.blocks.count; i++){
@@ -2479,7 +2520,8 @@ int main(int argc, char** argv){
 
                                         if(entangled_block->coast_horizontal > BLOCK_COAST_NONE){
                                              if(rotations_between % 2 == 0){
-                                                  block->coast_horizontal = entangled_block->coast_horizontal;
+                                                  if(entangled_block->coast_horizontal == BLOCK_COAST_PLAYER &&
+                                                     block->horizontal_move.state != MOVE_STATE_STOPPING) block->coast_horizontal = BLOCK_COAST_ENTANGLED_PLAYER;
 
                                                   // TODO: compress this code with the 3 instances below it
                                                   if(block->horizontal_move.state == MOVE_STATE_IDLING && player->push_time > BLOCK_PUSH_TIME &&
@@ -2495,7 +2537,8 @@ int main(int argc, char** argv){
                                                        }
                                                   }
                                              }else{
-                                                  block->coast_vertical = entangled_block->coast_horizontal;
+                                                  if(entangled_block->coast_horizontal == BLOCK_COAST_PLAYER &&
+                                                     block->horizontal_move.state != MOVE_STATE_STOPPING) block->coast_vertical = BLOCK_COAST_ENTANGLED_PLAYER;
 
                                                   if(block->vertical_move.state == MOVE_STATE_IDLING && player->push_time > BLOCK_PUSH_TIME &&
                                                      !block_held_down_by_another_block(block, world.block_qt, world.interactive_qt, &world.tilemap).held()){
@@ -2514,7 +2557,8 @@ int main(int argc, char** argv){
 
                                         if(entangled_block->coast_vertical > BLOCK_COAST_NONE){
                                              if(rotations_between % 2 == 0){
-                                                  block->coast_vertical = entangled_block->coast_vertical;
+                                                  if(entangled_block->coast_vertical == BLOCK_COAST_PLAYER &&
+                                                     block->vertical_move.state != MOVE_STATE_STOPPING) block->coast_vertical = BLOCK_COAST_ENTANGLED_PLAYER;
 
                                                   if(block->vertical_move.state == MOVE_STATE_IDLING && player->push_time > BLOCK_PUSH_TIME &&
                                                      !block_held_down_by_another_block(block, world.block_qt, world.interactive_qt, &world.tilemap).held()){
@@ -2529,7 +2573,8 @@ int main(int argc, char** argv){
                                                        }
                                                   }
                                              }else{
-                                                  block->coast_horizontal = entangled_block->coast_vertical;
+                                                  if(entangled_block->coast_vertical == BLOCK_COAST_PLAYER &&
+                                                     block->vertical_move.state != MOVE_STATE_STOPPING) block->coast_horizontal = BLOCK_COAST_ENTANGLED_PLAYER;
 
                                                   if(block->horizontal_move.state == MOVE_STATE_IDLING && player->push_time > BLOCK_PUSH_TIME &&
                                                      !block_held_down_by_another_block(block, world.block_qt, world.interactive_qt, &world.tilemap).held()){
@@ -2549,6 +2594,7 @@ int main(int argc, char** argv){
                               }
                          }
 
+#if 0
                          if(block->coast_horizontal == BLOCK_COAST_NONE && block->vel.x != 0){
                               Pixel_t block_pixel = block->pos.pixel;
                               if(block->vel.x > 0){
@@ -2584,6 +2630,7 @@ int main(int argc, char** argv){
                                    block->coast_vertical = BLOCK_COAST_AIR;
                               }
                          }
+#endif
                     }
                }
 
@@ -2596,87 +2643,39 @@ int main(int argc, char** argv){
                     MotionComponent_t x_component = motion_x_component(block);
                     MotionComponent_t y_component = motion_y_component(block);
 
+                    bool coasting_horizontally = false;
+                    if(block->horizontal_move.state == MOVE_STATE_STARTING ||
+                       block->horizontal_move.state == MOVE_STATE_COASTING){
+                         coasting_horizontally = block->coast_horizontal != BLOCK_COAST_NONE;
+                    }else if(block->horizontal_move.state == MOVE_STATE_STOPPING){
+                         coasting_horizontally = (block->coast_horizontal == BLOCK_COAST_ICE ||
+                                                  block->coast_horizontal == BLOCK_COAST_AIR ||
+                                                  block->coast_horizontal == BLOCK_COAST_ENTANGLED_PLAYER);
+                         if(block->stopped_by_player_horizontal){
+                              coasting_horizontally = false;
+                         }
+                    }
+
+                    bool coasting_vertically = false;
+                    if(block->vertical_move.state == MOVE_STATE_STARTING ||
+                       block->vertical_move.state == MOVE_STATE_COASTING){
+                         coasting_vertically = block->coast_vertical != BLOCK_COAST_NONE;
+                    }else if(block->vertical_move.state == MOVE_STATE_STOPPING){
+                         coasting_vertically = (block->coast_vertical == BLOCK_COAST_ICE ||
+                                                block->coast_vertical == BLOCK_COAST_AIR ||
+                                                block->coast_vertical == BLOCK_COAST_ENTANGLED_PLAYER);
+                         if(block->stopped_by_player_vertical){
+                              coasting_vertically = false;
+                         }
+                    }
+
                     update_motion_grid_aligned(&block->horizontal_move, &x_component,
-                                               block->coast_horizontal != BLOCK_COAST_NONE, dt,
+                                               coasting_horizontally, dt,
                                                pos_vec.x);
 
                     update_motion_grid_aligned(&block->vertical_move, &y_component,
-                                               block->coast_vertical != BLOCK_COAST_NONE, dt,
+                                               coasting_vertically, dt,
                                                pos_vec.y);
-               }
-
-               // TODO: for these next 2 passes, do we need to care about teleport position? Probably just the next loop?
-               for(S16 i = 0; i < world.blocks.count; i++){
-                    auto block = world.blocks.elements + i;
-
-                    auto result = block_held_up_by_another_block(block, world.block_qt, world.interactive_qt, &world.tilemap);
-                    if(result.held()){
-                         block->held_up |= BLOCK_HELD_BY_SOLID;
-                    }
-
-                    // TODO: should we care about the decimal component of the position ?
-                    Coord_t rect_coords[4];
-                    bool pushed_up = false;
-                    auto final_pos = block->pos + block->pos_delta;
-                    Pixel_t final_pixel = final_pos.pixel;
-
-                    // check if we pass over a grid aligned pixel, then use that one if so for both axis
-                    auto check_x_pixel = passes_over_grid_pixel(block->pos.pixel.x, final_pos.pixel.x);
-                    if(check_x_pixel >= 0) final_pixel.x = check_x_pixel;
-                    auto check_y_pixel = passes_over_grid_pixel(block->pos.pixel.y, final_pos.pixel.y);
-                    if(check_y_pixel >= 0) final_pixel.y = check_y_pixel;
-
-                    auto block_rect = block_get_rect(final_pixel);
-                    get_rect_coords(block_rect, rect_coords);
-                    for(S8 c = 0; c < 4; c++){
-                         auto* interactive = quad_tree_interactive_find_at(world.interactive_qt, rect_coords[c]);
-                         if(interactive){
-                              auto interactive_rect = block_get_rect(coord_to_pixel(rect_coords[c]));
-                              if(!rect_in_rect(block_rect, interactive_rect)) continue;
-
-                              if(interactive->type == INTERACTIVE_TYPE_POPUP){
-                                   if(!pushed_up && (block->pos.z == interactive->popup.lift.ticks - 2)){
-                                        raise_above_blocks(&world, block);
-
-                                        block->pos.z++;
-                                        block->held_up |= BLOCK_HELD_BY_SOLID;
-
-                                        raise_entangled_blocks(&world, block);
-
-                                        pushed_up = true;
-                                   }else if(!block->held_up && block->pos.z == (interactive->popup.lift.ticks - 1)){
-                                        block->held_up |= BLOCK_HELD_BY_SOLID;
-                                   }
-                              }
-                         }
-                    }
-               }
-
-               for(S16 i = 0; i < world.blocks.count; i++){
-                    auto block = world.blocks.elements + i;
-
-                    if(block->pos.z == 0) continue;
-
-                    if(block->entangle_index >= 0){
-                         S16 entangle_index = block->entangle_index;
-                         while(entangle_index != i && entangle_index >= 0){
-                              auto entangled_block = world.blocks.elements + entangle_index;
-                              if(entangled_block->held_up & BLOCK_HELD_BY_SOLID){
-                                   block->held_up |= BLOCK_HELD_BY_ENTANGLE;
-                                   break;
-                              }
-                              entangle_index = entangled_block->entangle_index;
-                         }
-                    }
-
-                    if(!block->held_up){
-                         block->fall_time -= dt;
-                         if(block->fall_time < 0){
-                              block->fall_time = FALL_TIME;
-                              block->pos.z--;
-                              block->fall_time = 0;
-                         }
-                    }
                }
 
                // unbounded collision: this should be exciting
@@ -3345,6 +3344,74 @@ int main(int argc, char** argv){
                          }
                     }else{
                          player->push_time = 0;
+                    }
+               }
+
+               // update interactives
+               for(S16 i = 0; i < world.interactives.count; i++){
+                    Interactive_t* interactive = world.interactives.elements + i;
+                    if(interactive->type == INTERACTIVE_TYPE_PRESSURE_PLATE){
+                         bool should_be_down = false;
+                         for(S16 p = 0; p < world.players.count; p++){
+                              if(world.players.elements[p].pos.z != 0) continue;
+                              Coord_t player_coord = pos_to_coord(world.players.elements[p].pos);
+                              if(interactive->coord == player_coord){
+                                   should_be_down = true;
+                                   break;
+                              }
+                         }
+
+                         if(!should_be_down){
+                              Tile_t* tile = tilemap_get_tile(&world.tilemap, interactive->coord);
+                              if(tile){
+                                   if(!tile_is_iced(tile)){
+                                        Rect_t rect = rect_to_check_surrounding_blocks(coord_to_pixel_at_center(interactive->coord));
+
+                                        S16 block_count = 0;
+                                        Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
+                                        quad_tree_find_in(world.block_qt, rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
+
+                                        for(S16 b = 0; b < block_count; b++){
+                                             if(blocks[b]->pos.z != 0) continue;
+
+                                             DirectionMask_t bottom_left_mask = direction_mask_add(DIRECTION_MASK_DOWN, DIRECTION_MASK_LEFT);
+                                             Position_t bottom_left_pos = blocks[b]->pos;
+
+                                             DirectionMask_t bottom_right_mask = direction_mask_add(DIRECTION_MASK_DOWN, DIRECTION_MASK_RIGHT);
+                                             Position_t bottom_right_pos{};
+                                             bottom_right_pos.pixel = block_bottom_right_pixel(blocks[b]->pos.pixel);
+                                             bottom_right_pos.decimal = blocks[b]->pos.decimal;
+
+                                             DirectionMask_t top_right_mask = direction_mask_add(DIRECTION_MASK_UP, DIRECTION_MASK_RIGHT);
+                                             Position_t top_right_pos{};
+                                             top_right_pos.pixel = block_top_right_pixel(blocks[b]->pos.pixel);
+                                             top_right_pos.decimal = blocks[b]->pos.decimal;
+
+                                             DirectionMask_t top_left_mask = direction_mask_add(DIRECTION_MASK_UP, DIRECTION_MASK_LEFT);
+                                             Position_t top_left_pos{};
+                                             top_left_pos.pixel = block_top_left_pixel(blocks[b]->pos.pixel);
+                                             top_left_pos.decimal = blocks[b]->pos.decimal;
+
+                                             Coord_t bottom_left = pixel_to_coord(get_corner_pixel_from_pos(bottom_left_pos, bottom_left_mask));
+                                             Coord_t bottom_right = pixel_to_coord(get_corner_pixel_from_pos(bottom_right_pos, bottom_right_mask));
+                                             Coord_t top_left = pixel_to_coord(get_corner_pixel_from_pos(top_left_pos, top_left_mask));
+                                             Coord_t top_right = pixel_to_coord(get_corner_pixel_from_pos(top_right_pos, top_right_mask));
+                                             if(interactive->coord == bottom_left ||
+                                                interactive->coord == bottom_right ||
+                                                interactive->coord == top_left ||
+                                                interactive->coord == top_right){
+                                                  should_be_down = true;
+                                                  break;
+                                             }
+                                        }
+                                   }
+                              }
+                         }
+
+                         if(should_be_down != interactive->pressure_plate.down){
+                              activate(&world, interactive->coord);
+                              interactive->pressure_plate.down = should_be_down;
+                         }
                     }
                }
 

@@ -119,6 +119,8 @@ const char* block_coast_to_string(BlockCoast_t coast){
           return "BLOCK_COAST_PLAYER";
      case BLOCK_COAST_AIR:
           return "BLOCK_COAST_AIR";
+     case BLOCK_COAST_ENTANGLED_PLAYER:
+          return "BLOCK_COAST_ENTANGLED_PLAYER";
      }
 
      return "BLOCK_COAST_UNKNOWN";

@@ -52,7 +52,9 @@ DecelToStopResult_t calc_decel_to_stop(F32 initial_pos, F32 final_pos, F32 initi
 
      // vf = at + vi
      // (vf - vi) / t = a
-     result.accel = -initial_velocity / result.time;
+     if(result.time != 0){
+          result.accel = -initial_velocity / result.time;
+     }
 
      return result;
 }
@@ -273,9 +275,13 @@ static F32 find_next_grid_center(F32 pos, F32 vel){
 }
 
 F32 calc_coast_motion_time_left(MotionComponent_t* motion, F32 pos){
+     return calc_coast_motion_time_left(pos, motion->ref->vel);
+}
+
+F32 calc_coast_motion_time_left(F32 pos, F32 vel){
      // pf = pi + vt
      // t = (pf - pi) / v
-     return (find_next_grid_center(pos, motion->ref->vel) - pos) / motion->ref->vel;
+     return (find_next_grid_center(pos, vel) - pos) / vel;
 }
 
 void update_motion_grid_aligned(Move_t* move, MotionComponent_t* motion, bool coast, F32 dt, F32 pos){
@@ -353,6 +359,9 @@ void update_motion_grid_aligned(Move_t* move, MotionComponent_t* motion, bool co
                motion->ref->stop_on_pixel = closest_grid_center_pixel(TILE_SIZE_IN_PIXELS, (S16)(pos / PIXEL_SIZE));
                motion->ref->pos_delta = (motion->ref->stop_on_pixel * PIXEL_SIZE) - pos;
                motion->ref->vel = 0.0;
+               motion->ref->accel = 0.0;
+          }else if(coast){
+               move->state = MOVE_STATE_COASTING;
                motion->ref->accel = 0.0;
           }
      } break;
