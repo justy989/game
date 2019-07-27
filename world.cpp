@@ -1343,27 +1343,26 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
                     // check if we are able to move or if we transfer our force to the block
                     transfers_force = true;
                     F32 block_vel = 0;
-                    if(instant_momentum){
-                         switch(against_block_push_dir){
-                         default:
-                              break;
-                         case DIRECTION_LEFT:
-                              transfers_force = (against_block->vel.x > -instant_momentum->vel);
-                              block_vel = block->vel.x;
-                              break;
-                         case DIRECTION_UP:
-                              transfers_force = (against_block->vel.y < instant_momentum->vel);
-                              block_vel = block->vel.y;
-                              break;
-                         case DIRECTION_RIGHT:
-                              transfers_force = (against_block->vel.x < instant_momentum->vel);
-                              block_vel = block->vel.x;
-                              break;
-                         case DIRECTION_DOWN:
-                              transfers_force = (against_block->vel.y > -instant_momentum->vel);
-                              block_vel = block->vel.y;
-                              break;
-                         }
+
+                    switch(against_block_push_dir){
+                    default:
+                         break;
+                    case DIRECTION_LEFT:
+                         transfers_force = (against_block->vel.x > -instant_momentum->vel);
+                         block_vel = block->vel.x;
+                         break;
+                    case DIRECTION_UP:
+                         transfers_force = (against_block->vel.y < instant_momentum->vel);
+                         block_vel = block->vel.y;
+                         break;
+                    case DIRECTION_RIGHT:
+                         transfers_force = (against_block->vel.x < instant_momentum->vel);
+                         block_vel = block->vel.x;
+                         break;
+                    case DIRECTION_DOWN:
+                         transfers_force = (against_block->vel.y > -instant_momentum->vel);
+                         block_vel = block->vel.y;
+                         break;
                     }
 
                     if(transfers_force){
@@ -1394,11 +1393,6 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
                                         result.mass = instant_momentum->mass;
                                         reset_move(&block->horizontal_move);
                                         result.pushed = false;
-                                   }else{
-                                        block->vel.x = push_result.velocity;
-                                        block->horizontal_move.state = MOVE_STATE_COASTING;
-                                        block->horizontal_move.sign = move_sign_from_vel(block->vel.x);
-                                        result.pushed = true;
                                    }
                               }else{
                                    reset_move(&block->horizontal_move);
@@ -1413,11 +1407,6 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
                                         result.mass = instant_momentum->mass;
                                         reset_move(&block->vertical_move);
                                         result.pushed = false;
-                                   }else{
-                                        block->vel.y = push_result.velocity;
-                                        block->vertical_move.state = MOVE_STATE_COASTING;
-                                        block->vertical_move.sign = move_sign_from_vel(block->vel.y);
-                                        result.pushed = true;
                                    }
                               }else{
                                    reset_move(&block->vertical_move);
