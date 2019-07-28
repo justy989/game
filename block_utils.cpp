@@ -92,14 +92,22 @@ Block_t* block_against_block_in_list(Position_t pos, Block_t** blocks, S16 block
           break;
      case DIRECTION_LEFT:
           for(S16 i = 0; i < block_count; i++){
-               Block_t* block = blocks[i];
-               if(!blocks_at_collidable_height(pos.z, block->pos.z)) continue;
+               Block_t* adjacent_block = blocks[i];
+               if(!blocks_at_collidable_height(pos.z, adjacent_block->pos.z)) continue;
 
-               Pixel_t pixel_to_check = (block->pos + portal_offsets[i]).pixel;
-               if((pixel_to_check.x + TILE_SIZE_IN_PIXELS) == pos.pixel.x &&
-                  pixel_to_check.y > (pos.pixel.y - BLOCK_SOLID_SIZE_IN_PIXELS) &&
-                  pixel_to_check.y < (pos.pixel.y + TILE_SIZE_IN_PIXELS)){
-                    return block;
+               auto adjacent_pos = adjacent_block->pos + portal_offsets[i];
+
+               auto boundary_check_pos = adjacent_pos + Pixel_t{TILE_SIZE_IN_PIXELS, 0};
+               auto distance_to_boundary = fabs(pos_to_vec(boundary_check_pos - pos).x);
+
+               auto bottom_boundary_pos = pos + Pixel_t{0, -BLOCK_SOLID_SIZE_IN_PIXELS};
+               auto top_boundary_pos = pos + Pixel_t{0, TILE_SIZE_IN_PIXELS};
+
+               // check if they are on the expected boundary
+               if(distance_to_boundary < FLT_EPSILON &&
+                  position_y_greater_than(adjacent_pos, bottom_boundary_pos) &&
+                  position_y_less_than(adjacent_pos, top_boundary_pos)){
+                    return adjacent_block;
                }
           }
           break;
@@ -1591,8 +1599,9 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                          }
 
 #if 0
-                         LOG("block %d collides with block %d to push it %s\n",
-                             block_index, get_block_index(world, block_inside_result.entries[i].block), direction_to_string(first_direction));
+                         LOG("block %d collides with block %d to push it %s with momentum: %d %f\n",
+                             block_index, get_block_index(world, block_inside_result.entries[i].block), direction_to_string(first_direction),
+                             instant_momentum.mass, instant_momentum.vel);
 #endif
 
                          auto current_block = world->blocks.elements + block_index;
@@ -1632,6 +1641,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                          case DIRECTION_RIGHT:
                               if(push_result.transferred_momentum_back()){
                                    if(current_block == world->blocks.elements + block_index){
+                                        // LOG("block %d transferred momentum back: vel %f\n", get_block_index(world, block_inside_result.entries[i].block), push_result.velocity);
                                         result.vel.x = push_result.velocity * scale_push_velocity;
                                         result.horizontal_move.state = MOVE_STATE_COASTING;
                                         result.horizontal_move.sign = move_sign_from_vel(result.vel.x);
@@ -1655,6 +1665,8 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                                         result.block_changes.add(adjacent_block_index, BLOCK_CHANGE_TYPE_HORIZONTAL_MOVE_SIGN, move_sign_from_vel(result.vel.x));
                                    }
                               }else{
+                                   // LOG("block %d did not transferred momentum back\n", get_block_index(world, block_inside_result.entries[i].block));
+
                                    if(odd_rotations_between_colliders){
                                         result.stop_vertically();
                                    }else{
@@ -1794,6 +1806,13 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
 
                                         result.stop_on_pixel_y = 0;
                                    }
+                              }
+                         }
+
+                         for(S16 p = 0; p < world->players.count; p++){
+                              auto player = world->players.elements + p;
+                              if(player->prev_pushing_block == block_index){
+                                   player->push_time = 0;
                               }
                          }
                     }

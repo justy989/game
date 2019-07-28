@@ -14,7 +14,7 @@ Entanglement Puzzles:
 - rotated entangled puzzles where the centroid is on a portal destination coord
 
 Current bugs:
-- if an entangled block on ice gets hit, and it's entangler is not on ice, but against a block that is on ice, maybe the block against the entangler should be hit ? Maybe this should be a more general rule
+- continuing to push a block through a collision on ice causes bad things to happen
 - a block travelling diagonally at a wall will stop on both axis' against the wall because of the collision
 - if a collision happens to an entangled block on ice, where the entangled block is moving towards the collider, the entangled block's entanglers do not get pushed
 - We can have a stack overflow in our quad tree queries for blocks, not sure how yet
@@ -1054,8 +1054,8 @@ int main(int argc, char** argv){
           return 1;
      }
 
-     int window_width = 800;
-     int window_height = 800;
+     int window_width = 1080;
+     int window_height = 1080;
      SDL_Window* window = nullptr;
      SDL_GLContext opengl_context = nullptr;
      GLuint theme_texture = 0;

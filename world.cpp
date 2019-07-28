@@ -1392,7 +1392,7 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
 
                          auto push_result = block_push(against_block, against_block_push_dir, world, pushed_by_ice, force, &split_instant_momentum);
 
-                         if(push_result.pushed){
+                         if(push_result.pushed || push_result.force_flowed_through){
                               push_entangled_block(against_block, world, against_block_push_dir, pushed_by_ice, &split_instant_momentum);
 
                               // if this push entangle call results in our velocity changing, update our block_push_vel
@@ -1411,6 +1411,8 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
                               }
                          }
 
+                         result.force_flowed_through = true;
+
                          // TODO when transferring momentum, split up the mass by how many blocks we are against that are on ice
                          if(direction_is_horizontal(direction)){
                               if(push_result.transferred_momentum_back()){
@@ -1428,8 +1430,6 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
                                         reset_move(&block->horizontal_move);
                                         result.pushed = false;
                                    }
-
-                                   result.force_flowed_through = true;
                               }else{
                                    reset_move(&block->horizontal_move);
                               }
@@ -1449,8 +1449,6 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
                                         reset_move(&block->vertical_move);
                                         result.pushed = false;
                                    }
-
-                                   result.force_flowed_through = true;
                               }else{
                                    reset_move(&block->vertical_move);
                               }
@@ -1473,7 +1471,7 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
 
                     auto push_result = block_push(against_block, against_block_push_dir, world, pushed_by_ice, force, instant_momentum);
 
-                    if(push_result.pushed){
+                    if(push_result.pushed || push_result.force_flowed_through){
                          if(!are_entangled){
                              push_entangled_block(against_block, world, against_block_push_dir, pushed_by_ice, instant_momentum);
                          }
@@ -2260,6 +2258,9 @@ ElasticCollisionResult_t elastic_transfer_momentum(F32 mass_1, F32 vel_i_1, F32 
      result.second_final_velocity = (initial_momentums + brought_over_to_left) / divided_by;
      result.first_final_velocity = vel_i_2 + result.second_final_velocity - vel_i_1;
 
+     // LOG("m1: %f, v1: %f, m2: %f, v2: %f, v1f: %f, v2f: %f\n",
+     //     mass_1, vel_i_1, mass_2, vel_i_2, result.first_final_velocity, result.second_final_velocity);
+
      return result;
 }
 
@@ -2341,7 +2342,11 @@ S16 get_block_mass_in_direction(World_t* world, Block_t* block, Direction_t dire
                mass += block_get_mass(block_entry->block);
 
                auto against_player = block_against_player(block_entry->block, direction, &world->players);
-               if(against_player) mass += PLAYER_MASS;
+               if(against_player){
+                    // LOG("get_block_mass_in_direction(block %d to the %s), for block %d against player\n",
+                    //     get_block_index(world, block), direction_to_string(direction), get_block_index(world, block_entry->block));
+                    mass += PLAYER_MASS;
+               }
           }
      }
 

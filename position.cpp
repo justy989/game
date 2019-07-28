@@ -49,6 +49,16 @@ Position_t operator-(Position_t p, Vec_t v){
      return p;
 }
 
+Position_t operator+(Position_t p, Pixel_t i){
+     p.pixel += i;
+     return p;
+}
+
+Position_t operator-(Position_t p, Pixel_t i){
+     p.pixel -= i;
+     return p;
+}
+
 void operator+=(Position_t& p, Vec_t v){
      p.decimal += v;
      canonicalize(&p);
@@ -117,4 +127,36 @@ F32 distance_between(Position_t a, Position_t b){
      F32 x_diff = (diff.pixel.x) * PIXEL_SIZE + diff.decimal.x;
      F32 y_diff = (diff.pixel.y) * PIXEL_SIZE + diff.decimal.y;
      return sqrt((x_diff * x_diff) + (y_diff * y_diff));
+}
+
+bool position_x_less_than(Position_t a, Position_t b){
+     if(a.pixel.x < b.pixel.x) return true;
+     if(a.pixel.x == b.pixel.x){
+          if(a.decimal.x < b.decimal.x) return true;
+     }
+     return false;
+}
+
+bool position_x_greater_than(Position_t a, Position_t b){
+     if(a.pixel.x > b.pixel.x) return true;
+     if(a.pixel.x == b.pixel.x){
+          if(a.decimal.x > b.decimal.x) return true;
+     }
+     return false;
+}
+
+bool position_y_less_than(Position_t a, Position_t b){
+     if(a.pixel.y < b.pixel.y) return true;
+     if(a.pixel.y == b.pixel.y){
+          if(a.decimal.y < b.decimal.y) return true;
+     }
+     return false;
+}
+
+bool position_y_greater_than(Position_t a, Position_t b){
+     if(a.pixel.y > b.pixel.y) return true;
+     if(a.pixel.y == b.pixel.y){
+          if(a.decimal.y > b.decimal.y) return true;
+     }
+     return false;
 }

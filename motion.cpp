@@ -179,9 +179,6 @@ void update_motion_free_form(Move_t* move, MotionComponent_t* motion, bool posit
                motion->ref->pos_delta = calc_position_motion(new_vel, motion->ref->accel, dt_consumed);
                new_vel = calc_velocity_motion(new_vel, motion->ref->accel, dt_consumed);
 
-               // motion->ref->pos_delta = mass_move_component_delta(new_vel, motion->ref->accel, dt_consumed);
-               // new_vel += motion->ref->accel * dt_consumed;
-
                // reverse the accel and simulate for the reset of the dt
                motion->ref->accel = new_accel;
                F32 stop_delta = calc_position_motion(new_vel, motion->ref->accel, dt_leftover);
@@ -341,7 +338,6 @@ void update_motion_grid_aligned(Move_t* move, MotionComponent_t* motion, bool co
                move->state = new_move_state;
 
                sim_motion.ref->accel = new_accel;
-               // sim_motion.ref->pos_delta += mass_move_component_delta(sim_motion.ref->vel, sim_motion.ref->accel, dt_leftover);
                sim_motion.ref->pos_delta += calc_position_motion(sim_motion.ref->vel, sim_motion.ref->accel, dt_leftover);
                sim_motion.ref->vel = calc_velocity_motion(sim_motion.ref->vel, sim_motion.ref->accel, dt_leftover);
 
