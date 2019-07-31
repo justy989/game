@@ -32,6 +32,7 @@ Current bugs:
 
 Big Features:
 - Momentum
+     - Blocks with a lot of momentum on ice, stop grid aligned as soon as they get off of ice, maybe based on the momentum we should go further?
      - Even if a block is iced, if there is a block on top of it, that should impact static friction but not collision impact velocities resolution
 - 3D
      - if we put a popup on the other side of a portal and a block 1 interval high goes through the portal, will it work the way we expect?
@@ -1131,6 +1132,8 @@ int main(int argc, char** argv){
      Position_t mouse_world = {};
      bool ctrl_down = false;
 
+     S8 collision_attempts = 0;
+
      // cached to seek in demo faster
      TileMap_t demo_starting_tilemap {};
      ObjectArray_t<Block_t> demo_starting_blocks {};
@@ -1846,9 +1849,9 @@ int main(int argc, char** argv){
                }
           }
 
-          S8 collision_attempts = 1;
-
           if(!demo.paused || demo.seek_frame >= 0){
+               collision_attempts = 1;
+
                reset_tilemap_light(&world);
 
                // update time related interactives
@@ -2594,44 +2597,6 @@ int main(int argc, char** argv){
                                    }
                               }
                          }
-
-#if 0
-                         if(block->coast_horizontal == BLOCK_COAST_NONE && block->vel.x != 0){
-                              Pixel_t block_pixel = block->pos.pixel;
-                              if(block->vel.x > 0){
-                                   block_pixel += Pixel_t{HALF_TILE_SIZE_IN_PIXELS, 0};
-                              }else{
-                                   block_pixel -= Pixel_t{HALF_TILE_SIZE_IN_PIXELS, 0};
-                              }
-
-                              auto check_block_pos = pixel_to_pos(block_pixel);
-                              check_block_pos.z = block->pos.z;
-
-                              if(block_on_ice(check_block_pos, Vec_t{}, &world.tilemap, world.interactive_qt, world.block_qt)){
-                                   block->coast_horizontal = BLOCK_COAST_ICE;
-                              }else if(block_on_air(check_block_pos, Vec_t{}, &world.tilemap, world.interactive_qt, world.block_qt)){
-                                   block->coast_horizontal = BLOCK_COAST_AIR;
-                              }
-                         }
-
-                         if(block->coast_vertical == BLOCK_COAST_NONE && block->vel.y != 0){
-                              Pixel_t block_pixel = block->pos.pixel;
-                              if(block->vel.y > 0){
-                                   block_pixel += Pixel_t{0, HALF_TILE_SIZE_IN_PIXELS};
-                              }else{
-                                   block_pixel -= Pixel_t{0, HALF_TILE_SIZE_IN_PIXELS};
-                              }
-
-                              auto check_block_pos = pixel_to_pos(block_pixel);
-                              check_block_pos.z = block->pos.z;
-
-                              if(block_on_ice(check_block_pos, Vec_t{}, &world.tilemap, world.interactive_qt, world.block_qt)){
-                                   block->coast_vertical = BLOCK_COAST_ICE;
-                              }else if(block_on_air(check_block_pos, Vec_t{}, &world.tilemap, world.interactive_qt, world.block_qt)){
-                                   block->coast_vertical = BLOCK_COAST_AIR;
-                              }
-                         }
-#endif
                     }
                }
 
@@ -2717,6 +2682,10 @@ int main(int argc, char** argv){
                                    // TODO: for pos_delta modifications, apply to entangled blocks, probably in apply_block_change() ?
                                    auto& block_change = all_block_changes.changes[c];
                                    apply_block_change(&world.blocks, &block_change);
+
+                                   // since this block has changed, redo collision for it later
+                                   auto changed_block = world.blocks.elements + block_change.block_index;
+                                   changed_block->done_collision_pass = false;
                               }
                          }
                     }
@@ -3626,6 +3595,7 @@ int main(int argc, char** argv){
                draw_input_on_hud('B', Vec_t{0.965f - (0.0f * TEXT_CHAR_WIDTH), 0.965f}, player_action.activate);
 
                glEnd();
+
           }
 
           SDL_GL_SwapWindow(window);

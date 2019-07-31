@@ -95,7 +95,10 @@ Block_t* block_against_block_in_list(Position_t pos, Block_t** blocks, S16 block
                Block_t* adjacent_block = blocks[i];
                if(!blocks_at_collidable_height(pos.z, adjacent_block->pos.z)) continue;
 
-               auto adjacent_pos = adjacent_block->pos + portal_offsets[i];
+               auto adjacent_pos = adjacent_block->teleport ?
+                                   adjacent_block->teleport_pos + adjacent_block->teleport_pos_delta
+                                   : adjacent_block->pos + adjacent_block->pos_delta;
+               adjacent_pos += portal_offsets[i];
 
                auto boundary_check_pos = adjacent_pos + Pixel_t{TILE_SIZE_IN_PIXELS, 0};
                auto distance_to_boundary = fabs(pos_to_vec(boundary_check_pos - pos).x);
@@ -104,7 +107,7 @@ Block_t* block_against_block_in_list(Position_t pos, Block_t** blocks, S16 block
                auto top_boundary_pos = pos + Pixel_t{0, TILE_SIZE_IN_PIXELS};
 
                // check if they are on the expected boundary
-               if(distance_to_boundary < FLT_EPSILON &&
+               if(distance_to_boundary <= FLT_EPSILON &&
                   position_y_greater_than(adjacent_pos, bottom_boundary_pos) &&
                   position_y_less_than(adjacent_pos, top_boundary_pos)){
                     return adjacent_block;
@@ -113,40 +116,73 @@ Block_t* block_against_block_in_list(Position_t pos, Block_t** blocks, S16 block
           break;
      case DIRECTION_RIGHT:
           for(S16 i = 0; i < block_count; i++){
-               Block_t* block = blocks[i];
-               if(!blocks_at_collidable_height(pos.z, block->pos.z)) continue;
+               Block_t* adjacent_block = blocks[i];
+               if(!blocks_at_collidable_height(pos.z, adjacent_block->pos.z)) continue;
 
-               Pixel_t pixel_to_check = (block->pos + portal_offsets[i]).pixel;
-               if(pixel_to_check.x == (pos.pixel.x + TILE_SIZE_IN_PIXELS) &&
-                  pixel_to_check.y > (pos.pixel.y - BLOCK_SOLID_SIZE_IN_PIXELS) &&
-                  pixel_to_check.y < (pos.pixel.y + TILE_SIZE_IN_PIXELS)){
-                    return block;
+               auto adjacent_pos = adjacent_block->teleport ?
+                                   adjacent_block->teleport_pos + adjacent_block->teleport_pos_delta
+                                   : adjacent_block->pos + adjacent_block->pos_delta;
+               adjacent_pos += portal_offsets[i];
+
+               auto boundary_check_pos = adjacent_pos;
+               auto distance_to_boundary = fabs(pos_to_vec(boundary_check_pos - (pos + Pixel_t{TILE_SIZE_IN_PIXELS, 0})).x);
+
+               auto bottom_boundary_pos = pos + Pixel_t{0, -BLOCK_SOLID_SIZE_IN_PIXELS};
+               auto top_boundary_pos = pos + Pixel_t{0, TILE_SIZE_IN_PIXELS};
+
+               // check if they are on the expected boundary
+               if(distance_to_boundary <= FLT_EPSILON &&
+                  position_y_greater_than(adjacent_pos, bottom_boundary_pos) &&
+                  position_y_less_than(adjacent_pos, top_boundary_pos)){
+                    return adjacent_block;
                }
           }
           break;
      case DIRECTION_DOWN:
           for(S16 i = 0; i < block_count; i++){
-               Block_t* block = blocks[i];
-               if(!blocks_at_collidable_height(pos.z, block->pos.z)) continue;
+               Block_t* adjacent_block = blocks[i];
+               if(!blocks_at_collidable_height(pos.z, adjacent_block->pos.z)) continue;
 
-               Pixel_t pixel_to_check = (block->pos + portal_offsets[i]).pixel;
-               if((pixel_to_check.y + TILE_SIZE_IN_PIXELS) == pos.pixel.y &&
-                  pixel_to_check.x > (pos.pixel.x - BLOCK_SOLID_SIZE_IN_PIXELS) &&
-                  pixel_to_check.x < (pos.pixel.x + TILE_SIZE_IN_PIXELS)){
-                    return block;
+               auto adjacent_pos = adjacent_block->teleport ?
+                                   adjacent_block->teleport_pos + adjacent_block->teleport_pos_delta
+                                   : adjacent_block->pos + adjacent_block->pos_delta;
+               adjacent_pos += portal_offsets[i];
+
+               auto boundary_check_pos = adjacent_pos + Pixel_t{0, TILE_SIZE_IN_PIXELS};
+               auto distance_to_boundary = fabs(pos_to_vec(boundary_check_pos - pos).y);
+
+               auto left_boundary_pos = pos + Pixel_t{-BLOCK_SOLID_SIZE_IN_PIXELS, 0};
+               auto right_boundary_pos = pos + Pixel_t{TILE_SIZE_IN_PIXELS, 0};
+
+               // check if they are on the expected boundary
+               if(distance_to_boundary <= FLT_EPSILON &&
+                  position_x_greater_than(adjacent_pos, left_boundary_pos) &&
+                  position_x_less_than(adjacent_pos, right_boundary_pos)){
+                    return adjacent_block;
                }
           }
           break;
      case DIRECTION_UP:
           for(S16 i = 0; i < block_count; i++){
-               Block_t* block = blocks[i];
-               if(!blocks_at_collidable_height(pos.z, block->pos.z)) continue;
+               Block_t* adjacent_block = blocks[i];
+               if(!blocks_at_collidable_height(pos.z, adjacent_block->pos.z)) continue;
 
-               Pixel_t pixel_to_check = (block->pos + portal_offsets[i]).pixel;
-               if(pixel_to_check.y == (pos.pixel.y + TILE_SIZE_IN_PIXELS) &&
-                  pixel_to_check.x > (pos.pixel.x - BLOCK_SOLID_SIZE_IN_PIXELS) &&
-                  pixel_to_check.x < (pos.pixel.x + TILE_SIZE_IN_PIXELS)){
-                    return block;
+               auto adjacent_pos = adjacent_block->teleport ?
+                                   adjacent_block->teleport_pos + adjacent_block->teleport_pos_delta
+                                   : adjacent_block->pos + adjacent_block->pos_delta;
+               adjacent_pos += portal_offsets[i];
+
+               auto boundary_check_pos = adjacent_pos;
+               auto distance_to_boundary = fabs(pos_to_vec(boundary_check_pos - (pos + Pixel_t{0, TILE_SIZE_IN_PIXELS})).y);
+
+               auto left_boundary_pos = pos + Pixel_t{-BLOCK_SOLID_SIZE_IN_PIXELS, 0};
+               auto right_boundary_pos = pos + Pixel_t{TILE_SIZE_IN_PIXELS, 0};
+
+               // check if they are on the expected boundary
+               if(distance_to_boundary <= FLT_EPSILON &&
+                  position_x_greater_than(adjacent_pos, left_boundary_pos) &&
+                  position_x_less_than(adjacent_pos, right_boundary_pos)){
+                    return adjacent_block;
                }
           }
           break;
@@ -479,6 +515,8 @@ BlockInsideBlockListResult_t block_inside_block_list(Position_t block_to_check_p
                                                      S16 block_to_check_index, bool block_to_check_cloning,
                                                      Block_t** blocks, S16 block_count, ObjectArray_t<Block_t>* blocks_array,
                                                      U8 portal_rotations, Position_t* portal_offsets){
+     // TODO(jtardiff): remove this as a param
+     (void)(portal_rotations);
      BlockInsideBlockListResult_t result;
 
      auto final_block_to_check_pos = block_to_check_pos + block_to_check_pos_delta;
@@ -496,9 +534,8 @@ BlockInsideBlockListResult_t block_inside_block_list(Position_t block_to_check_p
 
           if(!blocks_at_collidable_height(final_block_to_check_pos.z, block->pos.z)) continue;
 
-          auto final_block_pos = block->pos;
+          auto final_block_pos = block->pos + block->pos_delta;
           final_block_pos += portal_offsets[i];
-          final_block_pos += vec_rotate_quadrants_counter_clockwise(block->pos_delta, portal_rotations);
 
           auto pos_diff = final_block_pos - final_block_to_check_pos;
           auto check_vec = pos_to_vec(pos_diff);
@@ -950,6 +987,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
 
                for(S8 i = 0; i < block_inside_result.count; i++){
                     // find the closest pixel in the collision rect to our block
+                    auto collided_block_index = get_block_index(world, block_inside_result.entries[i].block);
                     auto collision_center_pixel = block_inside_result.entries[i].collision_pos.pixel;
                     Rect_t collision_rect;
 
@@ -975,8 +1013,11 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                          auto* inside_block = pixel_inside_block(closest_pixel + Pixel_t{1, 0},
                                                                  block_inside_result.entries[i].collision_pos.z,
                                                                  &world->tilemap, world->interactive_qt, world->block_qt);
-                         if(inside_block && get_block_index(world, inside_block) != block_index){
-                              block_inside_result.entries[i].invalidated = true;
+                         if(inside_block){
+                              auto inside_block_index = get_block_index(world, inside_block);
+                              if(inside_block_index != collided_block_index && inside_block_index != block_index){
+                                   block_inside_result.entries[i].invalidated = true;
+                              }
                          }
                     }
 
@@ -984,8 +1025,11 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                          auto* inside_block = pixel_inside_block(closest_pixel + Pixel_t{-1, 0},
                                                                  block_inside_result.entries[i].collision_pos.z,
                                                                  &world->tilemap, world->interactive_qt, world->block_qt);
-                         if(inside_block && get_block_index(world, inside_block) != block_index){
-                              block_inside_result.entries[i].invalidated = true;
+                         if(inside_block){
+                              auto inside_block_index = get_block_index(world, inside_block);
+                              if(inside_block_index != collided_block_index && inside_block_index != block_index){
+                                   block_inside_result.entries[i].invalidated = true;
+                              }
                          }
                     }
 
@@ -993,8 +1037,11 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                          auto* inside_block = pixel_inside_block(closest_pixel + Pixel_t{0, 1},
                                                                  block_inside_result.entries[i].collision_pos.z,
                                                                  &world->tilemap, world->interactive_qt, world->block_qt);
-                         if(inside_block && get_block_index(world, inside_block) != block_index){
-                              block_inside_result.entries[i].invalidated = true;
+                         if(inside_block){
+                              auto inside_block_index = get_block_index(world, inside_block);
+                              if(inside_block_index != collided_block_index && inside_block_index != block_index){
+                                   block_inside_result.entries[i].invalidated = true;
+                              }
                          }
                     }
 
@@ -1002,8 +1049,11 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                          auto* inside_block = pixel_inside_block(closest_pixel + Pixel_t{0, -1},
                                                                  block_inside_result.entries[i].collision_pos.z,
                                                                  &world->tilemap, world->interactive_qt, world->block_qt);
-                         if(inside_block && get_block_index(world, inside_block) != block_index){
-                              block_inside_result.entries[i].invalidated = true;
+                         if(inside_block){
+                              auto inside_block_index = get_block_index(world, inside_block);
+                              if(inside_block_index != collided_block_index && inside_block_index != block_index){
+                                   block_inside_result.entries[i].invalidated = true;
+                              }
                          }
                     }
                }
@@ -1598,12 +1648,6 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                               current_collision_block_vel = 0;
                          }
 
-#if 0
-                         LOG("block %d collides with block %d to push it %s with momentum: %d %f\n",
-                             block_index, get_block_index(world, block_inside_result.entries[i].block), direction_to_string(first_direction),
-                             instant_momentum.mass, instant_momentum.vel);
-#endif
-
                          auto current_block = world->blocks.elements + block_index;
                          auto save_current_block_horizontal_move_state = current_block->horizontal_move.state;
                          auto save_current_block_vertical_move_state = current_block->vertical_move.state;
@@ -1611,6 +1655,8 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                          auto push_result = block_push(block_inside_result.entries[i].block, push_pos, push_pos_delta, first_direction, world, true, 1.0f, &instant_momentum);
 
                          auto direction_to_check = direction_opposite(first_direction);
+                         auto save_direction_to_check = direction_to_check;
+                         S8 total_against_rotations = block_inside_result.entries[i].portal_rotations;
                          direction_to_check = direction_rotate_counter_clockwise(direction_to_check, block_inside_result.entries[i].portal_rotations);
 
                          if(push_result.transferred_momentum_back()){
@@ -1618,18 +1664,31 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                               // adjust the force back through the chain
                               while(true)
                               {
-                                   auto current_block_pos = current_block->pos;
-                                   if(current_block->teleport) current_block_pos = current_block->teleport_pos;
+                                   auto current_block_pos = current_block->pos + current_block->pos_delta;
+                                   if(current_block->teleport) current_block_pos = current_block->teleport_pos + current_block->teleport_pos_delta;
                                    auto adjacent_results = block_against_other_blocks(current_block_pos, direction_to_check, world->block_qt,
                                                                                       world->interactive_qt, &world->tilemap);
                                    // ignore if we are against ourselves
                                    if(adjacent_results.count && adjacent_results.againsts[0].block != current_block){
                                         current_block = adjacent_results.againsts[0].block;
                                         direction_to_check = direction_rotate_clockwise(direction_to_check, adjacent_results.againsts[0].rotations_through_portal);
+                                        total_against_rotations += adjacent_results.againsts[0].rotations_through_portal;
+                                        total_against_rotations %= DIRECTION_COUNT;
                                    }else{
                                         break;
                                    }
                               }
+                         }
+
+                         static const bool negate_push_direction_table[DIRECTION_COUNT][DIRECTION_COUNT] = {
+                              {false, true,  true, false}, // left
+                              {false, false, true, true}, // up
+                              {false, true,  true, false}, // right
+                              {false, false,  true, true}, // down
+                         };
+
+                         if(negate_push_direction_table[save_direction_to_check][total_against_rotations]){
+                              push_result.velocity = -push_result.velocity;
                          }
 
                          bool odd_rotations_between_colliders = (direction_rotations_between(first_direction, direction_to_check) % 2 != 0);
@@ -1641,7 +1700,6 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                          case DIRECTION_RIGHT:
                               if(push_result.transferred_momentum_back()){
                                    if(current_block == world->blocks.elements + block_index){
-                                        // LOG("block %d transferred momentum back: vel %f\n", get_block_index(world, block_inside_result.entries[i].block), push_result.velocity);
                                         result.vel.x = push_result.velocity * scale_push_velocity;
                                         result.horizontal_move.state = MOVE_STATE_COASTING;
                                         result.horizontal_move.sign = move_sign_from_vel(result.vel.x);
@@ -1654,9 +1712,6 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                                              result.stop_horizontally();
                                         }
 
-                                        if(direction_to_check == DIRECTION_LEFT && push_result.velocity > 0) push_result.velocity = -push_result.velocity;
-                                        if(direction_to_check == DIRECTION_RIGHT && push_result.velocity < 0) push_result.velocity = -push_result.velocity;
-
                                         auto adjacent_block_index = get_block_index(world, current_block);
 
                                         result.block_changes.add(adjacent_block_index, BLOCK_CHANGE_TYPE_POS_DELTA_X, 0.0f);
@@ -1665,8 +1720,6 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                                         result.block_changes.add(adjacent_block_index, BLOCK_CHANGE_TYPE_HORIZONTAL_MOVE_SIGN, move_sign_from_vel(result.vel.x));
                                    }
                               }else{
-                                   // LOG("block %d did not transferred momentum back\n", get_block_index(world, block_inside_result.entries[i].block));
-
                                    if(odd_rotations_between_colliders){
                                         result.stop_vertically();
                                    }else{
@@ -1873,7 +1926,7 @@ void search_portal_destination_for_blocks(QuadTreeNode_t<Block_t>* block_qt, Dir
      quad_tree_find_in(block_qt, rect, blocks, block_count, BLOCK_QUAD_TREE_MAX_QUERY);
 
      for(S8 o = 0; o < *block_count; o++){
-          Position_t block_center = block_get_center(blocks[o]);
+          Position_t block_center = block_get_center(blocks[o]->pos + blocks[o]->pos_delta);
           Position_t dst_offset = block_center - dst_center_pos;
           Position_t src_fake_pos = src_portal_center_pos + position_rotate_quadrants_clockwise(dst_offset, rotations_between_portals);
           portal_offsets[o] = src_fake_pos - block_center;

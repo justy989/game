@@ -375,7 +375,7 @@ void slow_block_toward_gridlock(World_t* world, Block_t* block, Direction_t dire
      }
 
      Direction_t against_dir = DIRECTION_COUNT;
-     Block_t* against_block = block_against_another_block(block->pos, direction_opposite(direction), world->block_qt, world->interactive_qt,
+     Block_t* against_block = block_against_another_block(block->pos + block->pos_delta, direction_opposite(direction), world->block_qt, world->interactive_qt,
                                                           &world->tilemap, &against_dir);
      if(against_block){
           slow_block_toward_gridlock(world, against_block, direction);
@@ -1322,8 +1322,7 @@ static F32 get_block_velocity_ratio(World_t* world, Block_t* block, F32 vel, F32
 BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Direction_t direction, World_t* world, bool pushed_by_ice, F32 force, TransferMomentum_t* instant_momentum,
                              bool from_entangler){
      BlockPushResult_t result {};
-     auto against_result = block_against_other_blocks(pos, direction, world->block_qt, world->interactive_qt,
-                                                           &world->tilemap);
+     auto against_result = block_against_other_blocks(pos + pos_delta, direction, world->block_qt, world->interactive_qt, &world->tilemap);
      bool both_on_ice = false;
      bool pushed_block_on_ice = block_on_ice(pos, pos_delta, &world->tilemap, world->interactive_qt, world->block_qt);
      bool transfers_force = false;
@@ -1425,7 +1424,7 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
                                         block->horizontal_move.sign = move_sign_from_vel(block->vel.x);
                                         result.pushed = true;
                                    }else{
-                                        result.velocity = elastic_result.second_final_velocity;
+                                        result.velocity = block_push_vel;
                                         result.mass = split_instant_momentum.mass;
                                         reset_move(&block->horizontal_move);
                                         result.pushed = false;
@@ -1488,9 +1487,10 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
                while(entangled_against_block){
                     Direction_t check_direction = against_block_push_dir;
 
-                    auto next_against_block = block_against_another_block(entangled_against_block->pos, check_direction, world->block_qt,
-                                                                           world->interactive_qt, &world->tilemap,
-                                                                           &check_direction);
+                    auto next_against_block = block_against_another_block(entangled_against_block->pos + entangled_against_block->pos_delta,
+                                                                          check_direction, world->block_qt,
+                                                                          world->interactive_qt, &world->tilemap,
+                                                                          &check_direction);
                     if(next_against_block == nullptr) break;
                     if(!blocks_are_entangled(entangled_against_block, next_against_block, &world->blocks) &&
                        !block_on_ice(next_against_block->pos, entangled_against_block->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt)){
@@ -1751,8 +1751,8 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
 
 bool block_pushable(Block_t* block, Direction_t direction, World_t* world){
      Direction_t collided_block_push_dir = DIRECTION_COUNT;
-     Block_t* collided_block = block_against_another_block(block->pos, direction, world->block_qt, world->interactive_qt,
-                                                           &world->tilemap, &collided_block_push_dir);
+     Block_t* collided_block = block_against_another_block(block->pos + block->pos_delta, direction, world->block_qt,
+                                                           world->interactive_qt, &world->tilemap, &collided_block_push_dir);
      if(collided_block){
           if(collided_block == block){
                // pass, this happens in a corner portal!
@@ -1792,12 +1792,14 @@ void describe_block(World_t* world, Block_t* block){
          block->pos.decimal.x, block->pos.decimal.y,
          block->rotation, element_to_string(block->element),
          block->entangle_index, block->clone_id);
-     LOG(" vel: %f, %f accel: %f, %f pos_delta: %f, %f, prev_vel: %f, %f\n", block->vel.x, block->vel.y, block->accel.x, block->accel.y, block->pos_delta.x, block->pos_delta.y,
-         block->prev_vel.x, block->prev_vel.y);
-     LOG(" hmove: %s %s %f\n", move_state_to_string(block->horizontal_move.state), move_sign_to_string(block->horizontal_move.sign), block->horizontal_move.distance);
-     LOG(" vmove: %s %s %f\n", move_state_to_string(block->vertical_move.state), move_sign_to_string(block->vertical_move.sign), block->vertical_move.distance);
-     LOG(" hcoast: %s vcoast: %s\n", block_coast_to_string(block->coast_horizontal), block_coast_to_string(block->coast_vertical));
-     LOG(" flags: held_up: %d, carried_by_block: %d stopped_by_player_horizontal: %d, stopped_by_player_vertical: %d\n",
+     LOG("  accel  : %f, %f\n", block->accel.x, block->accel.y);
+     LOG("    vel  : %f, %f prev_vel: %f, %f\n", block->vel.x, block->vel.y, block->prev_vel.x, block->prev_vel.y);
+     LOG(" pos dt  : %f, %f\n", block->pos_delta.x, block->pos_delta.y);
+     LOG(" stop px : %d, %d\n", block->stop_on_pixel_x, block->stop_on_pixel_y);
+     LOG(" hmove   : %s %s %f\n", move_state_to_string(block->horizontal_move.state), move_sign_to_string(block->horizontal_move.sign), block->horizontal_move.distance);
+     LOG(" vmove   : %s %s %f\n", move_state_to_string(block->vertical_move.state), move_sign_to_string(block->vertical_move.sign), block->vertical_move.distance);
+     LOG(" hcoast  : %s vcoast: %s\n", block_coast_to_string(block->coast_horizontal), block_coast_to_string(block->coast_vertical));
+     LOG(" flags   : held_up: %d, carried_by_block: %d stopped_by_player_horizontal: %d, stopped_by_player_vertical: %d\n",
          block->held_up, block->carried_pos_delta.block_index, block->stopped_by_player_horizontal, block->stopped_by_player_vertical);
      LOG(" stack mass: %d, horizontal momentum: %f, vertical momentum: %f\n", mass, horizontal_momentum, vertical_momentum);
      LOG("\n");
@@ -2278,7 +2280,7 @@ ElasticCollisionResult_t elastic_transfer_momentum_to_block(TransferMomentum_t* 
 }
 
 static void get_touching_blocks_in_direction(World_t* world, Block_t* block, Direction_t direction, BlockList_t* block_list){
-     auto result = block_against_other_blocks(block->pos, direction, world->block_qt, world->interactive_qt, &world->tilemap);
+     auto result = block_against_other_blocks(block->pos + block->pos_delta, direction, world->block_qt, world->interactive_qt, &world->tilemap);
      for(S16 i = 0; i < result.count; i++){
           Direction_t result_direction = direction;
           result_direction = direction_rotate_clockwise(result_direction, result.againsts[i].rotations_through_portal);
@@ -2343,8 +2345,6 @@ S16 get_block_mass_in_direction(World_t* world, Block_t* block, Direction_t dire
 
                auto against_player = block_against_player(block_entry->block, direction, &world->players);
                if(against_player){
-                    // LOG("get_block_mass_in_direction(block %d to the %s), for block %d against player\n",
-                    //     get_block_index(world, block), direction_to_string(direction), get_block_index(world, block_entry->block));
                     mass += PLAYER_MASS;
                }
           }
