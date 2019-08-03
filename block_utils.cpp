@@ -1522,6 +1522,8 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                          // LOG("Add push, block %d %s | %s %d\n",
                          //     block_index, direction_to_string(first_direction), direction_to_string(second_direction), push.pushee_index);
 
+                         push.collided_with_block_count = collided_with_blocks_on_ice;
+
                          result.block_pushes.add(&push);
 #if 0
                          TransferMomentum_t instant_momentum;
@@ -2009,11 +2011,17 @@ void apply_block_change(ObjectArray_t<Block_t>* blocks_array, BlockChange_t* cha
      case BLOCK_CHANGE_TYPE_HORIZONTAL_MOVE_SIGN:
           block->horizontal_move.sign = change->move_sign;
           break;
+     case BLOCK_CHANGE_TYPE_HORIZONTAL_MOVE_TIME_LEFT:
+          block->horizontal_move.time_left = change->decimal;
+          break;
      case BLOCK_CHANGE_TYPE_VERTICAL_MOVE_STATE:
           block->vertical_move.state = change->move_state;
           break;
      case BLOCK_CHANGE_TYPE_VERTICAL_MOVE_SIGN:
           block->vertical_move.sign = change->move_sign;
+          break;
+     case BLOCK_CHANGE_TYPE_VERTICAL_MOVE_TIME_LEFT:
+          block->vertical_move.time_left = change->decimal;
           break;
      case BLOCK_CHANGE_TYPE_STOP_ON_PIXEL_X:
           block->stop_on_pixel_x = change->integer;
@@ -2024,12 +2032,15 @@ void apply_block_change(ObjectArray_t<Block_t>* blocks_array, BlockChange_t* cha
      }
 }
 
-void block_collision_push(BlockPush_t* push, World_t* world){
+BlockChanges_t block_collision_push(BlockPush_t* push, World_t* world){
+     BlockChanges_t block_changes;
+
      auto* pusher = world->blocks.elements + push->pusher_index;
      auto* pushee = world->blocks.elements + push->pushee_index;
 
      TransferMomentum_t instant_momentum;
      instant_momentum.mass = get_block_stack_mass(world, pusher);
+     instant_momentum.mass = (S16)((F32)(instant_momentum.mass) * (1.0f / (F32)(push->collided_with_block_count)));
 
      for(S16 d = 0; d < DIRECTION_COUNT; d++){
           Direction_t direction = (Direction_t)(d);
@@ -2137,32 +2148,42 @@ void block_collision_push(BlockPush_t* push, World_t* world){
                if(push_result.transferred_momentum_back()){
                     if(block_receiving_force != pusher){
                          if(odd_rotations_between_colliders){
-                              pusher->vel.y = 0;
-                              pusher->accel.y = 0;
-                              reset_move(&pusher->vertical_move);
+                              block_changes.add(push->pusher_index, BLOCK_CHANGE_TYPE_VEL_Y, 0.0f);
+                              block_changes.add(push->pusher_index, BLOCK_CHANGE_TYPE_ACCEL_Y, 0.0f);
+                              block_changes.add(push->pusher_index, BLOCK_CHANGE_TYPE_VERTICAL_MOVE_STATE, MOVE_STATE_IDLING);
+                              block_changes.add(push->pusher_index, BLOCK_CHANGE_TYPE_VERTICAL_MOVE_SIGN, MOVE_SIGN_ZERO);
+                              block_changes.add(push->pusher_index, BLOCK_CHANGE_TYPE_VERTICAL_MOVE_TIME_LEFT, 0.0f);
                          }else{
-                              pusher->vel.x = 0;
-                              pusher->accel.x = 0;
-                              reset_move(&pusher->horizontal_move);
+                              block_changes.add(push->pusher_index, BLOCK_CHANGE_TYPE_VEL_X, 0.0f);
+                              block_changes.add(push->pusher_index, BLOCK_CHANGE_TYPE_ACCEL_X, 0.0f);
+                              block_changes.add(push->pusher_index, BLOCK_CHANGE_TYPE_HORIZONTAL_MOVE_STATE, MOVE_STATE_IDLING);
+                              block_changes.add(push->pusher_index, BLOCK_CHANGE_TYPE_HORIZONTAL_MOVE_SIGN, MOVE_SIGN_ZERO);
+                              block_changes.add(push->pusher_index, BLOCK_CHANGE_TYPE_HORIZONTAL_MOVE_TIME_LEFT, 0.0f);
                          }
                     }
 
-                    // block_receiving_force->pos_delta.x = 0;
-                    block_receiving_force->vel.x = push_result.velocity * scale_push_velocity;
-                    block_receiving_force->horizontal_move.state = MOVE_STATE_COASTING;
-                    block_receiving_force->horizontal_move.sign = move_sign_from_vel(block_receiving_force->vel.x);
-
+                    auto block_receiving_force_index = block_receiving_force - world->blocks.elements;
+                    F32 new_vel = push_result.velocity * scale_push_velocity;
                     F32 x_pos = pos_to_vec(block_receiving_force->pos + block_receiving_force->pos_delta).x;
-                    block_receiving_force->horizontal_move.time_left = calc_coast_motion_time_left(x_pos, block_receiving_force->vel.x);
+
+                    block_changes.add(block_receiving_force_index, BLOCK_CHANGE_TYPE_VEL_X, new_vel);
+                    block_changes.add(block_receiving_force_index, BLOCK_CHANGE_TYPE_ACCEL_X, 0.0f);
+                    block_changes.add(block_receiving_force_index, BLOCK_CHANGE_TYPE_HORIZONTAL_MOVE_STATE, MOVE_STATE_COASTING);
+                    block_changes.add(block_receiving_force_index, BLOCK_CHANGE_TYPE_HORIZONTAL_MOVE_SIGN, move_sign_from_vel(block_receiving_force->vel.x));
+                    block_changes.add(block_receiving_force_index, BLOCK_CHANGE_TYPE_HORIZONTAL_MOVE_TIME_LEFT, calc_coast_motion_time_left(x_pos, new_vel));
                }else{
                     if(odd_rotations_between_colliders){
-                         pusher->vel.y = 0;
-                         pusher->accel.y = 0;
-                         reset_move(&pusher->vertical_move);
+                         block_changes.add(push->pusher_index, BLOCK_CHANGE_TYPE_VEL_Y, 0.0f);
+                         block_changes.add(push->pusher_index, BLOCK_CHANGE_TYPE_ACCEL_Y, 0.0f);
+                         block_changes.add(push->pusher_index, BLOCK_CHANGE_TYPE_VERTICAL_MOVE_STATE, MOVE_STATE_IDLING);
+                         block_changes.add(push->pusher_index, BLOCK_CHANGE_TYPE_VERTICAL_MOVE_SIGN, MOVE_SIGN_ZERO);
+                         block_changes.add(push->pusher_index, BLOCK_CHANGE_TYPE_VERTICAL_MOVE_TIME_LEFT, 0.0f);
                     }else{
-                         pusher->vel.x = 0;
-                         pusher->accel.x = 0;
-                         reset_move(&pusher->horizontal_move);
+                         block_changes.add(push->pusher_index, BLOCK_CHANGE_TYPE_VEL_X, 0.0f);
+                         block_changes.add(push->pusher_index, BLOCK_CHANGE_TYPE_ACCEL_X, 0.0f);
+                         block_changes.add(push->pusher_index, BLOCK_CHANGE_TYPE_HORIZONTAL_MOVE_STATE, MOVE_STATE_IDLING);
+                         block_changes.add(push->pusher_index, BLOCK_CHANGE_TYPE_HORIZONTAL_MOVE_SIGN, MOVE_SIGN_ZERO);
+                         block_changes.add(push->pusher_index, BLOCK_CHANGE_TYPE_HORIZONTAL_MOVE_TIME_LEFT, 0.0f);
                     }
                }
                break;
@@ -2171,31 +2192,42 @@ void block_collision_push(BlockPush_t* push, World_t* world){
                if(push_result.transferred_momentum_back()){
                     if(block_receiving_force != pusher){
                          if(odd_rotations_between_colliders){
-                              pusher->vel.x = 0;
-                              pusher->accel.x = 0;
-                              reset_move(&pusher->horizontal_move);
+                              block_changes.add(push->pusher_index, BLOCK_CHANGE_TYPE_VEL_X, 0.0f);
+                              block_changes.add(push->pusher_index, BLOCK_CHANGE_TYPE_ACCEL_X, 0.0f);
+                              block_changes.add(push->pusher_index, BLOCK_CHANGE_TYPE_HORIZONTAL_MOVE_STATE, MOVE_STATE_IDLING);
+                              block_changes.add(push->pusher_index, BLOCK_CHANGE_TYPE_HORIZONTAL_MOVE_SIGN, MOVE_SIGN_ZERO);
+                              block_changes.add(push->pusher_index, BLOCK_CHANGE_TYPE_HORIZONTAL_MOVE_TIME_LEFT, 0.0f);
                          }else{
-                              pusher->vel.y = 0;
-                              pusher->accel.y = 0;
-                              reset_move(&pusher->vertical_move);
+                              block_changes.add(push->pusher_index, BLOCK_CHANGE_TYPE_VEL_Y, 0.0f);
+                              block_changes.add(push->pusher_index, BLOCK_CHANGE_TYPE_ACCEL_Y, 0.0f);
+                              block_changes.add(push->pusher_index, BLOCK_CHANGE_TYPE_VERTICAL_MOVE_STATE, MOVE_STATE_IDLING);
+                              block_changes.add(push->pusher_index, BLOCK_CHANGE_TYPE_VERTICAL_MOVE_SIGN, MOVE_SIGN_ZERO);
+                              block_changes.add(push->pusher_index, BLOCK_CHANGE_TYPE_VERTICAL_MOVE_TIME_LEFT, 0.0f);
                          }
                     }
 
-                    // block_receiving_force->pos_delta.y = 0;
-                    block_receiving_force->vel.y = push_result.velocity * scale_push_velocity;
-                    block_receiving_force->vertical_move.state = MOVE_STATE_COASTING;
-                    block_receiving_force->vertical_move.sign = move_sign_from_vel(block_receiving_force->vel.y);
+                    auto block_receiving_force_index = block_receiving_force - world->blocks.elements;
+                    F32 new_vel = push_result.velocity * scale_push_velocity;
                     F32 y_pos = pos_to_vec(block_receiving_force->pos + block_receiving_force->pos_delta).y;
-                    block_receiving_force->vertical_move.time_left = calc_coast_motion_time_left(y_pos, block_receiving_force->vel.y);
+
+                    block_changes.add(block_receiving_force_index, BLOCK_CHANGE_TYPE_VEL_Y, new_vel);
+                    block_changes.add(block_receiving_force_index, BLOCK_CHANGE_TYPE_ACCEL_Y, 0.0f);
+                    block_changes.add(block_receiving_force_index, BLOCK_CHANGE_TYPE_VERTICAL_MOVE_STATE, MOVE_STATE_COASTING);
+                    block_changes.add(block_receiving_force_index, BLOCK_CHANGE_TYPE_VERTICAL_MOVE_SIGN, move_sign_from_vel(block_receiving_force->vel.y));
+                    block_changes.add(block_receiving_force_index, BLOCK_CHANGE_TYPE_VERTICAL_MOVE_TIME_LEFT, calc_coast_motion_time_left(y_pos, new_vel));
                }else{
                     if(odd_rotations_between_colliders){
-                         pusher->vel.x = 0;
-                         pusher->accel.x = 0;
-                         reset_move(&pusher->horizontal_move);
+                         block_changes.add(push->pusher_index, BLOCK_CHANGE_TYPE_VEL_X, 0.0f);
+                         block_changes.add(push->pusher_index, BLOCK_CHANGE_TYPE_ACCEL_X, 0.0f);
+                         block_changes.add(push->pusher_index, BLOCK_CHANGE_TYPE_HORIZONTAL_MOVE_STATE, MOVE_STATE_IDLING);
+                         block_changes.add(push->pusher_index, BLOCK_CHANGE_TYPE_HORIZONTAL_MOVE_SIGN, MOVE_SIGN_ZERO);
+                         block_changes.add(push->pusher_index, BLOCK_CHANGE_TYPE_HORIZONTAL_MOVE_TIME_LEFT, 0.0f);
                     }else{
-                         pusher->vel.y = 0;
-                         pusher->accel.y = 0;
-                         reset_move(&pusher->vertical_move);
+                         block_changes.add(push->pusher_index, BLOCK_CHANGE_TYPE_VEL_Y, 0.0f);
+                         block_changes.add(push->pusher_index, BLOCK_CHANGE_TYPE_ACCEL_Y, 0.0f);
+                         block_changes.add(push->pusher_index, BLOCK_CHANGE_TYPE_VERTICAL_MOVE_STATE, MOVE_STATE_IDLING);
+                         block_changes.add(push->pusher_index, BLOCK_CHANGE_TYPE_VERTICAL_MOVE_SIGN, MOVE_SIGN_ZERO);
+                         block_changes.add(push->pusher_index, BLOCK_CHANGE_TYPE_VERTICAL_MOVE_TIME_LEFT, 0.0f);
                     }
                }
                break;
@@ -2221,4 +2253,6 @@ void block_collision_push(BlockPush_t* push, World_t* world){
                push_entangled_block(pushee, world, direction, true, &instant_momentum);
           }
      }
+
+     return block_changes;
 }

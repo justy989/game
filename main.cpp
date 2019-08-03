@@ -2671,8 +2671,15 @@ int main(int argc, char** argv){
                          update_blocks_count = block_collision_result.update_blocks_count;
                     }
 
+                    BlockChanges_t all_block_changes;
                     for(S16 i = 0; i < all_block_pushes.count; i++){
-                         block_collision_push(all_block_pushes.pushes + i, &world);
+                         auto block_changes = block_collision_push(all_block_pushes.pushes + i, &world);
+                         all_block_changes.merge(&block_changes);
+                    }
+
+                    for(S16 i = 0; i < all_block_changes.count; i++){
+                         auto& block_change = all_block_changes.changes[i];
+                         apply_block_change(&world.blocks, &block_change);
                     }
 
                     // check if blocks extinguish elements of other blocks

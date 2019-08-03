@@ -48,8 +48,10 @@ enum BlockChangeType_t : S8{
      BLOCK_CHANGE_TYPE_ACCEL_Y,
      BLOCK_CHANGE_TYPE_HORIZONTAL_MOVE_STATE,
      BLOCK_CHANGE_TYPE_HORIZONTAL_MOVE_SIGN,
+     BLOCK_CHANGE_TYPE_HORIZONTAL_MOVE_TIME_LEFT,
      BLOCK_CHANGE_TYPE_VERTICAL_MOVE_STATE,
      BLOCK_CHANGE_TYPE_VERTICAL_MOVE_SIGN,
+     BLOCK_CHANGE_TYPE_VERTICAL_MOVE_TIME_LEFT,
      BLOCK_CHANGE_TYPE_STOP_ON_PIXEL_X,
      BLOCK_CHANGE_TYPE_STOP_ON_PIXEL_Y,
 };
@@ -128,6 +130,7 @@ struct BlockPush_t{
      S8 portal_rotations;
      Position_t pos;
      Vec_t pos_delta;
+     S16 collided_with_block_count = 1;
 };
 
 template <S16 MAX_BLOCK_PUSHES>
@@ -317,6 +320,6 @@ bool blocks_are_entangled(Block_t* a, Block_t* b, ObjectArray_t<Block_t>* blocks
 bool blocks_are_entangled(S16 a_index, S16 b_index, ObjectArray_t<Block_t>* blocks_array);
 
 void apply_block_change(ObjectArray_t<Block_t>* blocks_array, BlockChange_t* change);
-void block_collision_push(BlockPush_t* push, World_t* world);
+BlockChanges_t block_collision_push(BlockPush_t* push, World_t* world);
 
 extern Pixel_t g_collided_with_pixel;
