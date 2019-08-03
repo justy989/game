@@ -121,6 +121,53 @@ struct BlockChanges_t{
      }
 };
 
+struct BlockPush_t{
+     S16 pusher_index;
+     S16 pushee_index;
+     DirectionMask_t direction_mask = DIRECTION_MASK_NONE;
+     S8 portal_rotations;
+     Position_t pos;
+     Vec_t pos_delta;
+};
+
+template <S16 MAX_BLOCK_PUSHES>
+struct BlockPushes_t{
+     BlockPush_t pushes[MAX_BLOCK_PUSHES];
+     S16 count = 0;
+
+     bool add(BlockPush_t* push){
+          if(count < MAX_BLOCK_PUSHES){
+               pushes[count] = *push;
+               count++;
+               return true;
+          }
+
+          return false;
+     }
+
+     // TODO: it'd be nice if this wasn't N^2
+     template <S16 ALTERNATE_MAX_BLOCK_PUSHES>
+     void merge(BlockPushes_t<ALTERNATE_MAX_BLOCK_PUSHES>* alternate_pushes){
+          for(S16 p = 0; p < alternate_pushes->count; p++){
+               BlockPush_t* alternate = alternate_pushes->pushes + p;
+               bool unique = true;
+
+               for(S16 i = 0; i < count; i++){
+                    BlockPush_t* check = pushes + i;
+                    if((check->pusher_index == alternate->pusher_index &&
+                        check->pushee_index == alternate->pushee_index) ||
+                       (check->pushee_index == alternate->pusher_index &&
+                        check->pusher_index == alternate->pushee_index)){
+                         unique = false;
+                         break;
+                    }
+               }
+
+               if(unique) add(alternate);
+          }
+     }
+};
+
 struct CheckBlockCollisionResult_t{
      bool collided;
 
@@ -141,7 +188,8 @@ struct CheckBlockCollisionResult_t{
      F32 horizontal_momentum;
      F32 vertical_momentum;
 
-     BlockChanges_t block_changes;
+     BlockPushes_t<4> block_pushes;
+     // BlockChanges_t block_changes;
 
      void stop_horizontally(){
           reset_move(&horizontal_move);
@@ -269,5 +317,6 @@ bool blocks_are_entangled(Block_t* a, Block_t* b, ObjectArray_t<Block_t>* blocks
 bool blocks_are_entangled(S16 a_index, S16 b_index, ObjectArray_t<Block_t>* blocks_array);
 
 void apply_block_change(ObjectArray_t<Block_t>* blocks_array, BlockChange_t* change);
+void block_collision_push(BlockPush_t* push, World_t* world);
 
 extern Pixel_t g_collided_with_pixel;

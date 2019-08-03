@@ -14,6 +14,7 @@ Entanglement Puzzles:
 - rotated entangled puzzles where the centroid is on a portal destination coord
 
 Current bugs:
+- for collision, can shorten things pos_deltas before we cause pushes to happen on ice in the same frame due to collisions ?
 - continuing to push a block through a collision on ice causes bad things to happen
 - a block travelling diagonally at a wall will stop on both axis' against the wall because of the collision
 - if a collision happens to an entangled block on ice, where the entangled block is moving towards the collider, the entangled block's entanglers do not get pushed
@@ -456,9 +457,17 @@ void hold_players(ObjectArray_t<Player_t>* players){
      }
 }
 
-bool do_block_collision(World_t* world, Block_t* block, F32 dt, S16* update_blocks_count, BlockChanges_t* block_changes){
+struct DoBlockCollisionResults_t{
+     bool repeat_collision_pass = false;
+     BlockPushes_t<4> block_pushes;
+     S16 update_blocks_count;
+};
+
+DoBlockCollisionResults_t do_block_collision(World_t* world, Block_t* block, F32 dt, S16 update_blocks_count){
+     DoBlockCollisionResults_t result;
+     result.update_blocks_count = update_blocks_count;
+
      S16 block_index = get_block_index(world, block);
-     bool repeat_collision = false;
 
      bool stop_on_boundary_x = false;
      bool stop_on_boundary_y = false;
@@ -489,7 +498,7 @@ bool do_block_collision(World_t* world, Block_t* block, F32 dt, S16* update_bloc
                                                                           block->clone_start.x > 0,
                                                                           world);
                if(collision_result.collided){
-                    repeat_collision = true;
+                    result.repeat_collision_pass = true;
 
                     block->teleport_pos_delta = collision_result.pos_delta;
                     block->teleport_vel = collision_result.vel;
@@ -517,7 +526,7 @@ bool do_block_collision(World_t* world, Block_t* block, F32 dt, S16* update_bloc
           }
 
           if(collision_result.collided){
-               repeat_collision = true;
+               result.repeat_collision_pass = true;
 
                if(collision_result.collided_block_index >= 0 && blocks_are_entangled(collision_result.collided_block_index, block_index, &world->blocks)){
                     // TODO: I don't love indexing the blocks without checking the index is valid first
@@ -663,7 +672,7 @@ bool do_block_collision(World_t* world, Block_t* block, F32 dt, S16* update_bloc
           }
      }
 
-     *block_changes = collision_result.block_changes;
+     result.block_pushes = collision_result.block_pushes;
 
      // check for adjacent walls
      if(block->pos_delta.x > 0.0f){
@@ -809,7 +818,7 @@ bool do_block_collision(World_t* world, Block_t* block, F32 dt, S16* update_bloc
           // stop on tile boundaries separately for each axis
           S16 boundary_x = range_passes_tile_boundary(block->pos.pixel.x, final_pos.pixel.x, block->started_on_pixel_x);
           if(boundary_x){
-               repeat_collision = true;
+               result.repeat_collision_pass = true;
 
                block->stop_on_pixel_x = boundary_x;
                block->accel.x = 0;
@@ -826,7 +835,7 @@ bool do_block_collision(World_t* world, Block_t* block, F32 dt, S16* update_bloc
      if(stop_on_boundary_y){
           S16 boundary_y = range_passes_tile_boundary(block->pos.pixel.y, final_pos.pixel.y, block->started_on_pixel_y);
           if(boundary_y){
-               repeat_collision = true;
+               result.repeat_collision_pass = true;
 
                block->stop_on_pixel_y = boundary_y;
                block->accel.y = 0;
@@ -905,7 +914,7 @@ bool do_block_collision(World_t* world, Block_t* block, F32 dt, S16* update_bloc
                // update ptr since we could have resized
                block = world->blocks.elements + block_index;
 
-               (*update_blocks_count)--;
+               result.update_blocks_count--;
 
                // if our entangled block was not the last element, then it was replaced by another
                if(block->entangle_index < world->blocks.count){
@@ -949,7 +958,7 @@ bool do_block_collision(World_t* world, Block_t* block, F32 dt, S16* update_bloc
           block->clone_start = Coord_t{};
      }
 
-     return repeat_collision;
+     return result;
 }
 
 void draw_input_on_hud(char c, Vec_t pos, bool down){
@@ -2647,62 +2656,23 @@ int main(int argc, char** argv){
                // unbounded collision: this should be exciting
                // we have our initial position and our initial pos_delta, update pos_delta for all players and blocks until nothing is colliding anymore
                const S8 max_collision_attempts = 16;
-               bool repeat_collision = true;
-               while(repeat_collision && collision_attempts <= max_collision_attempts){
-                    repeat_collision = false;
+               bool repeast_collision_pass = true;
+               while(repeast_collision_pass && collision_attempts <= max_collision_attempts){
+                    repeast_collision_pass = false;
 
                     // do a collision pass on each block
                     S16 update_blocks_count = world.blocks.count;
-
+                    BlockPushes_t<128> all_block_pushes; // TODO: is 128 this enough ?
                     for(S16 i = 0; i < update_blocks_count; i++){
                          auto block = world.blocks.elements + i;
-                         block->done_collision_pass = false;
+                         auto block_collision_result = do_block_collision(&world, block, dt, update_blocks_count);
+                         if(block_collision_result.repeat_collision_pass) repeast_collision_pass = true;
+                         all_block_pushes.merge(&block_collision_result.block_pushes);
+                         update_blocks_count = block_collision_result.update_blocks_count;
                     }
 
-                    for(S16 i = 0; i < update_blocks_count; i++){
-                         auto block = world.blocks.elements + i;
-
-                         BlockChanges_t all_block_changes;
-                         if(!block->done_collision_pass && block->entangle_index >= 0){
-                              S16 current_index = i;
-
-                              do
-                              {
-                                   BlockChanges_t block_changes;
-                                   Block_t* current_block = world.blocks.elements + current_index;
-                                   if(do_block_collision(&world, current_block, dt, &update_blocks_count, &block_changes)){
-                                        repeat_collision = true;
-                                   }
-                                   all_block_changes.merge(&block_changes);
-                                   current_block->done_collision_pass = true;
-                                   current_index = current_block->entangle_index;
-                              }while(current_index != i && current_index >= 0);
-
-                              for(S16 c = 0; c < all_block_changes.count; c++){
-                                   // TODO: for pos_delta modifications, apply to entangled blocks, probably in apply_block_change() ?
-                                   auto& block_change = all_block_changes.changes[c];
-                                   apply_block_change(&world.blocks, &block_change);
-
-                                   // since this block has changed, redo collision for it later
-                                   auto changed_block = world.blocks.elements + block_change.block_index;
-                                   changed_block->done_collision_pass = false;
-                              }
-                         }
-                    }
-
-                    BlockChanges_t block_changes;
-                    for(S16 i = 0; i < update_blocks_count; i++){
-                         auto block = world.blocks.elements + i;
-                         if(block->done_collision_pass) continue;
-                         if(do_block_collision(&world, block, dt, &update_blocks_count, &block_changes)){
-                              repeat_collision = true;
-                         }
-
-                         for(S16 c = 0; c < block_changes.count; c++){
-                              // TODO: for pos_delta modifications, apply to entangled blocks, probably in apply_block_change() ?
-                              auto& block_change = block_changes.changes[c];
-                              apply_block_change(&world.blocks, &block_change);
-                         }
+                    for(S16 i = 0; i < all_block_pushes.count; i++){
+                         block_collision_push(all_block_pushes.pushes + i, &world);
                     }
 
                     // check if blocks extinguish elements of other blocks
@@ -2784,13 +2754,13 @@ int main(int argc, char** argv){
                                                        entangled_block->pos_delta += new_carried_pos_delta;
                                                   }
 
-                                                  repeat_collision = true;
+                                                  repeast_collision_pass = true;
                                              }
 
                                              entangle_index = entangled_block->entangle_index;
                                         }
 
-                                        repeat_collision = true;
+                                        repeast_collision_pass = true;
                                    }
                               }
                          }
@@ -2863,7 +2833,7 @@ int main(int argc, char** argv){
                               quad_tree_free(world.block_qt);
                               world.block_qt = quad_tree_build(&world.blocks);
 
-                              repeat_collision = true;
+                              repeast_collision_pass = true;
                          }
                     }
 
@@ -2881,7 +2851,7 @@ int main(int argc, char** argv){
                                                                       player->clone_instance, i, player->teleport_pushing_block, player->teleport_pushing_block_dir,
                                                                       player->teleport_pushing_block_rotation, &world);
 
-                              if(move_result.collided) repeat_collision = true;
+                              if(move_result.collided) repeast_collision_pass = true;
                               if(move_result.resetting) resetting = true;
                               player->teleport_pos_delta = move_result.pos_delta;
                               player->teleport_pushing_block = move_result.pushing_block;
@@ -2893,7 +2863,7 @@ int main(int argc, char** argv){
                                                                       player->pushing_block_dir, player->pushing_block_rotation,
                                                                       &world);
 
-                              if(move_result.collided) repeat_collision = true;
+                              if(move_result.collided) repeast_collision_pass = true;
                               if(move_result.resetting) resetting = true;
                               player->pos_delta = move_result.pos_delta;
                               player->pushing_block = move_result.pushing_block;
@@ -3030,7 +3000,7 @@ int main(int argc, char** argv){
                                              }
                                         }
 
-                                        repeat_collision = true;
+                                        repeast_collision_pass = true;
                                    }
                               }
                          }
@@ -3098,7 +3068,7 @@ int main(int argc, char** argv){
                               player->teleport_pushing_block_rotation = 0;
                               player->teleport_pushing_block_dir = player->pushing_block_dir;
 
-                              repeat_collision = true;
+                              repeast_collision_pass = true;
                          }
                     }
 

@@ -63,8 +63,6 @@ struct Block_t : public GridMotion_t{
      CarriedPosDelta_t carried_pos_delta;
 
      S16 previous_mass;
-
-     bool done_collision_pass = false;
 };
 
 S16 get_object_x(Block_t* block);
