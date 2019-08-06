@@ -1059,6 +1059,9 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
           }
 
           for(S8 i = 0; i < block_inside_result.count; i++){
+               LOG("  block %d collides with block %d invalidated %d\n", block_index, get_block_index(world, block_inside_result.entries[i].block),
+                   block_inside_result.entries[i].invalidated);
+
                if(block_inside_result.entries[i].invalidated) continue;
 
                result.collided = true;
@@ -1289,6 +1292,8 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                                    final_stop_pos.pixel.x += HALF_TILE_SIZE_IN_PIXELS;
                                    auto new_pos_delta = pos_to_vec(final_stop_pos - block_pos);
                                    result.pos_delta.x = new_pos_delta.x;
+
+                                   auto debug_pos = block_pos + new_pos_delta;
                               }else{
                                    result.stop_on_pixel_x = closest_pixel(collided_block_center.pixel.x + HALF_TILE_SIZE_IN_PIXELS, collided_block_center.decimal.x);
 
@@ -1296,6 +1301,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                                    Vec_t pos_delta = pos_to_vec(final_stop_pos - block_pos);
 
                                    result.pos_delta.x = pos_delta.x;
+                                   auto debug_pos = block_pos + pos_delta;
                                    if(!both_frictionless) result.stop_horizontally();
                               }
                          }
@@ -1525,329 +1531,6 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                          push.collided_with_block_count = collided_with_blocks_on_ice;
 
                          result.block_pushes.add(&push);
-#if 0
-                         TransferMomentum_t instant_momentum;
-
-                         // take into account direction and portal rotations before setting the instant vel
-                         if(direction_is_horizontal(first_direction)){
-                              if((block_inside_result.entries[i].portal_rotations % 2)){
-                                   instant_momentum = vertical_momentum;
-                              }else{
-                                   instant_momentum = horizontal_momentum;
-                              }
-                         }else{
-                              if((block_inside_result.entries[i].portal_rotations % 2)){
-                                   instant_momentum = horizontal_momentum;
-                              }else{
-                                   instant_momentum = vertical_momentum;
-                              }
-                         }
-
-                         instant_momentum.mass = (S16)((F32)(instant_momentum.mass) * (1.0f / (F32)(collided_with_blocks_on_ice)));
-
-                         if(block_inside_index != block_index){
-                              switch(first_direction){
-                              default:
-                                   break;
-                              case DIRECTION_LEFT:
-                              case DIRECTION_RIGHT:
-                                   result.stop_horizontally();
-                                   break;
-                              case DIRECTION_DOWN:
-                              case DIRECTION_UP:
-                                   result.stop_vertically();
-                                   break;
-                              }
-
-                              switch(second_direction){
-                              default:
-                                   break;
-                              case DIRECTION_LEFT:
-                              case DIRECTION_RIGHT:
-                                   result.stop_horizontally();
-                                   break;
-                              case DIRECTION_DOWN:
-                              case DIRECTION_UP:
-                                   result.stop_vertically();
-                                   break;
-                              }
-                         }
-
-                         auto push_pos = block_inside_result.entries[i].block->pos;
-                         auto push_pos_delta = block_inside_result.entries[i].block->pos_delta;
-
-                         // if we collide with ourself, use the resulting pos_delta because we could have already moved
-                         // passed a valid spot that we would have been able to push from
-                         if(block_inside_index == block_index){
-                              push_pos_delta = result.pos_delta;
-                         }
-
-                         F32 current_collision_block_vel = 0;
-                         F32 current_pos_delta = 0;
-                         F32 scale_push_velocity = 1.0f;
-
-                         switch(first_direction){
-                         default:
-                              break;
-                         case DIRECTION_LEFT:
-                         case DIRECTION_RIGHT:
-                              current_collision_block_vel = block_inside_result.entries[i].block->vel.x;
-                              current_pos_delta = block_inside_result.entries[i].block->pos_delta.x;
-                              break;
-                         case DIRECTION_UP:
-                         case DIRECTION_DOWN:
-                              current_collision_block_vel = block_inside_result.entries[i].block->vel.y;
-                              current_pos_delta = block_inside_result.entries[i].block->pos_delta.y;
-                              break;
-                         }
-
-                         // If the block has velocity but hasn't moved yet, then it has been collided with another block during this frame.
-                         // Thus, the collisions happened at the same time.
-                         if(current_collision_block_vel != 0 && current_pos_delta == 0){
-                              auto collided_block_mass = get_block_stack_mass(world, block_inside_result.entries[i].block);
-
-                              // steal the momentum from the collided block to mimic the collisions happening as a simultaneous mass
-                              auto fake_elastic_addition = elastic_transfer_momentum(collided_block_mass, current_collision_block_vel, instant_momentum.mass, 0);
-                              scale_push_velocity = instant_momentum.vel / (instant_momentum.vel + fake_elastic_addition.second_final_velocity);
-                              instant_momentum.vel += fake_elastic_addition.second_final_velocity;
-
-                              // kill the collided blocks velocity so that the it transfers all of the momentum
-                              switch(first_direction){
-                              default:
-                                   break;
-                              case DIRECTION_LEFT:
-                              case DIRECTION_RIGHT:
-                                   block_inside_result.entries[i].block->vel.x = 0;
-                                   break;
-                              case DIRECTION_UP:
-                              case DIRECTION_DOWN:
-                                   block_inside_result.entries[i].block->vel.y = 0;
-                                   break;
-                              }
-
-                              current_collision_block_vel = 0;
-                         }
-
-                         auto current_block = world->blocks.elements + block_index;
-                         auto save_current_block_horizontal_move_state = current_block->horizontal_move.state;
-                         auto save_current_block_vertical_move_state = current_block->vertical_move.state;
-
-                         auto push_result = block_push(block_inside_result.entries[i].block, push_pos, push_pos_delta, first_direction, world, true, 1.0f, &instant_momentum);
-
-                         auto direction_to_check = direction_opposite(first_direction);
-                         auto save_direction_to_check = direction_to_check;
-                         S8 total_against_rotations = block_inside_result.entries[i].portal_rotations;
-                         direction_to_check = direction_rotate_counter_clockwise(direction_to_check, block_inside_result.entries[i].portal_rotations);
-
-                         if(push_result.transferred_momentum_back()){
-                              // TODO: handle multiple blocks we could be against
-                              // adjust the force back through the chain
-                              while(true)
-                              {
-                                   auto current_block_pos = current_block->pos + current_block->pos_delta;
-                                   if(current_block->teleport) current_block_pos = current_block->teleport_pos + current_block->teleport_pos_delta;
-                                   auto adjacent_results = block_against_other_blocks(current_block_pos, direction_to_check, world->block_qt,
-                                                                                      world->interactive_qt, &world->tilemap);
-                                   // ignore if we are against ourselves
-                                   if(adjacent_results.count && adjacent_results.againsts[0].block != current_block){
-                                        current_block = adjacent_results.againsts[0].block;
-                                        direction_to_check = direction_rotate_clockwise(direction_to_check, adjacent_results.againsts[0].rotations_through_portal);
-                                        total_against_rotations += adjacent_results.againsts[0].rotations_through_portal;
-                                        total_against_rotations %= DIRECTION_COUNT;
-                                   }else{
-                                        break;
-                                   }
-                              }
-                         }
-
-                         static const bool negate_push_direction_table[DIRECTION_COUNT][DIRECTION_COUNT] = {
-                              {false, true,  true, false}, // left
-                              {false, false, true, true}, // up
-                              {false, true,  true, false}, // right
-                              {false, false,  true, true}, // down
-                         };
-
-                         if(negate_push_direction_table[save_direction_to_check][total_against_rotations]){
-                              push_result.velocity = -push_result.velocity;
-                         }
-
-                         bool odd_rotations_between_colliders = (direction_rotations_between(direction, direction_to_check) % 2 != 0);
-
-                         switch(direction_to_check){
-                         default:
-                              break;
-                         case DIRECTION_LEFT:
-                         case DIRECTION_RIGHT:
-                              if(push_result.transferred_momentum_back()){
-                                   if(current_block == world->blocks.elements + block_index){
-                                        result.vel.x = push_result.velocity * scale_push_velocity;
-                                        result.horizontal_move.state = MOVE_STATE_COASTING;
-                                        result.horizontal_move.sign = move_sign_from_vel(result.vel.x);
-                                        F32 x_pos = pos_to_vec(current_block->pos + current_block->pos_delta).x;
-                                        result.horizontal_move.time_left = calc_coast_motion_time_left(x_pos, current_block->vel.x);
-                                   }else{
-                                        if(odd_rotations_between_colliders){
-                                             result.stop_vertically();
-                                        }else{
-                                             result.stop_horizontally();
-                                        }
-
-                                        auto adjacent_block_index = get_block_index(world, current_block);
-
-                                        result.block_changes.add(adjacent_block_index, BLOCK_CHANGE_TYPE_POS_DELTA_X, 0.0f);
-                                        result.block_changes.add(adjacent_block_index, BLOCK_CHANGE_TYPE_VEL_X, push_result.velocity * scale_push_velocity);
-                                        result.block_changes.add(adjacent_block_index, BLOCK_CHANGE_TYPE_HORIZONTAL_MOVE_STATE, MOVE_STATE_COASTING);
-                                        result.block_changes.add(adjacent_block_index, BLOCK_CHANGE_TYPE_HORIZONTAL_MOVE_SIGN, move_sign_from_vel(result.vel.x));
-                                   }
-                              }else{
-                                   if(odd_rotations_between_colliders){
-                                        result.stop_vertically();
-                                   }else{
-                                        result.stop_horizontally();
-                                   }
-                              }
-                              break;
-                         case DIRECTION_UP:
-                         case DIRECTION_DOWN:
-                              if(push_result.transferred_momentum_back()){
-                                   if(current_block == world->blocks.elements + block_index){
-                                        result.vel.y = push_result.velocity * scale_push_velocity;
-                                        result.vertical_move.state = MOVE_STATE_COASTING;
-                                        result.vertical_move.sign = move_sign_from_vel(result.vel.y);
-                                        F32 y_pos = pos_to_vec(current_block->pos + current_block->pos_delta).y;
-                                        result.vertical_move.time_left = calc_coast_motion_time_left(y_pos, current_block->vel.y);
-                                   }else{
-                                        if(odd_rotations_between_colliders){
-                                             result.stop_horizontally();
-                                        }else{
-                                             result.stop_vertically();
-                                        }
-
-                                        auto adjacent_block_index = get_block_index(world, current_block);
-
-                                        result.block_changes.add(adjacent_block_index, BLOCK_CHANGE_TYPE_POS_DELTA_Y, 0.0f);
-                                        result.block_changes.add(adjacent_block_index, BLOCK_CHANGE_TYPE_VEL_Y, push_result.velocity * scale_push_velocity);
-                                        result.block_changes.add(adjacent_block_index, BLOCK_CHANGE_TYPE_VERTICAL_MOVE_STATE, MOVE_STATE_COASTING);
-                                        result.block_changes.add(adjacent_block_index, BLOCK_CHANGE_TYPE_VERTICAL_MOVE_SIGN, move_sign_from_vel(result.vel.y));
-                                   }
-                              }else{
-                                   if(odd_rotations_between_colliders){
-                                        result.stop_horizontally();
-                                   }else{
-                                        result.stop_vertically();
-                                   }
-                              }
-                              break;
-                         }
-
-                         if(push_result.pushed){
-                              // TODO: should we apply this to second_direction logic?
-                              // update result move states based on push if we pushed ourselves
-                              if(block_inside_index == block_index){
-                                   if(direction_is_horizontal(first_direction)){
-                                        result.vel.x = block_inside_result.entries[i].block->vel.x;
-                                        result.horizontal_move = block_inside_result.entries[i].block->horizontal_move;
-                                   }else{
-                                        result.vel.y = block_inside_result.entries[i].block->vel.y;
-                                        result.vertical_move = block_inside_result.entries[i].block->vertical_move;
-                                   }
-                              }
-                         }
-
-                         if(push_result.pushed || push_result.force_flowed_through){
-                              push_entangled_block(block_inside_result.entries[i].block, world, first_direction, true, &instant_momentum);
-                         }
-
-                         if(push_result.pushed){
-                              if(blocks_are_entangled(block_inside_result.entries[i].block - world->blocks.elements, block_index, &world->blocks)){
-                                   Block_t* block = world->blocks.elements + block_index;
-                                   auto rotations_between = direction_rotations_between(static_cast<Direction_t>(block_inside_result.entries[i].block->rotation), static_cast<Direction_t>(block->rotation));
-                                   if(rotations_between % 2 == 0){
-                                        if(direction_is_horizontal(direction)){
-                                             result.vel.x = block->vel.x;
-                                             result.horizontal_move = block->horizontal_move;
-                                        }else{
-                                             result.vel.y = block->vel.y;
-                                             result.vertical_move = block->vertical_move;
-                                        }
-                                   }else{
-                                        if(direction_is_horizontal(direction)){
-                                             result.vel.y = block->vel.y;
-                                             result.vertical_move = block->vertical_move;
-                                        }else{
-                                             result.vel.x = block->vel.x;
-                                             result.horizontal_move = block->horizontal_move;
-                                        }
-                                   }
-
-                                   if(second_direction != DIRECTION_COUNT){
-                                        result.stop_on_pixel_x = 0;
-                                   }else{
-                                        result.stop_on_pixel_x = 0;
-                                        result.stop_on_pixel_y = 0;
-                                   }
-                              }
-                         }
-
-                         // if, as a result of this push, this current block gets pushed, update the results
-                         if(current_block == world->blocks.elements + block_index){
-                              if(current_block->horizontal_move.state == MOVE_STATE_COASTING &&
-                                 save_current_block_horizontal_move_state == MOVE_STATE_IDLING){
-                                   result.vel.x = current_block->vel.x;
-                                   result.horizontal_move = current_block->horizontal_move;
-                              }
-
-                              if(current_block->vertical_move.state == MOVE_STATE_COASTING &&
-                                 save_current_block_vertical_move_state == MOVE_STATE_IDLING){
-                                   result.vel.y = current_block->vel.y;
-                                   result.vertical_move = current_block->vertical_move;
-                              }
-                         }
-
-                         if(second_direction != DIRECTION_COUNT){
-                              if(block_push(block_inside_result.entries[i].block, second_direction, world, true, 1.0f, &instant_momentum).pushed){
-                                   result.block_changes.add(block_inside_index, BLOCK_CHANGE_TYPE_POS_DELTA_Y, block_inside_result.entries[i].block->pos_delta.y);
-                                   result.block_changes.add(block_inside_index, BLOCK_CHANGE_TYPE_STOP_ON_PIXEL_Y, (S16)(0));
-
-                                   push_entangled_block(block_inside_result.entries[i].block, world, second_direction, true, &instant_momentum);
-
-                                   if(blocks_are_entangled(block_inside_result.entries[i].block - world->blocks.elements, block_index, &world->blocks)){
-                                        Block_t* block = world->blocks.elements + block_index;
-                                        auto rotations_between = direction_rotations_between(static_cast<Direction_t>(block_inside_result.entries[i].block->rotation), static_cast<Direction_t>(block->rotation));
-                                        if(rotations_between % 2 == 0){
-                                             if(direction_is_horizontal(second_direction)){
-                                                  result.vel.x = block->vel.x;
-                                                  result.horizontal_move = block->horizontal_move;
-                                                  result.stop_on_pixel_x = 0;
-                                             }else{
-                                                  result.vel.y = block->vel.y;
-                                                  result.vertical_move = block->vertical_move;
-                                                  result.stop_on_pixel_y = 0;
-                                             }
-                                        }else{
-                                             if(direction_is_horizontal(second_direction)){
-                                                  result.vel.y = block->vel.y;
-                                                  result.vertical_move = block->vertical_move;
-                                                  result.stop_on_pixel_y = 0;
-                                             }else{
-                                                  result.vel.x = block->vel.x;
-                                                  result.horizontal_move = block->horizontal_move;
-                                                  result.stop_on_pixel_x = 0;
-                                             }
-                                        }
-
-                                        result.stop_on_pixel_y = 0;
-                                   }
-                              }
-                         }
-
-                         for(S16 p = 0; p < world->players.count; p++){
-                              auto player = world->players.elements + p;
-                              if(player->prev_pushing_block == block_index){
-                                   player->push_time = 0;
-                              }
-                         }
-#endif
                     }
                }
           }
@@ -2098,6 +1781,9 @@ BlockChanges_t block_collision_push(BlockPush_t* push, World_t* world){
                }
           }
 
+          LOG("block %d pushes block %d %s\n",
+              push->pusher_index, push->pushee_index, direction_to_string(push_direction));
+
           auto push_result = block_push(pushee, push->pos, push->pos_delta, push_direction, world, true, 1.0f, &instant_momentum);
 
           auto direction_to_check = direction_opposite(push_direction);
@@ -2117,15 +1803,20 @@ BlockChanges_t block_collision_push(BlockPush_t* push, World_t* world){
                                                                        world->interactive_qt, &world->tilemap);
                     // ignore if we are against ourselves
                     if(adjacent_results.count && adjacent_results.againsts[0].block != block_receiving_force){
+                         LOG("    block %d to the %s is against %d\n", get_block_index(world, block_receiving_force), direction_to_string(direction_to_check),
+                             get_block_index(world, adjacent_results.againsts[0].block));
                          block_receiving_force = adjacent_results.againsts[0].block;
                          direction_to_check = direction_rotate_clockwise(direction_to_check, adjacent_results.againsts[0].rotations_through_portal);
                          total_against_rotations += adjacent_results.againsts[0].rotations_through_portal;
                          total_against_rotations %= DIRECTION_COUNT;
                     }else{
+                         LOG("    block %d to the %s is not against anything\n", get_block_index(world, block_receiving_force), direction_to_string(direction_to_check));
                          break;
                     }
                }
           }
+
+          LOG("  transferred momentum back through block %d\n", get_block_index(world, block_receiving_force));
 
           static const bool negate_push_direction_table[DIRECTION_COUNT][DIRECTION_COUNT] = {
                {false, true,  true, false}, // left
@@ -2159,6 +1850,7 @@ BlockChanges_t block_collision_push(BlockPush_t* push, World_t* world){
                               block_changes.add(push->pusher_index, BLOCK_CHANGE_TYPE_HORIZONTAL_MOVE_STATE, MOVE_STATE_IDLING);
                               block_changes.add(push->pusher_index, BLOCK_CHANGE_TYPE_HORIZONTAL_MOVE_SIGN, MOVE_SIGN_ZERO);
                               block_changes.add(push->pusher_index, BLOCK_CHANGE_TYPE_HORIZONTAL_MOVE_TIME_LEFT, 0.0f);
+                              LOG("  stopping block horizontally %d\n", push->pusher_index);
                          }
                     }
 
@@ -2232,22 +1924,6 @@ BlockChanges_t block_collision_push(BlockPush_t* push, World_t* world){
                }
                break;
           }
-
-#if 0
-          if(push_result.pushed){
-               // TODO: should we apply this to second_direction logic?
-               // update result move states based on push if we pushed ourselves
-               if(block_inside_index == block_index){
-                    if(direction_is_horizontal(direction)){
-                         result.vel.x = block_inside_result.entries[i].block->vel.x;
-                         result.horizontal_move = block_inside_result.entries[i].block->horizontal_move;
-                    }else{
-                         result.vel.y = block_inside_result.entries[i].block->vel.y;
-                         result.vertical_move = block_inside_result.entries[i].block->vertical_move;
-                    }
-               }
-          }
-#endif
 
           if(push_result.pushed || push_result.force_flowed_through){
                push_entangled_block(pushee, world, direction, true, &instant_momentum);

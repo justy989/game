@@ -2653,6 +2653,8 @@ int main(int argc, char** argv){
                                                pos_vec.y);
                }
 
+               BlockPushes_t<128> all_block_pushes; // TODO: is 128 this enough ?
+
                // unbounded collision: this should be exciting
                // we have our initial position and our initial pos_delta, update pos_delta for all players and blocks until nothing is colliding anymore
                const S8 max_collision_attempts = 16;
@@ -2662,24 +2664,12 @@ int main(int argc, char** argv){
 
                     // do a collision pass on each block
                     S16 update_blocks_count = world.blocks.count;
-                    BlockPushes_t<128> all_block_pushes; // TODO: is 128 this enough ?
                     for(S16 i = 0; i < update_blocks_count; i++){
                          auto block = world.blocks.elements + i;
                          auto block_collision_result = do_block_collision(&world, block, dt, update_blocks_count);
                          if(block_collision_result.repeat_collision_pass) repeast_collision_pass = true;
                          all_block_pushes.merge(&block_collision_result.block_pushes);
                          update_blocks_count = block_collision_result.update_blocks_count;
-                    }
-
-                    BlockChanges_t all_block_changes;
-                    for(S16 i = 0; i < all_block_pushes.count; i++){
-                         auto block_changes = block_collision_push(all_block_pushes.pushes + i, &world);
-                         all_block_changes.merge(&block_changes);
-                    }
-
-                    for(S16 i = 0; i < all_block_changes.count; i++){
-                         auto& block_change = all_block_changes.changes[i];
-                         apply_block_change(&world.blocks, &block_change);
                     }
 
                     // check if blocks extinguish elements of other blocks
@@ -3080,6 +3070,20 @@ int main(int argc, char** argv){
                     }
 
                     collision_attempts++;
+               }
+
+               // pass to cause pushes to happen
+               {
+                    BlockChanges_t all_block_changes;
+                    for(S16 i = 0; i < all_block_pushes.count; i++){
+                         auto block_changes = block_collision_push(all_block_pushes.pushes + i, &world);
+                         all_block_changes.merge(&block_changes);
+                    }
+
+                    for(S16 i = 0; i < all_block_changes.count; i++){
+                         auto& block_change = all_block_changes.changes[i];
+                         apply_block_change(&world.blocks, &block_change);
+                    }
                }
 
                // finalize positions
