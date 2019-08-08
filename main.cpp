@@ -3076,8 +3076,24 @@ int main(int argc, char** argv){
                {
                     BlockChanges_t all_block_changes;
                     for(S16 i = 0; i < all_block_pushes.count; i++){
-                         auto block_changes = block_collision_push(all_block_pushes.pushes + i, &world);
-                         all_block_changes.merge(&block_changes);
+                         auto& block_push = all_block_pushes.pushes[i];
+                         if(block_push.invalidated) continue;
+
+                         auto result = block_collision_push(&block_push, &world);
+                         all_block_changes.merge(&result.changes);
+
+                         for(S16 p = 0; p < result.count; p++){
+                              auto& block_pushed = result.blocks_pushed[p];
+
+                              for(S16 j = i + 1; j < all_block_pushes.count; j++){
+                                   auto& check_block_push = all_block_pushes.pushes[j];
+
+                                   if(block_pushed.block_index == check_block_push.pusher_index &&
+                                      direction_in_mask(check_block_push.direction_mask, block_pushed.direction)){
+                                        check_block_push.invalidated = true;
+                                   }
+                              }
+                         }
                     }
 
                     for(S16 i = 0; i < all_block_changes.count; i++){

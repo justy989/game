@@ -128,9 +128,8 @@ struct BlockPush_t{
      S16 pushee_index;
      DirectionMask_t direction_mask = DIRECTION_MASK_NONE;
      S8 portal_rotations;
-     Position_t pos;
-     Vec_t pos_delta;
      S16 collided_with_block_count = 1;
+     bool invalidated = false;
 };
 
 template <S16 MAX_BLOCK_PUSHES>
@@ -266,6 +265,28 @@ struct BlockAgainstOthersResult_t{
      }
 };
 
+struct BlockPushed_t{
+     S16 block_index;
+     Direction_t direction;
+};
+
+#define MAX_BLOCKS_PUSHED 8
+
+struct BlockCollisionPushResult_t{
+     BlockPushed_t blocks_pushed[MAX_BLOCKS_PUSHED];
+     S8 count = 0;
+
+     bool add_block_pushed(S16 block_index, Direction_t direction){
+          if(count >= MAX_BLOCKS_PUSHED) return false;
+          blocks_pushed[count].block_index = block_index;
+          blocks_pushed[count].direction = direction;
+          count++;
+          return true;
+     }
+
+     BlockChanges_t changes;
+};
+
 void add_block_held(BlockHeldResult_t* result, Block_t* block, Rect_t rect);
 void add_interactive_held(InteractiveHeldResult_t* result, Interactive_t* interactive, Rect_t rect);
 
@@ -320,6 +341,6 @@ bool blocks_are_entangled(Block_t* a, Block_t* b, ObjectArray_t<Block_t>* blocks
 bool blocks_are_entangled(S16 a_index, S16 b_index, ObjectArray_t<Block_t>* blocks_array);
 
 void apply_block_change(ObjectArray_t<Block_t>* blocks_array, BlockChange_t* change);
-BlockChanges_t block_collision_push(BlockPush_t* push, World_t* world);
+BlockCollisionPushResult_t block_collision_push(BlockPush_t* push, World_t* world);
 
 extern Pixel_t g_collided_with_pixel;
