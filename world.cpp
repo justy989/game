@@ -1597,7 +1597,6 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
           if(pushed_by_ice){
                auto elastic_result = elastic_transfer_momentum_to_block(instant_momentum, world, block, direction);
                if(collision_result_overcomes_friction(block->vel.x, elastic_result.second_final_velocity, get_block_stack_mass(world, block))){
-                    LOG("block %d pushed left\n", get_block_index(world, block));
                     auto instant_vel = elastic_result.second_final_velocity;
                     result.mass = instant_momentum->mass;
                     result.velocity = elastic_result.first_final_velocity;
@@ -1637,7 +1636,6 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
           if(pushed_by_ice){
                auto elastic_result = elastic_transfer_momentum_to_block(instant_momentum, world, block, direction);
                if(collision_result_overcomes_friction(block->vel.x, elastic_result.second_final_velocity, get_block_stack_mass(world, block))){
-                    LOG("block %d pushed right\n", get_block_index(world, block));
                     auto instant_vel = elastic_result.second_final_velocity;
                     result.mass = instant_momentum->mass;
                     result.velocity = elastic_result.first_final_velocity;
@@ -2278,7 +2276,10 @@ ElasticCollisionResult_t elastic_transfer_momentum_to_block(TransferMomentum_t* 
           vel = block->vel.y;
      }
 
-     return elastic_transfer_momentum(first_transfer_momentum->mass, first_transfer_momentum->vel, second_block_mass, vel);
+     auto result = elastic_transfer_momentum(first_transfer_momentum->mass, first_transfer_momentum->vel, second_block_mass, vel);
+     LOG("  collision %d %f -> block %d with %d %f results: %f, %f\n", first_transfer_momentum->mass, first_transfer_momentum->vel,
+         get_block_index(world, block), second_block_mass, vel, result.first_final_velocity, result.second_final_velocity);
+     return result;
 }
 
 static void get_touching_blocks_in_direction(World_t* world, Block_t* block, Direction_t direction, BlockList_t* block_list){

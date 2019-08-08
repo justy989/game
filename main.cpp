@@ -3074,13 +3074,11 @@ int main(int argc, char** argv){
 
                // pass to cause pushes to happen
                {
-                    BlockChanges_t all_block_changes;
                     for(S16 i = 0; i < all_block_pushes.count; i++){
                          auto& block_push = all_block_pushes.pushes[i];
                          if(block_push.invalidated) continue;
 
                          auto result = block_collision_push(&block_push, &world);
-                         all_block_changes.merge(&result.changes);
 
                          for(S16 p = 0; p < result.count; p++){
                               auto& block_pushed = result.blocks_pushed[p];
@@ -3094,11 +3092,11 @@ int main(int argc, char** argv){
                                    }
                               }
                          }
-                    }
 
-                    for(S16 i = 0; i < all_block_changes.count; i++){
-                         auto& block_change = all_block_changes.changes[i];
-                         apply_block_change(&world.blocks, &block_change);
+                         for(S16 c = 0; c < result.changes.count; c++){
+                              auto& block_change = result.changes.changes[c];
+                              apply_block_change(&world.blocks, &block_change);
+                         }
                     }
                }
 
