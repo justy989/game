@@ -2277,8 +2277,8 @@ ElasticCollisionResult_t elastic_transfer_momentum_to_block(TransferMomentum_t* 
      }
 
      auto result = elastic_transfer_momentum(first_transfer_momentum->mass, first_transfer_momentum->vel, second_block_mass, vel);
-     LOG("  collision %d %f -> block %d with %d %f results: %f, %f\n", first_transfer_momentum->mass, first_transfer_momentum->vel,
-         get_block_index(world, block), second_block_mass, vel, result.first_final_velocity, result.second_final_velocity);
+     // LOG("  collision %d %f -> block %d with %d %f results: %f, %f\n", first_transfer_momentum->mass, first_transfer_momentum->vel,
+     //     get_block_index(world, block), second_block_mass, vel, result.first_final_velocity, result.second_final_velocity);
      return result;
 }
 

@@ -5,6 +5,8 @@ http://www.simonstalenhag.se/
 -Grant Sanderson 3blue1brown
 -Shane Hendrixson
 
+USE deal_with_push_result() FOR RESULTS OF push_entangled_block() CALLS INSIDE OF block_collision_push()
+
 TODO:
 Entanglement Puzzles:
 - entangle puzzle where there is a line of pressure plates against the wall with a line of popups on the other side that would
@@ -3080,6 +3082,7 @@ int main(int argc, char** argv){
 
                          auto result = block_collision_push(&block_push, &world);
 
+                         // cancel out any pushes we have queued up in the opposite direction
                          for(S16 p = 0; p < result.count; p++){
                               auto& block_pushed = result.blocks_pushed[p];
 
