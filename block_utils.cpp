@@ -1839,9 +1839,13 @@ BlockCollisionPushResult_t block_collision_push(BlockPush_t* push, World_t* worl
           }
 
           if(push_result.transferred_momentum_back()){
-               result.add_block_pushed(get_block_index(world, deal_with_push_result_result.block_receiving_force), direction_opposite(direction_to_check));
-               push_entangled_block(deal_with_push_result_result.block_receiving_force, world, direction_opposite(direction_to_check), true, &instant_momentum);
+               if(deal_with_push_result_result.block_receiving_force){
+                    result.add_block_pushed(get_block_index(world, deal_with_push_result_result.block_receiving_force), direction_opposite(direction_to_check));
+                    push_entangled_block(deal_with_push_result_result.block_receiving_force, world, direction_opposite(direction_to_check), true, &instant_momentum);
+               }
           }
+
+          result.changes.merge(&deal_with_push_result_result.changes);
      }
 
      return result;
