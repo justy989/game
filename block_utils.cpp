@@ -1365,6 +1365,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                             block_inside_result.entries[i].block->vel.x < 0 &&
                             block_vel.x < block_inside_result.entries[i].block->vel.x){
                               result.vel.x = block_inside_result.entries[i].block->vel.x;
+                              if(result.vel.x == 0) result.stop_horizontally();
                               should_push = false;
                          }
                          break;
@@ -1373,6 +1374,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                             block_inside_result.entries[i].block->vel.x > 0 &&
                             block_vel.x > block_inside_result.entries[i].block->vel.x){
                               result.vel.x = block_inside_result.entries[i].block->vel.x;
+                              if(result.vel.x == 0) result.stop_horizontally();
                               should_push = false;
                          }
                          break;
@@ -1381,6 +1383,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                             block_inside_result.entries[i].block->vel.y < 0 &&
                             block_vel.y < block_inside_result.entries[i].block->vel.y){
                               result.vel.y = block_inside_result.entries[i].block->vel.y;
+                              if(result.vel.y == 0) result.stop_vertically();
                               should_push = false;
                          }
                          break;
@@ -1389,6 +1392,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                             block_inside_result.entries[i].block->vel.y >= 0 &&
                             block_vel.y > block_inside_result.entries[i].block->vel.y){
                               result.vel.y = block_inside_result.entries[i].block->vel.y;
+                              if(result.vel.y == 0) result.stop_vertically();
                               should_push = false;
                          }
                          break;
