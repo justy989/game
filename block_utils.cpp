@@ -1351,6 +1351,50 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                     }
                }
 
+               bool c_on_ice_or_air = block_on_ice(last_block_in_chain->pos, last_block_in_chain->pos_delta,
+                                                   &world->tilemap, world->interactive_qt, world->block_qt) ||
+                                      block_on_air(last_block_in_chain->pos, last_block_in_chain->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt);
+
+               // if the blocks are headed in the same direction but the block is slowing down, slow down with it
+               if(!c_on_ice_or_air){
+                    switch(first_direction){
+                    default:
+                         break;
+                    case DIRECTION_LEFT:
+                         if(block_vel.x < 0 &&
+                            block_inside_result.entries[i].block->vel.x < 0 &&
+                            block_vel.x < block_inside_result.entries[i].block->vel.x){
+                              result.vel.x = block_inside_result.entries[i].block->vel.x;
+                              should_push = false;
+                         }
+                         break;
+                    case DIRECTION_RIGHT:
+                         if(block_vel.x > 0 &&
+                            block_inside_result.entries[i].block->vel.x > 0 &&
+                            block_vel.x > block_inside_result.entries[i].block->vel.x){
+                              result.vel.x = block_inside_result.entries[i].block->vel.x;
+                              should_push = false;
+                         }
+                         break;
+                    case DIRECTION_DOWN:
+                         if(block_vel.y < 0 &&
+                            block_inside_result.entries[i].block->vel.y < 0 &&
+                            block_vel.y < block_inside_result.entries[i].block->vel.y){
+                              result.vel.y = block_inside_result.entries[i].block->vel.y;
+                              should_push = false;
+                         }
+                         break;
+                    case DIRECTION_UP:
+                         if(block_vel.y > 0 &&
+                            block_inside_result.entries[i].block->vel.y >= 0 &&
+                            block_vel.y > block_inside_result.entries[i].block->vel.y){
+                              result.vel.y = block_inside_result.entries[i].block->vel.y;
+                              should_push = false;
+                         }
+                         break;
+                    }
+               }
+
                if(a_on_ice_or_air && b_on_ice_or_air){
                     if(block_inside_index != block_index){
                          if(!direction_in_mask(vec_direction_mask(block_pos_delta), first_direction)){
