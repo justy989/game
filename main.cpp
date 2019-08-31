@@ -3076,6 +3076,8 @@ int main(int argc, char** argv){
 
                // pass to cause pushes to happen
                {
+                    BlockChanges_t all_changes;
+
                     for(S16 i = 0; i < all_block_pushes.count; i++){
                          auto& block_push = all_block_pushes.pushes[i];
                          if(block_push.invalidated) continue;
@@ -3096,10 +3098,12 @@ int main(int argc, char** argv){
                               }
                          }
 
-                         for(S16 c = 0; c < result.changes.count; c++){
-                              auto& block_change = result.changes.changes[c];
-                              apply_block_change(&world.blocks, &block_change);
-                         }
+                         all_changes.merge(&result.changes);
+                    }
+
+                    for(S16 c = 0; c < all_changes.count; c++){
+                         auto& block_change = all_changes.changes[c];
+                         apply_block_change(&world.blocks, &block_change);
                     }
                }
 
