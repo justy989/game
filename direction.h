@@ -46,6 +46,7 @@ U8 direction_rotations_between(Direction_t a, Direction_t b);
 Direction_t direction_rotate_clockwise(Direction_t dir, U8 times);
 Direction_t direction_rotate_counter_clockwise(Direction_t dir, U8 times);
 DirectionMask_t direction_mask_rotate_clockwise(DirectionMask_t mask);
+DirectionMask_t direction_mask_rotate_clockwise(DirectionMask_t mask, U8 times);
 Direction_t direction_from_single_mask(DirectionMask_t mask);
 const char* direction_to_string(Direction_t dir);
 bool direction_is_horizontal(Direction_t dir);

@@ -3291,7 +3291,6 @@ int main(int argc, char** argv){
                               // TODO: get back to this once we improve our demo tools
                               player->push_time += dt;
                               if(player->push_time > BLOCK_PUSH_TIME){
-
                                    // if this is the frame that causes the block to be pushed, make a commit
                                    if(save_push_time <= BLOCK_PUSH_TIME) undo_commit(&undo, &world.players, &world.tilemap, &world.blocks, &world.interactives);
 

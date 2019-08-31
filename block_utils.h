@@ -207,9 +207,6 @@ struct CheckBlockCollisionResult_t{
 };
 
 struct BlockCollidesWithItselfResult_t{
-     Direction_t push_dir;
-     Vec_t vel;
-     Vec_t accel;
      S16 stop_on_pixel_x = -1;
      S16 stop_on_pixel_y = -1;
 };
@@ -328,7 +325,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                                                                     S16 block_index, bool block_is_cloning, World_t* world);
 
 BlockCollidesWithItselfResult_t resolve_block_colliding_with_itself(Direction_t src_portal_dir, Direction_t dst_portal_dir, DirectionMask_t move_mask,
-                                                                    Vec_t block_vel, Vec_t block_accel, Position_t block_pos);
+                                                                    Position_t block_pos);
 
 void search_portal_destination_for_blocks(QuadTreeNode_t<Block_t>* block_qt, Direction_t src_portal_face,
                                           Direction_t dst_portal_face, Coord_t src_portal_coord,

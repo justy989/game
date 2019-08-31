@@ -79,6 +79,15 @@ DirectionMask_t direction_mask_rotate_clockwise(DirectionMask_t mask){
      return (DirectionMask_t)(rot);
 }
 
+DirectionMask_t direction_mask_rotate_clockwise(DirectionMask_t mask, U8 times){
+     // lol im so lame
+     for(U8 i = 0; i < times; i++){
+          mask = direction_mask_rotate_clockwise(mask);
+     }
+
+     return mask;
+}
+
 const char* direction_to_string(Direction_t dir){
      switch(dir){
      default:
