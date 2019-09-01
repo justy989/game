@@ -1667,6 +1667,8 @@ DealWithPushResult_t deal_with_push_result(Block_t* pusher, Direction_t directio
                     }
                }
 
+               result.block_receiving_force = block_receiving_force;
+
                auto block_receiving_force_index = block_receiving_force - world->blocks.elements;
                F32 new_vel = push_result->velocity * scale_push_velocity;
                F32 x_pos = pos_to_vec(block_receiving_force->pos + block_receiving_force->pos_delta).x;
@@ -1710,6 +1712,8 @@ DealWithPushResult_t deal_with_push_result(Block_t* pusher, Direction_t directio
                          result.changes.add(pusher_index, BLOCK_CHANGE_TYPE_VERTICAL_MOVE_TIME_LEFT, 0.0f);
                     }
                }
+
+               result.block_receiving_force = block_receiving_force;
 
                auto block_receiving_force_index = block_receiving_force - world->blocks.elements;
                F32 new_vel = push_result->velocity * scale_push_velocity;
@@ -1831,10 +1835,8 @@ BlockCollisionPushResult_t block_collision_push(BlockPush_t* push, World_t* worl
           }
 
           if(push_result.transferred_momentum_back()){
-               if(deal_with_push_result_result.block_receiving_force){
-                    result.add_block_pushed(get_block_index(world, deal_with_push_result_result.block_receiving_force), direction_opposite(direction_to_check));
-                    push_entangled_block(deal_with_push_result_result.block_receiving_force, world, direction_opposite(direction_to_check), true, &instant_momentum);
-               }
+               result.add_block_pushed(get_block_index(world, deal_with_push_result_result.block_receiving_force), direction_opposite(direction_to_check));
+               push_entangled_block(deal_with_push_result_result.block_receiving_force, world, direction_opposite(direction_to_check), true, &instant_momentum);
           }
 
           result.changes.merge(&deal_with_push_result_result.changes);
