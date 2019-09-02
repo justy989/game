@@ -1606,6 +1606,7 @@ struct DealWithPushResult_t
      BlockChanges_t changes;
      Block_t* block_receiving_force = nullptr;
      Direction_t final_direction = DIRECTION_COUNT;
+     F32 new_vel = 0;
 };
 
 DealWithPushResult_t deal_with_push_result(Block_t* pusher, Direction_t direction_to_check, S8 portal_rotations,
@@ -1636,6 +1637,8 @@ DealWithPushResult_t deal_with_push_result(Block_t* pusher, Direction_t directio
                     total_against_rotations += adjacent_results.againsts[0].rotations_through_portal;
                     total_against_rotations %= DIRECTION_COUNT;
                }else{
+                    // if vel is 0, then the most recent connected block is the one that can absorb the energy of the collision
+                    // this happens when a block falls off of another block (into a slot) and collides with another block all at the same time
                     break;
                }
           }else{
@@ -1675,6 +1678,7 @@ DealWithPushResult_t deal_with_push_result(Block_t* pusher, Direction_t directio
                result.changes.add(block_receiving_force_index, BLOCK_CHANGE_TYPE_HORIZONTAL_MOVE_STATE, MOVE_STATE_COASTING);
                result.changes.add(block_receiving_force_index, BLOCK_CHANGE_TYPE_HORIZONTAL_MOVE_SIGN, move_sign_from_vel(new_vel));
                result.changes.add(block_receiving_force_index, BLOCK_CHANGE_TYPE_HORIZONTAL_MOVE_TIME_LEFT, calc_coast_motion_time_left(x_pos, new_vel));
+               result.new_vel = new_vel;
           }else{
                result.changes.add(block_receiving_force_index, BLOCK_CHANGE_TYPE_VEL_X, 0.0f);
                result.changes.add(block_receiving_force_index, BLOCK_CHANGE_TYPE_ACCEL_X, 0.0f);
@@ -1694,6 +1698,7 @@ DealWithPushResult_t deal_with_push_result(Block_t* pusher, Direction_t directio
                result.changes.add(block_receiving_force_index, BLOCK_CHANGE_TYPE_VERTICAL_MOVE_STATE, MOVE_STATE_COASTING);
                result.changes.add(block_receiving_force_index, BLOCK_CHANGE_TYPE_VERTICAL_MOVE_SIGN, move_sign_from_vel(new_vel));
                result.changes.add(block_receiving_force_index, BLOCK_CHANGE_TYPE_VERTICAL_MOVE_TIME_LEFT, calc_coast_motion_time_left(y_pos, new_vel));
+               result.new_vel = new_vel;
           }else{
                result.changes.add(block_receiving_force_index, BLOCK_CHANGE_TYPE_VEL_Y, 0.0f);
                result.changes.add(block_receiving_force_index, BLOCK_CHANGE_TYPE_ACCEL_Y, 0.0f);
@@ -1795,7 +1800,25 @@ BlockCollisionPushResult_t block_collision_push(BlockPush_t* push, World_t* worl
 
           if(push_result.transferred_momentum_back()){
                result.add_block_pushed(get_block_index(world, deal_with_push_result_result.block_receiving_force), direction_opposite(deal_with_push_result_result.final_direction));
-               push_entangled_block(deal_with_push_result_result.block_receiving_force, world, direction_opposite(deal_with_push_result_result.final_direction), true, &instant_momentum);
+
+               F32 current_vel = 0;
+               switch(deal_with_push_result_result.final_direction){
+               default:
+                    break;
+               case DIRECTION_LEFT:
+               case DIRECTION_RIGHT:
+                    current_vel = deal_with_push_result_result.block_receiving_force->vel.x;
+                    break;
+               case DIRECTION_UP:
+               case DIRECTION_DOWN:
+                    current_vel = deal_with_push_result_result.block_receiving_force->vel.y;
+                    break;
+               }
+
+               if((current_vel > 0 && current_vel < deal_with_push_result_result.new_vel) ||
+                  (current_vel < 0 && current_vel > deal_with_push_result_result.new_vel)){
+                    push_entangled_block(deal_with_push_result_result.block_receiving_force, world, direction_opposite(deal_with_push_result_result.final_direction), true, &instant_momentum);
+               }
           }
 
           result.changes.merge(&deal_with_push_result_result.changes);

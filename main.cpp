@@ -3288,22 +3288,23 @@ int main(int argc, char** argv){
                               default:
                                    break;
                               case DIRECTION_LEFT:
-                                   already_moving_fast_enough = (expected_final_velocity <= block_to_push->vel.x);
+                                   already_moving_fast_enough = (block_to_push->vel.x <= -expected_final_velocity);
                                    break;
                               case DIRECTION_RIGHT:
-                                   already_moving_fast_enough = (expected_final_velocity >= block_to_push->vel.x);
+                                   already_moving_fast_enough = (block_to_push->vel.x >= expected_final_velocity);
                                    break;
                               case DIRECTION_DOWN:
-                                   already_moving_fast_enough = (expected_final_velocity <= block_to_push->vel.y);
+                                   already_moving_fast_enough = (block_to_push->vel.y <= -expected_final_velocity);
                                    break;
                               case DIRECTION_UP:
-                                   already_moving_fast_enough = (expected_final_velocity >= block_to_push->vel.y);
+                                   already_moving_fast_enough = (block_to_push->vel.y >= expected_final_velocity);
                                    break;
                               }
                          }
 
                          if(already_moving_fast_enough){
                               // pass
+                              player->push_time += dt;
                          }else if(direction_in_mask(direction_mask_opposite(block_move_dir_mask), push_block_dir)){
                               // if the player is pushing against a block moving towards them, the block wins
                               player->push_time = 0;
