@@ -1818,6 +1818,9 @@ BlockCollisionPushResult_t block_collision_push(BlockPush_t* push, World_t* worl
                if((current_vel > 0 && current_vel < deal_with_push_result_result.new_vel) ||
                   (current_vel < 0 && current_vel > deal_with_push_result_result.new_vel)){
                     push_entangled_block(deal_with_push_result_result.block_receiving_force, world, direction_opposite(deal_with_push_result_result.final_direction), true, &instant_momentum);
+               }else if((current_vel > 0 && deal_with_push_result_result.new_vel < 0) ||
+                        (current_vel < 0 && deal_with_push_result_result.new_vel > 0)){
+                    push_entangled_block(deal_with_push_result_result.block_receiving_force, world, deal_with_push_result_result.final_direction, true, &instant_momentum);
                }
           }
 
