@@ -1066,8 +1066,8 @@ int main(int argc, char** argv){
           return 1;
      }
 
-     int window_width = 2000;
-     int window_height = 2000;
+     int window_width = 1080;
+     int window_height = 1080;
      SDL_Window* window = nullptr;
      SDL_GLContext opengl_context = nullptr;
      GLuint theme_texture = 0;
@@ -3088,13 +3088,15 @@ int main(int argc, char** argv){
 
                          auto result = block_collision_push(&block_push, &world);
 
+                         all_changes.merge(&result.changes);
+
                          // for simultaneous pushes, skip ahead because they should not be cancelled
                          S16 cancellable_block_pushes = i + 1;
-                         if(block_push.collided_with_block_count > 1){
-                              simultaneous_block_pushes = block_push.collided_with_block_count - 1;
-                              cancellable_block_pushes += simultaneous_block_pushes;
-                         }else if(simultaneous_block_pushes > 0){
+                         if(simultaneous_block_pushes > 0){
                               simultaneous_block_pushes--;
+                              cancellable_block_pushes += simultaneous_block_pushes;
+                         }else if(block_push.collided_with_block_count > 1){
+                              simultaneous_block_pushes = block_push.collided_with_block_count - 1;
                               cancellable_block_pushes += simultaneous_block_pushes;
                          }
 
@@ -3112,13 +3114,16 @@ int main(int argc, char** argv){
                               }
                          }
 
-                         all_changes.merge(&result.changes);
+                         if(simultaneous_block_pushes == 0){
+                              for(S16 c = 0; c < all_changes.count; c++){
+                                   auto& block_change = all_changes.changes[c];
+                                   apply_block_change(&world.blocks, &block_change);
+                              }
+
+                              all_changes.clear();
+                         }
                     }
 
-                    for(S16 c = 0; c < all_changes.count; c++){
-                         auto& block_change = all_changes.changes[c];
-                         apply_block_change(&world.blocks, &block_change);
-                    }
                }
 
                // finalize positions

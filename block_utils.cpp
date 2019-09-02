@@ -1535,6 +1535,7 @@ void push_entangled_block(Block_t* block, World_t* world, Direction_t push_dir, 
 
                     auto allowed_result = allowed_to_push(world, entangled_block, rotated_dir, &rotated_instant_momentum);
                     if(allowed_result.push){
+                         // LOG("entangled push %d %s\n", get_block_index(world, entangled_block), direction_to_string(rotated_dir));
                          block_push(entangled_block, rotated_dir, world, pushed_by_ice, allowed_result.mass_ratio, &rotated_instant_momentum, true);
                          // TODO: deal_with_push_result() here and below
                     }
