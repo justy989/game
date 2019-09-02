@@ -1277,6 +1277,9 @@ int main(int argc, char** argv){
                switch(sdl_event.type){
                default:
                     break;
+               case SDL_QUIT:
+                    quit = true;
+                    break;
                case SDL_KEYDOWN:
                     switch(sdl_event.key.keysym.scancode){
                     default:

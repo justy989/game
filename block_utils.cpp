@@ -1536,6 +1536,7 @@ void push_entangled_block(Block_t* block, World_t* world, Direction_t push_dir, 
                     auto allowed_result = allowed_to_push(world, entangled_block, rotated_dir, &rotated_instant_momentum);
                     if(allowed_result.push){
                          block_push(entangled_block, rotated_dir, world, pushed_by_ice, allowed_result.mass_ratio, &rotated_instant_momentum, true);
+                         // TODO: deal_with_push_result() here and below
                     }
                }else{
                     auto allowed_result = allowed_to_push(world, entangled_block, rotated_dir);
@@ -1780,7 +1781,7 @@ BlockCollisionPushResult_t block_collision_push(BlockPush_t* push, World_t* worl
           }
 
           // LOG("collision on ice causes block %d pushes block %d %s with mass: %d, vel: %f\n",
-           //    push->pusher_index, push->pushee_index, direction_to_string(push_direction), instant_momentum.mass, instant_momentum.vel);
+          //    push->pusher_index, push->pushee_index, direction_to_string(push_direction), instant_momentum.mass, instant_momentum.vel);
 
           auto push_pos = pushee->pos;
           auto push_pos_delta = pushee->pos_delta;
