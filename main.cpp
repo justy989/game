@@ -1066,8 +1066,8 @@ int main(int argc, char** argv){
           return 1;
      }
 
-     int window_width = 1080;
-     int window_height = 1080;
+     int window_width = 2000;
+     int window_height = 2000;
      SDL_Window* window = nullptr;
      SDL_GLContext opengl_context = nullptr;
      GLuint theme_texture = 0;
@@ -3077,6 +3077,7 @@ int main(int argc, char** argv){
                // pass to cause pushes to happen
                {
                     BlockChanges_t all_changes;
+                    S16 simultaneous_block_pushes = 0;
 
                     for(S16 i = 0; i < all_block_pushes.count; i++){
                          auto& block_push = all_block_pushes.pushes[i];
@@ -3084,11 +3085,21 @@ int main(int argc, char** argv){
 
                          auto result = block_collision_push(&block_push, &world);
 
+                         // for simultaneous pushes, skip ahead because they should not be cancelled
+                         S16 cancellable_block_pushes = i + 1;
+                         if(block_push.collided_with_block_count > 1){
+                              simultaneous_block_pushes = block_push.collided_with_block_count - 1;
+                              cancellable_block_pushes += simultaneous_block_pushes;
+                         }else if(simultaneous_block_pushes > 0){
+                              simultaneous_block_pushes--;
+                              cancellable_block_pushes += simultaneous_block_pushes;
+                         }
+
                          // cancel out any pushes we have queued up in the opposite direction
                          for(S16 p = 0; p < result.count; p++){
                               auto& block_pushed = result.blocks_pushed[p];
 
-                              for(S16 j = i + 1; j < all_block_pushes.count; j++){
+                              for(S16 j = cancellable_block_pushes; j < all_block_pushes.count; j++){
                                    auto& check_block_push = all_block_pushes.pushes[j];
 
                                    if(block_pushed.block_index == check_block_push.pusher_index &&

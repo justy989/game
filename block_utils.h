@@ -121,6 +121,8 @@ struct BlockChanges_t{
                add(block_changes->changes + i);
           }
      }
+
+     void clear(){count = 0;}
 };
 
 struct BlockPush_t{

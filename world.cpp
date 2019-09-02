@@ -1602,6 +1602,8 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
                     result.velocity = elastic_result.first_final_velocity;
                     // the velocity may be going the wrong way, but we can fix it here
                     if(instant_vel > 0) instant_vel = -instant_vel;
+                    // LOG("block %d wth mass %d at vel %f is pushed to vel %f by block mass %d with vel %f which changes to vel %f\n", get_block_index(world, block), get_block_stack_mass(world, block),
+                    //     block->vel.x, instant_vel, instant_momentum->mass, instant_momentum->vel, elastic_result.first_final_velocity);
                     block->vel.x = instant_vel;
                     block->horizontal_move.sign = move_sign_from_vel(block->vel.x);
                     block->horizontal_move.state = MOVE_STATE_COASTING;
@@ -1640,6 +1642,8 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
                     result.mass = instant_momentum->mass;
                     result.velocity = elastic_result.first_final_velocity;
                     if(instant_vel < 0) instant_vel = -instant_vel;
+                    // LOG("block %d wth mass %d at vel %f is pushed to vel %f by block mass %d with vel %f which changes to vel %f\n", get_block_index(world, block), get_block_stack_mass(world, block),
+                    //     block->vel.x, instant_vel, instant_momentum->mass, instant_momentum->vel, elastic_result.first_final_velocity);
                     block->vel.x = instant_vel;
                     block->horizontal_move.sign = move_sign_from_vel(block->vel.x);
                     block->horizontal_move.state = MOVE_STATE_COASTING;
@@ -1678,6 +1682,8 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
                     result.mass = instant_momentum->mass;
                     result.velocity = elastic_result.first_final_velocity;
                     if(instant_vel > 0) instant_vel = -instant_vel;
+                    // LOG("block %d wth mass %d at vel %f is pushed to vel %f by block mass %d with vel %f which changes to vel %f\n", get_block_index(world, block), get_block_stack_mass(world, block),
+                    //     block->vel.y, instant_vel, instant_momentum->mass, instant_momentum->vel, elastic_result.first_final_velocity);
                     block->vel.y = instant_vel;
                     block->vertical_move.sign = move_sign_from_vel(block->vel.y);
                     block->vertical_move.state = MOVE_STATE_COASTING;
@@ -1715,6 +1721,8 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
                     result.mass = instant_momentum->mass;
                     result.velocity = elastic_result.first_final_velocity;
                     if(instant_vel < 0) instant_vel = -instant_vel;
+                    // LOG("block %d wth mass %d at vel %f is pushed to vel %f by block mass %d with vel %f which changes to vel %f\n", get_block_index(world, block), get_block_stack_mass(world, block),
+                    //     block->vel.y, instant_vel, instant_momentum->mass, instant_momentum->vel, elastic_result.first_final_velocity);
                     block->vel.y = instant_vel;
                     block->vertical_move.sign = move_sign_from_vel(block->vel.y);
                     block->vertical_move.state = MOVE_STATE_COASTING;
