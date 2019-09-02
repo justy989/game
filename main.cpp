@@ -3079,7 +3079,7 @@ int main(int argc, char** argv){
 
                // pass to cause pushes to happen
                {
-                    BlockChanges_t all_changes;
+                    BlockChanges_t grouped_changes;
                     S16 simultaneous_block_pushes = 0;
 
                     for(S16 i = 0; i < all_block_pushes.count; i++){
@@ -3088,7 +3088,7 @@ int main(int argc, char** argv){
 
                          auto result = block_collision_push(&block_push, &world);
 
-                         all_changes.merge(&result.changes);
+                         grouped_changes.merge(&result.changes);
 
                          // for simultaneous pushes, skip ahead because they should not be cancelled
                          S16 cancellable_block_pushes = i + 1;
@@ -3115,12 +3115,12 @@ int main(int argc, char** argv){
                          }
 
                          if(simultaneous_block_pushes == 0){
-                              for(S16 c = 0; c < all_changes.count; c++){
-                                   auto& block_change = all_changes.changes[c];
+                              for(S16 c = 0; c < grouped_changes.count; c++){
+                                   auto& block_change = grouped_changes.changes[c];
                                    apply_block_change(&world.blocks, &block_change);
                               }
 
-                              all_changes.clear();
+                              grouped_changes.clear();
                          }
                     }
 

@@ -1535,13 +1535,14 @@ void push_entangled_block(Block_t* block, World_t* world, Direction_t push_dir, 
 
                     auto allowed_result = allowed_to_push(world, entangled_block, rotated_dir, &rotated_instant_momentum);
                     if(allowed_result.push){
-                         // LOG("entangled push %d %s\n", get_block_index(world, entangled_block), direction_to_string(rotated_dir));
+                         // LOG("  entangled push %d %s\n", get_block_index(world, entangled_block), direction_to_string(rotated_dir));
                          block_push(entangled_block, rotated_dir, world, pushed_by_ice, allowed_result.mass_ratio, &rotated_instant_momentum, true);
                          // TODO: deal_with_push_result() here and below
                     }
                }else{
                     auto allowed_result = allowed_to_push(world, entangled_block, rotated_dir);
                     if(allowed_result.push){
+                         // LOG("  entangled push %d %s\n", get_block_index(world, entangled_block), direction_to_string(rotated_dir));
                          block_push(entangled_block, rotated_dir, world, pushed_by_ice, allowed_result.mass_ratio);
                     }
                }
@@ -1561,6 +1562,7 @@ void apply_block_change(ObjectArray_t<Block_t>* blocks_array, BlockChange_t* cha
           block->pos_delta.y = change->decimal;
           break;
      case BLOCK_CHANGE_TYPE_VEL_X:
+          // LOG("changing block %d vel x from %f to %f\n", change->block_index, block->vel.x, change->decimal);
           block->vel.x = change->decimal;
           break;
      case BLOCK_CHANGE_TYPE_VEL_Y:
@@ -1626,30 +1628,18 @@ DealWithPushResult_t deal_with_push_result(Block_t* pusher, Direction_t directio
                                                              world->interactive_qt, &world->tilemap);
           // ignore if we are against ourselves
           if(adjacent_results.count && adjacent_results.againsts[0].block != block_receiving_force){
-               block_receiving_force = adjacent_results.againsts[0].block;
-               direction_to_check = direction_rotate_clockwise(direction_to_check, adjacent_results.againsts[0].rotations_through_portal);
-               total_against_rotations += adjacent_results.againsts[0].rotations_through_portal;
-               total_against_rotations %= DIRECTION_COUNT;
+               auto new_direction_to_check = direction_rotate_clockwise(direction_to_check, adjacent_results.againsts[0].rotations_through_portal);
+               auto vel = direction_is_horizontal(new_direction_to_check) ? adjacent_results.againsts[0].block->vel.x : adjacent_results.againsts[0].block->vel.y;
+               if(vel != 0){
+                    block_receiving_force = adjacent_results.againsts[0].block;
+                    direction_to_check = direction_rotate_clockwise(direction_to_check, adjacent_results.againsts[0].rotations_through_portal);
+                    total_against_rotations += adjacent_results.againsts[0].rotations_through_portal;
+                    total_against_rotations %= DIRECTION_COUNT;
+               }else{
+                    break;
+               }
           }else{
                break;
-          }
-     }
-
-     if(block_receiving_force != pusher && !push_result->transferred_momentum_back()){
-          S16 pusher_index = get_block_index(world, pusher);
-
-          if(direction_is_horizontal(save_direction_to_check)){
-               result.changes.add(pusher_index, BLOCK_CHANGE_TYPE_VEL_X, 0.0f);
-               result.changes.add(pusher_index, BLOCK_CHANGE_TYPE_ACCEL_X, 0.0f);
-               result.changes.add(pusher_index, BLOCK_CHANGE_TYPE_HORIZONTAL_MOVE_STATE, MOVE_STATE_IDLING);
-               result.changes.add(pusher_index, BLOCK_CHANGE_TYPE_HORIZONTAL_MOVE_SIGN, MOVE_SIGN_ZERO);
-               result.changes.add(pusher_index, BLOCK_CHANGE_TYPE_HORIZONTAL_MOVE_TIME_LEFT, 0.0f);
-          }else{
-               result.changes.add(pusher_index, BLOCK_CHANGE_TYPE_VEL_Y, 0.0f);
-               result.changes.add(pusher_index, BLOCK_CHANGE_TYPE_ACCEL_Y, 0.0f);
-               result.changes.add(pusher_index, BLOCK_CHANGE_TYPE_VERTICAL_MOVE_STATE, MOVE_STATE_IDLING);
-               result.changes.add(pusher_index, BLOCK_CHANGE_TYPE_VERTICAL_MOVE_SIGN, MOVE_SIGN_ZERO);
-               result.changes.add(pusher_index, BLOCK_CHANGE_TYPE_VERTICAL_MOVE_TIME_LEFT, 0.0f);
           }
      }
 
