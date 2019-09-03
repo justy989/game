@@ -35,7 +35,6 @@ Current bugs:
 
 Big Features:
 - Momentum
-     - Blocks with a lot of momentum on ice, stop grid aligned as soon as they get off of ice, maybe based on the momentum we should go further?
      - Even if a block is iced, if there is a block on top of it, that should impact static friction but not collision impact velocities resolution
 - 3D
      - if we put a popup on the other side of a portal and a block 1 interval high goes through the portal, will it work the way we expect?
@@ -2649,13 +2648,15 @@ int main(int argc, char** argv){
                          }
                     }
 
+                    S16 mass = get_block_stack_mass(&world, block);
+
                     update_motion_grid_aligned(&block->horizontal_move, &x_component,
                                                coasting_horizontally, dt,
-                                               pos_vec.x);
+                                               pos_vec.x, mass);
 
                     update_motion_grid_aligned(&block->vertical_move, &y_component,
                                                coasting_vertically, dt,
-                                               pos_vec.y);
+                                               pos_vec.y, mass);
                }
 
                BlockPushes_t<128> all_block_pushes; // TODO: is 128 this enough ?

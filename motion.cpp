@@ -226,7 +226,7 @@ void update_motion_free_form(Move_t* move, MotionComponent_t* motion, bool posit
      }
 }
 
-F32 begin_stopping_grid_aligned_motion(MotionComponent_t* motion, F32 pos){
+F32 begin_stopping_grid_aligned_motion(MotionComponent_t* motion, F32 pos, S16 mass){
      F32 final_pos = pos + motion->ref->pos_delta;
 
      bool positive = motion->ref->vel >= 0;
@@ -236,20 +236,24 @@ F32 begin_stopping_grid_aligned_motion(MotionComponent_t* motion, F32 pos){
           if(goal < final_pos){
                goal += TILE_SIZE;
           }
-
-          // TODO: if we are coasting too close to our target, go to the next target
-          // if(fabs(goal - final_pos) < (0.25f * TILE_SIZE)){
-          //      goal += TILE_SIZE;
-          // }
      }else{
           if(goal > final_pos){
                goal -= TILE_SIZE;
           }
+     }
 
-          // TODO: if we are coasting too close to our target, go to the next target
-          // if(fabs(goal - final_pos) < (0.25f * TILE_SIZE)){
-          //      goal -= TILE_SIZE;
-          // }
+     F32 normal_velocity = get_block_normal_pushed_velocity(mass);
+     F32 normal_momentum = normal_velocity * (F32)(mass);
+
+     F32 current_momentum = motion->ref->vel * (F32)(mass);
+
+     S16 grid_cells_to_travel = (current_momentum / normal_momentum) - 1;
+     if(grid_cells_to_travel < 0) grid_cells_to_travel = 0;
+
+     if(positive){
+          goal += TILE_SIZE * (F32)(grid_cells_to_travel);
+     }else{
+          goal -= TILE_SIZE * (F32)(grid_cells_to_travel);
      }
 
      auto decel_result = calc_decel_to_stop(final_pos, goal, motion->ref->vel);
@@ -281,14 +285,14 @@ F32 calc_coast_motion_time_left(F32 pos, F32 vel){
      return (find_next_grid_center(pos, vel) - pos) / vel;
 }
 
-void update_motion_grid_aligned(Move_t* move, MotionComponent_t* motion, bool coast, F32 dt, F32 pos){
+void update_motion_grid_aligned(Move_t* move, MotionComponent_t* motion, bool coast, F32 dt, F32 pos, S16 mass){
      switch(move->state){
      default:
      case MOVE_STATE_IDLING:
           break;
      case MOVE_STATE_COASTING:
           if(!coast){
-               motion->ref->accel = begin_stopping_grid_aligned_motion(motion, pos);
+               motion->ref->accel = begin_stopping_grid_aligned_motion(motion, pos, mass);
                move->state = MOVE_STATE_STOPPING;
           }
           break;
@@ -330,7 +334,7 @@ void update_motion_grid_aligned(Move_t* move, MotionComponent_t* motion, bool co
                          new_accel = sim_motion.ref->accel;
                     }
                }else{
-                    new_accel = begin_stopping_grid_aligned_motion(&sim_motion, pos);
+                    new_accel = begin_stopping_grid_aligned_motion(&sim_motion, pos, mass);
                     new_move_state = MOVE_STATE_STOPPING;
                }
 

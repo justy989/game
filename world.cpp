@@ -363,15 +363,16 @@ void slow_block_toward_gridlock(World_t* world, Block_t* block, Direction_t dire
      // (d - vt) / 1/2t^2 = a
 
      auto pos = pos_to_vec(block->pos);
+     auto block_mass = get_block_stack_mass(world, block);
 
      if(direction_is_horizontal(direction)){
           block->stopped_by_player_horizontal = true;
           auto motion = motion_x_component(block);
-          block->accel.x = begin_stopping_grid_aligned_motion(&motion, pos.x); // adjust by one tick since we missed this update
+          block->accel.x = begin_stopping_grid_aligned_motion(&motion, pos.x, block_mass); // adjust by one tick since we missed this update
      }else{
           block->stopped_by_player_vertical = true;
           auto motion = motion_y_component(block);
-          block->accel.y = begin_stopping_grid_aligned_motion(&motion, pos.y); // adjust by one tick since we missed this update
+          block->accel.y = begin_stopping_grid_aligned_motion(&motion, pos.y, block_mass); // adjust by one tick since we missed this update
      }
 
      Direction_t against_dir = DIRECTION_COUNT;
@@ -1297,22 +1298,7 @@ static bool collision_result_overcomes_friction(F32 original_vel, F32 final_vel,
 
 F32 get_block_expected_player_push_velocity(World_t* world, Block_t* block, F32 force){
      S16 mass = get_block_stack_mass(world, block);
-     F32 block_mass_ratio = (F32)BLOCK_BASELINE_MASS / (F32)mass;
-
-     // accurately accumulate floating point error in the same way simulating does lol
-     F32 time_left = BLOCK_ACCEL_TIME;
-     F32 result = 0;
-     while(time_left >= 0){
-          if(time_left > FRAME_TIME){
-               result += block_mass_ratio * FRAME_TIME * BLOCK_ACCEL * force;
-          }else{
-               result += block_mass_ratio * time_left * BLOCK_ACCEL * force;
-               break;
-          }
-
-          time_left -= FRAME_TIME;
-     }
-     return result;
+     return get_block_normal_pushed_velocity(mass, force);
 }
 
 static F32 get_block_velocity_ratio(World_t* world, Block_t* block, F32 vel, F32 force){

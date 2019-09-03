@@ -60,3 +60,4 @@ void get_rect_coords(Rect_t rect, Coord_t* coords);
 Pixel_t closest_pixel_in_rect(Pixel_t pixel, Rect_t rect);
 
 bool direction_in_vec(Vec_t vec, Direction_t direction);
+F32 get_block_normal_pushed_velocity(S16 mass, F32 force = 1.0);

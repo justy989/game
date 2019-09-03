@@ -377,3 +377,22 @@ bool direction_in_vec(Vec_t vec, Direction_t direction){
 
      return false;
 }
+
+F32 get_block_normal_pushed_velocity(S16 mass, F32 force){
+     F32 block_mass_ratio = (F32)BLOCK_BASELINE_MASS / (F32)mass;
+
+     // accurately accumulate floating point error in the same way simulating does lol
+     F32 time_left = BLOCK_ACCEL_TIME;
+     F32 result = 0;
+     while(time_left >= 0){
+          if(time_left > FRAME_TIME){
+               result += block_mass_ratio * FRAME_TIME * BLOCK_ACCEL * force;
+          }else{
+               result += block_mass_ratio * time_left * BLOCK_ACCEL * force;
+               break;
+          }
+
+          time_left -= FRAME_TIME;
+     }
+     return result;
+}
