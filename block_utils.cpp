@@ -1535,14 +1535,12 @@ void push_entangled_block(Block_t* block, World_t* world, Direction_t push_dir, 
 
                     auto allowed_result = allowed_to_push(world, entangled_block, rotated_dir, &rotated_instant_momentum);
                     if(allowed_result.push){
-                         // LOG("  entangled push %d %s\n", get_block_index(world, entangled_block), direction_to_string(rotated_dir));
                          block_push(entangled_block, rotated_dir, world, pushed_by_ice, allowed_result.mass_ratio, &rotated_instant_momentum, true);
                          // TODO: deal_with_push_result() here and below
                     }
                }else{
                     auto allowed_result = allowed_to_push(world, entangled_block, rotated_dir);
                     if(allowed_result.push){
-                         // LOG("  entangled push %d %s\n", get_block_index(world, entangled_block), direction_to_string(rotated_dir));
                          block_push(entangled_block, rotated_dir, world, pushed_by_ice, allowed_result.mass_ratio);
                     }
                }
@@ -1562,7 +1560,6 @@ void apply_block_change(ObjectArray_t<Block_t>* blocks_array, BlockChange_t* cha
           block->pos_delta.y = change->decimal;
           break;
      case BLOCK_CHANGE_TYPE_VEL_X:
-          // LOG("changing block %d vel x from %f to %f\n", change->block_index, block->vel.x, change->decimal);
           block->vel.x = change->decimal;
           break;
      case BLOCK_CHANGE_TYPE_VEL_Y:
@@ -1613,9 +1610,10 @@ DealWithPushResult_t deal_with_push_result(Block_t* pusher, Direction_t directio
                                            F32 scale_push_velocity, World_t* world, BlockPushResult_t* push_result){
      DealWithPushResult_t result;
 
+     // TODO: this rotation up here is clockwise, while the rotations below are counter clockwise, ugh
      auto save_direction_to_check = direction_to_check;
      direction_to_check = direction_rotate_counter_clockwise(direction_to_check, portal_rotations);
-     S8 total_against_rotations = portal_rotations;
+     S8 total_against_rotations = (DIRECTION_COUNT - portal_rotations);
 
      auto block_receiving_force = pusher;
 
@@ -1635,7 +1633,6 @@ DealWithPushResult_t deal_with_push_result(Block_t* pusher, Direction_t directio
                     block_receiving_force = adjacent_results.againsts[0].block;
                     direction_to_check = direction_rotate_clockwise(direction_to_check, adjacent_results.againsts[0].rotations_through_portal);
                     total_against_rotations += adjacent_results.againsts[0].rotations_through_portal;
-                    total_against_rotations %= DIRECTION_COUNT;
                }else{
                     // if vel is 0, then the most recent connected block is the one that can absorb the energy of the collision
                     // this happens when a block falls off of another block (into a slot) and collides with another block all at the same time
@@ -1653,6 +1650,8 @@ DealWithPushResult_t deal_with_push_result(Block_t* pusher, Direction_t directio
                {false, true,  true, false}, // right
                {false, false,  true, true}, // down
           };
+
+          total_against_rotations %= DIRECTION_COUNT;
 
           if(negate_push_direction_table[save_direction_to_check][total_against_rotations]){
                push_result->velocity = -push_result->velocity;
