@@ -298,6 +298,9 @@ void copy_block_collision_results(Block_t* block, CheckBlockCollisionResult_t* r
      block->stop_on_pixel_x = result->stop_on_pixel_x;
      block->stop_on_pixel_y = result->stop_on_pixel_y;
 
+     block->started_on_pixel_x = 0;
+     block->started_on_pixel_y = 0;
+
      block->horizontal_move = result->horizontal_move;
      block->vertical_move = result->vertical_move;
 }

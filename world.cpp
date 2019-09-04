@@ -1783,6 +1783,7 @@ void describe_block(World_t* world, Block_t* block){
      LOG("  accel  : %f, %f\n", block->accel.x, block->accel.y);
      LOG("    vel  : %f, %f prev_vel: %f, %f\n", block->vel.x, block->vel.y, block->prev_vel.x, block->prev_vel.y);
      LOG(" pos dt  : %f, %f\n", block->pos_delta.x, block->pos_delta.y);
+     LOG(" start px: %d, %d\n", block->started_on_pixel_x, block->started_on_pixel_y);
      LOG(" stop px : %d, %d\n", block->stop_on_pixel_x, block->stop_on_pixel_y);
      LOG(" hmove   : %s %s %f\n", move_state_to_string(block->horizontal_move.state), move_sign_to_string(block->horizontal_move.sign), block->horizontal_move.distance);
      LOG(" vmove   : %s %s %f\n", move_state_to_string(block->vertical_move.state), move_sign_to_string(block->vertical_move.sign), block->vertical_move.distance);
