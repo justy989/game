@@ -305,8 +305,7 @@ void copy_block_collision_results(Block_t* block, CheckBlockCollisionResult_t* r
      block->vertical_move = result->vertical_move;
 }
 
-void build_move_actions_from_player(PlayerAction_t* player_action, Player_t* player, bool* move_actions, S8 move_action_count)
-{
+void build_move_actions_from_player(PlayerAction_t* player_action, Player_t* player, bool* move_actions, S8 move_action_count){
      assert(move_action_count == DIRECTION_COUNT);
      memset(move_actions, 0, sizeof(*move_actions) * move_action_count);
 
@@ -988,6 +987,30 @@ Pixel_t get_corner_pixel_from_pos(Position_t pos, DirectionMask_t from_center){
           if(pos.decimal.x > FLT_EPSILON) result.x++;
      }
      return result;
+}
+
+void consolidate_block_pushes(BlockPushes_t<128>* block_pushes, BlockPushes_t<128>* consolidated_block_pushes){
+     for(S16 i = 0; i < block_pushes->count; i++){
+          auto* push = block_pushes->pushes + i;
+
+          assert(push->pusher_count == 1);
+
+          // consolidate pushes if we can
+          bool consolidated_current_push = false;
+          for(S16 j = 0; j < consolidated_block_pushes->count; j++){
+               auto* consolidated_push = consolidated_block_pushes->pushes + j;
+
+               if(push->pushee_index == consolidated_push->pushee_index &&
+                  push->direction_mask == consolidated_push->direction_mask &&
+                  push->portal_rotations == consolidated_push->portal_rotations){
+                    consolidated_push->add_pusher(push->pusher_indices[0]);
+                    consolidated_current_push = true;
+               }
+          }
+
+          // otherwise just add it
+          if(!consolidated_current_push) consolidated_block_pushes->add(push);
+     }
 }
 
 int main(int argc, char** argv){
@@ -2663,6 +2686,7 @@ int main(int argc, char** argv){
                }
 
                BlockPushes_t<128> all_block_pushes; // TODO: is 128 this enough ?
+               BlockPushes_t<128> all_consolidated_block_pushes;
 
                // unbounded collision: this should be exciting
                // we have our initial position and our initial pos_delta, update pos_delta for all players and blocks until nothing is colliding anymore
@@ -3086,8 +3110,10 @@ int main(int argc, char** argv){
                     BlockChanges_t grouped_changes;
                     S16 simultaneous_block_pushes = 0;
 
-                    for(S16 i = 0; i < all_block_pushes.count; i++){
-                         auto& block_push = all_block_pushes.pushes[i];
+                    consolidate_block_pushes(&all_block_pushes, &all_consolidated_block_pushes);
+
+                    for(S16 i = 0; i < all_consolidated_block_pushes.count; i++){
+                         auto& block_push = all_consolidated_block_pushes.pushes[i];
                          if(block_push.invalidated) continue;
 
                          auto result = block_collision_push(&block_push, &world);
@@ -3108,10 +3134,10 @@ int main(int argc, char** argv){
                          for(S16 p = 0; p < result.count; p++){
                               auto& block_pushed = result.blocks_pushed[p];
 
-                              for(S16 j = cancellable_block_pushes; j < all_block_pushes.count; j++){
-                                   auto& check_block_push = all_block_pushes.pushes[j];
+                              for(S16 j = cancellable_block_pushes; j < all_consolidated_block_pushes.count; j++){
+                                   auto& check_block_push = all_consolidated_block_pushes.pushes[j];
 
-                                   if(block_pushed.block_index == check_block_push.pusher_index &&
+                                   if(block_pushed.block_index == check_block_push.pusher_indices[0] &&
                                       direction_in_mask(check_block_push.direction_mask, block_pushed.direction)){
                                         check_block_push.invalidated = true;
                                    }

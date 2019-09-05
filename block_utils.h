@@ -125,13 +125,23 @@ struct BlockChanges_t{
      void clear(){count = 0;}
 };
 
+#define MAX_BLOCK_PUSHERS 4
+
 struct BlockPush_t{
-     S16 pusher_index;
-     S16 pushee_index;
+     S16 pusher_indices[MAX_BLOCK_PUSHERS];
+     S8 pusher_count = 0;
+     S16 pushee_index = -1;
      DirectionMask_t direction_mask = DIRECTION_MASK_NONE;
      S8 portal_rotations;
      S16 collided_with_block_count = 1;
      bool invalidated = false;
+
+     bool add_pusher(S16 index){
+          if(pusher_count >= MAX_BLOCK_PUSHERS) return false;
+          pusher_indices[pusher_count] = index;
+          pusher_count++;
+          return true;
+     }
 };
 
 template <S16 MAX_BLOCK_PUSHES>
@@ -156,14 +166,17 @@ struct BlockPushes_t{
                BlockPush_t* alternate = alternate_pushes->pushes + p;
                bool unique = true;
 
-               for(S16 i = 0; i < count; i++){
-                    BlockPush_t* check = pushes + i;
-                    if((check->pusher_index == alternate->pusher_index &&
-                        check->pushee_index == alternate->pushee_index) ||
-                       (check->pushee_index == alternate->pusher_index &&
-                        check->pusher_index == alternate->pushee_index)){
-                         unique = false;
-                         break;
+               if(alternate->pusher_count > 0){
+                    for(S16 i = 0; i < count; i++){
+                         BlockPush_t* check = pushes + i;
+                         if(check->pusher_count <= 0) continue;
+                         if((check->pusher_indices[0] == alternate->pusher_indices[0] &&
+                             check->pushee_index == alternate->pushee_index) ||
+                            (check->pushee_index == alternate->pusher_indices[0] &&
+                             check->pusher_indices[0] == alternate->pushee_index)){
+                              unique = false;
+                              break;
+                         }
                     }
                }
 
