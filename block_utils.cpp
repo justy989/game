@@ -1755,7 +1755,10 @@ BlockCollisionPushResult_t block_collision_push(BlockPush_t* push, World_t* worl
 
           F32 total_momentum = 0;
 
+          LOG("%d block(s) ", push->pusher_count);
+
           for(S16 p = 0; p < push->pusher_count; p++){
+               LOG(" %d", push->pusher_indices[p]);
                auto* pusher = world->blocks.elements + push->pusher_indices[p];
 
                // TODO: have a collided_with_block_counts for each pusher_index
@@ -1785,6 +1788,8 @@ BlockCollisionPushResult_t block_collision_push(BlockPush_t* push, World_t* worl
 
           instant_momentum.vel = total_momentum / instant_momentum.mass;
 
+          LOG(" pushing block %d with momentum %d %f\n", push->pushee_index, instant_momentum.mass, instant_momentum.vel);
+
           auto push_result = block_push(pushee, push_pos, push_pos_delta, push_direction, world, true, 1.0f, &instant_momentum);
 
           auto direction_to_check = direction_opposite(push_direction);
@@ -1793,25 +1798,28 @@ BlockCollisionPushResult_t block_collision_push(BlockPush_t* push, World_t* worl
                auto* pusher = world->blocks.elements + push->pusher_indices[p];
 
                S16 pusher_mass = get_block_stack_mass(world, pusher);
-               instant_momentum.mass = (S16)((F32)(pusher_mass) * (1.0f / (F32)(push->collided_with_block_count)));
+               pusher_mass = (S16)((F32)(pusher_mass) * (1.0f / (F32)(push->collided_with_block_count)));
 
                Vec_t rotated_pusher_vel = vec_rotate_quadrants_clockwise(pusher->vel, push->portal_rotations);
 
                // TODO: scale based on how much this pusher contributed to total momentum
                F32 scale_push_velocity = 1.0f;
+               F32 current_momentum = 0;
 
                switch(push_direction){
                default:
                     break;
                case DIRECTION_LEFT:
                case DIRECTION_RIGHT:
-                    instant_momentum.vel = rotated_pusher_vel.x;
+                    current_momentum = rotated_pusher_vel.x * (F32)(pusher_mass);
                     break;
                case DIRECTION_UP:
                case DIRECTION_DOWN:
-                    instant_momentum.vel = rotated_pusher_vel.y;
+                    current_momentum = rotated_pusher_vel.y * (F32)(pusher_mass);
                     break;
                }
+
+               scale_push_velocity = current_momentum / total_momentum;
 
                auto deal_with_push_result_result = deal_with_push_result(pusher, direction_to_check, push->portal_rotations,
                                                                          scale_push_velocity, world, &push_result);

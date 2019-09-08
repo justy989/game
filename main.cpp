@@ -3143,17 +3143,12 @@ int main(int argc, char** argv){
                                    }
                               }
                          }
-
-                         if(simultaneous_block_pushes == 0){
-                              for(S16 c = 0; c < grouped_changes.count; c++){
-                                   auto& block_change = grouped_changes.changes[c];
-                                   apply_block_change(&world.blocks, &block_change);
-                              }
-
-                              grouped_changes.clear();
-                         }
                     }
 
+                    for(S16 c = 0; c < grouped_changes.count; c++){
+                         auto& block_change = grouped_changes.changes[c];
+                         apply_block_change(&world.blocks, &block_change);
+                    }
                }
 
                // finalize positions
