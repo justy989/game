@@ -1599,7 +1599,7 @@ void apply_block_change(ObjectArray_t<Block_t>* blocks_array, BlockChange_t* cha
 }
 
 struct DealWithPushResult_t{
-     BlockChanges_t changes;
+     BlockMomentumChanges_t momentum_changes;
      Block_t* block_receiving_force = nullptr;
      Direction_t final_direction = DIRECTION_COUNT;
      F32 new_vel = 0;
@@ -1669,40 +1669,24 @@ DealWithPushResult_t deal_with_push_result(Block_t* pusher, Direction_t directio
      case DIRECTION_RIGHT:
           if(push_result->transferred_momentum_back()){
                F32 new_vel = push_result->velocity * scale_push_velocity;
-               F32 x_pos = pos_to_vec(block_receiving_force->pos + block_receiving_force->pos_delta).x;
+               auto block_mass = get_block_stack_mass(world, block_receiving_force);
 
-               result.changes.add(block_receiving_force_index, BLOCK_CHANGE_TYPE_VEL_X, new_vel);
-               result.changes.add(block_receiving_force_index, BLOCK_CHANGE_TYPE_ACCEL_X, 0.0f);
-               result.changes.add(block_receiving_force_index, BLOCK_CHANGE_TYPE_HORIZONTAL_MOVE_STATE, MOVE_STATE_COASTING);
-               result.changes.add(block_receiving_force_index, BLOCK_CHANGE_TYPE_HORIZONTAL_MOVE_SIGN, move_sign_from_vel(new_vel));
-               result.changes.add(block_receiving_force_index, BLOCK_CHANGE_TYPE_HORIZONTAL_MOVE_TIME_LEFT, calc_coast_motion_time_left(x_pos, new_vel));
+               result.momentum_changes.add(block_receiving_force_index, new_vel * block_mass, true);
                result.new_vel = new_vel;
           }else{
-               result.changes.add(block_receiving_force_index, BLOCK_CHANGE_TYPE_VEL_X, 0.0f);
-               result.changes.add(block_receiving_force_index, BLOCK_CHANGE_TYPE_ACCEL_X, 0.0f);
-               result.changes.add(block_receiving_force_index, BLOCK_CHANGE_TYPE_HORIZONTAL_MOVE_STATE, MOVE_STATE_IDLING);
-               result.changes.add(block_receiving_force_index, BLOCK_CHANGE_TYPE_HORIZONTAL_MOVE_SIGN, MOVE_SIGN_ZERO);
-               result.changes.add(block_receiving_force_index, BLOCK_CHANGE_TYPE_HORIZONTAL_MOVE_TIME_LEFT, 0.0f);
+               result.momentum_changes.add(block_receiving_force_index, 0.0f, true);
           }
           break;
      case DIRECTION_UP:
      case DIRECTION_DOWN:
           if(push_result->transferred_momentum_back()){
                F32 new_vel = push_result->velocity * scale_push_velocity;
-               F32 y_pos = pos_to_vec(block_receiving_force->pos + block_receiving_force->pos_delta).y;
+               auto block_mass = get_block_stack_mass(world, block_receiving_force);
 
-               result.changes.add(block_receiving_force_index, BLOCK_CHANGE_TYPE_VEL_Y, new_vel);
-               result.changes.add(block_receiving_force_index, BLOCK_CHANGE_TYPE_ACCEL_Y, 0.0f);
-               result.changes.add(block_receiving_force_index, BLOCK_CHANGE_TYPE_VERTICAL_MOVE_STATE, MOVE_STATE_COASTING);
-               result.changes.add(block_receiving_force_index, BLOCK_CHANGE_TYPE_VERTICAL_MOVE_SIGN, move_sign_from_vel(new_vel));
-               result.changes.add(block_receiving_force_index, BLOCK_CHANGE_TYPE_VERTICAL_MOVE_TIME_LEFT, calc_coast_motion_time_left(y_pos, new_vel));
+               result.momentum_changes.add(block_receiving_force_index, new_vel * block_mass, false);
                result.new_vel = new_vel;
           }else{
-               result.changes.add(block_receiving_force_index, BLOCK_CHANGE_TYPE_VEL_Y, 0.0f);
-               result.changes.add(block_receiving_force_index, BLOCK_CHANGE_TYPE_ACCEL_Y, 0.0f);
-               result.changes.add(block_receiving_force_index, BLOCK_CHANGE_TYPE_VERTICAL_MOVE_STATE, MOVE_STATE_IDLING);
-               result.changes.add(block_receiving_force_index, BLOCK_CHANGE_TYPE_VERTICAL_MOVE_SIGN, MOVE_SIGN_ZERO);
-               result.changes.add(block_receiving_force_index, BLOCK_CHANGE_TYPE_VERTICAL_MOVE_TIME_LEFT, 0.0f);
+               result.momentum_changes.add(block_receiving_force_index, 0.0f, false);
           }
           break;
      }
@@ -1755,10 +1739,7 @@ BlockCollisionPushResult_t block_collision_push(BlockPush_t* push, World_t* worl
 
           F32 total_momentum = 0;
 
-          LOG("%d block(s) ", push->pusher_count);
-
           for(S16 p = 0; p < push->pusher_count; p++){
-               LOG(" %d", push->pusher_indices[p]);
                auto* pusher = world->blocks.elements + push->pusher_indices[p];
 
                // TODO: have a collided_with_block_counts for each pusher_index
@@ -1787,8 +1768,6 @@ BlockCollisionPushResult_t block_collision_push(BlockPush_t* push, World_t* worl
           }
 
           instant_momentum.vel = total_momentum / instant_momentum.mass;
-
-          LOG(" pushing block %d with momentum %d %f\n", push->pushee_index, instant_momentum.mass, instant_momentum.vel);
 
           auto push_result = block_push(pushee, push_pos, push_pos_delta, push_direction, world, true, 1.0f, &instant_momentum);
 
@@ -1854,7 +1833,7 @@ BlockCollisionPushResult_t block_collision_push(BlockPush_t* push, World_t* worl
                     }
                }
 
-               result.changes.merge(&deal_with_push_result_result.changes);
+               result.momentum_changes.merge(&deal_with_push_result_result.momentum_changes);
           }
      }
 

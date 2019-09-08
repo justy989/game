@@ -1091,8 +1091,8 @@ int main(int argc, char** argv){
           return 1;
      }
 
-     int window_width = 1080;
-     int window_height = 1080;
+     int window_width = 2160;
+     int window_height = 2160;
      SDL_Window* window = nullptr;
      SDL_GLContext opengl_context = nullptr;
      GLuint theme_texture = 0;
@@ -3107,7 +3107,7 @@ int main(int argc, char** argv){
 
                // pass to cause pushes to happen
                {
-                    BlockChanges_t grouped_changes;
+                    BlockMomentumChanges_t momentum_changes;
                     S16 simultaneous_block_pushes = 0;
 
                     consolidate_block_pushes(&all_block_pushes, &all_consolidated_block_pushes);
@@ -3118,7 +3118,7 @@ int main(int argc, char** argv){
 
                          auto result = block_collision_push(&block_push, &world);
 
-                         grouped_changes.merge(&result.changes);
+                         momentum_changes.merge(&result.momentum_changes);
 
                          // for simultaneous pushes, skip ahead because they should not be cancelled
                          S16 cancellable_block_pushes = i + 1;
@@ -3145,9 +3145,52 @@ int main(int argc, char** argv){
                          }
                     }
 
-                    for(S16 c = 0; c < grouped_changes.count; c++){
-                         auto& block_change = grouped_changes.changes[c];
-                         apply_block_change(&world.blocks, &block_change);
+                    // clear momentum for each impacted block
+                    for(S16 c = 0; c < momentum_changes.count; c++){
+                         auto& block_change = momentum_changes.changes[c];
+                         auto* block = world.blocks.elements + block_change.block_index;
+                         if(block_change.x){
+                              block->vel.x = 0;
+                         }else{
+                              block->vel.y = 0;
+                         }
+                    }
+
+                    // add momentum
+                    for(S16 c = 0; c < momentum_changes.count; c++){
+                         auto& block_change = momentum_changes.changes[c];
+                         auto* block = world.blocks.elements + block_change.block_index;
+                         F32 add_vel = block_change.change / get_block_stack_mass(&world, block);
+                         if(block_change.x){
+                              block->vel.x += add_vel;
+                         }else{
+                              block->vel.y += add_vel;
+                         }
+                    }
+
+                    // set coasting or idling based on velocity
+                    for(S16 c = 0; c < momentum_changes.count; c++){
+                         auto& block_change = momentum_changes.changes[c];
+                         auto* block = world.blocks.elements + block_change.block_index;
+                         if(block_change.x){
+                              if(block->vel.x == 0){
+                                   block->horizontal_move.state = MOVE_STATE_IDLING;
+                                   block->horizontal_move.sign = MOVE_SIGN_ZERO;
+                              }else{
+                                   block->horizontal_move.state = MOVE_STATE_COASTING;
+                                   block->horizontal_move.sign = move_sign_from_vel(block->vel.x);
+                              }
+                              block->horizontal_move.time_left = 0;
+                         }else{
+                              if(block->vel.y == 0){
+                                   block->vertical_move.state = MOVE_STATE_IDLING;
+                                   block->vertical_move.sign = MOVE_SIGN_ZERO;
+                              }else{
+                                   block->vertical_move.state = MOVE_STATE_COASTING;
+                                   block->vertical_move.sign = move_sign_from_vel(block->vel.y);
+                              }
+                              block->vertical_move.time_left = 0;
+                         }
                     }
                }
 
