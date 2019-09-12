@@ -3112,13 +3112,28 @@ int main(int argc, char** argv){
 
                     consolidate_block_pushes(&all_block_pushes, &all_consolidated_block_pushes);
 
+                    if(all_consolidated_block_pushes.count){
+                         LOG("%d block pushes\n", all_consolidated_block_pushes.count);
+                    }
+
                     for(S16 i = 0; i < all_consolidated_block_pushes.count; i++){
                          auto& block_push = all_consolidated_block_pushes.pushes[i];
                          if(block_push.invalidated) continue;
+                         auto* block = world.blocks.elements + block_push.pushee_index;
+
+                         LOG("  block %d vel %f, %f pushed by %d block(s) ", block_push.pushee_index, block->vel.x, block->vel.y, block_push.pusher_count);
+                         for(S16 p = 0; p < block_push.pusher_count; p++){
+                              LOG("%d ", block_push.pusher_indices[p]);
+                         }
+                         LOG("\n");
 
                          auto result = block_collision_push(&block_push, &world);
 
                          momentum_changes.merge(&result.momentum_changes);
+
+                         if(result.entangled_block_pushes.count){
+                              all_consolidated_block_pushes.merge(&result.entangled_block_pushes);
+                         }
 
                          // for simultaneous pushes, skip ahead because they should not be cancelled
                          S16 cancellable_block_pushes = i + 1;
@@ -3145,13 +3160,20 @@ int main(int argc, char** argv){
                          }
                     }
 
+                    if(momentum_changes.count){
+                         LOG("%d momentum changes\n", momentum_changes.count);
+                    }
+
                     // clear momentum for each impacted block
                     for(S16 c = 0; c < momentum_changes.count; c++){
                          auto& block_change = momentum_changes.changes[c];
                          auto* block = world.blocks.elements + block_change.block_index;
+                         LOG("  block %d vel %f x ", block_change.block_index, block_change.change / get_block_stack_mass(&world, block));
                          if(block_change.x){
+                              LOG("current vel x: %f\n", block->vel.x);
                               block->vel.x = 0;
                          }else{
+                              LOG("current vel x: %f\n", block->vel.y);
                               block->vel.y = 0;
                          }
                     }

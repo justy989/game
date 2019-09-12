@@ -135,6 +135,7 @@ struct BlockPush_t{
      S8 portal_rotations;
      S16 collided_with_block_count = 1;
      bool invalidated = false;
+     bool entangled = false;
 
      bool add_pusher(S16 index){
           if(pusher_count >= MAX_BLOCK_PUSHERS) return false;
@@ -310,8 +311,10 @@ struct BlockPushed_t{
 };
 
 #define MAX_BLOCKS_PUSHED 8
+#define MAX_ENTANGLE_BLOCK_PUSHES (MAX_BLOCKS_PUSHED * 4)
 
 struct BlockCollisionPushResult_t{
+     BlockPushes_t<MAX_ENTANGLE_BLOCK_PUSHES> entangled_block_pushes;
      BlockPushed_t blocks_pushed[MAX_BLOCKS_PUSHED];
      S8 count = 0;
 

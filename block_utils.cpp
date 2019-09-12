@@ -1500,104 +1500,6 @@ Interactive_t* block_is_teleporting(Block_t* block, QuadTreeNode_t<Interactive_t
      return nullptr;
 }
 
-void push_entangled_block(Block_t* block, World_t* world, Direction_t push_dir, bool pushed_by_ice, TransferMomentum_t* instant_momentum){
-     if(block->entangle_index < 0) return;
-
-     S16 block_index = block - world->blocks.elements;
-     S16 entangle_index = block->entangle_index;
-     while(entangle_index != block_index && entangle_index >= 0){
-          Block_t* entangled_block = world->blocks.elements + entangle_index;
-          bool held_down = block_held_down_by_another_block(entangled_block, world->block_qt, world->interactive_qt, &world->tilemap).held();
-          bool on_ice = block_on_ice(entangled_block->pos, entangled_block->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt);
-          if(!held_down || on_ice){
-               auto rotations_between = direction_rotations_between(static_cast<Direction_t>(entangled_block->rotation), static_cast<Direction_t>(block->rotation));
-               Direction_t rotated_dir = direction_rotate_clockwise(push_dir, rotations_between);
-
-               if(instant_momentum){
-                    auto rotated_instant_momentum = *instant_momentum;
-
-                    switch(rotated_dir){
-                    default:
-                         break;
-                    case DIRECTION_LEFT:
-                         if(rotated_instant_momentum.vel > 0) rotated_instant_momentum.vel = -rotated_instant_momentum.vel;
-                         break;
-                    case DIRECTION_RIGHT:
-                         if(rotated_instant_momentum.vel < 0) rotated_instant_momentum.vel = -rotated_instant_momentum.vel;
-                         break;
-                    case DIRECTION_DOWN:
-                         if(rotated_instant_momentum.vel > 0) rotated_instant_momentum.vel = -rotated_instant_momentum.vel;
-                         break;
-                    case DIRECTION_UP:
-                         if(rotated_instant_momentum.vel < 0) rotated_instant_momentum.vel = -rotated_instant_momentum.vel;
-                         break;
-                    }
-
-                    auto allowed_result = allowed_to_push(world, entangled_block, rotated_dir, &rotated_instant_momentum);
-                    if(allowed_result.push){
-                         block_push(entangled_block, rotated_dir, world, pushed_by_ice, allowed_result.mass_ratio, &rotated_instant_momentum, true);
-                         // TODO: deal_with_push_result() here and below
-                    }
-               }else{
-                    auto allowed_result = allowed_to_push(world, entangled_block, rotated_dir);
-                    if(allowed_result.push){
-                         block_push(entangled_block, rotated_dir, world, pushed_by_ice, allowed_result.mass_ratio);
-                    }
-               }
-          }
-          entangle_index = entangled_block->entangle_index;
-     }
-}
-
-void apply_block_change(ObjectArray_t<Block_t>* blocks_array, BlockChange_t* change){
-     auto block = blocks_array->elements + change->block_index;
-
-     switch(change->type){
-     case BLOCK_CHANGE_TYPE_POS_DELTA_X:
-          block->pos_delta.x = change->decimal;
-          break;
-     case BLOCK_CHANGE_TYPE_POS_DELTA_Y:
-          block->pos_delta.y = change->decimal;
-          break;
-     case BLOCK_CHANGE_TYPE_VEL_X:
-          block->vel.x = change->decimal;
-          break;
-     case BLOCK_CHANGE_TYPE_VEL_Y:
-          block->vel.y = change->decimal;
-          break;
-     case BLOCK_CHANGE_TYPE_ACCEL_X:
-          block->accel.x = change->decimal;
-          break;
-     case BLOCK_CHANGE_TYPE_ACCEL_Y:
-          block->accel.y = change->decimal;
-          break;
-     case BLOCK_CHANGE_TYPE_HORIZONTAL_MOVE_STATE:
-          block->horizontal_move.state = change->move_state;
-          break;
-     case BLOCK_CHANGE_TYPE_HORIZONTAL_MOVE_SIGN:
-          block->horizontal_move.sign = change->move_sign;
-          break;
-     case BLOCK_CHANGE_TYPE_HORIZONTAL_MOVE_TIME_LEFT:
-          block->horizontal_move.time_left = change->decimal;
-          break;
-     case BLOCK_CHANGE_TYPE_VERTICAL_MOVE_STATE:
-          block->vertical_move.state = change->move_state;
-          break;
-     case BLOCK_CHANGE_TYPE_VERTICAL_MOVE_SIGN:
-          block->vertical_move.sign = change->move_sign;
-          break;
-     case BLOCK_CHANGE_TYPE_VERTICAL_MOVE_TIME_LEFT:
-          block->vertical_move.time_left = change->decimal;
-          break;
-     case BLOCK_CHANGE_TYPE_STOP_ON_PIXEL_X:
-          block->stop_on_pixel_x = change->integer;
-          break;
-     case BLOCK_CHANGE_TYPE_STOP_ON_PIXEL_Y:
-          block->stop_on_pixel_y = change->integer;
-          break;
-     }
-}
-
 struct DealWithPushResult_t{
      BlockMomentumChanges_t momentum_changes;
      Block_t* block_receiving_force = nullptr;
@@ -1683,15 +1585,168 @@ DealWithPushResult_t deal_with_push_result(Block_t* pusher, Direction_t directio
                F32 new_vel = push_result->velocity * scale_push_velocity;
                auto block_mass = get_block_stack_mass(world, block_receiving_force);
 
+               LOG("    give block %d vel %f\n", block_receiving_force_index, new_vel);
                result.momentum_changes.add(block_receiving_force_index, new_vel * block_mass, false);
                result.new_vel = new_vel;
           }else{
+               LOG("    stop block %d\n", block_receiving_force_index);
                result.momentum_changes.add(block_receiving_force_index, 0.0f, false);
           }
           break;
      }
 
      return result;
+}
+
+
+void push_entangled_block(Block_t* block, World_t* world, Direction_t push_dir, bool pushed_by_ice, TransferMomentum_t* instant_momentum){
+     if(block->entangle_index < 0) return;
+
+     S16 block_index = block - world->blocks.elements;
+     S16 entangle_index = block->entangle_index;
+     while(entangle_index != block_index && entangle_index >= 0){
+          Block_t* entangled_block = world->blocks.elements + entangle_index;
+          bool held_down = block_held_down_by_another_block(entangled_block, world->block_qt, world->interactive_qt, &world->tilemap).held();
+          bool on_ice = block_on_ice(entangled_block->pos, entangled_block->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt);
+          if(!held_down || on_ice){
+               auto rotations_between = direction_rotations_between(static_cast<Direction_t>(entangled_block->rotation), static_cast<Direction_t>(block->rotation));
+               Direction_t rotated_dir = direction_rotate_clockwise(push_dir, rotations_between);
+
+               if(instant_momentum){
+                    auto rotated_instant_momentum = *instant_momentum;
+
+                    switch(rotated_dir){
+                    default:
+                         break;
+                    case DIRECTION_LEFT:
+                         if(rotated_instant_momentum.vel > 0) rotated_instant_momentum.vel = -rotated_instant_momentum.vel;
+                         break;
+                    case DIRECTION_RIGHT:
+                         if(rotated_instant_momentum.vel < 0) rotated_instant_momentum.vel = -rotated_instant_momentum.vel;
+                         break;
+                    case DIRECTION_DOWN:
+                         if(rotated_instant_momentum.vel > 0) rotated_instant_momentum.vel = -rotated_instant_momentum.vel;
+                         break;
+                    case DIRECTION_UP:
+                         if(rotated_instant_momentum.vel < 0) rotated_instant_momentum.vel = -rotated_instant_momentum.vel;
+                         break;
+                    }
+
+                    auto allowed_result = allowed_to_push(world, entangled_block, rotated_dir, &rotated_instant_momentum);
+                    if(allowed_result.push){
+                         LOG("  push entangled block %d\n", get_block_index(world, entangled_block));
+                         block_push(entangled_block, rotated_dir, world, pushed_by_ice, allowed_result.mass_ratio, &rotated_instant_momentum, true);
+                    }
+               }else{
+                    auto allowed_result = allowed_to_push(world, entangled_block, rotated_dir);
+                    if(allowed_result.push){
+                         block_push(entangled_block, rotated_dir, world, pushed_by_ice, allowed_result.mass_ratio);
+                    }
+               }
+          }
+          entangle_index = entangled_block->entangle_index;
+     }
+}
+
+BlockPushes_t<MAX_ENTANGLE_BLOCK_PUSHES> push_entangled_block_pushes(Block_t* block, World_t* world, Direction_t push_dir, Block_t* pusher, S16 collided_with_block_count, TransferMomentum_t* instant_momentum){
+     BlockPushes_t<MAX_ENTANGLE_BLOCK_PUSHES> result;
+     if(block->entangle_index < 0) return result;
+
+     S16 block_index = block - world->blocks.elements;
+     S16 entangle_index = block->entangle_index;
+     while(entangle_index != block_index && entangle_index >= 0){
+          Block_t* entangled_block = world->blocks.elements + entangle_index;
+          bool held_down = block_held_down_by_another_block(entangled_block, world->block_qt, world->interactive_qt, &world->tilemap).held();
+          bool on_ice = block_on_ice(entangled_block->pos, entangled_block->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt);
+          if(!held_down || on_ice){
+               auto rotations_between = direction_rotations_between(static_cast<Direction_t>(entangled_block->rotation), static_cast<Direction_t>(block->rotation));
+               Direction_t rotated_dir = direction_rotate_clockwise(push_dir, rotations_between);
+
+               auto rotated_instant_momentum = *instant_momentum;
+
+               switch(rotated_dir){
+               default:
+                    break;
+               case DIRECTION_LEFT:
+                    if(rotated_instant_momentum.vel > 0) rotated_instant_momentum.vel = -rotated_instant_momentum.vel;
+                    break;
+               case DIRECTION_RIGHT:
+                    if(rotated_instant_momentum.vel < 0) rotated_instant_momentum.vel = -rotated_instant_momentum.vel;
+                    break;
+               case DIRECTION_DOWN:
+                    if(rotated_instant_momentum.vel > 0) rotated_instant_momentum.vel = -rotated_instant_momentum.vel;
+                    break;
+               case DIRECTION_UP:
+                    if(rotated_instant_momentum.vel < 0) rotated_instant_momentum.vel = -rotated_instant_momentum.vel;
+                    break;
+               }
+
+               auto allowed_result = allowed_to_push(world, entangled_block, rotated_dir, &rotated_instant_momentum);
+               if(allowed_result.push){
+                    BlockPush_t push;
+                    push.add_pusher(get_block_index(world, pusher));
+                    push.pushee_index = get_block_index(world, entangled_block);
+                    push.direction_mask = direction_to_direction_mask(rotated_dir);
+                    push.portal_rotations = 0;
+                    push.collided_with_block_count = collided_with_block_count;
+                    push.entangled = true;
+                    result.add(&push);
+               }
+          }
+
+          entangle_index = entangled_block->entangle_index;
+     }
+
+     return result;
+}
+
+void apply_block_change(ObjectArray_t<Block_t>* blocks_array, BlockChange_t* change){
+     auto block = blocks_array->elements + change->block_index;
+
+     switch(change->type){
+     case BLOCK_CHANGE_TYPE_POS_DELTA_X:
+          block->pos_delta.x = change->decimal;
+          break;
+     case BLOCK_CHANGE_TYPE_POS_DELTA_Y:
+          block->pos_delta.y = change->decimal;
+          break;
+     case BLOCK_CHANGE_TYPE_VEL_X:
+          block->vel.x = change->decimal;
+          break;
+     case BLOCK_CHANGE_TYPE_VEL_Y:
+          block->vel.y = change->decimal;
+          break;
+     case BLOCK_CHANGE_TYPE_ACCEL_X:
+          block->accel.x = change->decimal;
+          break;
+     case BLOCK_CHANGE_TYPE_ACCEL_Y:
+          block->accel.y = change->decimal;
+          break;
+     case BLOCK_CHANGE_TYPE_HORIZONTAL_MOVE_STATE:
+          block->horizontal_move.state = change->move_state;
+          break;
+     case BLOCK_CHANGE_TYPE_HORIZONTAL_MOVE_SIGN:
+          block->horizontal_move.sign = change->move_sign;
+          break;
+     case BLOCK_CHANGE_TYPE_HORIZONTAL_MOVE_TIME_LEFT:
+          block->horizontal_move.time_left = change->decimal;
+          break;
+     case BLOCK_CHANGE_TYPE_VERTICAL_MOVE_STATE:
+          block->vertical_move.state = change->move_state;
+          break;
+     case BLOCK_CHANGE_TYPE_VERTICAL_MOVE_SIGN:
+          block->vertical_move.sign = change->move_sign;
+          break;
+     case BLOCK_CHANGE_TYPE_VERTICAL_MOVE_TIME_LEFT:
+          block->vertical_move.time_left = change->decimal;
+          break;
+     case BLOCK_CHANGE_TYPE_STOP_ON_PIXEL_X:
+          block->stop_on_pixel_x = change->integer;
+          break;
+     case BLOCK_CHANGE_TYPE_STOP_ON_PIXEL_Y:
+          block->stop_on_pixel_y = change->integer;
+          break;
+     }
 }
 
 BlockCollisionPushResult_t block_collision_push(BlockPush_t* push, World_t* world){
@@ -1803,33 +1858,40 @@ BlockCollisionPushResult_t block_collision_push(BlockPush_t* push, World_t* worl
                auto deal_with_push_result_result = deal_with_push_result(pusher, direction_to_check, push->portal_rotations,
                                                                          scale_push_velocity, world, &push_result);
 
-               if(push_result.pushed || push_result.force_flowed_through){
-                    push_entangled_block(pushee, world, push_direction, true, &instant_momentum);
+               if(!push->entangled && (push_result.pushed || push_result.force_flowed_through)){
+                    auto entangled_pushes = push_entangled_block_pushes(pushee, world, push_direction, pusher, push->collided_with_block_count, &instant_momentum);
+                    result.entangled_block_pushes.merge(&entangled_pushes);
                }
 
                if(push_result.transferred_momentum_back()){
                     result.add_block_pushed(get_block_index(world, deal_with_push_result_result.block_receiving_force), direction_opposite(deal_with_push_result_result.final_direction));
 
-                    F32 current_vel = 0;
-                    switch(deal_with_push_result_result.final_direction){
-                    default:
-                         break;
-                    case DIRECTION_LEFT:
-                    case DIRECTION_RIGHT:
-                         current_vel = deal_with_push_result_result.block_receiving_force->vel.x;
-                         break;
-                    case DIRECTION_UP:
-                    case DIRECTION_DOWN:
-                         current_vel = deal_with_push_result_result.block_receiving_force->vel.y;
-                         break;
-                    }
+                    if(!push->entangled){
+                         F32 current_vel = 0;
+                         switch(deal_with_push_result_result.final_direction){
+                         default:
+                              break;
+                         case DIRECTION_LEFT:
+                         case DIRECTION_RIGHT:
+                              current_vel = deal_with_push_result_result.block_receiving_force->vel.x;
+                              break;
+                         case DIRECTION_UP:
+                         case DIRECTION_DOWN:
+                              current_vel = deal_with_push_result_result.block_receiving_force->vel.y;
+                              break;
+                         }
 
-                    if((current_vel > 0 && current_vel < deal_with_push_result_result.new_vel) ||
-                       (current_vel < 0 && current_vel > deal_with_push_result_result.new_vel)){
-                         push_entangled_block(deal_with_push_result_result.block_receiving_force, world, direction_opposite(deal_with_push_result_result.final_direction), true, &instant_momentum);
-                    }else if((current_vel > 0 && deal_with_push_result_result.new_vel < 0) ||
-                             (current_vel < 0 && deal_with_push_result_result.new_vel > 0)){
-                         push_entangled_block(deal_with_push_result_result.block_receiving_force, world, deal_with_push_result_result.final_direction, true, &instant_momentum);
+                         if((current_vel > 0 && current_vel < deal_with_push_result_result.new_vel) ||
+                            (current_vel < 0 && current_vel > deal_with_push_result_result.new_vel)){
+                              auto entangled_pushes = push_entangled_block_pushes(deal_with_push_result_result.block_receiving_force, world, direction_opposite(deal_with_push_result_result.final_direction),
+                                                                                  pusher, push->collided_with_block_count, &instant_momentum);
+                              result.entangled_block_pushes.merge(&entangled_pushes);
+                         }else if((current_vel > 0 && deal_with_push_result_result.new_vel < 0) ||
+                                  (current_vel < 0 && deal_with_push_result_result.new_vel > 0)){
+                              auto entangled_pushes = push_entangled_block_pushes(deal_with_push_result_result.block_receiving_force, world, deal_with_push_result_result.final_direction,
+                                                                                  pusher, push->collided_with_block_count, &instant_momentum);
+                              result.entangled_block_pushes.merge(&entangled_pushes);
+                         }
                     }
                }
 
