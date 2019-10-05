@@ -1413,7 +1413,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                     if(should_push){
                          BlockPush_t push;
 
-                         push.add_pusher(block_index);
+                         push.add_pusher(block_index, collided_with_blocks_on_ice);
                          push.pushee_index = get_block_index(world, block_inside_result.entries[i].block);
 
                          push.direction_mask = direction_mask_add(direction_to_direction_mask(first_direction),
@@ -1421,11 +1421,9 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
 
                          push.portal_rotations = block_inside_result.entries[i].portal_rotations;
 
-                         // LOG("Add push, block %d %s | %s %d pr %d result vel: %f, %f\n",
-                         //     block_index, direction_to_string(first_direction), direction_to_string(second_direction), push.pushee_index, push.portal_rotations,
-                         //     result.vel.x, result.vel.y);
-
-                         push.collided_with_block_count = collided_with_blocks_on_ice;
+                         LOG("Add push, block %d %s | %s %d pr %d result vel: %f, %f collided with blocks %d\n",
+                             block_index, direction_to_string(first_direction), direction_to_string(second_direction), push.pushee_index, push.portal_rotations,
+                             result.vel.x, result.vel.y, collided_with_blocks_on_ice);
 
                          result.block_pushes.add(&push);
                     }
@@ -1677,11 +1675,10 @@ BlockPushes_t<MAX_ENTANGLE_BLOCK_PUSHES> push_entangled_block_pushes(Block_t* bl
                auto allowed_result = allowed_to_push(world, entangled_block, rotated_dir, &rotated_instant_momentum);
                if(allowed_result.push){
                     BlockPush_t push;
-                    push.add_pusher(get_block_index(world, pusher));
+                    push.add_pusher(get_block_index(world, pusher), collided_with_block_count);
                     push.pushee_index = get_block_index(world, entangled_block);
                     push.direction_mask = direction_to_direction_mask(rotated_dir);
                     push.portal_rotations = 0;
-                    push.collided_with_block_count = collided_with_block_count;
                     push.entangled = true;
                     result.add(&push);
                }
@@ -1788,11 +1785,13 @@ BlockCollisionPushResult_t block_collision_push(BlockPush_t* push, World_t* worl
           F32 total_momentum = 0;
 
           for(S16 p = 0; p < push->pusher_count; p++){
-               auto* pusher = world->blocks.elements + push->pusher_indices[p];
+               auto* pusher = world->blocks.elements + push->pushers[p].index;
 
                // TODO: have a collided_with_block_counts for each pusher_index
                S16 pusher_mass = get_block_stack_mass(world, pusher);
-               pusher_mass = (S16)((F32)(pusher_mass) * (1.0f / (F32)(push->collided_with_block_count)));
+               pusher_mass = (S16)((F32)(pusher_mass) * (1.0f / (F32)(push->pushers[p].collided_with_block_count)));
+
+               LOG("pusher %d collided with %d blocks\n", push->pushers[p].index, push->pushers[p].collided_with_block_count);
 
                Vec_t rotated_pusher_vel = vec_rotate_quadrants_clockwise(pusher->vel, push->portal_rotations);
                F32 vel = 0;
@@ -1822,10 +1821,10 @@ BlockCollisionPushResult_t block_collision_push(BlockPush_t* push, World_t* worl
           auto direction_to_check = direction_opposite(push_direction);
 
           for(S16 p = 0; p < push->pusher_count; p++){
-               auto* pusher = world->blocks.elements + push->pusher_indices[p];
+               auto* pusher = world->blocks.elements + push->pushers[p].index;
 
                S16 pusher_mass = get_block_stack_mass(world, pusher);
-               pusher_mass = (S16)((F32)(pusher_mass) * (1.0f / (F32)(push->collided_with_block_count)));
+               pusher_mass = (S16)((F32)(pusher_mass) * (1.0f / (F32)(push->pushers[p].collided_with_block_count)));
 
                Vec_t rotated_pusher_vel = vec_rotate_quadrants_clockwise(pusher->vel, push->portal_rotations);
 
@@ -1852,7 +1851,7 @@ BlockCollisionPushResult_t block_collision_push(BlockPush_t* push, World_t* worl
                                                                          scale_push_velocity, world, &push_result);
 
                if(!push->entangled && (push_result.pushed || push_result.force_flowed_through)){
-                    auto entangled_pushes = push_entangled_block_pushes(pushee, world, push_direction, pusher, push->collided_with_block_count, &instant_momentum);
+                    auto entangled_pushes = push_entangled_block_pushes(pushee, world, push_direction, pusher, push->pushers[p].collided_with_block_count, &instant_momentum);
                     result.entangled_block_pushes.merge(&entangled_pushes);
                }
 
@@ -1877,12 +1876,12 @@ BlockCollisionPushResult_t block_collision_push(BlockPush_t* push, World_t* worl
                          if((current_vel > 0 && current_vel < deal_with_push_result_result.new_vel) ||
                             (current_vel < 0 && current_vel > deal_with_push_result_result.new_vel)){
                               auto entangled_pushes = push_entangled_block_pushes(deal_with_push_result_result.block_receiving_force, world, direction_opposite(deal_with_push_result_result.final_direction),
-                                                                                  pusher, push->collided_with_block_count, &instant_momentum);
+                                                                                  pusher, push->pushers[p].collided_with_block_count, &instant_momentum);
                               result.entangled_block_pushes.merge(&entangled_pushes);
                          }else if((current_vel > 0 && deal_with_push_result_result.new_vel < 0) ||
                                   (current_vel < 0 && deal_with_push_result_result.new_vel > 0)){
                               auto entangled_pushes = push_entangled_block_pushes(deal_with_push_result_result.block_receiving_force, world, deal_with_push_result_result.final_direction,
-                                                                                  pusher, push->collided_with_block_count, &instant_momentum);
+                                                                                  pusher, push->pushers[p].collided_with_block_count, &instant_momentum);
                               result.entangled_block_pushes.merge(&entangled_pushes);
                          }
                     }

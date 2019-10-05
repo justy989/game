@@ -1003,7 +1003,7 @@ void consolidate_block_pushes(BlockPushes_t<128>* block_pushes, BlockPushes_t<12
                if(push->pushee_index == consolidated_push->pushee_index &&
                   push->direction_mask == consolidated_push->direction_mask &&
                   push->portal_rotations == consolidated_push->portal_rotations){
-                    consolidated_push->add_pusher(push->pusher_indices[0]);
+                    consolidated_push->add_pusher(push->pushers[0].index, push->pushers[0].collided_with_block_count);
                     consolidated_current_push = true;
                }
           }
@@ -3124,13 +3124,22 @@ int main(int argc, char** argv){
                               all_consolidated_block_pushes.merge(&result.entangled_block_pushes);
                          }
 
+                         // TODO: I don't think getting the max collided with block count is right fore determining
+                         // the cancellable block pushes
+                         S16 max_collided_with_block_count = 0;
+                         for(S16 p = 0; p < block_push.pusher_count; p++){
+                              if(block_push.pushers[p].collided_with_block_count > max_collided_with_block_count){
+                                   max_collided_with_block_count = block_push.pushers[p].collided_with_block_count;
+                              }
+                         }
+
                          // for simultaneous pushes, skip ahead because they should not be cancelled
                          S16 cancellable_block_pushes = i + 1;
                          if(simultaneous_block_pushes > 0){
                               simultaneous_block_pushes--;
                               cancellable_block_pushes += simultaneous_block_pushes;
-                         }else if(block_push.collided_with_block_count > 1){
-                              simultaneous_block_pushes = block_push.collided_with_block_count - 1;
+                         }else if(max_collided_with_block_count > 1){
+                              simultaneous_block_pushes = max_collided_with_block_count - 1;
                               cancellable_block_pushes += simultaneous_block_pushes;
                          }
 
@@ -3141,7 +3150,7 @@ int main(int argc, char** argv){
                               for(S16 j = cancellable_block_pushes; j < all_consolidated_block_pushes.count; j++){
                                    auto& check_block_push = all_consolidated_block_pushes.pushes[j];
 
-                                   if(block_pushed.block_index == check_block_push.pusher_indices[0] &&
+                                   if(block_pushed.block_index == check_block_push.pushers[0].index &&
                                       direction_in_mask(check_block_push.direction_mask, block_pushed.direction)){
                                         check_block_push.invalidated = true;
                                    }
@@ -3165,6 +3174,8 @@ int main(int argc, char** argv){
                               if(block_change.block_index != i) continue;
 
                               F32 ratio = (F32)(block_change.mass) / (F32)(block_mass);
+
+                              LOG("block %d where %d of the mass is given %f vel, at a ratio of %f\n", i, block_change.mass, block_change.vel, ratio);
 
                               if(block_change.x){
                                    new_vel.x += block_change.vel * ratio;
