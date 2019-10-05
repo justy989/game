@@ -1091,8 +1091,8 @@ int main(int argc, char** argv){
           return 1;
      }
 
-     int window_width = 2160;
-     int window_height = 2160;
+     int window_width = 1024;
+     int window_height = 1024;
      SDL_Window* window = nullptr;
      SDL_GLContext opengl_context = nullptr;
      GLuint theme_texture = 0;
@@ -3112,20 +3112,9 @@ int main(int argc, char** argv){
 
                     consolidate_block_pushes(&all_block_pushes, &all_consolidated_block_pushes);
 
-                    if(all_consolidated_block_pushes.count){
-                         LOG("%d block pushes\n", all_consolidated_block_pushes.count);
-                    }
-
                     for(S16 i = 0; i < all_consolidated_block_pushes.count; i++){
                          auto& block_push = all_consolidated_block_pushes.pushes[i];
                          if(block_push.invalidated) continue;
-                         auto* block = world.blocks.elements + block_push.pushee_index;
-
-                         LOG("  block %d vel %f, %f pushed by %d block(s) ", block_push.pushee_index, block->vel.x, block->vel.y, block_push.pusher_count);
-                         for(S16 p = 0; p < block_push.pusher_count; p++){
-                              LOG("%d ", block_push.pusher_indices[p]);
-                         }
-                         LOG("\n");
 
                          auto result = block_collision_push(&block_push, &world);
 
@@ -3160,34 +3149,34 @@ int main(int argc, char** argv){
                          }
                     }
 
-                    if(momentum_changes.count){
-                         LOG("%d momentum changes\n", momentum_changes.count);
-                    }
+                    // TODO: Loop over momentum changes and build a list of blocks for us to loop over here
 
-                    // clear momentum for each impacted block
-                    for(S16 c = 0; c < momentum_changes.count; c++){
-                         auto& block_change = momentum_changes.changes[c];
-                         auto* block = world.blocks.elements + block_change.block_index;
-                         LOG("  block %d vel %f x ", block_change.block_index, block_change.change / get_block_stack_mass(&world, block));
-                         if(block_change.x){
-                              LOG("current vel x: %f\n", block->vel.x);
-                              block->vel.x = 0;
-                         }else{
-                              LOG("current vel x: %f\n", block->vel.y);
-                              block->vel.y = 0;
-                         }
-                    }
+                    for(S16 i = 0; i < world.blocks.count; i++){
+                         auto* block = world.blocks.elements + i;
+                         auto block_mass = get_block_stack_mass(&world, block);
 
-                    // add momentum
-                    for(S16 c = 0; c < momentum_changes.count; c++){
-                         auto& block_change = momentum_changes.changes[c];
-                         auto* block = world.blocks.elements + block_change.block_index;
-                         F32 add_vel = block_change.change / get_block_stack_mass(&world, block);
-                         if(block_change.x){
-                              block->vel.x += add_vel;
-                         }else{
-                              block->vel.y += add_vel;
+                         S16 x_changes = 0;
+                         S16 y_changes = 0;
+                         Vec_t new_vel = vec_zero();
+
+                         // clear momentum for each impacted block
+                         for(S16 c = 0; c < momentum_changes.count; c++){
+                              auto& block_change = momentum_changes.changes[c];
+                              if(block_change.block_index != i) continue;
+
+                              F32 ratio = (F32)(block_change.mass) / (F32)(block_mass);
+
+                              if(block_change.x){
+                                   new_vel.x += block_change.vel * ratio;
+                                   x_changes++;
+                              }else{
+                                   new_vel.y += block_change.vel * ratio;
+                                   y_changes++;
+                              }
                          }
+
+                         if(x_changes) block->vel.x = new_vel.x;
+                         if(y_changes) block->vel.y = new_vel.y;
                     }
 
                     // set coasting or idling based on velocity

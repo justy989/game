@@ -1571,26 +1571,20 @@ DealWithPushResult_t deal_with_push_result(Block_t* pusher, Direction_t directio
      case DIRECTION_RIGHT:
           if(push_result->transferred_momentum_back()){
                F32 new_vel = push_result->velocity * scale_push_velocity;
-               auto block_mass = get_block_stack_mass(world, block_receiving_force);
-
-               result.momentum_changes.add(block_receiving_force_index, new_vel * block_mass, true);
+               result.momentum_changes.add(block_receiving_force_index, push_result->mass, new_vel, true);
                result.new_vel = new_vel;
           }else{
-               result.momentum_changes.add(block_receiving_force_index, 0.0f, true);
+               result.momentum_changes.add(block_receiving_force_index, push_result->mass, 0.0f, true);
           }
           break;
      case DIRECTION_UP:
      case DIRECTION_DOWN:
           if(push_result->transferred_momentum_back()){
                F32 new_vel = push_result->velocity * scale_push_velocity;
-               auto block_mass = get_block_stack_mass(world, block_receiving_force);
-
-               LOG("    give block %d vel %f\n", block_receiving_force_index, new_vel);
-               result.momentum_changes.add(block_receiving_force_index, new_vel * block_mass, false);
+               result.momentum_changes.add(block_receiving_force_index, push_result->mass, new_vel, false);
                result.new_vel = new_vel;
           }else{
-               LOG("    stop block %d\n", block_receiving_force_index);
-               result.momentum_changes.add(block_receiving_force_index, 0.0f, false);
+               result.momentum_changes.add(block_receiving_force_index, push_result->mass, 0.0f, false);
           }
           break;
      }
@@ -1634,7 +1628,6 @@ void push_entangled_block(Block_t* block, World_t* world, Direction_t push_dir, 
 
                     auto allowed_result = allowed_to_push(world, entangled_block, rotated_dir, &rotated_instant_momentum);
                     if(allowed_result.push){
-                         LOG("  push entangled block %d\n", get_block_index(world, entangled_block));
                          block_push(entangled_block, rotated_dir, world, pushed_by_ice, allowed_result.mass_ratio, &rotated_instant_momentum, true);
                     }
                }else{
