@@ -278,29 +278,31 @@ struct BlockAgainstOthersResult_t{
      }
 };
 
-struct BlockMomentumChange_t{
+struct BlockColliderMomentum_t{
      S16 block_index = -1;
-     F32 change = 0;
+     S16 mass = 0;
+     F32 vel = 0;
      bool x = false;
 };
 
-struct BlockMomentumChanges_t{
-     BlockMomentumChange_t changes[MAX_BLOCK_CHANGES];
+struct BlockColliderMomentums_t{
+     BlockColliderMomentum_t changes[MAX_BLOCK_CHANGES];
      S16 count = 0;
 
-     bool add(S16 block_index, F32 change, bool x){
+     bool add(S16 block_index, S16 mass, F32 vel, bool x){
           if(count >= MAX_BLOCK_CHANGES) return false;
           changes[count].block_index = block_index;
-          changes[count].change = change;
+          changes[count].mass = mass;
+          changes[count].vel = vel;
           changes[count].x = x;
           count++;
           return true;
      }
 
-     void merge(BlockMomentumChanges_t* block_changes){
+     void merge(BlockColliderMomentums_t* block_changes){
           for(S16 i = 0; i < block_changes->count; i++){
                auto* change = block_changes->changes + i;
-               add(change->block_index, change->change, change->x);
+               add(change->block_index, change->mass, change->vel, change->x);
           }
      }
 };
@@ -326,7 +328,7 @@ struct BlockCollisionPushResult_t{
           return true;
      }
 
-     BlockMomentumChanges_t momentum_changes;
+     BlockColliderMomentums_t collider_momentums;
 };
 
 void add_block_held(BlockHeldResult_t* result, Block_t* block, Rect_t rect);

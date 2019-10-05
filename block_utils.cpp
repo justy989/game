@@ -1501,7 +1501,6 @@ Interactive_t* block_is_teleporting(Block_t* block, QuadTreeNode_t<Interactive_t
 }
 
 struct DealWithPushResult_t{
-     BlockMomentumChanges_t momentum_changes;
      Block_t* block_receiving_force = nullptr;
      Direction_t final_direction = DIRECTION_COUNT;
      F32 new_vel = 0;
@@ -1562,8 +1561,6 @@ DealWithPushResult_t deal_with_push_result(Block_t* pusher, Direction_t directio
      result.block_receiving_force = block_receiving_force;
      result.final_direction = direction_to_check;
 
-     S16 block_receiving_force_index = block_receiving_force - world->blocks.elements;
-
      switch(direction_to_check){
      default:
           break;
@@ -1571,26 +1568,14 @@ DealWithPushResult_t deal_with_push_result(Block_t* pusher, Direction_t directio
      case DIRECTION_RIGHT:
           if(push_result->transferred_momentum_back()){
                F32 new_vel = push_result->velocity * scale_push_velocity;
-               auto block_mass = get_block_stack_mass(world, block_receiving_force);
-
-               result.momentum_changes.add(block_receiving_force_index, new_vel * block_mass, true);
                result.new_vel = new_vel;
-          }else{
-               result.momentum_changes.add(block_receiving_force_index, 0.0f, true);
           }
           break;
      case DIRECTION_UP:
      case DIRECTION_DOWN:
           if(push_result->transferred_momentum_back()){
                F32 new_vel = push_result->velocity * scale_push_velocity;
-               auto block_mass = get_block_stack_mass(world, block_receiving_force);
-
-               LOG("    give block %d vel %f\n", block_receiving_force_index, new_vel);
-               result.momentum_changes.add(block_receiving_force_index, new_vel * block_mass, false);
                result.new_vel = new_vel;
-          }else{
-               LOG("    stop block %d\n", block_receiving_force_index);
-               result.momentum_changes.add(block_receiving_force_index, 0.0f, false);
           }
           break;
      }
@@ -1778,9 +1763,6 @@ BlockCollisionPushResult_t block_collision_push(BlockPush_t* push, World_t* worl
                break;
           }
 
-          // LOG("collision on ice causes block %d pushes block %d %s with mass: %d, vel: %f\n",
-          //    push->pusher_indices[0], push->pushee_index, direction_to_string(push_direction), instant_momentum.mass, instant_momentum.vel);
-
           auto push_pos = pushee->pos;
           auto push_pos_delta = pushee->pos_delta;
 
@@ -1810,10 +1792,14 @@ BlockCollisionPushResult_t block_collision_push(BlockPush_t* push, World_t* worl
                case DIRECTION_LEFT:
                case DIRECTION_RIGHT:
                     vel = rotated_pusher_vel.x;
+
+                    result.collider_momentums.add(push->pusher_indices[p], get_block_stack_mass(world, pushee), pushee->vel.x, true);
                     break;
                case DIRECTION_UP:
                case DIRECTION_DOWN:
                     vel = rotated_pusher_vel.y;
+
+                    result.collider_momentums.add(push->pusher_indices[p], get_block_stack_mass(world, pushee), pushee->vel.y, false);
                     break;
                }
 
@@ -1823,6 +1809,9 @@ BlockCollisionPushResult_t block_collision_push(BlockPush_t* push, World_t* worl
           }
 
           instant_momentum.vel = total_momentum / instant_momentum.mass;
+
+          LOG("collision on ice causes block %d pushes block %d %s with mass: %d, vel: %f\n",
+             push->pusher_indices[0], push->pushee_index, direction_to_string(push_direction), instant_momentum.mass, instant_momentum.vel);
 
           auto push_result = block_push(pushee, push_pos, push_pos_delta, push_direction, world, true, 1.0f, &instant_momentum);
 
@@ -1894,8 +1883,6 @@ BlockCollisionPushResult_t block_collision_push(BlockPush_t* push, World_t* worl
                          }
                     }
                }
-
-               result.momentum_changes.merge(&deal_with_push_result_result.momentum_changes);
           }
      }
 
