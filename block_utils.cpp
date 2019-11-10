@@ -1421,9 +1421,9 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
 
                          push.portal_rotations = block_inside_result.entries[i].portal_rotations;
 
-                         LOG("Add push, block %d %s | %s %d pr %d result vel: %f, %f collided with blocks %d\n",
-                             block_index, direction_to_string(first_direction), direction_to_string(second_direction), push.pushee_index, push.portal_rotations,
-                             result.vel.x, result.vel.y, collided_with_blocks_on_ice);
+                         // LOG("Add push, pusher: block %d %s | %s pushee: block %d portal rot: %d result vel: %f, %f collided with blocks %d\n",
+                         //     block_index, direction_to_string(first_direction), direction_to_string(second_direction), push.pushee_index, push.portal_rotations,
+                         //     result.vel.x, result.vel.y, collided_with_blocks_on_ice);
 
                          result.block_pushes.add(&push);
                     }
@@ -1768,9 +1768,6 @@ BlockCollisionPushResult_t block_collision_push(BlockPush_t* push, World_t* worl
                break;
           }
 
-          // LOG("collision on ice causes block %d pushes block %d %s with mass: %d, vel: %f\n",
-          //    push->pusher_indices[0], push->pushee_index, direction_to_string(push_direction), instant_momentum.mass, instant_momentum.vel);
-
           auto push_pos = pushee->pos;
           auto push_pos_delta = pushee->pos_delta;
 
@@ -1790,8 +1787,6 @@ BlockCollisionPushResult_t block_collision_push(BlockPush_t* push, World_t* worl
                // TODO: have a collided_with_block_counts for each pusher_index
                S16 pusher_mass = get_block_stack_mass(world, pusher);
                pusher_mass = (S16)((F32)(pusher_mass) * (1.0f / (F32)(push->pushers[p].collided_with_block_count)));
-
-               LOG("pusher %d collided with %d blocks\n", push->pushers[p].index, push->pushers[p].collided_with_block_count);
 
                Vec_t rotated_pusher_vel = vec_rotate_quadrants_clockwise(pusher->vel, push->portal_rotations);
                F32 vel = 0;

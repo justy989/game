@@ -3116,6 +3116,22 @@ int main(int argc, char** argv){
                          auto& block_push = all_consolidated_block_pushes.pushes[i];
                          if(block_push.invalidated) continue;
 
+                         // if the block being pushed is entangled, add block pushes for those
+                         Block_t* pushee = world.blocks.elements + block_push.pushee_index;
+                         if(!block_push.entangled && pushee->entangle_index >= 0){
+                              S16 current_entangle_index = pushee->entangle_index;
+                              while(current_entangle_index != block_push.pushee_index && current_entangle_index >= 0){
+                                  Block_t* entangler = world.blocks.elements + current_entangle_index;
+                                  BlockPush_t new_block_push = block_push;
+                                  S8 rotations_between_blocks = blocks_rotations_between(entangler, pushee);
+                                  new_block_push.pushee_index = current_entangle_index;
+                                  new_block_push.portal_rotations = (block_push.portal_rotations + rotations_between_blocks) % DIRECTION_COUNT;
+                                  new_block_push.entangled = true;
+                                  all_consolidated_block_pushes.add(&new_block_push);
+                                  current_entangle_index = entangler->entangle_index;
+                              }
+                         }
+
                          auto result = block_collision_push(&block_push, &world);
 
                          momentum_changes.merge(&result.momentum_changes);
@@ -3174,8 +3190,6 @@ int main(int argc, char** argv){
                               if(block_change.block_index != i) continue;
 
                               F32 ratio = (F32)(block_change.mass) / (F32)(block_mass);
-
-                              LOG("block %d where %d of the mass is given %f vel, at a ratio of %f\n", i, block_change.mass, block_change.vel, ratio);
 
                               if(block_change.x){
                                    new_vel.x += block_change.vel * ratio;

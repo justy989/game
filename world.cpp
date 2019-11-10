@@ -2249,8 +2249,8 @@ ElasticCollisionResult_t elastic_transfer_momentum(F32 mass_1, F32 vel_i_1, F32 
      result.second_final_velocity = (initial_momentums + brought_over_to_left) / divided_by;
      result.first_final_velocity = vel_i_2 + result.second_final_velocity - vel_i_1;
 
-     LOG("m1: %f, v1: %f, m2: %f, v2: %f, v1f: %f, v2f: %f\n",
-         mass_1, vel_i_1, mass_2, vel_i_2, result.first_final_velocity, result.second_final_velocity);
+     // LOG("m1: %f, v1: %f, m2: %f, v2: %f, v1f: %f, v2f: %f\n",
+     //     mass_1, vel_i_1, mass_2, vel_i_2, result.first_final_velocity, result.second_final_velocity);
 
      return result;
 }
