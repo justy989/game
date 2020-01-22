@@ -16,6 +16,8 @@ Entanglement Puzzles:
 - rotated entangled puzzles where the centroid is on a portal destination coord
 
 Current bugs:
+- in map 42, when I had 4 blocks lined up on the column of the pressure plate, and 1 block to the right at the bottom
+  of the collumn. When I pushed that 1 block up, the bottom block in the column of 4 disappeared
 - for collision, can shorten things pos_deltas before we cause pushes to happen on ice in the same frame due to collisions ?
 - continuing to push a block through a collision on ice causes bad things to happen
 - a block travelling diagonally at a wall will stop on both axis' against the wall because of the collision
@@ -83,6 +85,8 @@ You can use the normal blocks to guide the these realistic blocks for some sweet
 It can be a more jaggy shape to represent how the real world is much messier
 
 Should we ice the under side of a block when it is in the air near an ice lit block?
+
+build the entangled pushes before the loop and then when invalidating, we need to invalidate the entangled pushes that we added
 
 */
 
@@ -1023,6 +1027,8 @@ int main(int argc, char** argv){
      S16 first_map_number = 0;
      S16 first_frame = 0;
      S16 fail_count = 0;
+     int window_width = 800;
+     int window_height = 800;
 
      Demo_t demo {};
 
@@ -1063,6 +1069,14 @@ int main(int argc, char** argv){
                demo.dt_scalar = (F32)(atof(argv[next]));
           }else if(strcmp(argv[i], "-failslow") == 0){
                fail_slow = true;
+          }else if(strcmp(argv[i], "-windowwidth") == 0){
+               int next = i + 1;
+               if(next >= argc) continue;
+               window_width = atoi(argv[next]);
+          }else if(strcmp(argv[i], "-windowheight") == 0){
+               int next = i + 1;
+               if(next >= argc) continue;
+               window_height = atoi(argv[next]);
           }else if(strcmp(argv[i], "-h") == 0){
                printf("%s [options]\n", argv[0]);
                printf("  -play   <demo filepath> replay a recorded demo file\n");
@@ -1075,6 +1089,8 @@ int main(int argc, char** argv){
                printf("  -speed  <decimal>       when replaying a demo, specify how fast/slow to replay where 1.0 is realtime\n");
                printf("  -frame  <integer>       which frame to play to automatically before drawing\n");
                printf("  -failslow               opposite of failfast, where we continue running tests in the suite after failure\n");
+               printf("  -windowwidth            set the width of the window. default: 800\n");
+               printf("  -windowheight           set the height of the window. default: 800\n");
                printf("  -h this help.\n");
                return 0;
           }
@@ -1091,8 +1107,6 @@ int main(int argc, char** argv){
           return 1;
      }
 
-     int window_width = 1024;
-     int window_height = 1024;
      SDL_Window* window = nullptr;
      SDL_GLContext opengl_context = nullptr;
      GLuint theme_texture = 0;
@@ -2739,6 +2753,7 @@ int main(int argc, char** argv){
                          }
                     }
 
+                    // update carried blocks pos_delta based on carrying blocks pos_delta
                     for(S16 i = 0; i < world.blocks.count; i++){
                          auto block = world.blocks.elements + i;
 
@@ -2796,6 +2811,7 @@ int main(int argc, char** argv){
                          }
                     }
 
+                    // see if any moving blocks teleport
                     for(S16 i = 0; i < world.blocks.count; i++){
                          auto block = world.blocks.elements + i;
                          if(block->teleport) continue;
