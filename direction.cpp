@@ -118,3 +118,13 @@ bool direction_is_horizontal(Direction_t dir){
 bool direction_is_positive(Direction_t dir){
      return dir == DIRECTION_RIGHT || dir == DIRECTION_UP;
 }
+
+bool direction_horizontal_in_mask(DirectionMask_t mask){
+     return direction_in_mask(mask, DIRECTION_LEFT) ||
+            direction_in_mask(mask, DIRECTION_RIGHT);
+}
+
+bool direction_vertical_in_mask(DirectionMask_t mask){
+     return direction_in_mask(mask, DIRECTION_UP) ||
+            direction_in_mask(mask, DIRECTION_DOWN);
+}

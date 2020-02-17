@@ -1,7 +1,8 @@
 #!/bin/bash
 set -x
 SOURCES=($(ls *.cpp))
-FLAGS='-Wall -Werror -Wshadow -Wextra -std=c++11 -ggdb3 -DDEBUG -O3'
+#FLAGS='-Wall -Werror -Wshadow -Wextra -std=c++11 -ggdb3 -DDEBUG -O3'
+FLAGS='-Wall -Werror -Wshadow -Wextra -std=c++11 -ggdb3 -DDEBUG'
 EXE='game'
 LINK='-lSDL2 -lGL -pthread'
 clang++ $FLAGS $@ ${SOURCES[*]} -o $EXE $LINK

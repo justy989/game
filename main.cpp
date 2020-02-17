@@ -1026,13 +1026,13 @@ void log_block_pushes(BlockPushes_t<128>& block_pushes)
           LOG(" invalidated      : %d\n", block_push.invalidated);
           if(block_push.invalidated) continue;
 
-          LOG(" pushers          : %d\n", block_push.pusher_count);
+          LOG(" pushee           : %d\n", block_push.pushee_index);
+          LOG(" pushers (%d)\n", block_push.pusher_count);
           for(S8 p = 0; p < block_push.pusher_count; p++){
               LOG("  pusher          : %d\n", block_push.pushers[p].index);
               LOG("  collided_with   : %d\n", block_push.pushers[p].collided_with_block_count);
               LOG("  entangled       : %d\n", block_push.pushers[p].entangled);
           }
-          LOG(" pushee           : %d\n", block_push.pushee_index);
           LOG(" direction_mask   : %d\n", block_push.direction_mask);
           LOG(" portal_rotations : %d\n", block_push.portal_rotations);
           LOG(" invalidated      : %d\n", block_push.invalidated);
@@ -1148,7 +1148,7 @@ int main(int argc, char** argv){
           }
 
           LOG("Create window: %d, %d\n", window_width, window_height);
-          window = SDL_CreateWindow("bryte", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, window_width, window_height, SDL_WINDOW_OPENGL);
+          window = SDL_CreateWindow("bryte", (1920 / 2) - window_width / 2, SDL_WINDOWPOS_CENTERED, window_width, window_height, SDL_WINDOW_OPENGL);
           if(!window) return 1;
 
           opengl_context = SDL_GL_CreateContext(window);
@@ -3181,6 +3181,7 @@ int main(int argc, char** argv){
                     }
 
                     log_block_pushes(all_block_pushes);
+
                     if(all_consolidated_block_pushes.count > 0){
                          LOG("pre collision push consolidated block pushes: %d\n", all_consolidated_block_pushes.count);
                     }
@@ -3192,6 +3193,34 @@ int main(int argc, char** argv){
                          if(block_push.invalidated) continue;
 
                          auto result = block_collision_push(&block_push, &world);
+
+                         // any momentum changes that stop a block, means that block could not have pushed anything, so invalidate it's pushes
+                         for(S16 m = 0; m < result.momentum_changes.count; m++){
+                             auto& block_change = result.momentum_changes.changes[m];
+
+                             if(block_change.vel != 0) continue;
+
+                             for(S16 j = i + 1; j < all_consolidated_block_pushes.count; j++){
+                                 auto& check_block_push = all_consolidated_block_pushes.pushes[j];
+
+                                 for(S16 p = 0; p < check_block_push.pusher_count; p++){
+                                     auto& check_pusher = check_block_push.pushers[p];
+
+                                     if(check_pusher.index != block_change.block_index) continue;
+                                     if(check_pusher.entangled) continue;
+
+                                     if(block_change.x){
+                                         if(direction_horizontal_in_mask(check_block_push.direction_mask)){
+                                              check_block_push.remove_pusher(p);
+                                         }
+                                     }else{
+                                         if(direction_vertical_in_mask(check_block_push.direction_mask)){
+                                              check_block_push.remove_pusher(p);
+                                         }
+                                     }
+                                 }
+                             }
+                         }
 
                          momentum_changes.merge(&result.momentum_changes);
 
@@ -3232,6 +3261,20 @@ int main(int argc, char** argv){
                               }
                          }
                     }
+
+#if 0
+                    if(momentum_changes.count > 1){
+                         LOG("momentum changes: %d\n", momentum_changes.count);
+                    }
+                    for(S16 c = 0; c < momentum_changes.count; c++){
+                         auto& block_change = momentum_changes.changes[c];
+                         if(block_change.x){
+                              LOG("  block %d with mass %d changes vel x: %f\n", block_change.block_index, block_change.mass, block_change.vel);
+                         }else{
+                              LOG("  block %d with mass %d changes vel y: %f\n", block_change.block_index, block_change.mass, block_change.vel);
+                         }
+                    }
+#endif
 
                     // TODO: Loop over momentum changes and build a list of blocks for us to loop over here
 

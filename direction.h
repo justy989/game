@@ -51,3 +51,5 @@ Direction_t direction_from_single_mask(DirectionMask_t mask);
 const char* direction_to_string(Direction_t dir);
 bool direction_is_horizontal(Direction_t dir);
 bool direction_is_positive(Direction_t dir);
+bool direction_horizontal_in_mask(DirectionMask_t mask);
+bool direction_vertical_in_mask(DirectionMask_t mask);

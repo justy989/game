@@ -150,6 +150,23 @@ struct BlockPush_t{
           pusher_count++;
           return true;
      }
+
+     bool remove_pusher(S16 index){
+          if(index < 0 || index >= pusher_count) return false;
+
+          // if there only 1 remove it and invalidate it
+          if(pusher_count == 1){
+              pusher_count = 0;
+              invalidated = true;
+          }else{
+              // swap the last one to this place
+              S16 last_index = pusher_count - 1;
+              pushers[index] = pushers[last_index];
+              pusher_count--;
+          }
+
+          return true;
+     }
 };
 
 template <S16 MAX_BLOCK_PUSHES>
