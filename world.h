@@ -53,10 +53,12 @@ struct BlockPushResult_t{
      bool pushed = false;
      bool force_flowed_through = false;
      bool busy = false;
-     S16 mass = 0;
-     F32 velocity = 0;
+     S16 pushee_mass = 0;
+     F32 pushee_velocity = 0;
+     S16 pusher_mass = 0;
+     F32 pusher_velocity = 0;
 
-     bool transferred_momentum_back(){return velocity != 0;}
+     bool transferred_momentum_back(){return pusher_velocity != 0;}
 };
 
 struct BlockPushMoveDirectionResult_t{

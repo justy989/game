@@ -1506,7 +1506,7 @@ struct DealWithPushResult_t{
 };
 
 DealWithPushResult_t deal_with_push_result(Block_t* pusher, Direction_t direction_to_check, S8 portal_rotations,
-                                           F32 scale_push_velocity, World_t* world, BlockPushResult_t* push_result){
+                                           TransferMomentum_t* pusher_momentum, World_t* world, BlockPushResult_t* push_result){
      DealWithPushResult_t result;
 
      // TODO: this rotation up here is clockwise, while the rotations below are counter clockwise, ugh
@@ -1553,7 +1553,7 @@ DealWithPushResult_t deal_with_push_result(Block_t* pusher, Direction_t directio
           total_against_rotations %= DIRECTION_COUNT;
 
           if(negate_push_direction_table[save_direction_to_check][total_against_rotations]){
-               push_result->velocity = -push_result->velocity;
+               push_result->pusher_velocity = -push_result->pusher_velocity;
           }
      }
 
@@ -1568,21 +1568,21 @@ DealWithPushResult_t deal_with_push_result(Block_t* pusher, Direction_t directio
      case DIRECTION_LEFT:
      case DIRECTION_RIGHT:
           if(push_result->transferred_momentum_back()){
-               F32 new_vel = push_result->velocity * scale_push_velocity;
-               result.momentum_changes.add(block_receiving_force_index, push_result->mass, new_vel, true);
-               result.new_vel = new_vel;
+               auto elastic_result = elastic_transfer_momentum(pusher_momentum->mass, pusher_momentum->vel, push_result->pushee_mass, push_result->pushee_velocity);
+               result.momentum_changes.add(block_receiving_force_index, pusher_momentum->mass, elastic_result.first_final_velocity, true);
+               result.new_vel = elastic_result.first_final_velocity;
           }else{
-               result.momentum_changes.add(block_receiving_force_index, push_result->mass, 0.0f, true);
+               result.momentum_changes.add(block_receiving_force_index, pusher_momentum->mass, 0.0f, true);
           }
           break;
      case DIRECTION_UP:
      case DIRECTION_DOWN:
           if(push_result->transferred_momentum_back()){
-               F32 new_vel = push_result->velocity * scale_push_velocity;
-               result.momentum_changes.add(block_receiving_force_index, push_result->mass, new_vel, false);
-               result.new_vel = new_vel;
+               auto elastic_result = elastic_transfer_momentum(pusher_momentum->mass, pusher_momentum->vel, push_result->pushee_mass, push_result->pushee_velocity);
+               result.momentum_changes.add(block_receiving_force_index, pusher_momentum->mass, elastic_result.first_final_velocity, false);
+               result.new_vel = elastic_result.first_final_velocity;
           }else{
-               result.momentum_changes.add(block_receiving_force_index, push_result->mass, 0.0f, false);
+               result.momentum_changes.add(block_receiving_force_index, pusher_momentum->mass, 0.0f, false);
           }
           break;
      }
@@ -1743,7 +1743,6 @@ BlockCollisionPushResult_t block_collision_push(BlockPush_t* push, World_t* worl
      BlockCollisionPushResult_t result;
 
      auto* pushee = world->blocks.elements + push->pushee_index;
-
      for(S16 d = 0; d < DIRECTION_COUNT; d++){
           Direction_t direction = (Direction_t)(d);
           if(!direction_in_mask(push->direction_mask, direction)) continue;
@@ -1804,7 +1803,7 @@ BlockCollisionPushResult_t block_collision_push(BlockPush_t* push, World_t* worl
                     break;
                }
 
-               // TODO: normalize momentum to a specific mass, maybe juse use the first one ?
+               // TODO: normalize momentum to a specific mass, maybe just use the first one ?
                total_momentum += (F32)(pusher_mass) * vel;
                instant_momentum.mass += pusher_mass;
           }
@@ -1813,39 +1812,41 @@ BlockCollisionPushResult_t block_collision_push(BlockPush_t* push, World_t* worl
 
           auto push_result = block_push(pushee, push_pos, push_pos_delta, push_direction, world, true, 1.0f, &instant_momentum);
 
+          // LOG("push result: pushee: %d, %f pusher: %d, %f\n", push_result.pushee_mass, push_result.pushee_velocity, push_result.pusher_mass, push_result.pusher_velocity);
+
           auto direction_to_check = direction_opposite(push_direction);
 
           for(S16 p = 0; p < push->pusher_count; p++){
                auto* pusher = world->blocks.elements + push->pushers[p].index;
+
+               if(push->pushers[p].entangled) continue;
 
                S16 pusher_mass = get_block_stack_mass(world, pusher);
                pusher_mass = (S16)((F32)(pusher_mass) * (1.0f / (F32)(push->pushers[p].collided_with_block_count)));
 
                Vec_t rotated_pusher_vel = vec_rotate_quadrants_clockwise(pusher->vel, push->portal_rotations);
 
-               // TODO: scale based on how much this pusher contributed to total momentum
-               F32 scale_push_velocity = 1.0f;
-               F32 current_momentum = 0;
+               TransferMomentum_t pusher_momentum;
+               pusher_momentum.mass = pusher_mass;
 
                switch(push_direction){
                default:
                     break;
                case DIRECTION_LEFT:
                case DIRECTION_RIGHT:
-                    current_momentum = rotated_pusher_vel.x * (F32)(pusher_mass);
+                    pusher_momentum.vel = rotated_pusher_vel.x;
                     break;
                case DIRECTION_UP:
                case DIRECTION_DOWN:
-                    current_momentum = rotated_pusher_vel.y * (F32)(pusher_mass);
+                    pusher_momentum.vel = rotated_pusher_vel.y;
                     break;
                }
 
-               scale_push_velocity = current_momentum / total_momentum;
-
                auto deal_with_push_result_result = deal_with_push_result(pusher, direction_to_check, push->portal_rotations,
-                                                                         scale_push_velocity, world, &push_result);
+                                                                         &pusher_momentum, world, &push_result);
 
-               if(!push->entangled && (push_result.pushed || push_result.force_flowed_through)){
+               // force could have flowed through in the initial push but due to an entangled block pushing (and it's entanglers pushing), it could actually not move
+               if(!push->entangled && (push_result.pushed || push_result.force_flowed_through) && deal_with_push_result_result.new_vel != 0){
                     auto entangled_pushes = push_entangled_block_pushes(pushee, world, push_direction, pusher, push->pushers[p].collided_with_block_count, &instant_momentum);
                     result.entangled_block_pushes.merge(&entangled_pushes);
                }
@@ -1882,7 +1883,10 @@ BlockCollisionPushResult_t block_collision_push(BlockPush_t* push, World_t* worl
                     }
                }
 
-               result.momentum_changes.merge(&deal_with_push_result_result.momentum_changes);
+               // entangled pushes don't transfer momentum back to the pusher since they aren't there
+               if(!push->pushers[p].entangled){
+                    result.momentum_changes.merge(&deal_with_push_result_result.momentum_changes);
+               }
           }
      }
 

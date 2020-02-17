@@ -1007,13 +1007,36 @@ void consolidate_block_pushes(BlockPushes_t<128>* block_pushes, BlockPushes_t<12
                if(push->pushee_index == consolidated_push->pushee_index &&
                   push->direction_mask == consolidated_push->direction_mask &&
                   push->portal_rotations == consolidated_push->portal_rotations){
-                    consolidated_push->add_pusher(push->pushers[0].index, push->pushers[0].collided_with_block_count);
+                    consolidated_push->add_pusher(push->pushers[0].index, push->pushers[0].collided_with_block_count, push->pushers[0].entangled);
                     consolidated_current_push = true;
                }
           }
 
           // otherwise just add it
           if(!consolidated_current_push) consolidated_block_pushes->add(push);
+     }
+}
+
+void log_block_pushes(BlockPushes_t<128>& block_pushes)
+{
+     for(S16 i = 0; i < block_pushes.count; i++){
+          auto& block_push = block_pushes.pushes[i];
+
+          LOG("\nblock push: %d\n", i);
+          LOG(" invalidated      : %d\n", block_push.invalidated);
+          if(block_push.invalidated) continue;
+
+          LOG(" pushers          : %d\n", block_push.pusher_count);
+          for(S8 p = 0; p < block_push.pusher_count; p++){
+              LOG("  pusher          : %d\n", block_push.pushers[p].index);
+              LOG("  collided_with   : %d\n", block_push.pushers[p].collided_with_block_count);
+              LOG("  entangled       : %d\n", block_push.pushers[p].entangled);
+          }
+          LOG(" pushee           : %d\n", block_push.pushee_index);
+          LOG(" direction_mask   : %d\n", block_push.direction_mask);
+          LOG(" portal_rotations : %d\n", block_push.portal_rotations);
+          LOG(" invalidated      : %d\n", block_push.invalidated);
+          LOG(" entangled        : %d\n", block_push.entangled);
      }
 }
 
@@ -3121,6 +3144,30 @@ int main(int argc, char** argv){
                     collision_attempts++;
                }
 
+               // add entangled pushes
+               for(S16 i = 0; i < all_block_pushes.count; i++){
+                    auto& block_push = all_block_pushes.pushes[i];
+                    if(block_push.invalidated) continue;
+
+                    // if the block being pushed is entangled, add block pushes for those
+                    Block_t* pushee = world.blocks.elements + block_push.pushee_index;
+                    if(!block_push.entangled && pushee->entangle_index >= 0){
+                         S16 current_entangle_index = pushee->entangle_index;
+                         while(current_entangle_index != block_push.pushee_index && current_entangle_index >= 0){
+                             Block_t* entangler = world.blocks.elements + current_entangle_index;
+                             BlockPush_t new_block_push = block_push;
+                             S8 rotations_between_blocks = blocks_rotations_between(entangler, pushee);
+                             new_block_push.pushee_index = current_entangle_index;
+                             new_block_push.portal_rotations = (block_push.portal_rotations + rotations_between_blocks) % DIRECTION_COUNT;
+                             new_block_push.entangled = true;
+                             // TODO: do we ever need to do this for multiple pushers?
+                             new_block_push.pushers[0].entangled = true;
+                             all_block_pushes.add(&new_block_push);
+                             current_entangle_index = entangler->entangle_index;
+                         }
+                    }
+               }
+
                // pass to cause pushes to happen
                {
                     BlockMomentumChanges_t momentum_changes;
@@ -3128,25 +3175,21 @@ int main(int argc, char** argv){
 
                     consolidate_block_pushes(&all_block_pushes, &all_consolidated_block_pushes);
 
+#if 0
+                    if(all_block_pushes.count > 0){
+                         LOG("all block pushes: %d\n", all_block_pushes.count);
+                    }
+
+                    log_block_pushes(all_block_pushes);
+                    if(all_consolidated_block_pushes.count > 0){
+                         LOG("pre collision push consolidated block pushes: %d\n", all_consolidated_block_pushes.count);
+                    }
+                    log_block_pushes(all_consolidated_block_pushes);
+#endif
+
                     for(S16 i = 0; i < all_consolidated_block_pushes.count; i++){
                          auto& block_push = all_consolidated_block_pushes.pushes[i];
                          if(block_push.invalidated) continue;
-
-                         // if the block being pushed is entangled, add block pushes for those
-                         Block_t* pushee = world.blocks.elements + block_push.pushee_index;
-                         if(!block_push.entangled && pushee->entangle_index >= 0){
-                              S16 current_entangle_index = pushee->entangle_index;
-                              while(current_entangle_index != block_push.pushee_index && current_entangle_index >= 0){
-                                  Block_t* entangler = world.blocks.elements + current_entangle_index;
-                                  BlockPush_t new_block_push = block_push;
-                                  S8 rotations_between_blocks = blocks_rotations_between(entangler, pushee);
-                                  new_block_push.pushee_index = current_entangle_index;
-                                  new_block_push.portal_rotations = (block_push.portal_rotations + rotations_between_blocks) % DIRECTION_COUNT;
-                                  new_block_push.entangled = true;
-                                  all_consolidated_block_pushes.add(&new_block_push);
-                                  current_entangle_index = entangler->entangle_index;
-                              }
-                         }
 
                          auto result = block_collision_push(&block_push, &world);
 
@@ -3182,8 +3225,8 @@ int main(int argc, char** argv){
                               for(S16 j = cancellable_block_pushes; j < all_consolidated_block_pushes.count; j++){
                                    auto& check_block_push = all_consolidated_block_pushes.pushes[j];
 
-                                   if(block_pushed.block_index == check_block_push.pushers[0].index &&
-                                      direction_in_mask(check_block_push.direction_mask, block_pushed.direction)){
+                                   if(block_pushed.block_index == check_block_push.pushee_index &&
+                                      direction_in_mask(check_block_push.direction_mask, direction_opposite(block_pushed.direction))){
                                         check_block_push.invalidated = true;
                                    }
                               }

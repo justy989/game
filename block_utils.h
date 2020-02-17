@@ -130,6 +130,7 @@ struct BlockChanges_t{
 struct BlockPusher_t{
      S16 index = 0;
      S16 collided_with_block_count = 1;
+     bool entangled = false;
 };
 
 struct BlockPush_t{
@@ -141,10 +142,11 @@ struct BlockPush_t{
      bool invalidated = false;
      bool entangled = false;
 
-     bool add_pusher(S16 index, S16 collided_with_block_count = 1){
+     bool add_pusher(S16 index, S16 collided_with_block_count = 1, bool is_entangled = false){
           if(pusher_count >= MAX_BLOCK_PUSHERS) return false;
           pushers[pusher_count].index = index;
           pushers[pusher_count].collided_with_block_count = collided_with_block_count;
+          pushers[pusher_count].entangled = is_entangled;
           pusher_count++;
           return true;
      }
