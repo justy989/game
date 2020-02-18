@@ -1040,6 +1040,31 @@ void log_block_pushes(BlockPushes_t<128>& block_pushes)
      }
 }
 
+bool consecutive_block_pushes_are_the_same_collision(BlockPushes_t<128>& block_pushes, S16 start_index, S16 end_index, S16 block_index){
+     if(start_index < 0 || start_index > block_pushes.count) return false;
+     if(end_index < 0 || end_index > block_pushes.count) return false;
+     if(start_index > end_index) return false;
+
+     S16 expected_collided_with_block_count = (end_index - start_index) + 1;
+
+     for(S16 i = start_index; i <= end_index; i++){
+          auto& push = block_pushes.pushes[i];
+
+          bool found_index = false;
+
+          for(S16 p = 0; p < push.pusher_count; p++){
+               auto& pusher = push.pushers[p];
+               if(pusher.index != block_index) continue;
+               found_index = true;
+               if(pusher.collided_with_block_count != expected_collided_with_block_count) return false;
+          }
+
+          if(!found_index) return false;
+     }
+
+     return true;
+}
+
 int main(int argc, char** argv){
      const char* load_map_filepath = nullptr;
      bool test = false;
@@ -3194,14 +3219,12 @@ int main(int argc, char** argv){
 
                          auto result = block_collision_push(&block_push, &world);
 
-                         // any momentum changes that stop a block, means that block could not have pushed anything, so invalidate it's pushes
-                         for(S16 m = 0; m < result.momentum_changes.count; m++){
-                             auto& block_change = result.momentum_changes.changes[m];
+                         // any momentum changes that stops or changes a blocks momentum, means that block could not have pushed anything, so invalidate it's pushes
+                         for(S16 j = i + 1; j < all_consolidated_block_pushes.count; j++){
+                             auto& check_block_push = all_consolidated_block_pushes.pushes[j];
 
-                             if(block_change.vel != 0) continue;
-
-                             for(S16 j = i + 1; j < all_consolidated_block_pushes.count; j++){
-                                 auto& check_block_push = all_consolidated_block_pushes.pushes[j];
+                             for(S16 m = 0; m < result.momentum_changes.count; m++){
+                                 auto& block_change = result.momentum_changes.changes[m];
 
                                  for(S16 p = 0; p < check_block_push.pusher_count; p++){
                                      auto& check_pusher = check_block_push.pushers[p];
@@ -3210,12 +3233,24 @@ int main(int argc, char** argv){
                                      if(check_pusher.entangled) continue;
 
                                      if(block_change.x){
-                                         if(direction_horizontal_in_mask(check_block_push.direction_mask)){
-                                              check_block_push.remove_pusher(p);
+                                         if(direction_in_mask(check_block_push.direction_mask, DIRECTION_LEFT) && block_change.vel >= 0){
+                                              if(!consecutive_block_pushes_are_the_same_collision(all_consolidated_block_pushes, i, j, check_pusher.index)){
+                                                   check_block_push.remove_pusher(p);
+                                              }
+                                         }else if(direction_in_mask(check_block_push.direction_mask, DIRECTION_RIGHT) && block_change.vel <= 0){
+                                              if(!consecutive_block_pushes_are_the_same_collision(all_consolidated_block_pushes, i, j, check_pusher.index)){
+                                                   check_block_push.remove_pusher(p);
+                                              }
                                          }
                                      }else{
-                                         if(direction_vertical_in_mask(check_block_push.direction_mask)){
-                                              check_block_push.remove_pusher(p);
+                                         if(direction_in_mask(check_block_push.direction_mask, DIRECTION_DOWN) && block_change.vel >= 0){
+                                              if(!consecutive_block_pushes_are_the_same_collision(all_consolidated_block_pushes, i, j, check_pusher.index)){
+                                                   check_block_push.remove_pusher(p);
+                                              }
+                                         }else if(direction_in_mask(check_block_push.direction_mask, DIRECTION_UP) && block_change.vel <= 0){
+                                              if(!consecutive_block_pushes_are_the_same_collision(all_consolidated_block_pushes, i, j, check_pusher.index)){
+                                                   check_block_push.remove_pusher(p);
+                                              }
                                          }
                                      }
                                  }

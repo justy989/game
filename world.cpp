@@ -1401,19 +1401,18 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
                          // TODO when transferring momentum, split up the mass by how many blocks we are against that are on ice
                          if(direction_is_horizontal(direction)){
                               if(push_result.transferred_momentum_back()){
-                                   elastic_result = elastic_transfer_momentum(push_result.pushee_mass, push_result.pusher_velocity, split_instant_momentum.mass, block_push_vel);
-                                   block_push_vel = elastic_result.second_final_velocity;
+                                   elastic_result = elastic_transfer_momentum(split_instant_momentum.mass, split_instant_momentum.vel, push_result.pushee_mass, push_result.pushee_velocity);
 
                                    if(from_entangler){
-                                        block->vel.x = block_push_vel;
+                                        block->vel.x = elastic_result.first_final_velocity;
                                         block->horizontal_move.state = MOVE_STATE_COASTING;
                                         block->horizontal_move.sign = move_sign_from_vel(block->vel.x);
                                         result.pushed = true;
                                    }else{
                                         result.pushee_mass = push_result.pushee_mass;
-                                        result.pushee_velocity = block_against_dir_vel;
+                                        result.pushee_velocity = push_result.pushee_velocity;
                                         result.pusher_mass = split_instant_momentum.mass;
-                                        result.pusher_velocity = block_push_vel;
+                                        result.pusher_velocity = elastic_result.first_final_velocity;
                                         reset_move(&block->horizontal_move);
                                         result.pushed = false;
                                    }
@@ -1422,19 +1421,18 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
                               }
                          }else{
                               if(push_result.transferred_momentum_back()){
-                                   elastic_result = elastic_transfer_momentum(push_result.pushee_mass, push_result.pusher_velocity, split_instant_momentum.mass, block_push_vel);
-                                   block_push_vel = elastic_result.second_final_velocity;
+                                   elastic_result = elastic_transfer_momentum(split_instant_momentum.mass, split_instant_momentum.vel, push_result.pushee_mass, push_result.pushee_velocity);
 
                                    if(from_entangler){
-                                        block->vel.y = block_push_vel;
+                                        block->vel.y = elastic_result.first_final_velocity;
                                         block->vertical_move.state = MOVE_STATE_COASTING;
                                         block->vertical_move.sign = move_sign_from_vel(block->vel.x);
                                         result.pushed = true;
                                    }else{
                                         result.pushee_mass = push_result.pushee_mass;
-                                        result.pushee_velocity = block_against_dir_vel;
+                                        result.pushee_velocity = push_result.pushee_velocity;
                                         result.pusher_mass = split_instant_momentum.mass;
-                                        result.pusher_velocity = elastic_result.second_final_velocity;
+                                        result.pusher_velocity = elastic_result.first_final_velocity;
                                         reset_move(&block->vertical_move);
                                         result.pushed = false;
                                    }
