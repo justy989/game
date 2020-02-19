@@ -1506,24 +1506,26 @@ struct DealWithPushResult_t{
 };
 
 DealWithPushResult_t deal_with_push_result(Block_t* pusher, Direction_t direction_to_check, S8 portal_rotations,
-                                           TransferMomentum_t* pusher_momentum, World_t* world, BlockPushResult_t* push_result){
+                                           World_t* world, BlockPushResult_t* push_result, S16 collided_with_block_count){
      DealWithPushResult_t result;
 
      // TODO: this rotation up here is clockwise, while the rotations below are counter clockwise, ugh
-     auto save_direction_to_check = direction_to_check;
      direction_to_check = direction_rotate_counter_clockwise(direction_to_check, portal_rotations);
      S8 total_against_rotations = (DIRECTION_COUNT - portal_rotations);
+
+     auto pusher_direction = direction_opposite(direction_to_check);
 
      auto block_receiving_force = pusher;
 
      // TODO: handle multiple blocks we could be against
-     // adjust the force back through the chain
+     // Work backwards through the chain of against blocks to find the block that receives the force
      while(true){
           auto block_receiving_force_final_pos = block_receiving_force->pos + block_receiving_force->pos_delta;
           if(block_receiving_force->teleport) block_receiving_force_final_pos = block_receiving_force->teleport_pos + block_receiving_force->teleport_pos_delta;
 
           auto adjacent_results = block_against_other_blocks(block_receiving_force_final_pos, direction_to_check, world->block_qt,
                                                              world->interactive_qt, &world->tilemap);
+
           // ignore if we are against ourselves
           if(adjacent_results.count && adjacent_results.againsts[0].block != block_receiving_force){
                auto new_direction_to_check = direction_rotate_clockwise(direction_to_check, adjacent_results.againsts[0].rotations_through_portal);
@@ -1542,49 +1544,23 @@ DealWithPushResult_t deal_with_push_result(Block_t* pusher, Direction_t directio
           }
      }
 
-     {
-          static const bool negate_push_direction_table[DIRECTION_COUNT][DIRECTION_COUNT] = {
-               {false, true,  true, false}, // left
-               {false, false, true, true}, // up
-               {false, true,  true, false}, // right
-               {false, false,  true, true}, // down
-          };
-
-          total_against_rotations %= DIRECTION_COUNT;
-
-          if(negate_push_direction_table[save_direction_to_check][total_against_rotations]){
-               push_result->pusher_velocity = -push_result->pusher_velocity;
-          }
-     }
-
      result.block_receiving_force = block_receiving_force;
      result.final_direction = direction_to_check;
 
      S16 block_receiving_force_index = block_receiving_force - world->blocks.elements;
 
-     switch(direction_to_check){
-     default:
-          break;
-     case DIRECTION_LEFT:
-     case DIRECTION_RIGHT:
-          if(push_result->transferred_momentum_back()){
-               auto elastic_result = elastic_transfer_momentum(pusher_momentum->mass, pusher_momentum->vel, push_result->pushee_mass, push_result->pushee_velocity);
-               result.momentum_changes.add(block_receiving_force_index, pusher_momentum->mass, elastic_result.first_final_velocity, true);
-               result.new_vel = elastic_result.first_final_velocity;
-          }else{
-               result.momentum_changes.add(block_receiving_force_index, pusher_momentum->mass, 0.0f, true);
-          }
-          break;
-     case DIRECTION_UP:
-     case DIRECTION_DOWN:
-          if(push_result->transferred_momentum_back()){
-               auto elastic_result = elastic_transfer_momentum(pusher_momentum->mass, pusher_momentum->vel, push_result->pushee_mass, push_result->pushee_velocity);
-               result.momentum_changes.add(block_receiving_force_index, pusher_momentum->mass, elastic_result.first_final_velocity, false);
-               result.new_vel = elastic_result.first_final_velocity;
-          }else{
-               result.momentum_changes.add(block_receiving_force_index, pusher_momentum->mass, 0.0f, false);
-          }
-          break;
+     // get the momentum in the current direction for the block receiving the force
+     auto pusher_momentum = get_block_momentum(world, block_receiving_force, direction_opposite(direction_to_check));
+     // split the mass by how many blocks our pusher actually collided with
+     pusher_momentum.mass = pusher_momentum.mass / collided_with_block_count;
+     if(push_result->transferred_momentum_back()){
+          // determine if we need to negate the pushee's velocity to get it into our block receiving force's rotational space
+          auto rotated_pushee_vel = rotate_vec_to_see_if_negates(push_result->pushee_velocity, direction_is_horizontal(pusher_direction), total_against_rotations);
+          auto elastic_result = elastic_transfer_momentum(pusher_momentum.mass, pusher_momentum.vel, push_result->pushee_mass, rotated_pushee_vel);
+          result.momentum_changes.add(block_receiving_force_index, pusher_momentum.mass, elastic_result.first_final_velocity, direction_is_horizontal(direction_to_check));
+          result.new_vel = elastic_result.first_final_velocity;
+     }else{
+          result.momentum_changes.add(block_receiving_force_index, pusher_momentum.mass, 0.0f, direction_is_horizontal(direction_to_check));
      }
 
      return result;
@@ -1812,7 +1788,7 @@ BlockCollisionPushResult_t block_collision_push(BlockPush_t* push, World_t* worl
 
           auto push_result = block_push(pushee, push_pos, push_pos_delta, push_direction, world, true, 1.0f, &instant_momentum);
 
-          // LOG("push result: pushee (%d): %d, %f pusher: %d, %f\n", get_block_index(world,pushee), push_result.pushee_mass, push_result.pushee_velocity, push_result.pusher_mass, push_result.pusher_velocity);
+          // LOG("push result %d: pushee (%d): %d, %f pusher: %d, %f\n", push_result.pushed, get_block_index(world, pushee), push_result.pushee_mass, push_result.pushee_velocity, push_result.pusher_mass, push_result.pusher_velocity);
 
           auto direction_to_check = direction_opposite(push_direction);
 
@@ -1822,26 +1798,8 @@ BlockCollisionPushResult_t block_collision_push(BlockPush_t* push, World_t* worl
                S16 pusher_mass = get_block_stack_mass(world, pusher);
                pusher_mass = (S16)((F32)(pusher_mass) * (1.0f / (F32)(push->pushers[p].collided_with_block_count)));
 
-               Vec_t rotated_pusher_vel = vec_rotate_quadrants_clockwise(pusher->vel, push->portal_rotations);
-
-               TransferMomentum_t pusher_momentum;
-               pusher_momentum.mass = pusher_mass;
-
-               switch(push_direction){
-               default:
-                    break;
-               case DIRECTION_LEFT:
-               case DIRECTION_RIGHT:
-                    pusher_momentum.vel = rotated_pusher_vel.x;
-                    break;
-               case DIRECTION_UP:
-               case DIRECTION_DOWN:
-                    pusher_momentum.vel = rotated_pusher_vel.y;
-                    break;
-               }
-
                auto deal_with_push_result_result = deal_with_push_result(pusher, direction_to_check, push->portal_rotations,
-                                                                         &pusher_momentum, world, &push_result);
+                                                                         world, &push_result, push->pushers[p].collided_with_block_count);
 
                if(!push->pushers[p].entangled){
                     // force could have flowed through in the initial push but due to an entangled block pushing (and it's entanglers pushing), it could actually not move

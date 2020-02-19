@@ -396,3 +396,17 @@ F32 get_block_normal_pushed_velocity(S16 mass, F32 force){
      }
      return result;
 }
+
+F32 rotate_vec_to_see_if_negates(F32 value, bool x, S8 rotations){
+     Vec_t v = vec_zero();
+     if(x){
+          v.x = value;
+     }else{
+          v.y = value;
+     }
+
+     Vec_t rotated = vec_rotate_quadrants_counter_clockwise(v, rotations);
+
+     if(rotated.x != 0) return rotated.x;
+     return rotated.y;
+}

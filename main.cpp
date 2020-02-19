@@ -1077,6 +1077,8 @@ int main(int argc, char** argv){
      S16 fail_count = 0;
      int window_width = 800;
      int window_height = 800;
+     int window_x = SDL_WINDOWPOS_CENTERED;
+     int window_y = SDL_WINDOWPOS_CENTERED;
 
      Demo_t demo {};
 
@@ -1117,14 +1119,22 @@ int main(int argc, char** argv){
                demo.dt_scalar = (F32)(atof(argv[next]));
           }else if(strcmp(argv[i], "-failslow") == 0){
                fail_slow = true;
-          }else if(strcmp(argv[i], "-windowwidth") == 0){
+          }else if(strcmp(argv[i], "-winw") == 0){
                int next = i + 1;
                if(next >= argc) continue;
                window_width = atoi(argv[next]);
-          }else if(strcmp(argv[i], "-windowheight") == 0){
+          }else if(strcmp(argv[i], "-winh") == 0){
                int next = i + 1;
                if(next >= argc) continue;
                window_height = atoi(argv[next]);
+          }else if(strcmp(argv[i], "-winx") == 0){
+               int next = i + 1;
+               if(next >= argc) continue;
+               window_x = atoi(argv[next]);
+          }else if(strcmp(argv[i], "-winy") == 0){
+               int next = i + 1;
+               if(next >= argc) continue;
+               window_y = atoi(argv[next]);
           }else if(strcmp(argv[i], "-h") == 0){
                printf("%s [options]\n", argv[0]);
                printf("  -play   <demo filepath> replay a recorded demo file\n");
@@ -1137,8 +1147,10 @@ int main(int argc, char** argv){
                printf("  -speed  <decimal>       when replaying a demo, specify how fast/slow to replay where 1.0 is realtime\n");
                printf("  -frame  <integer>       which frame to play to automatically before drawing\n");
                printf("  -failslow               opposite of failfast, where we continue running tests in the suite after failure\n");
-               printf("  -windowwidth            set the width of the window. default: 800\n");
-               printf("  -windowheight           set the height of the window. default: 800\n");
+               printf("  -winx                   set the x position of the window. default: SDL_WINDOWPOS_CENTERED\n");
+               printf("  -winy                   set the y position of the window. default: SDL_WINDOWPOS_CENTERED\n");
+               printf("  -winw                   set the width of the window. default: 800\n");
+               printf("  -winh                   set the height of the window. default: 800\n");
                printf("  -h this help.\n");
                return 0;
           }
@@ -1173,7 +1185,7 @@ int main(int argc, char** argv){
           }
 
           LOG("Create window: %d, %d\n", window_width, window_height);
-          window = SDL_CreateWindow("bryte", (1920 / 2) - window_width / 2, SDL_WINDOWPOS_CENTERED, window_width, window_height, SDL_WINDOW_OPENGL);
+          window = SDL_CreateWindow("bryte", window_x, window_y, window_width, window_height, SDL_WINDOW_OPENGL);
           if(!window) return 1;
 
           opengl_context = SDL_GL_CreateContext(window);
@@ -3210,6 +3222,7 @@ int main(int argc, char** argv){
                     if(all_consolidated_block_pushes.count > 0){
                          LOG("pre collision push consolidated block pushes: %d\n", all_consolidated_block_pushes.count);
                     }
+
                     log_block_pushes(all_consolidated_block_pushes);
 #endif
 
@@ -3231,26 +3244,19 @@ int main(int argc, char** argv){
 
                                      if(check_pusher.index != block_change.block_index) continue;
                                      if(check_pusher.entangled) continue;
+                                     if(consecutive_block_pushes_are_the_same_collision(all_consolidated_block_pushes, i, j, check_pusher.index)) continue;
 
                                      if(block_change.x){
                                          if(direction_in_mask(check_block_push.direction_mask, DIRECTION_LEFT) && block_change.vel >= 0){
-                                              if(!consecutive_block_pushes_are_the_same_collision(all_consolidated_block_pushes, i, j, check_pusher.index)){
-                                                   check_block_push.remove_pusher(p);
-                                              }
+                                              check_block_push.remove_pusher(p);
                                          }else if(direction_in_mask(check_block_push.direction_mask, DIRECTION_RIGHT) && block_change.vel <= 0){
-                                              if(!consecutive_block_pushes_are_the_same_collision(all_consolidated_block_pushes, i, j, check_pusher.index)){
-                                                   check_block_push.remove_pusher(p);
-                                              }
+                                              check_block_push.remove_pusher(p);
                                          }
                                      }else{
                                          if(direction_in_mask(check_block_push.direction_mask, DIRECTION_DOWN) && block_change.vel >= 0){
-                                              if(!consecutive_block_pushes_are_the_same_collision(all_consolidated_block_pushes, i, j, check_pusher.index)){
-                                                   check_block_push.remove_pusher(p);
-                                              }
+                                              check_block_push.remove_pusher(p);
                                          }else if(direction_in_mask(check_block_push.direction_mask, DIRECTION_UP) && block_change.vel <= 0){
-                                              if(!consecutive_block_pushes_are_the_same_collision(all_consolidated_block_pushes, i, j, check_pusher.index)){
-                                                   check_block_push.remove_pusher(p);
-                                              }
+                                              check_block_push.remove_pusher(p);
                                          }
                                      }
                                  }
