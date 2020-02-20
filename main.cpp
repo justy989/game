@@ -1040,29 +1040,37 @@ void log_block_pushes(BlockPushes_t<128>& block_pushes)
      }
 }
 
-bool consecutive_block_pushes_are_the_same_collision(BlockPushes_t<128>& block_pushes, S16 start_index, S16 end_index, S16 block_index){
+bool block_pushes_are_the_same_collision(BlockPushes_t<128>& block_pushes, S16 start_index, S16 end_index, S16 block_index){
      if(start_index < 0 || start_index > block_pushes.count) return false;
      if(end_index < 0 || end_index > block_pushes.count) return false;
      if(start_index > end_index) return false;
 
-     S16 expected_collided_with_block_count = (end_index - start_index) + 1;
+     auto& start_push = block_pushes.pushes[start_index];
+     auto& end_push = block_pushes.pushes[end_index];
 
-     for(S16 i = start_index; i <= end_index; i++){
-          auto& push = block_pushes.pushes[i];
+     S16 start_push_count = 0;
+     S16 end_push_count = 0;
 
-          bool found_index = false;
-
-          for(S16 p = 0; p < push.pusher_count; p++){
-               auto& pusher = push.pushers[p];
-               if(pusher.index != block_index) continue;
-               found_index = true;
-               if(pusher.collided_with_block_count != expected_collided_with_block_count) return false;
-          }
-
-          if(!found_index) return false;
+     bool found_index = false;
+     for(S16 i = 0; i < start_push.pusher_count; i++){
+         auto& pusher = start_push.pushers[i];
+         if(pusher.index != block_index) continue;
+         found_index = true;
+         start_push_count = pusher.collided_with_block_count;
      }
+     if(!found_index) return false;
 
-     return true;
+     found_index = false;
+     for(S16 i = 0; i < end_push.pusher_count; i++){
+         auto& pusher = end_push.pushers[i];
+         if(pusher.index != block_index) continue;
+         found_index = true;
+         end_push_count = pusher.collided_with_block_count;
+     }
+     if(!found_index) return false;
+
+     return (start_push_count > 1 && end_push_count > 1 && start_push_count == end_push_count &&
+             start_push.direction_mask == end_push.direction_mask);
 }
 
 int main(int argc, char** argv){
@@ -3244,7 +3252,7 @@ int main(int argc, char** argv){
 
                                      if(check_pusher.index != block_change.block_index) continue;
                                      if(check_pusher.entangled) continue;
-                                     if(consecutive_block_pushes_are_the_same_collision(all_consolidated_block_pushes, i, j, check_pusher.index)) continue;
+                                     if(block_pushes_are_the_same_collision(all_consolidated_block_pushes, i, j, check_pusher.index)) continue;
 
                                      if(block_change.x){
                                          if(direction_in_mask(check_block_push.direction_mask, DIRECTION_LEFT) && block_change.vel >= 0){
