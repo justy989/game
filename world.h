@@ -49,16 +49,40 @@ struct ElasticCollisionResult_t{
      F32 second_final_velocity;
 };
 
-struct BlockPushResult_t{
-     bool pushed = false;
-     bool force_flowed_through = false;
-     bool busy = false;
+struct BlockElasticCollision_t{
      S16 pushee_mass = 0;
      F32 pushee_velocity = 0;
      S16 pusher_mass = 0;
      F32 pusher_velocity = 0;
 
      bool transferred_momentum_back(){return pusher_velocity != 0;}
+};
+
+#define BLOCK_PUSH_MAX_COLLISIONS 4
+
+struct BlockPushResult_t{
+     bool pushed = false;
+     bool force_flowed_through = false;
+     bool busy = false;
+
+     BlockElasticCollision_t collisions[BLOCK_PUSH_MAX_COLLISIONS];
+     S8 collision_count = 0;
+
+     bool add_collision(S16 pusher_mass, F32 pusher_vel, S16 pushee_mass, F32 pushee_vel){
+         if(collision_count >= BLOCK_PUSH_MAX_COLLISIONS){
+             assert(!"ya dun messed up A-ARON");
+             return false;
+         }
+         auto& collision = collisions[collision_count];
+         collision.pusher_mass = pusher_mass;
+         collision.pusher_velocity = pusher_vel;
+         collision.pushee_mass = pushee_mass;
+         collision.pushee_velocity = pushee_vel;
+         collision_count++;
+         return true;
+     }
+
+     // TODO: do we need a merge?
 };
 
 struct BlockPushMoveDirectionResult_t{

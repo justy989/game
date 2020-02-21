@@ -49,6 +49,7 @@ DirectionMask_t direction_mask_rotate_clockwise(DirectionMask_t mask);
 DirectionMask_t direction_mask_rotate_clockwise(DirectionMask_t mask, U8 times);
 Direction_t direction_from_single_mask(DirectionMask_t mask);
 const char* direction_to_string(Direction_t dir);
+void direction_mask_to_string(DirectionMask_t mask, char* buffer, U16 buffer_size);
 bool direction_is_horizontal(Direction_t dir);
 bool direction_is_positive(Direction_t dir);
 bool direction_horizontal_in_mask(DirectionMask_t mask);

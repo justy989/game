@@ -2,6 +2,7 @@
 #include "defines.h"
 
 #include <cassert>
+#include <cstdio>
 
 DirectionMask_t g_direction_mask_conversion[] = {
      DIRECTION_MASK_LEFT,
@@ -127,4 +128,21 @@ bool direction_horizontal_in_mask(DirectionMask_t mask){
 bool direction_vertical_in_mask(DirectionMask_t mask){
      return direction_in_mask(mask, DIRECTION_UP) ||
             direction_in_mask(mask, DIRECTION_DOWN);
+}
+
+void direction_mask_to_string(DirectionMask_t mask, char* buffer, U16 buffer_size){
+    U16 buffer_start = 0;
+
+    if(mask & DIRECTION_MASK_UP){
+        buffer_start += snprintf(buffer + buffer_start, buffer_size - buffer_start, "MASK_UP ");
+    }
+    if(mask & DIRECTION_MASK_LEFT){
+        buffer_start += snprintf(buffer + buffer_start, buffer_size - buffer_start, "MASK_LEFT ");
+    }
+    if(mask & DIRECTION_MASK_RIGHT){
+        buffer_start += snprintf(buffer + buffer_start, buffer_size - buffer_start, "MASK_RIGHT ");
+    }
+    if(mask & DIRECTION_MASK_DOWN){
+        buffer_start += snprintf(buffer + buffer_start, buffer_size - buffer_start, "MASK_DOWN ");
+    }
 }

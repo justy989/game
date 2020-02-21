@@ -1553,14 +1553,23 @@ DealWithPushResult_t deal_with_push_result(Block_t* pusher, Direction_t directio
      auto pusher_momentum = get_block_momentum(world, block_receiving_force, direction_opposite(direction_to_check));
      // split the mass by how many blocks our pusher actually collided with
      pusher_momentum.mass = pusher_momentum.mass / collided_with_block_count;
-     if(push_result->transferred_momentum_back()){
-          // determine if we need to negate the pushee's velocity to get it into our block receiving force's rotational space
-          auto rotated_pushee_vel = rotate_vec_to_see_if_negates(push_result->pushee_velocity, direction_is_horizontal(pusher_direction), total_against_rotations);
-          auto elastic_result = elastic_transfer_momentum(pusher_momentum.mass, pusher_momentum.vel, push_result->pushee_mass, rotated_pushee_vel);
-          result.momentum_changes.add(block_receiving_force_index, pusher_momentum.mass, elastic_result.first_final_velocity, direction_is_horizontal(direction_to_check));
-          result.new_vel = elastic_result.first_final_velocity;
-     }else{
-          result.momentum_changes.add(block_receiving_force_index, pusher_momentum.mass, 0.0f, direction_is_horizontal(direction_to_check));
+     bool transferred_momentum_back = false;
+     for(S16 c = 0; c < push_result->collision_count; c++){
+         auto& collision = push_result->collisions[c];
+
+         if(collision.transferred_momentum_back()){
+             transferred_momentum_back = true;
+             // determine if we need to negate the pushee's velocity to get it into our block receiving force's rotational space
+             auto rotated_pushee_vel = rotate_vec_to_see_if_negates(collision.pushee_velocity, direction_is_horizontal(pusher_direction), total_against_rotations);
+             auto elastic_result = elastic_transfer_momentum(pusher_momentum.mass, pusher_momentum.vel, collision.pushee_mass, rotated_pushee_vel);
+             // LOG("  transferred momentum back to block %d, %d %f <- %d %f resulting in vel: %f x: %d\n", block_receiving_force_index, pusher_momentum.mass, pusher_momentum.vel, collision.pushee_mass, rotated_pushee_vel, elastic_result.first_final_velocity, direction_is_horizontal(direction_to_check));
+             result.momentum_changes.add(block_receiving_force_index, pusher_momentum.mass, elastic_result.first_final_velocity, direction_is_horizontal(direction_to_check));
+             result.new_vel = elastic_result.first_final_velocity;
+         }
+     }
+
+     if(!transferred_momentum_back){
+         result.momentum_changes.add(block_receiving_force_index, pusher_momentum.mass, 0.0f, direction_is_horizontal(direction_to_check));
      }
 
      return result;
@@ -1808,36 +1817,42 @@ BlockCollisionPushResult_t block_collision_push(BlockPush_t* push, World_t* worl
                          result.entangled_block_pushes.merge(&entangled_pushes);
                     }
 
-                    if(push_result.transferred_momentum_back()){
-                         result.add_block_pushed(get_block_index(world, deal_with_push_result_result.block_receiving_force), direction_opposite(deal_with_push_result_result.final_direction));
+                    for(S16 c = 0; c < push_result.collision_count; c++){
+                        auto& collision = push_result.collisions[c];
 
-                         if(!push->entangled){
-                              F32 current_vel = 0;
-                              switch(deal_with_push_result_result.final_direction){
-                              default:
-                                   break;
-                              case DIRECTION_LEFT:
-                              case DIRECTION_RIGHT:
-                                   current_vel = deal_with_push_result_result.block_receiving_force->vel.x;
-                                   break;
-                              case DIRECTION_UP:
-                              case DIRECTION_DOWN:
-                                   current_vel = deal_with_push_result_result.block_receiving_force->vel.y;
-                                   break;
-                              }
+                        if(collision.transferred_momentum_back()){
+                            result.add_block_pushed(get_block_index(world, deal_with_push_result_result.block_receiving_force), direction_opposite(deal_with_push_result_result.final_direction));
 
-                              if((current_vel > 0 && current_vel < deal_with_push_result_result.new_vel) ||
-                                 (current_vel < 0 && current_vel > deal_with_push_result_result.new_vel)){
-                                   auto entangled_pushes = push_entangled_block_pushes(deal_with_push_result_result.block_receiving_force, world, direction_opposite(deal_with_push_result_result.final_direction),
-                                                                                       pusher, push->pushers[p].collided_with_block_count, &instant_momentum);
-                                   result.entangled_block_pushes.merge(&entangled_pushes);
-                              }else if((current_vel > 0 && deal_with_push_result_result.new_vel < 0) ||
-                                       (current_vel < 0 && deal_with_push_result_result.new_vel > 0)){
-                                   auto entangled_pushes = push_entangled_block_pushes(deal_with_push_result_result.block_receiving_force, world, deal_with_push_result_result.final_direction,
-                                                                                       pusher, push->pushers[p].collided_with_block_count, &instant_momentum);
-                                   result.entangled_block_pushes.merge(&entangled_pushes);
-                              }
-                         }
+                            if(!push->entangled){
+                                F32 current_vel = 0;
+                                switch(deal_with_push_result_result.final_direction){
+                                default:
+                                     break;
+                                case DIRECTION_LEFT:
+                                case DIRECTION_RIGHT:
+                                     current_vel = deal_with_push_result_result.block_receiving_force->vel.x;
+                                     break;
+                                case DIRECTION_UP:
+                                case DIRECTION_DOWN:
+                                     current_vel = deal_with_push_result_result.block_receiving_force->vel.y;
+                                     break;
+                                }
+
+                                if((current_vel > 0 && current_vel < deal_with_push_result_result.new_vel) ||
+                                   (current_vel < 0 && current_vel > deal_with_push_result_result.new_vel)){
+                                    auto entangled_pushes = push_entangled_block_pushes(deal_with_push_result_result.block_receiving_force, world, direction_opposite(deal_with_push_result_result.final_direction),
+                                                                                         pusher, push->pushers[p].collided_with_block_count, &instant_momentum);
+                                    result.entangled_block_pushes.merge(&entangled_pushes);
+                                }else if((current_vel > 0 && deal_with_push_result_result.new_vel < 0) ||
+                                         (current_vel < 0 && deal_with_push_result_result.new_vel > 0)){
+                                    auto entangled_pushes = push_entangled_block_pushes(deal_with_push_result_result.block_receiving_force, world, deal_with_push_result_result.final_direction,
+                                                                                         pusher, push->pushers[p].collided_with_block_count, &instant_momentum);
+                                    result.entangled_block_pushes.merge(&entangled_pushes);
+                                }
+                            }
+
+                            break;
+                        }
                     }
 
                    result.momentum_changes.merge(&deal_with_push_result_result.momentum_changes);
