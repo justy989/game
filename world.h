@@ -50,10 +50,11 @@ struct ElasticCollisionResult_t{
 };
 
 struct BlockElasticCollision_t{
-     S16 pushee_mass = 0;
-     F32 pushee_velocity = 0;
      S16 pusher_mass = 0;
      F32 pusher_velocity = 0;
+     S16 pushee_mass = 0;
+     F32 pushee_initial_velocity = 0;
+     F32 pushee_velocity = 0;
 
      bool transferred_momentum_back(){return pusher_velocity != 0;}
 };
@@ -68,7 +69,7 @@ struct BlockPushResult_t{
      BlockElasticCollision_t collisions[BLOCK_PUSH_MAX_COLLISIONS];
      S8 collision_count = 0;
 
-     bool add_collision(S16 pusher_mass, F32 pusher_vel, S16 pushee_mass, F32 pushee_vel){
+     bool add_collision(S16 pusher_mass, F32 pusher_vel, S16 pushee_mass, F32 pushee_initial_vel, F32 pushee_vel){
          if(collision_count >= BLOCK_PUSH_MAX_COLLISIONS){
              assert(!"ya dun messed up A-ARON");
              return false;
@@ -77,6 +78,7 @@ struct BlockPushResult_t{
          collision.pusher_mass = pusher_mass;
          collision.pusher_velocity = pusher_vel;
          collision.pushee_mass = pushee_mass;
+         collision.pushee_initial_velocity = pushee_initial_vel;
          collision.pushee_velocity = pushee_vel;
          collision_count++;
          return true;

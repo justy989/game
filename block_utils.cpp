@@ -1560,7 +1560,7 @@ DealWithPushResult_t deal_with_push_result(Block_t* pusher, Direction_t directio
          if(collision.transferred_momentum_back()){
              transferred_momentum_back = true;
              // determine if we need to negate the pushee's velocity to get it into our block receiving force's rotational space
-             auto rotated_pushee_vel = rotate_vec_to_see_if_negates(collision.pushee_velocity, direction_is_horizontal(pusher_direction), total_against_rotations);
+             auto rotated_pushee_vel = rotate_vec_to_see_if_negates(collision.pushee_initial_velocity, direction_is_horizontal(pusher_direction), total_against_rotations);
              auto elastic_result = elastic_transfer_momentum(pusher_momentum.mass, pusher_momentum.vel, collision.pushee_mass, rotated_pushee_vel);
              // LOG("  transferred momentum back to block %d, %d %f <- %d %f resulting in vel: %f x: %d\n", block_receiving_force_index, pusher_momentum.mass, pusher_momentum.vel, collision.pushee_mass, rotated_pushee_vel, elastic_result.first_final_velocity, direction_is_horizontal(direction_to_check));
              result.momentum_changes.add(block_receiving_force_index, pusher_momentum.mass, elastic_result.first_final_velocity, direction_is_horizontal(direction_to_check));
