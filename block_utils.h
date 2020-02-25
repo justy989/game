@@ -139,6 +139,7 @@ struct BlockPush_t{
      S16 pushee_index = -1;
      DirectionMask_t direction_mask = DIRECTION_MASK_NONE;
      S8 portal_rotations = 0;
+     S8 entangle_rotations = 0;
      bool invalidated = false;
      bool entangled = false;
 

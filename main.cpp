@@ -16,6 +16,7 @@ Entanglement Puzzles:
 - rotated entangled puzzles where the centroid is on a portal destination coord
 
 Current bugs:
+- Colliding with and pushing an entangled block on ice should cause force to flow through its entangles, but shouldn't push entanglers that are not on ice
 - in map 42, when I had 4 blocks lined up on the column of the pressure plate, and 1 block to the right at the bottom
   of the collumn. When I pushed that 1 block up, the bottom block in the column of 4 disappeared
 - for collision, can shorten things pos_deltas before we cause pushes to happen on ice in the same frame due to collisions ?
@@ -3203,7 +3204,8 @@ int main(int argc, char** argv){
                              BlockPush_t new_block_push = block_push;
                              S8 rotations_between_blocks = blocks_rotations_between(entangler, pushee);
                              new_block_push.pushee_index = current_entangle_index;
-                             new_block_push.portal_rotations = (block_push.portal_rotations + rotations_between_blocks) % DIRECTION_COUNT;
+                             new_block_push.portal_rotations = block_push.portal_rotations;
+                             new_block_push.entangle_rotations = rotations_between_blocks;
                              new_block_push.entangled = true;
                              // TODO: do we ever need to do this for multiple pushers?
                              new_block_push.pushers[0].entangled = true;
@@ -3312,7 +3314,7 @@ int main(int argc, char** argv){
                     }
 
 #if 0
-                    if(momentum_changes.count > 1){
+                    if(momentum_changes.count > 0){
                          LOG("momentum changes: %d\n", momentum_changes.count);
                     }
                     for(S16 c = 0; c < momentum_changes.count; c++){
