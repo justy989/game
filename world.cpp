@@ -1308,6 +1308,9 @@ static F32 get_block_velocity_ratio(World_t* world, Block_t* block, F32 vel, F32
 BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Direction_t direction, World_t* world, bool pushed_by_ice, F32 force, TransferMomentum_t* instant_momentum,
                              bool from_entangler){
      // LOG("block %d pushed %s\n", get_block_index(world, block), direction_to_string(direction));
+     // if(instant_momentum){
+     //     LOG(" instant momentum %d, %f\n", instant_momentum->mass, instant_momentum->vel);
+     // }
 
      BlockPushResult_t result {};
      auto against_result = block_against_other_blocks(pos + pos_delta, direction, world->block_qt, world->interactive_qt, &world->tilemap);
@@ -1600,7 +1603,6 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
                     result.add_collision(instant_momentum->mass, elastic_result.first_final_velocity, pushee_momentum.mass, pushee_momentum.vel, elastic_result.second_final_velocity);
                     // the velocity may be going the wrong way, but we can fix it here
                     if(instant_vel > 0) instant_vel = -instant_vel;
-                    // LOG("  setting block %d vel x to %f\n", get_block_index(world, block), instant_vel);
                     block->vel.x = instant_vel;
                     block->horizontal_move.sign = move_sign_from_vel(block->vel.x);
                     block->horizontal_move.state = MOVE_STATE_COASTING;
@@ -1639,7 +1641,6 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
                     auto pushee_momentum = get_block_momentum(world, block, direction);
                     result.add_collision(instant_momentum->mass, elastic_result.first_final_velocity, pushee_momentum.mass, pushee_momentum.vel, elastic_result.second_final_velocity);
                     if(instant_vel < 0) instant_vel = -instant_vel;
-                    // LOG("  setting block %d vel x to %f\n", get_block_index(world, block), instant_vel);
                     block->vel.x = instant_vel;
                     block->horizontal_move.sign = move_sign_from_vel(block->vel.x);
                     block->horizontal_move.state = MOVE_STATE_COASTING;
@@ -1678,7 +1679,6 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
                     auto pushee_momentum = get_block_momentum(world, block, direction);
                     result.add_collision(instant_momentum->mass, elastic_result.first_final_velocity, pushee_momentum.mass, pushee_momentum.vel, elastic_result.second_final_velocity);
                     if(instant_vel > 0) instant_vel = -instant_vel;
-                    // LOG("  setting block %d vel y to %f\n", get_block_index(world, block), instant_vel);
                     block->vel.y = instant_vel;
                     block->vertical_move.sign = move_sign_from_vel(block->vel.y);
                     block->vertical_move.state = MOVE_STATE_COASTING;
@@ -1716,7 +1716,6 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
                     auto pushee_momentum = get_block_momentum(world, block, direction);
                     result.add_collision(instant_momentum->mass, elastic_result.first_final_velocity, pushee_momentum.mass, pushee_momentum.vel, elastic_result.second_final_velocity);
                     if(instant_vel < 0) instant_vel = -instant_vel;
-                    // LOG("  setting block %d vel y to %f\n", get_block_index(world, block), instant_vel);
                     block->vel.y = instant_vel;
                     block->vertical_move.sign = move_sign_from_vel(block->vel.y);
                     block->vertical_move.state = MOVE_STATE_COASTING;

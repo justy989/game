@@ -1789,7 +1789,8 @@ BlockCollisionPushResult_t block_collision_push(BlockPush_t* push, World_t* worl
                S16 pusher_mass = get_block_stack_mass(world, pusher);
                pusher_mass = (S16)((F32)(pusher_mass) * (1.0f / (F32)(push->pushers[p].collided_with_block_count)));
 
-               Vec_t rotated_pusher_vel = vec_rotate_quadrants_clockwise(pusher->vel, push->portal_rotations);
+               S8 total_rotations = push->portal_rotations + push->entangle_rotations;
+               Vec_t rotated_pusher_vel = vec_rotate_quadrants_clockwise(pusher->vel, total_rotations);
                F32 vel = 0;
 
                switch(push_direction){
