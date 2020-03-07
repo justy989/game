@@ -1565,7 +1565,7 @@ DealWithPushResult_t deal_with_push_result(Block_t* pusher, Direction_t directio
              transferred_momentum_back = true;
 
              if(entangled){
-                 // LOG("adding entangled momentum change for block %d at %f in the %s\n", block_receiving_force_index, collision.pusher_velocity, direction_is_horizontal(direction_to_check) ? "x" : "y");
+                 // LOG("  adding entangled momentum change for block %d at %f in the %s\n", block_receiving_force_index, collision.pusher_velocity, direction_is_horizontal(direction_to_check) ? "x" : "y");
                  result.momentum_changes.add(block_receiving_force_index, collision.pusher_mass, collision.pusher_velocity, direction_is_horizontal(direction_to_check));
                  result.new_vel = collision.pusher_velocity;
              }else{
@@ -1782,6 +1782,15 @@ BlockCollisionPushResult_t block_collision_push(BlockPush_t* push, World_t* worl
 
           F32 total_momentum = 0;
 
+#if 0
+          LOG("pushers: %d\n", push->pusher_count);
+          for(S16 p = 0; p < push->pusher_count; p++){
+               auto* pusher = push->pushers + p;
+               LOG("  index: %d, collided_with_block_count: %d, entangled: %d\n",
+                   pusher->index, pusher->collided_with_block_count, pusher->entangled);
+          }
+#endif
+
           for(S16 p = 0; p < push->pusher_count; p++){
                auto* pusher = world->blocks.elements + push->pushers[p].index;
 
@@ -1808,8 +1817,7 @@ BlockCollisionPushResult_t block_collision_push(BlockPush_t* push, World_t* worl
 
                // TODO: normalize momentum to a specific mass, maybe just use the first one ?
                total_momentum += (F32)(pusher_mass) * vel;
-               instant_momentum.mass += pusher_mass;
-          }
+               instant_momentum.mass += pusher_mass; }
 
           instant_momentum.vel = total_momentum / instant_momentum.mass;
 
@@ -1824,12 +1832,16 @@ BlockCollisionPushResult_t block_collision_push(BlockPush_t* push, World_t* worl
           }
 #endif
 
+          // if the push itself is entangled then we don't care about the results in terms of transferring momentum back or the consequences on the other side of the push
+
           auto direction_to_check = direction_opposite(push_direction);
 
           for(S16 p = 0; p < push->pusher_count; p++){
                auto* pusher = world->blocks.elements + push->pushers[p].index;
 
-               if(push->pushers[p].entangled){
+               if(push->pushers[p].entangled) continue;
+
+               if(push->entangled){
                    pusher = pushee;
                }
 
@@ -1838,9 +1850,10 @@ BlockCollisionPushResult_t block_collision_push(BlockPush_t* push, World_t* worl
                S16 pusher_mass = get_block_stack_mass(world, pusher);
                pusher_mass = (S16)((F32)(pusher_mass) * (1.0f / (F32)(push->pushers[p].collided_with_block_count)));
 
+
                auto deal_with_push_result_result = deal_with_push_result(pusher, direction_to_check, push->portal_rotations,
                                                                          world, &push_result, push->pushers[p].collided_with_block_count,
-                                                                         push->pushers[p].entangled);
+                                                                         push->entangled);
 
                 // force could have flowed through in the initial push but due to an entangled block pushing (and it's entanglers pushing), it could actually not move
                 // LOG("push result pushed: %d, force flowed through: %d, deal with push result vel: %f\n", push_result.pushed, push_result.force_flowed_through, deal_with_push_result_result.new_vel);

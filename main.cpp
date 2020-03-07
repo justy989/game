@@ -1008,7 +1008,7 @@ void consolidate_block_pushes(BlockPushes_t<128>* block_pushes, BlockPushes_t<12
                if(push->pushee_index == consolidated_push->pushee_index &&
                   push->direction_mask == consolidated_push->direction_mask &&
                   push->portal_rotations == consolidated_push->portal_rotations){
-                    consolidated_push->add_pusher(push->pushers[0].index, push->pushers[0].collided_with_block_count, push->pushers[0].entangled);
+                    consolidated_push->add_pusher(push->pushers[0].index, push->pushers[0].collided_with_block_count, true);
                     consolidated_current_push = true;
                }
           }
@@ -1023,21 +1023,15 @@ void log_block_pushes(BlockPushes_t<128>& block_pushes)
      for(S16 i = 0; i < block_pushes.count; i++){
           auto& block_push = block_pushes.pushes[i];
 
-          LOG("\nblock push: %d\n", i);
-          LOG(" invalidated      : %d\n", block_push.invalidated);
-          if(block_push.invalidated) continue;
+          LOG(" block push %d, invalidated %d, direction_mask %d portal_rot %d, entangle_rot %d, entangled: %d\n",
+              i, block_push.invalidated, block_push.direction_mask, block_push.portal_rotations, block_push.entangle_rotations,
+              block_push.entangled);
 
-          LOG(" pushee           : %d\n", block_push.pushee_index);
-          LOG(" pushers (%d)\n", block_push.pusher_count);
+          LOG("  pushee %d, pushers (%d)\n", block_push.pushee_index, block_push.pusher_count);
           for(S8 p = 0; p < block_push.pusher_count; p++){
-              LOG("  pusher          : %d\n", block_push.pushers[p].index);
-              LOG("  collided_with   : %d\n", block_push.pushers[p].collided_with_block_count);
-              LOG("  entangled       : %d\n", block_push.pushers[p].entangled);
+              LOG("   pusher %d, collided_with %d, entangled: %d\n",
+                  block_push.pushers[p].index, block_push.pushers[p].collided_with_block_count, block_push.pushers[p].entangled);
           }
-          LOG(" direction_mask   : %d\n", block_push.direction_mask);
-          LOG(" portal_rotations : %d\n", block_push.portal_rotations);
-          LOG(" invalidated      : %d\n", block_push.invalidated);
-          LOG(" entangled        : %d\n", block_push.entangled);
      }
 }
 
@@ -3207,8 +3201,6 @@ int main(int argc, char** argv){
                              new_block_push.portal_rotations = block_push.portal_rotations;
                              new_block_push.entangle_rotations = rotations_between_blocks;
                              new_block_push.entangled = true;
-                             // TODO: do we ever need to do this for multiple pushers?
-                             new_block_push.pushers[0].entangled = true;
                              all_block_pushes.add(&new_block_push);
                              current_entangle_index = entangler->entangle_index;
                          }
