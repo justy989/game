@@ -1008,7 +1008,8 @@ void consolidate_block_pushes(BlockPushes_t<128>* block_pushes, BlockPushes_t<12
                if(push->pushee_index == consolidated_push->pushee_index &&
                   push->direction_mask == consolidated_push->direction_mask &&
                   push->portal_rotations == consolidated_push->portal_rotations){
-                    consolidated_push->add_pusher(push->pushers[0].index, push->pushers[0].collided_with_block_count, true);
+                    consolidated_push->add_pusher(push->pushers[0].index, push->pushers[0].collided_with_block_count, true,
+                                                  push->entangle_rotations, push->portal_rotations);
                     consolidated_current_push = true;
                }
           }
@@ -1020,19 +1021,24 @@ void consolidate_block_pushes(BlockPushes_t<128>* block_pushes, BlockPushes_t<12
 
 void log_block_pushes(BlockPushes_t<128>& block_pushes)
 {
-     for(S16 i = 0; i < block_pushes.count; i++){
-          auto& block_push = block_pushes.pushes[i];
+    const S16 direction_mask_string_size = 64;
+    char direction_mask_string[direction_mask_string_size];
 
-          LOG(" block push %d, invalidated %d, direction_mask %d portal_rot %d, entangle_rot %d, entangled: %d\n",
-              i, block_push.invalidated, block_push.direction_mask, block_push.portal_rotations, block_push.entangle_rotations,
-              block_push.entangled);
+    for(S16 i = 0; i < block_pushes.count; i++){
+        auto& block_push = block_pushes.pushes[i];
 
-          LOG("  pushee %d, pushers (%d)\n", block_push.pushee_index, block_push.pusher_count);
-          for(S8 p = 0; p < block_push.pusher_count; p++){
-              LOG("   pusher %d, collided_with %d, entangled: %d\n",
-                  block_push.pushers[p].index, block_push.pushers[p].collided_with_block_count, block_push.pushers[p].entangled);
-          }
-     }
+        direction_mask_to_string(block_push.direction_mask, direction_mask_string, direction_mask_string_size);
+
+        LOG(" block push %d, invalidated %d, direction_mask %s portal_rot %d, entangle_rot %d, entangled: %d\n",
+            i, block_push.invalidated, direction_mask_string, block_push.portal_rotations, block_push.entangle_rotations,
+            block_push.entangled);
+
+        LOG("  pushee %d, pushers (%d)\n", block_push.pushee_index, block_push.pusher_count);
+        for(S8 p = 0; p < block_push.pusher_count; p++){
+            LOG("   pusher %d, collided_with %d, entangled: %d\n",
+                block_push.pushers[p].index, block_push.pushers[p].collided_with_block_count, block_push.pushers[p].entangled);
+        }
+    }
 }
 
 bool block_pushes_are_the_same_collision(BlockPushes_t<128>& block_pushes, S16 start_index, S16 end_index, S16 block_index){
@@ -3238,6 +3244,12 @@ int main(int argc, char** argv){
                          for(S16 j = i + 1; j < all_consolidated_block_pushes.count; j++){
                              auto& check_block_push = all_consolidated_block_pushes.pushes[j];
 
+                             // TODO: consolidate this code with the below code. Should probably be a BlockPush_t function
+                             S8 rotations = (check_block_push.entangle_rotations + check_block_push.portal_rotations) % DIRECTION_COUNT;
+                             auto rotated_direction_mask = direction_mask_rotate_clockwise(check_block_push.direction_mask, rotations);
+
+                             if(check_block_push.entangled) continue;
+
                              for(S16 m = 0; m < result.momentum_changes.count; m++){
                                  auto& block_change = result.momentum_changes.changes[m];
 
@@ -3249,16 +3261,16 @@ int main(int argc, char** argv){
                                      if(block_pushes_are_the_same_collision(all_consolidated_block_pushes, i, j, check_pusher.index)) continue;
 
                                      if(block_change.x){
-                                         if(direction_in_mask(check_block_push.direction_mask, DIRECTION_LEFT) && block_change.vel >= 0){
-                                              check_block_push.remove_pusher(p);
-                                         }else if(direction_in_mask(check_block_push.direction_mask, DIRECTION_RIGHT) && block_change.vel <= 0){
-                                              check_block_push.remove_pusher(p);
+                                         if(direction_in_mask(rotated_direction_mask, DIRECTION_LEFT) && block_change.vel >= 0){
+                                             check_block_push.remove_pusher(p);
+                                         }else if(direction_in_mask(rotated_direction_mask, DIRECTION_RIGHT) && block_change.vel <= 0){
+                                             check_block_push.remove_pusher(p);
                                          }
                                      }else{
-                                         if(direction_in_mask(check_block_push.direction_mask, DIRECTION_DOWN) && block_change.vel >= 0){
-                                              check_block_push.remove_pusher(p);
-                                         }else if(direction_in_mask(check_block_push.direction_mask, DIRECTION_UP) && block_change.vel <= 0){
-                                              check_block_push.remove_pusher(p);
+                                         if(direction_in_mask(rotated_direction_mask, DIRECTION_DOWN) && block_change.vel >= 0){
+                                             check_block_push.remove_pusher(p);
+                                         }else if(direction_in_mask(rotated_direction_mask, DIRECTION_UP) && block_change.vel <= 0){
+                                             check_block_push.remove_pusher(p);
                                          }
                                      }
                                  }
@@ -3268,7 +3280,7 @@ int main(int argc, char** argv){
                          momentum_changes.merge(&result.momentum_changes);
 
                          if(result.entangled_block_pushes.count){
-                              all_consolidated_block_pushes.merge(&result.entangled_block_pushes);
+                             all_consolidated_block_pushes.merge(&result.entangled_block_pushes);
                          }
 
                          // TODO: I don't think getting the max collided with block count is right fore determining
@@ -3297,8 +3309,11 @@ int main(int argc, char** argv){
                               for(S16 j = cancellable_block_pushes; j < all_consolidated_block_pushes.count; j++){
                                    auto& check_block_push = all_consolidated_block_pushes.pushes[j];
 
+                                   S8 rotations = (check_block_push.entangle_rotations + check_block_push.portal_rotations) % DIRECTION_COUNT;
+                                   auto rotated_direction_mask = direction_mask_rotate_clockwise(check_block_push.direction_mask, rotations);
+
                                    if(block_pushed.block_index == check_block_push.pushee_index &&
-                                      direction_in_mask(check_block_push.direction_mask, direction_opposite(block_pushed.direction))){
+                                      direction_in_mask(rotated_direction_mask, direction_opposite(block_pushed.direction))){
                                         check_block_push.invalidated = true;
                                    }
                               }

@@ -1307,7 +1307,7 @@ static F32 get_block_velocity_ratio(World_t* world, Block_t* block, F32 vel, F32
 
 BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Direction_t direction, World_t* world, bool pushed_by_ice, F32 force, TransferMomentum_t* instant_momentum,
                              bool from_entangler){
-     // LOG("block %d pushed %s\n", get_block_index(world, block), direction_to_string(direction));
+     // LOG("block_push() %d -> %s\n", get_block_index(world, block), direction_to_string(direction));
      // if(instant_momentum){
      //     LOG(" instant momentum %d, %f\n", instant_momentum->mass, instant_momentum->vel);
      // }

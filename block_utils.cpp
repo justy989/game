@@ -1839,7 +1839,7 @@ BlockCollisionPushResult_t block_collision_push(BlockPush_t* push, World_t* worl
           for(S16 p = 0; p < push->pusher_count; p++){
                auto* pusher = world->blocks.elements + push->pushers[p].index;
 
-               if(push->pushers[p].entangled) continue;
+               // if(push->pushers[p].entangled) continue;
 
                if(push->entangled){
                    pusher = pushee;
