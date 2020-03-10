@@ -1679,7 +1679,8 @@ BlockPushes_t<MAX_ENTANGLE_BLOCK_PUSHES> push_entangled_block_pushes(Block_t* bl
                     push.pushee_index = get_block_index(world, entangled_block);
                     push.direction_mask = direction_to_direction_mask(rotated_dir);
                     push.portal_rotations = 0;
-                    push.entangled = true;
+                    // TODO: this is not correct, we need to calculate the correct index, I'm not sure how at the moment
+                    push.entangled_with_push_index = 0;
                     result.add(&push);
                }
           }
@@ -1841,7 +1842,7 @@ BlockCollisionPushResult_t block_collision_push(BlockPush_t* push, World_t* worl
 
                // if(push->pushers[p].entangled) continue;
 
-               if(push->entangled){
+               if(push->is_entangled()){
                    pusher = pushee;
                }
 
@@ -1853,7 +1854,7 @@ BlockCollisionPushResult_t block_collision_push(BlockPush_t* push, World_t* worl
 
                auto deal_with_push_result_result = deal_with_push_result(pusher, direction_to_check, push->portal_rotations,
                                                                          world, &push_result, push->pushers[p].collided_with_block_count,
-                                                                         push->entangled);
+                                                                         push->is_entangled());
 
                 // force could have flowed through in the initial push but due to an entangled block pushing (and it's entanglers pushing), it could actually not move
                 // LOG("push result pushed: %d, force flowed through: %d, deal with push result vel: %f\n", push_result.pushed, push_result.force_flowed_through, deal_with_push_result_result.new_vel);
@@ -1870,7 +1871,7 @@ BlockCollisionPushResult_t block_collision_push(BlockPush_t* push, World_t* worl
                     if(collision.transferred_momentum_back()){
                         result.add_block_pushed(get_block_index(world, deal_with_push_result_result.block_receiving_force), direction_opposite(deal_with_push_result_result.final_direction));
 
-                        if(!push->entangled){
+                        if(!push->is_entangled()){
                             F32 current_vel = 0;
                             switch(deal_with_push_result_result.final_direction){
                             default:

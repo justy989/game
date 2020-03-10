@@ -143,7 +143,7 @@ struct BlockPush_t{
      S8 portal_rotations = 0;
      S8 entangle_rotations = 0;
      bool invalidated = false;
-     bool entangled = false;
+     S8 entangled_with_push_index = -1;
 
      bool add_pusher(S16 index, S16 collided_with_block_count = 1, bool is_entangled = false,
                      S8 pusher_entangle_rotations = 0, S8 pusher_portal_rotations = 0){
@@ -173,6 +173,10 @@ struct BlockPush_t{
 
           return true;
      }
+
+    bool is_entangled(){
+        return entangled_with_push_index >= 0;
+    }
 };
 
 template <S16 MAX_BLOCK_PUSHES>

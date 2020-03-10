@@ -1031,7 +1031,7 @@ void log_block_pushes(BlockPushes_t<128>& block_pushes)
 
         LOG(" block push %d, invalidated %d, direction_mask %s portal_rot %d, entangle_rot %d, entangled: %d\n",
             i, block_push.invalidated, direction_mask_string, block_push.portal_rotations, block_push.entangle_rotations,
-            block_push.entangled);
+            block_push.entangled_with_push_index);
 
         LOG("  pushee %d, pushers (%d)\n", block_push.pushee_index, block_push.pusher_count);
         for(S8 p = 0; p < block_push.pusher_count; p++){
@@ -3197,7 +3197,7 @@ int main(int argc, char** argv){
 
                     // if the block being pushed is entangled, add block pushes for those
                     Block_t* pushee = world.blocks.elements + block_push.pushee_index;
-                    if(!block_push.entangled && pushee->entangle_index >= 0){
+                    if(!block_push.is_entangled() && pushee->entangle_index >= 0){
                          S16 current_entangle_index = pushee->entangle_index;
                          while(current_entangle_index != block_push.pushee_index && current_entangle_index >= 0){
                              Block_t* entangler = world.blocks.elements + current_entangle_index;
@@ -3206,7 +3206,7 @@ int main(int argc, char** argv){
                              new_block_push.pushee_index = current_entangle_index;
                              new_block_push.portal_rotations = block_push.portal_rotations;
                              new_block_push.entangle_rotations = rotations_between_blocks;
-                             new_block_push.entangled = true;
+                             new_block_push.entangled_with_push_index = i;
                              all_block_pushes.add(&new_block_push);
                              current_entangle_index = entangler->entangle_index;
                          }
@@ -3248,7 +3248,10 @@ int main(int argc, char** argv){
                              S8 rotations = (check_block_push.entangle_rotations + check_block_push.portal_rotations) % DIRECTION_COUNT;
                              auto rotated_direction_mask = direction_mask_rotate_clockwise(check_block_push.direction_mask, rotations);
 
-                             if(check_block_push.entangled) continue;
+                             // if the entangled push has already been executed, then we can't invalidate it
+                             if(check_block_push.is_entangled()){
+                                 if(i >= check_block_push.entangled_with_push_index) continue;
+                             }
 
                              for(S16 m = 0; m < result.momentum_changes.count; m++){
                                  auto& block_change = result.momentum_changes.changes[m];
