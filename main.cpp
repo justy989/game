@@ -1008,7 +1008,7 @@ void consolidate_block_pushes(BlockPushes_t<128>* block_pushes, BlockPushes_t<12
                if(push->pushee_index == consolidated_push->pushee_index &&
                   push->direction_mask == consolidated_push->direction_mask &&
                   push->portal_rotations == consolidated_push->portal_rotations){
-                    consolidated_push->add_pusher(push->pushers[0].index, push->pushers[0].collided_with_block_count, true,
+                    consolidated_push->add_pusher(push->pushers[0].index, push->pushers[0].collided_with_block_count, push->is_entangled(),
                                                   push->entangle_rotations, push->portal_rotations);
                     consolidated_current_push = true;
                }
@@ -1019,25 +1019,36 @@ void consolidate_block_pushes(BlockPushes_t<128>* block_pushes, BlockPushes_t<12
      }
 }
 
-void log_block_pushes(BlockPushes_t<128>& block_pushes)
+void log_block_pusher(BlockPusher_t* pusher){
+    LOG("   pusher %d, collided_with %d, hit_entangler: %d\n", pusher->index, pusher->collided_with_block_count, pusher->hit_entangler);
+}
+
+void log_block_push(BlockPush_t* block_push)
 {
     const S16 direction_mask_string_size = 64;
     char direction_mask_string[direction_mask_string_size];
+    char rot_direction_mask_string[direction_mask_string_size];
 
+    S8 rotations = (block_push->entangle_rotations + block_push->portal_rotations) % DIRECTION_COUNT;
+    auto rot_direction_mask = direction_mask_rotate_clockwise(block_push->direction_mask, rotations);
+
+    direction_mask_to_string(block_push->direction_mask, direction_mask_string, direction_mask_string_size);
+    direction_mask_to_string(rot_direction_mask, rot_direction_mask_string, direction_mask_string_size);
+
+    LOG(" block push: invalidated %d, direction_mask %s portal_rot %d, entangle_rot %d, entangled: %d, rot direction_mask: %s\n",
+        block_push->invalidated, direction_mask_string, block_push->portal_rotations, block_push->entangle_rotations,
+        block_push->entangled_with_push_index, rot_direction_mask_string);
+
+    LOG("  pushee %d, pushers (%d)\n", block_push->pushee_index, block_push->pusher_count);
+    for(S8 p = 0; p < block_push->pusher_count; p++){
+        log_block_pusher(block_push->pushers + p);
+    }
+}
+
+void log_block_pushes(BlockPushes_t<128>& block_pushes)
+{
     for(S16 i = 0; i < block_pushes.count; i++){
-        auto& block_push = block_pushes.pushes[i];
-
-        direction_mask_to_string(block_push.direction_mask, direction_mask_string, direction_mask_string_size);
-
-        LOG(" block push %d, invalidated %d, direction_mask %s portal_rot %d, entangle_rot %d, entangled: %d\n",
-            i, block_push.invalidated, direction_mask_string, block_push.portal_rotations, block_push.entangle_rotations,
-            block_push.entangled_with_push_index);
-
-        LOG("  pushee %d, pushers (%d)\n", block_push.pushee_index, block_push.pusher_count);
-        for(S8 p = 0; p < block_push.pusher_count; p++){
-            LOG("   pusher %d, collided_with %d, entangled: %d\n",
-                block_push.pushers[p].index, block_push.pushers[p].collided_with_block_count, block_push.pushers[p].entangled);
-        }
+        log_block_push(block_pushes.pushes + i);
     }
 }
 
@@ -3244,10 +3255,6 @@ int main(int argc, char** argv){
                          for(S16 j = i + 1; j < all_consolidated_block_pushes.count; j++){
                              auto& check_block_push = all_consolidated_block_pushes.pushes[j];
 
-                             // TODO: consolidate this code with the below code. Should probably be a BlockPush_t function
-                             S8 rotations = (check_block_push.entangle_rotations + check_block_push.portal_rotations) % DIRECTION_COUNT;
-                             auto rotated_direction_mask = direction_mask_rotate_clockwise(check_block_push.direction_mask, rotations);
-
                              // if the entangled push has already been executed, then we can't invalidate it
                              if(check_block_push.is_entangled()){
                                  if(i >= check_block_push.entangled_with_push_index) continue;
@@ -3260,20 +3267,24 @@ int main(int argc, char** argv){
                                      auto& check_pusher = check_block_push.pushers[p];
 
                                      if(check_pusher.index != block_change.block_index) continue;
-                                     if(check_pusher.entangled) continue;
+                                     if(check_pusher.hit_entangler) continue;
                                      if(block_pushes_are_the_same_collision(all_consolidated_block_pushes, i, j, check_pusher.index)) continue;
 
                                      if(block_change.x){
-                                         if(direction_in_mask(rotated_direction_mask, DIRECTION_LEFT) && block_change.vel >= 0){
+                                         if(direction_in_mask(check_block_push.direction_mask, DIRECTION_LEFT) && block_change.vel >= 0){
                                              check_block_push.remove_pusher(p);
-                                         }else if(direction_in_mask(rotated_direction_mask, DIRECTION_RIGHT) && block_change.vel <= 0){
+                                             p--;
+                                         }else if(direction_in_mask(check_block_push.direction_mask, DIRECTION_RIGHT) && block_change.vel <= 0){
                                              check_block_push.remove_pusher(p);
+                                             p--;
                                          }
                                      }else{
-                                         if(direction_in_mask(rotated_direction_mask, DIRECTION_DOWN) && block_change.vel >= 0){
+                                         if(direction_in_mask(check_block_push.direction_mask, DIRECTION_DOWN) && block_change.vel >= 0){
                                              check_block_push.remove_pusher(p);
-                                         }else if(direction_in_mask(rotated_direction_mask, DIRECTION_UP) && block_change.vel <= 0){
+                                             p--;
+                                         }else if(direction_in_mask(check_block_push.direction_mask, DIRECTION_UP) && block_change.vel <= 0){
                                              check_block_push.remove_pusher(p);
+                                             p--;
                                          }
                                      }
                                  }

@@ -130,7 +130,7 @@ struct BlockChanges_t{
 struct BlockPusher_t{
      S16 index = 0;
      S16 collided_with_block_count = 1;
-     bool entangled = false;
+     bool hit_entangler = false;
      S8 entangle_rotations = 0;
      S8 portal_rotations = 0;
 };
@@ -145,12 +145,12 @@ struct BlockPush_t{
      bool invalidated = false;
      S8 entangled_with_push_index = -1;
 
-     bool add_pusher(S16 index, S16 collided_with_block_count = 1, bool is_entangled = false,
+     bool add_pusher(S16 index, S16 collided_with_block_count = 1, bool hit_entangler = false,
                      S8 pusher_entangle_rotations = 0, S8 pusher_portal_rotations = 0){
           if(pusher_count >= MAX_BLOCK_PUSHERS) return false;
           pushers[pusher_count].index = index;
           pushers[pusher_count].collided_with_block_count = collided_with_block_count;
-          pushers[pusher_count].entangled = is_entangled;
+          pushers[pusher_count].hit_entangler = hit_entangler;
           pushers[pusher_count].entangle_rotations = pusher_entangle_rotations;
           pushers[pusher_count].portal_rotations = pusher_portal_rotations;
           pusher_count++;
