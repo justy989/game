@@ -3342,11 +3342,7 @@ int main(int argc, char** argv){
                     }
                     for(S16 c = 0; c < momentum_changes.count; c++){
                          auto& block_change = momentum_changes.changes[c];
-                         if(block_change.x){
-                              LOG("  block %d with mass %d changes vel x: %f\n", block_change.block_index, block_change.mass, block_change.vel);
-                         }else{
-                              LOG("  block %d with mass %d changes vel y: %f\n", block_change.block_index, block_change.mass, block_change.vel);
-                         }
+                         LOG("  block %d m: %d, v: %f in %s\n", block_change.block_index, block_change.mass, block_change.vel, block_change.x ? "x" : "y");
                     }
 #endif
 

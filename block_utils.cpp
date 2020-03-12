@@ -1842,68 +1842,33 @@ BlockCollisionPushResult_t block_collision_push(BlockPush_t* push, World_t* worl
 
           for(S16 p = 0; p < push->pusher_count; p++){
                auto* pusher = world->blocks.elements + push->pushers[p].index;
+               auto local_rotations = total_push_rotations;
 
                if(push->pushers[p].hit_entangler) continue;
 
                if(push->is_entangled()){
                    pusher = pushee;
+                   local_rotations = 0;
                }
 
-               // LOG("pusher %d checking %s\n", get_block_index(world, pusher), direction_to_string(direction_to_check));
+               // LOG("pusher %d checking %s with rotations %d\n", get_block_index(world, pusher), direction_to_string(direction_to_check), local_rotations);
 
                S16 pusher_mass = get_block_stack_mass(world, pusher);
                pusher_mass = (S16)((F32)(pusher_mass) * (1.0f / (F32)(push->pushers[p].collided_with_block_count)));
 
-               auto deal_with_push_result_result = deal_with_push_result(pusher, direction_to_check, total_push_rotations,
+               auto deal_with_push_result_result = deal_with_push_result(pusher, direction_to_check, local_rotations,
                                                                          world, &push_result, push->pushers[p].collided_with_block_count,
                                                                          push->is_entangled());
 
                 // force could have flowed through in the initial push but due to an entangled block pushing (and it's entanglers pushing), it could actually not move
                 // LOG("push result pushed: %d, force flowed through: %d, deal with push result vel: %f\n", push_result.pushed, push_result.force_flowed_through, deal_with_push_result_result.new_vel);
 
-                if((push_result.pushed || push_result.force_flowed_through) && deal_with_push_result_result.new_vel != 0){
-                     // LOG("adding entangled push based on block %d to the %s\n", get_block_index(world, pushee), direction_to_string(push_direction));
+                if(!push->is_entangled() && (push_result.pushed || push_result.force_flowed_through) && deal_with_push_result_result.new_vel != 0){
                      auto entangled_pushes = push_entangled_block_pushes(pushee, world, push_direction, pusher, push->pushers[p].collided_with_block_count, &instant_momentum);
                      result.entangled_block_pushes.merge(&entangled_pushes);
                 }
 
-                for(S16 c = 0; c < push_result.collision_count; c++){
-                    auto& collision = push_result.collisions[c];
-
-                    if(collision.transferred_momentum_back()){
-                        result.add_block_pushed(get_block_index(world, deal_with_push_result_result.block_receiving_force), direction_opposite(deal_with_push_result_result.final_direction));
-
-                        if(!push->is_entangled()){
-                            F32 current_vel = 0;
-                            switch(deal_with_push_result_result.final_direction){
-                            default:
-                                 break;
-                            case DIRECTION_LEFT:
-                            case DIRECTION_RIGHT:
-                                 current_vel = deal_with_push_result_result.block_receiving_force->vel.x;
-                                 break;
-                            case DIRECTION_UP:
-                            case DIRECTION_DOWN:
-                                 current_vel = deal_with_push_result_result.block_receiving_force->vel.y;
-                                 break;
-                            }
-
-                            if((current_vel > 0 && current_vel < deal_with_push_result_result.new_vel) ||
-                               (current_vel < 0 && current_vel > deal_with_push_result_result.new_vel)){
-                                auto entangled_pushes = push_entangled_block_pushes(deal_with_push_result_result.block_receiving_force, world, direction_opposite(deal_with_push_result_result.final_direction),
-                                                                                     pusher, push->pushers[p].collided_with_block_count, &instant_momentum);
-                                result.entangled_block_pushes.merge(&entangled_pushes);
-                            }else if((current_vel > 0 && deal_with_push_result_result.new_vel < 0) ||
-                                     (current_vel < 0 && deal_with_push_result_result.new_vel > 0)){
-                                auto entangled_pushes = push_entangled_block_pushes(deal_with_push_result_result.block_receiving_force, world, deal_with_push_result_result.final_direction,
-                                                                                     pusher, push->pushers[p].collided_with_block_count, &instant_momentum);
-                                result.entangled_block_pushes.merge(&entangled_pushes);
-                            }
-                        }
-
-                        break;
-                    }
-                }
+                // TODO: if the block has force thrown back at it through an elastic collision, we should impact the other entangler blocks that are on ice
 
                 result.momentum_changes.merge(&deal_with_push_result_result.momentum_changes);
           }
