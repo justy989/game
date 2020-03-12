@@ -16,6 +16,8 @@ Entanglement Puzzles:
 - rotated entangled puzzles where the centroid is on a portal destination coord
 
 Current bugs:
+- Lining up 2 entangled blocks pushing them across ice, and having a player stop them against the wall, does weird physics things. At the very least they
+  want to keep going toward the wall but cant and as soon as the player moves they continue towards the wall.
 - Colliding with and pushing an entangled block on ice should cause force to flow through its entangles, but shouldn't push entanglers that are not on ice
 - in map 42, when I had 4 blocks lined up on the column of the pressure plate, and 1 block to the right at the bottom
   of the collumn. When I pushed that 1 block up, the bottom block in the column of 4 disappeared

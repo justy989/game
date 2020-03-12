@@ -41,6 +41,7 @@ struct Block_t : public GridMotion_t{
      DirectionMask_t prev_push_mask;
 
      // these could all be flags one day when they grow up
+     // TODO: this is set to a mix of enum values and true/false so fix it man
      S8   held_up;
 
      bool       teleport;

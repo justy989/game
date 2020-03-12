@@ -247,6 +247,7 @@ F32 begin_stopping_grid_aligned_motion(MotionComponent_t* motion, F32 pos, S16 m
 
      F32 current_momentum = motion->ref->vel * (F32)(mass);
 
+     // we travel more grid cells when slowing down if there is a lot of momentum
      S16 grid_cells_to_travel = (current_momentum / normal_momentum) - 1;
      if(grid_cells_to_travel < 0) grid_cells_to_travel = 0;
 
