@@ -1558,19 +1558,22 @@ int main(int argc, char** argv){
                               for(S16 i = 0; i < block_count; i++){
                                    S16 block_index = get_block_index(&world, blocks[i]);
                                    if(editor.entangle_indices.count > 1 && block_index == editor.entangle_indices.elements[0]){
+                                        LOG("applying entanglement\n");
                                         for(S16 e = 0; e < editor.entangle_indices.count; e++){
                                              S16 next_index = (e + 1) % editor.entangle_indices.count;
                                              S16 entangle_index = editor.entangle_indices.elements[next_index];
                                              Block_t* block = world.blocks.elements + editor.entangle_indices.elements[e];
+                                             LOG("  %d -> %d\n", editor.entangle_indices.elements[e], entangle_index);
                                              block->entangle_index = entangle_index;
                                         }
+                                        destroy(&editor.entangle_indices);
                                         break;
+                                   }else{
+                                       S16 last_index = editor.entangle_indices.count;
+                                       resize(&editor.entangle_indices, editor.entangle_indices.count + 1);
+                                       editor.entangle_indices.elements[last_index] = block_index;
+                                       LOG("editor track entangle index %d\n", block_index);
                                    }
-
-                                   S16 last_index = editor.entangle_indices.count;
-                                   resize(&editor.entangle_indices, editor.entangle_indices.count + 1);
-                                   editor.entangle_indices.elements[last_index] = block_index;
-                                   LOG("editor track entangle index %d\n", block_index);
                               }
                          }
                          break;
