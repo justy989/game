@@ -60,6 +60,7 @@ struct Block_t : public GridMotion_t{
      BlockCoast_t coast_vertical = BLOCK_COAST_NONE;
      bool stopped_by_player_horizontal = false;
      bool stopped_by_player_vertical = false;
+     bool already_received_forceback_from_chain = false;
 
      CarriedPosDelta_t carried_pos_delta;
 
@@ -78,6 +79,7 @@ Coord_t block_get_coord(Position_t pos);
 bool blocks_at_collidable_height(S8 a_z, S8 b_z);
 Rect_t block_get_rect(Block_t* block);
 Rect_t block_get_rect(Pixel_t pixel);
+void block_set_pos_from_center(Block_t* block, Position_t pos);
 
 Pixel_t block_bottom_right_pixel(Pixel_t block);
 Pixel_t block_top_left_pixel(Pixel_t block);

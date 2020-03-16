@@ -35,6 +35,10 @@ Position_t block_get_center(Position_t pos){
      return pos;
 }
 
+void block_set_pos_from_center(Block_t* block, Position_t pos){
+    block->pos = pos - HALF_TILE_SIZE_PIXEL;
+}
+
 Coord_t block_get_coord(Block_t* block){
      Pixel_t center = block->pos.pixel + HALF_TILE_SIZE_PIXEL;
      return pixel_to_coord(center);

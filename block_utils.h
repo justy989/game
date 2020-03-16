@@ -341,28 +341,12 @@ struct BlockMomentumChanges_t{
      }
 };
 
-struct BlockPushed_t{
-     S16 block_index;
-     Direction_t direction;
-};
-
-#define MAX_BLOCKS_PUSHED 8
-#define MAX_ENTANGLE_BLOCK_PUSHES (MAX_BLOCKS_PUSHED * 4)
+#define MAX_BLOCK_PUSHES 128
 
 struct BlockCollisionPushResult_t{
-     BlockPushes_t<MAX_ENTANGLE_BLOCK_PUSHES> entangled_block_pushes;
-     BlockPushed_t blocks_pushed[MAX_BLOCKS_PUSHED];
-     S8 count = 0;
-
-     bool add_block_pushed(S16 block_index, Direction_t direction){
-          if(count >= MAX_BLOCKS_PUSHED) return false;
-          blocks_pushed[count].block_index = block_index;
-          blocks_pushed[count].direction = direction;
-          count++;
-          return true;
-     }
-
+     BlockPushes_t<MAX_BLOCK_PUSHES> additional_block_pushes;
      BlockMomentumChanges_t momentum_changes;
+     bool reapply_push = false;
 };
 
 void add_block_held(BlockHeldResult_t* result, Block_t* block, Rect_t rect);

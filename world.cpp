@@ -375,11 +375,13 @@ void slow_block_toward_gridlock(World_t* world, Block_t* block, Direction_t dire
           block->accel.y = begin_stopping_grid_aligned_motion(&motion, pos.y, block_mass); // adjust by one tick since we missed this update
      }
 
-     Direction_t against_dir = DIRECTION_COUNT;
-     Block_t* against_block = block_against_another_block(block->pos + block->pos_delta, direction_opposite(direction), world->block_qt, world->interactive_qt,
-                                                          &world->tilemap, &against_dir);
-     if(against_block){
-          slow_block_toward_gridlock(world, against_block, direction);
+     auto against_result = block_against_other_blocks(block->pos + block->pos_delta, direction_opposite(direction), world->block_qt,
+                                                      world->interactive_qt, &world->tilemap);
+     for(S16 i = 0; i < against_result.count; i++){
+         Direction_t against_direction = direction_rotate_clockwise(direction, against_result.againsts[i].rotations_through_portal);
+         Block_t* against_block = against_result.againsts[i].block;
+
+         slow_block_toward_gridlock(world, against_block, against_direction);
      }
 }
 
@@ -530,6 +532,58 @@ static int collision_distance_comparer(const void* a, const void* b){
 
 void sort_collisions_by_distance(PlayerBlockCollisions_t* block_collisions){
     qsort(block_collisions->collisions, block_collisions->count, sizeof(*block_collisions->collisions), collision_distance_comparer);
+}
+
+void stop_against_blocks_moving_with_block(World_t* world, Block_t* block, Direction_t direction, Position_t adjusted_stop_pos){
+    if(direction_is_horizontal(direction)){
+        reset_move(&block->horizontal_move);
+        block->vel.x = 0;
+        block->accel.x = 0;
+        block->stopped_by_player_horizontal = false;
+    }else{
+        reset_move(&block->vertical_move);
+        block->vel.y = 0;
+        block->accel.y = 0;
+        block->stopped_by_player_vertical = false;
+    }
+
+    Position_t block_center = block_get_center(adjusted_stop_pos);
+    auto against_result = block_against_other_blocks(block->pos + block->pos_delta, direction, world->block_qt,
+                                                     world->interactive_qt, &world->tilemap);
+    for(S16 i = 0; i < against_result.count; i++){
+        Direction_t against_direction = direction_rotate_clockwise(direction, against_result.againsts[i].rotations_through_portal);
+        Block_t* against_block = against_result.againsts[i].block;
+        Position_t against_center = block_get_center(against_block);
+        Position_t new_against_center = against_center;
+
+        switch(against_direction)
+        {
+        default:
+            break;
+        case DIRECTION_LEFT:
+            new_against_center.pixel.x = block_center.pixel.x - TILE_SIZE_IN_PIXELS;
+            new_against_center.decimal.x = block_center.decimal.x;
+            against_block->pos_delta.x = pos_to_vec(new_against_center - against_center).x;
+            break;
+        case DIRECTION_RIGHT:
+            new_against_center.pixel.x = block_center.pixel.x + TILE_SIZE_IN_PIXELS;
+            new_against_center.decimal.x = block_center.decimal.x;
+            against_block->pos_delta.x = pos_to_vec(new_against_center - against_center).x;
+            break;
+        case DIRECTION_DOWN:
+            new_against_center.pixel.y = block_center.pixel.y - TILE_SIZE_IN_PIXELS;
+            new_against_center.decimal.y = block_center.decimal.y;
+            against_block->pos_delta.y = pos_to_vec(new_against_center - against_center).y;
+            break;
+        case DIRECTION_UP:
+            new_against_center.pixel.y = block_center.pixel.y + TILE_SIZE_IN_PIXELS;
+            new_against_center.decimal.y = block_center.decimal.y;
+            against_block->pos_delta.y = pos_to_vec(new_against_center - against_center).y;
+            break;
+        }
+
+        stop_against_blocks_moving_with_block(world, against_block, against_direction, against_block->pos + against_block->pos_delta);
+    }
 }
 
 MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, Vec_t player_vel, Vec_t player_pos_delta,
@@ -703,17 +757,14 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                          if(momentum >= PLAYER_SQUISH_MOMENTUM){
                               result.resetting = true;
                          }else{
-                              reset_move(&collision.block->horizontal_move);
-                              collision.block->vel.x = 0;
-                              collision.block->accel.x = 0;
-                              collision.block->stopped_by_player_horizontal = false;
-
                               auto collided_pos_offset = collision.pos - collision.block->pos;
                               auto block_new_pos = collision.pos;
                               block_new_pos.pixel.x--;
                               block_new_pos.decimal.x = 0;
                               block_new_pos -= collided_pos_offset;
-                              collision.block->pos_delta.x = pos_to_vec(block_new_pos - collision.block->pos).x;
+                              F32 new_pos_delta = pos_to_vec(block_new_pos - collision.block->pos).x;
+                              stop_against_blocks_moving_with_block(world, collision.block, collision.dir, block_new_pos);
+                              collision.block->pos_delta.x = new_pos_delta;
                          }
                     }else if(!(collision.block->pos.z > player->pos.z && block_held_up_by_another_block(collision.block, world->block_qt, world->interactive_qt, &world->tilemap).held())){
                          auto new_pos = collision.pos + Vec_t{TILE_SIZE + PLAYER_RADIUS, 0};
@@ -757,17 +808,14 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                          if(momentum >= PLAYER_SQUISH_MOMENTUM){
                               result.resetting = true;
                          }else{
-                              reset_move(&collision.block->horizontal_move);
-                              collision.block->vel.x = 0;
-                              collision.block->accel.x = 0;
-                              collision.block->stopped_by_player_horizontal = false;
-
                               auto collided_pos_offset = collision.pos - collision.block->pos;
                               auto block_new_pos = collision.pos;
                               block_new_pos.pixel.x++;
                               block_new_pos.decimal.x = 0;
                               block_new_pos -= collided_pos_offset;
-                              collision.block->pos_delta.x = pos_to_vec(block_new_pos - collision.block->pos).x;
+                              F32 new_pos_delta = pos_to_vec(block_new_pos - collision.block->pos).x;
+                              stop_against_blocks_moving_with_block(world, collision.block, collision.dir, block_new_pos);
+                              collision.block->pos_delta.x = new_pos_delta;
                          }
                     }else if(!(collision.block->pos.z > player->pos.z && block_held_up_by_another_block(collision.block, world->block_qt, world->interactive_qt, &world->tilemap).held())){
                          auto new_pos = collision.pos - Vec_t{PLAYER_RADIUS, 0};
@@ -810,17 +858,15 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                          if(momentum >= PLAYER_SQUISH_MOMENTUM){
                               result.resetting = true;
                          }else{
-                              reset_move(&collision.block->vertical_move);
-                              collision.block->vel.y = 0;
-                              collision.block->accel.y = 0;
-                              collision.block->stopped_by_player_vertical = false;
-
                               auto collided_pos_offset = collision.pos - collision.block->pos;
                               auto block_new_pos = collision.pos;
                               block_new_pos.pixel.y++;
                               block_new_pos.decimal.y = 0;
                               block_new_pos -= collided_pos_offset;
-                              collision.block->pos_delta.y = pos_to_vec(block_new_pos - collision.block->pos).y;
+                              F32 new_pos_delta = pos_to_vec(block_new_pos - collision.block->pos).y;
+                              stop_against_blocks_moving_with_block(world, collision.block, collision.dir, block_new_pos);
+                              collision.block->pos_delta.y = new_pos_delta;
+
                          }
                     }else if(!(collision.block->pos.z > player->pos.z && block_held_up_by_another_block(collision.block, world->block_qt, world->interactive_qt, &world->tilemap).held())){
                          auto new_pos = collision.pos - Vec_t{0, PLAYER_RADIUS};
@@ -864,17 +910,14 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                          if(momentum >= PLAYER_SQUISH_MOMENTUM){
                               result.resetting = true;
                          }else{
-                              reset_move(&collision.block->vertical_move);
-                              collision.block->vel.y = 0;
-                              collision.block->accel.y = 0;
-                              collision.block->stopped_by_player_vertical = false;
-
                               auto collided_pos_offset = collision.pos - collision.block->pos;
                               auto block_new_pos = collision.pos;
                               block_new_pos.pixel.y--;
                               block_new_pos.decimal.y = 0;
                               block_new_pos -= collided_pos_offset;
-                              collision.block->pos_delta.y = pos_to_vec(block_new_pos - collision.block->pos).y;
+                              F32 new_pos_delta = pos_to_vec(block_new_pos - collision.block->pos).y;
+                              stop_against_blocks_moving_with_block(world, collision.block, collision.dir, block_new_pos);
+                              collision.block->pos_delta.y = new_pos_delta;
                          }
                     }else if(!(collision.block->pos.z > player->pos.z && block_held_up_by_another_block(collision.block, world->block_qt, world->interactive_qt, &world->tilemap).held())){
                          auto new_pos = collision.pos + Vec_t{0, TILE_SIZE + PLAYER_RADIUS};
@@ -1421,7 +1464,7 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
                                           result.pushed = true;
                                      }else{
                                           result.add_collision(collision.pusher_mass, collision.pusher_velocity, collision.pushee_mass, collision.pushee_initial_velocity, collision.pushee_velocity);
-                                          reset_move(&block->horizontal_move);
+                                          // reset_move(&block->horizontal_move);
                                           result.pushed = false;
                                      }
                                  }
@@ -1443,7 +1486,7 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
                                           result.pushed = true;
                                      }else{
                                           result.add_collision(collision.pusher_mass, collision.pusher_velocity, collision.pushee_mass, collision.pushee_initial_velocity, collision.pushee_velocity);
-                                          reset_move(&block->vertical_move);
+                                          // reset_move(&block->vertical_move);
                                           result.pushed = false;
                                      }
                                  }
@@ -1802,7 +1845,8 @@ void describe_block(World_t* world, Block_t* block){
      LOG(" vmove   : %s %s %f\n", move_state_to_string(block->vertical_move.state), move_sign_to_string(block->vertical_move.sign), block->vertical_move.distance);
      LOG(" hcoast  : %s vcoast: %s\n", block_coast_to_string(block->coast_horizontal), block_coast_to_string(block->coast_vertical));
      LOG(" flags   : held_up: %d, carried_by_block: %d stopped_by_player_horizontal: %d, stopped_by_player_vertical: %d\n",
-         block->held_up, block->carried_pos_delta.block_index, block->stopped_by_player_horizontal, block->stopped_by_player_vertical);
+         block->held_up, block->carried_pos_delta.block_index, block->stopped_by_player_horizontal,
+         block->stopped_by_player_vertical);
      LOG(" stack mass: %d, horizontal momentum: %f, vertical momentum: %f\n", mass, horizontal_momentum, vertical_momentum);
      LOG("\n");
 }
