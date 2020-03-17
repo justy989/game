@@ -955,7 +955,9 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                                                                     S16 block_index, bool block_is_cloning, World_t* world){
      CheckBlockCollisionResult_t result {};
 
+     result.block_index = block_index;
      result.pos_delta = block_pos_delta;
+     result.original_vel = block_vel;
      result.vel = block_vel;
      result.accel = block_accel;
 
@@ -1147,7 +1149,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                }
 
                if(block_inside_index != block_index){
-                    LOG("block %d inside block %d\n", block_index, result.collided_block_index);
+                    // LOG("block %d inside block %d\n", block_index, result.collided_block_index);
 
                     switch(move_direction){
                     default:
@@ -1376,12 +1378,12 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                Block_t* last_block_in_chain = block_inside_result.entries[i].block;
                Direction_t against_direction = first_direction;
 
-               LOG("finding block against block %d in the %s with pos %d, %d - %f, %f with delta %f, %f\n",
-                   get_block_index(world, last_block_in_chain), direction_to_string(against_direction), last_block_in_chain->pos.pixel.x, last_block_in_chain->pos.pixel.y, last_block_in_chain->pos.decimal.x, last_block_in_chain->pos.decimal.y,
-                   last_block_in_chain->pos_delta.x, last_block_in_chain->pos_delta.y);
-               auto p = world->blocks.elements[3].pos;
-               auto pd = world->blocks.elements[3].pos_delta;
-               LOG("  block 3 pos %d, %d - %f, %f, pos dt: %f, %f\n", p.pixel.x, p.pixel.y, p.decimal.x, p.decimal.x, pd.x, pd.y);
+               // LOG("finding block against block %d in the %s with pos %d, %d - %f, %f with delta %f, %f\n",
+               //     get_block_index(world, last_block_in_chain), direction_to_string(against_direction), last_block_in_chain->pos.pixel.x, last_block_in_chain->pos.pixel.y, last_block_in_chain->pos.decimal.x, last_block_in_chain->pos.decimal.y,
+               //     last_block_in_chain->pos_delta.x, last_block_in_chain->pos_delta.y);
+               // auto p = world->blocks.elements[3].pos;
+               // auto pd = world->blocks.elements[3].pos_delta;
+               // LOG("  block 3 pos %d, %d - %f, %f, pos dt: %f, %f\n", p.pixel.x, p.pixel.y, p.decimal.x, p.decimal.x, pd.x, pd.y);
 
                while(true){
                     // TODO: handle multiple against blocks
@@ -1399,8 +1401,8 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                                                    &world->tilemap, world->interactive_qt, world->block_qt) ||
                                       block_on_air(last_block_in_chain->pos, last_block_in_chain->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt);
 
-               LOG("block %d is against block %d. is it on frictionless: %d\n",
-                   block_index, get_block_index(world, last_block_in_chain), c_on_ice_or_air);
+               // LOG("block %d is against block %d. is it on frictionless: %d\n",
+               //     block_index, get_block_index(world, last_block_in_chain), c_on_ice_or_air);
 
                // if the blocks are headed in the same direction but the block is slowing down, slow down with it
                if(!c_on_ice_or_air){
@@ -1408,7 +1410,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                     default:
                          break;
                     case DIRECTION_LEFT:
-                         LOG("  block vel x: %f, inside block vel x: %f\n", block_vel.x, block_inside_result.entries[i].block->vel.x);
+                         // LOG("  block vel x: %f, inside block vel x: %f\n", block_vel.x, block_inside_result.entries[i].block->vel.x);
                          if(block_vel.x < 0 &&
                             block_inside_result.entries[i].block->vel.x < 0 &&
                             block_vel.x < block_inside_result.entries[i].block->vel.x){
@@ -1418,7 +1420,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                          }
                          break;
                     case DIRECTION_RIGHT:
-                         LOG("  block vel x: %f, inside block vel x: %f\n", block_vel.x, block_inside_result.entries[i].block->vel.x);
+                         // LOG("  block vel x: %f, inside block vel x: %f\n", block_vel.x, block_inside_result.entries[i].block->vel.x);
                          if(block_vel.x > 0 &&
                             block_inside_result.entries[i].block->vel.x > 0 &&
                             block_vel.x > block_inside_result.entries[i].block->vel.x){
@@ -1428,7 +1430,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                          }
                          break;
                     case DIRECTION_DOWN:
-                         LOG("  block vel y: %f, inside block vel y %f\n", block_vel.y, block_inside_result.entries[i].block->vel.y);
+                         // LOG("  block vel y: %f, inside block vel y %f\n", block_vel.y, block_inside_result.entries[i].block->vel.y);
                          if(block_vel.y < 0 &&
                             block_inside_result.entries[i].block->vel.y < 0 &&
                             block_vel.y < block_inside_result.entries[i].block->vel.y){
@@ -1438,7 +1440,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                          }
                          break;
                     case DIRECTION_UP:
-                         LOG("  block vel y: %f, inside block vel y %f\n", block_vel.y, block_inside_result.entries[i].block->vel.y);
+                         // LOG("  block vel y: %f, inside block vel y %f\n", block_vel.y, block_inside_result.entries[i].block->vel.y);
                          if(block_vel.y > 0 &&
                             block_inside_result.entries[i].block->vel.y >= 0 &&
                             block_vel.y > block_inside_result.entries[i].block->vel.y){

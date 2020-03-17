@@ -222,8 +222,10 @@ struct BlockPushes_t{
 
 struct CheckBlockCollisionResult_t{
      bool collided;
+     S16 block_index;
 
      Vec_t pos_delta;
+     Vec_t original_vel;
      Vec_t vel;
      Vec_t accel;
 
@@ -241,7 +243,6 @@ struct CheckBlockCollisionResult_t{
      F32 vertical_momentum;
 
      BlockPushes_t<4> block_pushes;
-     // BlockChanges_t block_changes;
 
      void stop_horizontally(){
           reset_move(&horizontal_move);
