@@ -1245,6 +1245,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
 
                                    if(direction_in_mask(collided_block_move_mask, first_direction)){
                                        result.vel.x = block_inside_result.entries[i].block->vel.x;
+                                       if(result.vel.x == 0) result.stop_horizontally();
                                    }
 
                                    // LOG("A block %d collides left with block %d and reduces it's pos_delta.x from %f, to %f\n",
@@ -1274,6 +1275,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
 
                                    if(direction_in_mask(collided_block_move_mask, first_direction)){
                                        result.vel.x = block_inside_result.entries[i].block->vel.x;
+                                       if(result.vel.x == 0) result.stop_horizontally();
                                    }
 
                                    // LOG("A block %d collides right with block %d and reduces it's pos_delta.x from %f, to %f\n",
@@ -1303,6 +1305,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
 
                                    if(direction_in_mask(collided_block_move_mask, first_direction)){
                                        result.vel.y = block_inside_result.entries[i].block->vel.y;
+                                       if(result.vel.y == 0) result.stop_vertically();
                                    }
                               }else{
                                    result.stop_on_pixel_y = closest_pixel(collided_block_center.pixel.y + HALF_TILE_SIZE_IN_PIXELS, collided_block_center.decimal.y);
@@ -1326,6 +1329,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
 
                                    if(direction_in_mask(collided_block_move_mask, first_direction)){
                                        result.vel.y = block_inside_result.entries[i].block->vel.y;
+                                       if(result.vel.y == 0) result.stop_vertically();
                                    }
                               }else{
                                    result.stop_on_pixel_y = closest_pixel((collided_block_center.pixel.y - HALF_TILE_SIZE_IN_PIXELS) - TILE_SIZE_IN_PIXELS, collided_block_center.decimal.y);
