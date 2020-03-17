@@ -1244,7 +1244,8 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                                    result.pos_delta.x = new_pos_delta.x;
 
                                    if(direction_in_mask(collided_block_move_mask, first_direction)){
-                                       result.vel.x = block_inside_result.entries[i].block->vel.x;
+                                       Vec_t collided_block_vel = vec_rotate_quadrants_counter_clockwise(block_inside_result.entries[i].block->vel, block_inside_result.entries[i].portal_rotations);
+                                       result.vel.x = collided_block_vel.x;
                                        if(result.vel.x == 0) result.stop_horizontally();
                                    }
 
@@ -1274,7 +1275,8 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                                    result.pos_delta.x = new_pos_delta.x;
 
                                    if(direction_in_mask(collided_block_move_mask, first_direction)){
-                                       result.vel.x = block_inside_result.entries[i].block->vel.x;
+                                       Vec_t collided_block_vel = vec_rotate_quadrants_counter_clockwise(block_inside_result.entries[i].block->vel, block_inside_result.entries[i].portal_rotations);
+                                       result.vel.x = collided_block_vel.x;
                                        if(result.vel.x == 0) result.stop_horizontally();
                                    }
 
@@ -1304,7 +1306,8 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                                    result.pos_delta.y = new_pos_delta.y;
 
                                    if(direction_in_mask(collided_block_move_mask, first_direction)){
-                                       result.vel.y = block_inside_result.entries[i].block->vel.y;
+                                       Vec_t collided_block_vel = vec_rotate_quadrants_counter_clockwise(block_inside_result.entries[i].block->vel, block_inside_result.entries[i].portal_rotations);
+                                       result.vel.y = collided_block_vel.y;
                                        if(result.vel.y == 0) result.stop_vertically();
                                    }
                               }else{
@@ -1328,7 +1331,8 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                                    result.pos_delta.y = new_pos_delta.y;
 
                                    if(direction_in_mask(collided_block_move_mask, first_direction)){
-                                       result.vel.y = block_inside_result.entries[i].block->vel.y;
+                                       Vec_t collided_block_vel = vec_rotate_quadrants_counter_clockwise(block_inside_result.entries[i].block->vel, block_inside_result.entries[i].portal_rotations);
+                                       result.vel.y = collided_block_vel.y;
                                        if(result.vel.y == 0) result.stop_vertically();
                                    }
                               }else{
