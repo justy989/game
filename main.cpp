@@ -350,102 +350,7 @@ bool check_direction_from_block_for_adjacent_walls(Block_t* block, TileMap_t* ti
      return false;
 }
 
-void adjust_blocks_against_pos_delta(Block_t* block, World_t* world, Vec_t pos_delta, Vec_t final_pos_delta, CheckBlockCollisionResult_t* result){
-    (void)(result);
-    Direction_t horizontal_direction = DIRECTION_COUNT;
-    Direction_t vertical_direction = DIRECTION_COUNT;
-
-    // figure out if our pos delta has shrunk in either direction
-
-    if(pos_delta.x > 0 && pos_delta.x > final_pos_delta.x){
-        horizontal_direction = DIRECTION_LEFT;
-    }else if(pos_delta.x < 0 && pos_delta.x < final_pos_delta.x){
-        horizontal_direction = DIRECTION_RIGHT;
-    }
-
-    if(pos_delta.y > 0 && pos_delta.y > final_pos_delta.y){
-        vertical_direction = DIRECTION_DOWN;
-    }else if(pos_delta.y < 0 && pos_delta.x < final_pos_delta.y){
-        vertical_direction = DIRECTION_UP;
-    }
-
-    Position_t final_block_pos = block->pos + final_pos_delta;
-    Position_t final_block_center = block_get_center(final_block_pos);
-
-    if(horizontal_direction != DIRECTION_COUNT){
-        auto against_result = block_against_other_blocks(block->pos + pos_delta, horizontal_direction, world->block_qt,
-                                                         world->interactive_qt, &world->tilemap);
-
-        for(S16 i = 0; i < against_result.count; i++){
-            Direction_t against_direction = direction_rotate_clockwise(horizontal_direction, against_result.againsts[i].rotations_through_portal);
-            Block_t* against_block = against_result.againsts[i].block;
-            Position_t against_center = block_get_center(against_block);
-            Position_t new_against_center = against_center;
-
-            // TODO: compress this with code in stop_against_blocks_moving_with_block() in world.cpp
-            switch(against_direction)
-            {
-            default:
-                break;
-            case DIRECTION_LEFT:
-                new_against_center.pixel.x = final_block_center.pixel.x - TILE_SIZE_IN_PIXELS;
-                new_against_center.decimal.x = final_block_center.decimal.x;
-                against_block->pos_delta.x = pos_to_vec(new_against_center - against_center).x;
-                if(against_block->horizontal_move.state == MOVE_STATE_COASTING && block->vel.x > 0 && block->vel.x < against_block->vel.x){
-                    against_block->vel.x = block->vel.x;
-                }
-                break;
-            case DIRECTION_RIGHT:
-                new_against_center.pixel.x = final_block_center.pixel.x + TILE_SIZE_IN_PIXELS;
-                new_against_center.decimal.x = final_block_center.decimal.x;
-                against_block->pos_delta.x = pos_to_vec(new_against_center - against_center).x;
-                if(against_block->horizontal_move.state == MOVE_STATE_COASTING && block->vel.x < 0 && block->vel.x > against_block->vel.x){
-                    against_block->vel.x = block->vel.x;
-                }
-                break;
-            }
-        }
-    }
-
-    if(vertical_direction != DIRECTION_COUNT){
-        auto against_result = block_against_other_blocks(block->pos + pos_delta, vertical_direction, world->block_qt,
-                                                         world->interactive_qt, &world->tilemap);
-
-        for(S16 i = 0; i < against_result.count; i++){
-            Direction_t against_direction = direction_rotate_clockwise(vertical_direction, against_result.againsts[i].rotations_through_portal);
-            Block_t* against_block = against_result.againsts[i].block;
-            Position_t against_center = block_get_center(against_block);
-            Position_t new_against_center = against_center;
-
-            // TODO: compress this with code in stop_against_blocks_moving_with_block() in world.cpp
-            switch(against_direction)
-            {
-            default:
-                break;
-            case DIRECTION_DOWN:
-                new_against_center.pixel.y = final_block_center.pixel.y - TILE_SIZE_IN_PIXELS;
-                new_against_center.decimal.y = final_block_center.decimal.y;
-                against_block->pos_delta.y = pos_to_vec(new_against_center - against_center).y;
-                if(against_block->vertical_move.state == MOVE_STATE_COASTING && block->vel.y > 0 && block->vel.y < against_block->vel.y){
-                    against_block->vel.y = block->vel.y;
-                }
-                break;
-            case DIRECTION_UP:
-                new_against_center.pixel.y = final_block_center.pixel.y + TILE_SIZE_IN_PIXELS;
-                new_against_center.decimal.y = final_block_center.decimal.y;
-                against_block->pos_delta.y = pos_to_vec(new_against_center - against_center).y;
-                if(against_block->vertical_move.state == MOVE_STATE_COASTING && block->vel.y < 0 && block->vel.y > against_block->vel.y){
-                    against_block->vel.y = block->vel.y;
-                }
-                break;
-            }
-        }
-    }
-}
-
-void copy_block_collision_results(Block_t* block, CheckBlockCollisionResult_t* result, World_t* world){
-     adjust_blocks_against_pos_delta(block, world, block->pos_delta, result->pos_delta, result);
-
+void copy_block_collision_results(Block_t* block, CheckBlockCollisionResult_t* result){
      block->pos_delta = result->pos_delta;
      block->vel = result->vel;
      block->accel = result->accel;
@@ -739,7 +644,7 @@ void apply_block_collision(World_t* world, Block_t* block, F32 dt, CheckBlockCol
                               }
 
                               if(move_dir_to_stop == DIRECTION_COUNT){
-                                   copy_block_collision_results(block, collision_result, world);
+                                   copy_block_collision_results(block, collision_result);
                               }else{
                                    bool block_on_ice_or_air = block_on_ice(block->pos, block->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt) ||
                                    block_on_air(block->pos, block->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt);
@@ -804,10 +709,10 @@ void apply_block_collision(World_t* world, Block_t* block, F32 dt, CheckBlockCol
                               }
                          }
                     }else{
-                         copy_block_collision_results(block, collision_result, world);
+                         copy_block_collision_results(block, collision_result);
                     }
                }else{
-                    copy_block_collision_results(block, collision_result, world);
+                    copy_block_collision_results(block, collision_result);
                }
           }
      }

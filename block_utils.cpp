@@ -750,7 +750,7 @@ InteractiveHeldResult_t block_held_up_by_popup(Position_t block_pos, QuadTreeNod
 
 static BlockHeldResult_t block_at_height_in_block_rect(Pixel_t block_to_check_pixel, QuadTreeNode_t<Block_t>* block_qt,
                                                        S8 expected_height, QuadTreeNode_t<Interactive_t>* interactive_qt,
-                                                       TileMap_t* tilemap, S16 min_area = 0){
+                                                       TileMap_t* tilemap, S16 min_area = 0, bool include_pos_delta = true){
      BlockHeldResult_t result;
 
      // TODO: need more complicated function to detect this
@@ -765,7 +765,8 @@ static BlockHeldResult_t block_at_height_in_block_rect(Pixel_t block_to_check_pi
      for(S16 i = 0; i < block_count; i++){
           Block_t* block = blocks[i];
           if(block->pos.z != expected_height) continue;
-          auto block_pos = block->pos + block->pos_delta;
+          auto block_pos = block->pos;
+          if(include_pos_delta) block_pos += block->pos_delta;
 
           if(pixel_in_rect(block_pos.pixel, check_rect) ||
              pixel_in_rect(block_top_left_pixel(block_pos.pixel), check_rect) ||
@@ -814,7 +815,9 @@ static BlockHeldResult_t block_at_height_in_block_rect(Pixel_t block_to_check_pi
 
                               auto portal_rotations = direction_rotations_between(interactive->portal.face, direction_opposite((Direction_t)(pd)));
 
-                              auto block_portal_dst_offset = block->pos + block->pos_delta;
+                              auto block_portal_dst_offset = block->pos;
+                              if(include_pos_delta) block_portal_dst_offset += block->pos_delta;
+
                               block_portal_dst_offset.pixel += HALF_TILE_SIZE_PIXEL;
                               block_portal_dst_offset.pixel -= portal_dst_center_pixel;
 
@@ -879,8 +882,9 @@ BlockHeldResult_t block_held_down_by_another_block(Block_t* block, QuadTreeNode_
 }
 
 BlockHeldResult_t block_held_down_by_another_block(Pixel_t block_pixel, S8 block_z, QuadTreeNode_t<Block_t>* block_qt,
-                                                   QuadTreeNode_t<Interactive_t>* interactive_qt, TileMap_t* tilemap, S16 min_area){
-     return block_at_height_in_block_rect(block_pixel, block_qt, block_z + HEIGHT_INTERVAL, interactive_qt, tilemap, min_area);
+                                                   QuadTreeNode_t<Interactive_t>* interactive_qt, TileMap_t* tilemap,
+                                                   S16 min_area, bool include_pos_delta){
+     return block_at_height_in_block_rect(block_pixel, block_qt, block_z + HEIGHT_INTERVAL, interactive_qt, tilemap, min_area, include_pos_delta);
 }
 
 bool block_on_ice(Position_t pos, Vec_t pos_delta, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt,
@@ -1149,8 +1153,6 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                }
 
                if(block_inside_index != block_index){
-                    // LOG("block %d inside block %d\n", block_index, result.collided_block_index);
-
                     switch(move_direction){
                     default:
                          break;
@@ -1406,12 +1408,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                Block_t* last_block_in_chain = block_inside_result.entries[i].block;
                Direction_t against_direction = first_direction;
 
-               // LOG("finding block against block %d in the %s with pos %d, %d - %f, %f with delta %f, %f\n",
-               //     get_block_index(world, last_block_in_chain), direction_to_string(against_direction), last_block_in_chain->pos.pixel.x, last_block_in_chain->pos.pixel.y, last_block_in_chain->pos.decimal.x, last_block_in_chain->pos.decimal.y,
-               //     last_block_in_chain->pos_delta.x, last_block_in_chain->pos_delta.y);
-               // auto p = world->blocks.elements[3].pos;
-               // auto pd = world->blocks.elements[3].pos_delta;
-               // LOG("  block 3 pos %d, %d - %f, %f, pos dt: %f, %f\n", p.pixel.x, p.pixel.y, p.decimal.x, p.decimal.x, pd.x, pd.y);
+               S8 rotations_between_last_in_chain = result.collided_portal_rotations;
 
                while(true){
                     // TODO: handle multiple against blocks
@@ -1420,64 +1417,73 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                     if(against_result.count > 0){
                          last_block_in_chain = against_result.againsts[0].block;
                          against_direction = direction_rotate_clockwise(against_direction, against_result.againsts[0].rotations_through_portal);
+                         rotations_between_last_in_chain += against_result.againsts[0].rotations_through_portal;
                     }else{
                          break;
                     }
                }
 
-               bool c_on_ice_or_air = block_on_ice(last_block_in_chain->pos, last_block_in_chain->pos_delta,
-                                                   &world->tilemap, world->interactive_qt, world->block_qt) ||
-                                      block_on_air(last_block_in_chain->pos, last_block_in_chain->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt);
-
-               // LOG("block %d is against block %d. is it on frictionless: %d\n",
-               //     block_index, get_block_index(world, last_block_in_chain), c_on_ice_or_air);
+               bool slow_down = false;
+               if(rotations_between_last_in_chain % 2 == 0){
+                   if(direction_is_horizontal(first_direction)){
+                       slow_down = (last_block_in_chain->horizontal_move.state == MOVE_STATE_STOPPING);
+                   }else{
+                       slow_down = (last_block_in_chain->vertical_move.state == MOVE_STATE_STOPPING);
+                   }
+               }else{
+                   if(direction_is_horizontal(first_direction)){
+                       slow_down = (last_block_in_chain->vertical_move.state == MOVE_STATE_STOPPING);
+                   }else{
+                       slow_down = (last_block_in_chain->horizontal_move.state == MOVE_STATE_STOPPING);
+                   }
+               }
 
                // if the blocks are headed in the same direction but the block is slowing down, slow down with it
-               if(!c_on_ice_or_air){
-                    switch(first_direction){
-                    default:
-                         break;
-                    case DIRECTION_LEFT:
-                         // LOG("  block vel x: %f, inside block vel x: %f\n", block_vel.x, block_inside_result.entries[i].block->vel.x);
-                         if(block_vel.x < 0 &&
-                            block_inside_result.entries[i].block->vel.x < 0 &&
-                            block_vel.x < block_inside_result.entries[i].block->vel.x){
-                              result.vel.x = block_inside_result.entries[i].block->vel.x;
-                              if(result.vel.x == 0) result.stop_horizontally();
-                              should_push = false;
-                         }
-                         break;
-                    case DIRECTION_RIGHT:
-                         // LOG("  block vel x: %f, inside block vel x: %f\n", block_vel.x, block_inside_result.entries[i].block->vel.x);
-                         if(block_vel.x > 0 &&
-                            block_inside_result.entries[i].block->vel.x > 0 &&
-                            block_vel.x > block_inside_result.entries[i].block->vel.x){
-                              result.vel.x = block_inside_result.entries[i].block->vel.x;
-                              if(result.vel.x == 0) result.stop_horizontally();
-                              should_push = false;
-                         }
-                         break;
-                    case DIRECTION_DOWN:
-                         // LOG("  block vel y: %f, inside block vel y %f\n", block_vel.y, block_inside_result.entries[i].block->vel.y);
-                         if(block_vel.y < 0 &&
-                            block_inside_result.entries[i].block->vel.y < 0 &&
-                            block_vel.y < block_inside_result.entries[i].block->vel.y){
-                              result.vel.y = block_inside_result.entries[i].block->vel.y;
-                              if(result.vel.y == 0) result.stop_vertically();
-                              should_push = false;
-                         }
-                         break;
-                    case DIRECTION_UP:
-                         // LOG("  block vel y: %f, inside block vel y %f\n", block_vel.y, block_inside_result.entries[i].block->vel.y);
-                         if(block_vel.y > 0 &&
-                            block_inside_result.entries[i].block->vel.y >= 0 &&
-                            block_vel.y > block_inside_result.entries[i].block->vel.y){
-                              result.vel.y = block_inside_result.entries[i].block->vel.y;
-                              if(result.vel.y == 0) result.stop_vertically();
-                              should_push = false;
-                         }
-                         break;
-                    }
+               if(slow_down){
+                   switch(first_direction){
+                   default:
+                        break;
+                   case DIRECTION_LEFT:
+                   {
+                        if(block_vel.x < 0 &&
+                           block_inside_result.entries[i].block->vel.x < 0 &&
+                           block_vel.x < block_inside_result.entries[i].block->vel.x){
+                             result.vel.x = block_inside_result.entries[i].block->vel.x;
+                             if(result.vel.x == 0) result.stop_horizontally();
+                             should_push = false;
+                        }
+                   } break;
+                   case DIRECTION_RIGHT:
+                   {
+                        if(block_vel.x > 0 &&
+                           block_inside_result.entries[i].block->vel.x > 0 &&
+                           block_vel.x > block_inside_result.entries[i].block->vel.x){
+                             result.vel.x = block_inside_result.entries[i].block->vel.x;
+                             if(result.vel.x == 0) result.stop_horizontally();
+                             should_push = false;
+                        }
+                   } break;
+                   case DIRECTION_DOWN:
+                   {
+                        if(block_vel.y < 0 &&
+                           block_inside_result.entries[i].block->vel.y < 0 &&
+                           block_vel.y < block_inside_result.entries[i].block->vel.y){
+                             result.vel.y = block_inside_result.entries[i].block->vel.y;
+                             if(result.vel.y == 0) result.stop_vertically();
+                             should_push = false;
+                        }
+                   } break;
+                   case DIRECTION_UP:
+                   {
+                        if(block_vel.y > 0 &&
+                           block_inside_result.entries[i].block->vel.y >= 0 &&
+                           block_vel.y > block_inside_result.entries[i].block->vel.y){
+                             result.vel.y = block_inside_result.entries[i].block->vel.y;
+                             if(result.vel.y == 0) result.stop_vertically();
+                             should_push = false;
+                        }
+                   } break;
+                   }
                }
 
                if(a_on_ice_or_air && b_on_ice_or_air){
