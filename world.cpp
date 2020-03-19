@@ -2235,7 +2235,8 @@ static S16 get_player_mass_on_block(World_t* world, Block_t* block){
 
      for(S16 p = 0; p < world->players.count; p++){
           auto player = world->players.elements + p;
-          if(player->pos.z == (block->pos.z + HEIGHT_INTERVAL) && pixel_in_rect(player->pos.pixel, block_rect)){
+          auto player_pos = player->teleport ? player->teleport_pos + player->teleport_pos_delta : player->pos + player->pos_delta;
+          if(player_pos.z == (block->pos.z + HEIGHT_INTERVAL) && pixel_in_rect(player_pos.pixel, block_rect)){
                mass += PLAYER_MASS;
           }
      }
