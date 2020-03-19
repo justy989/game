@@ -16,38 +16,26 @@ Entanglement Puzzles:
 - rotated entangled puzzles where the centroid is on a portal destination coord
 
 Current bugs:
-- Lining up 2 entangled blocks pushing them across ice, and having a player stop them against the wall, does weird physics things. At the very least they
-  want to keep going toward the wall but cant and as soon as the player moves they continue towards the wall.
+- a block travelling diagonally at a wall will stop on both axis' against the wall because of the collision
+- Players standing on blocks going through portals colliding on ice seem to gain speed over time
 - Colliding with and pushing an entangled block on ice should cause force to flow through its entangles, but shouldn't push entanglers that are not on ice
 - in map 42, when I had 4 blocks lined up on the column of the pressure plate, and 1 block to the right at the bottom
   of the collumn. When I pushed that 1 block up, the bottom block in the column of 4 disappeared
 - for collision, can shorten things pos_deltas before we cause pushes to happen on ice in the same frame due to collisions ?
-- continuing to push a block through a collision on ice causes bad things to happen
-- a block travelling diagonally at a wall will stop on both axis' against the wall because of the collision
 - if a collision happens to an entangled block on ice, where the entangled block is moving towards the collider, the entangled block's entanglers do not get pushed
 - We can have a stack overflow in our quad tree queries for blocks, not sure how yet
-- Players standing on blocks going through portals colliding on ice seem to gain speed over time
 - pressure plates don't see blocks as 1 pixel too small on the right and top, so their activation is delayed in those directions
 - A block on the tile outside a portal pushed into the portal to clone, the clone has weird behavior and ends up on the portal block
 - When pushing a block through a portal that turns off, the block keeps going
 - Getting a block and it's rotated entangler to push into the centroid causes any other entangled blocks to alternate pushing
-- Lockups/crashing when lots of entangled blocks collided on ice
-- In the case of 3 rotated entangled blocks, 2 blocks that have a rotation of 2 between them colliding into each other seem to end up off of the grid
-- When pushing a block through portals, the block seems to snap to grid oddly when you finish pushing it
-- Sometimes when pushing a block, it will slide a tiny bit (around a pixel) further than the square it is supposed to land on, then snap to the right pixel
 - Pushing a block and shooting an arrow causes the player to go invisible
-- Something funky about level 76 taking forever to test the map
 
 Big Features:
-- Momentum
-     - Even if a block is iced, if there is a block on top of it, that should impact static friction but not collision impact velocities resolution
 - 3D
      - if we put a popup on the other side of a portal and a block 1 interval high goes through the portal, will it work the way we expect?
      - how does a stack of entangled blocks move? really f***ing weird right now tbh
-- Blocks collide with blocks and transfer momentum through portals even if they don't go through the portal (not grid aligned)
 - When pushing blocks against blocks that are off-grid (due to pushing against a player), sometimes the blocks can't move towards other off-grid blocks
 - Players impact carry velocity until the block teleports
-- 2 non-entangled blocks colliding at a centroid on ice don't do the right thing
 - update get mass and block push to handle infinite mass cases
 - A way to tell which blocks are entangled
 - arrow kills player
@@ -336,9 +324,9 @@ bool check_direction_from_block_for_adjacent_walls(Block_t* block, TileMap_t* ti
      Coord_t coord_b = pixel_to_coord(pixel_b);
 
      if(tilemap_is_solid(tilemap, coord_a)){
-          return true;
+          if(!tilemap_is_solid(tilemap, coord_a - direction)) return true;
      }else if(tilemap_is_solid(tilemap, coord_b)){
-          return true;
+          if(!tilemap_is_solid(tilemap, coord_b - direction)) return true;
      }
 
      Interactive_t* a = quad_tree_interactive_solid_at(interactive_qt, tilemap, coord_a, block->pos.z);
