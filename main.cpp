@@ -400,7 +400,7 @@ PlayerInBlockRectResult_t player_in_block_rect(Player_t* player, TileMap_t* tile
 
      quad_tree_find_in(block_qt, search_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
      for(S16 b = 0; b < block_count; b++){
-         auto block_pos = blocks[b]->teleport ? blocks[b]->teleport_pos : blocks[b]->pos;
+         auto block_pos = blocks[b]->teleport ? blocks[b]->teleport_pos + blocks[b]->teleport_pos_delta : blocks[b]->pos + blocks[b]->pos_delta;
          auto block_rect = block_get_rect(block_pos.pixel);
          if(pixel_in_rect(player->pos.pixel, block_rect)){
               PlayerInBlockRectResult_t::Entry_t entry;
@@ -439,7 +439,7 @@ PlayerInBlockRectResult_t player_in_block_rect(Player_t* player, TileMap_t* tile
 
                               auto portal_rotations = direction_rotations_between(interactive->portal.face, direction_opposite((Direction_t)(pd)));
 
-                              auto block_portal_dst_offset = block->pos + block->pos_delta;
+                              auto block_portal_dst_offset = block->teleport ? block->teleport_pos + block->teleport_pos_delta : block->pos + block->pos_delta;
                               block_portal_dst_offset.pixel += HALF_TILE_SIZE_PIXEL;
                               block_portal_dst_offset.pixel -= portal_dst_center_pixel;
 
