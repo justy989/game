@@ -1257,9 +1257,14 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                                        }
                                    }
                               }else{
-                                   result.stop_on_pixel_x = closest_pixel(collided_block_center.pixel.x + HALF_TILE_SIZE_IN_PIXELS, collided_block_center.decimal.x);
+                                   Position_t final_stop_pos;
+                                   if(collided_block_center.decimal.x == 0){
+                                       // if the block is grid aligned let's keep it that way
+                                       final_stop_pos = pixel_pos(Pixel_t{(S16)(collided_block_center.pixel.x + HALF_TILE_SIZE_IN_PIXELS), 0});
+                                   }else{
+                                       final_stop_pos = collided_block_center + Pixel_t{HALF_TILE_SIZE_IN_PIXELS, 0};
+                                   }
 
-                                   Position_t final_stop_pos = pixel_pos(Pixel_t{result.stop_on_pixel_x, 0});
                                    Vec_t pos_delta = pos_to_vec(final_stop_pos - block_pos);
 
                                    result.pos_delta.x = pos_delta.x;
@@ -1284,9 +1289,14 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                                        }
                                    }
                               }else{
-                                   result.stop_on_pixel_x = closest_pixel((collided_block_center.pixel.x - HALF_TILE_SIZE_IN_PIXELS) - TILE_SIZE_IN_PIXELS, collided_block_center.decimal.x);
+                                   Position_t final_stop_pos;
+                                   if(collided_block_center.decimal.x == 0){
+                                       // if the block is grid aligned let's keep it that way
+                                       final_stop_pos = pixel_pos(Pixel_t{(S16)(collided_block_center.pixel.x - (HALF_TILE_SIZE_IN_PIXELS + TILE_SIZE_IN_PIXELS)), 0});
+                                   }else{
+                                       final_stop_pos = collided_block_center - Pixel_t{(S16)(HALF_TILE_SIZE_IN_PIXELS + TILE_SIZE_IN_PIXELS), 0};
+                                   }
 
-                                   Position_t final_stop_pos = pixel_pos(Pixel_t{result.stop_on_pixel_x, 0});
                                    Vec_t pos_delta = pos_to_vec(final_stop_pos - block_pos);
 
                                    result.pos_delta.x = pos_delta.x;
@@ -1311,9 +1321,14 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                                        }
                                    }
                               }else{
-                                   result.stop_on_pixel_y = closest_pixel(collided_block_center.pixel.y + HALF_TILE_SIZE_IN_PIXELS, collided_block_center.decimal.y);
+                                   Position_t final_stop_pos;
+                                   if(collided_block_center.decimal.x == 0){
+                                       // if the block is grid aligned let's keep it that way
+                                       final_stop_pos = pixel_pos(Pixel_t{0, (S16)(collided_block_center.pixel.x + HALF_TILE_SIZE_IN_PIXELS)});
+                                   }else{
+                                       final_stop_pos = collided_block_center + Pixel_t{0, HALF_TILE_SIZE_IN_PIXELS};
+                                   }
 
-                                   Position_t final_stop_pos = pixel_pos(Pixel_t{0, result.stop_on_pixel_y});
                                    Vec_t pos_delta = pos_to_vec(final_stop_pos - block_pos);
 
                                    result.pos_delta.y = pos_delta.y;
@@ -1338,9 +1353,14 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                                        }
                                    }
                               }else{
-                                   result.stop_on_pixel_y = closest_pixel((collided_block_center.pixel.y - HALF_TILE_SIZE_IN_PIXELS) - TILE_SIZE_IN_PIXELS, collided_block_center.decimal.y);
+                                   Position_t final_stop_pos;
+                                   if(collided_block_center.decimal.x == 0){
+                                       // if the block is grid aligned let's keep it that way
+                                       final_stop_pos = pixel_pos(Pixel_t{0, (S16)(collided_block_center.pixel.y - (HALF_TILE_SIZE_IN_PIXELS + TILE_SIZE_IN_PIXELS))});
+                                   }else{
+                                       final_stop_pos = collided_block_center - Pixel_t{0, (S16)(HALF_TILE_SIZE_IN_PIXELS + TILE_SIZE_IN_PIXELS)};
+                                   }
 
-                                   Position_t final_stop_pos = pixel_pos(Pixel_t{0, result.stop_on_pixel_y});
                                    Vec_t pos_delta = pos_to_vec(final_stop_pos - block_pos);
 
                                    result.pos_delta.y = pos_delta.y;

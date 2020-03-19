@@ -390,7 +390,9 @@ struct PlayerInBlockRectResult_t{
 PlayerInBlockRectResult_t player_in_block_rect(Player_t* player, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt, QuadTreeNode_t<Block_t>* block_qt){
      PlayerInBlockRectResult_t result;
 
-     auto player_coord = pos_to_coord(player->pos);
+     auto player_pos = player->teleport ? player->teleport_pos + player->teleport_pos_delta : player->pos + player->pos_delta;
+
+     auto player_coord = pos_to_coord(player_pos);
      Rect_t search_rect = rect_surrounding_adjacent_coords(player_coord);
 
      S16 block_count = 0;
@@ -398,11 +400,12 @@ PlayerInBlockRectResult_t player_in_block_rect(Player_t* player, TileMap_t* tile
 
      quad_tree_find_in(block_qt, search_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
      for(S16 b = 0; b < block_count; b++){
-         auto block_rect = block_get_rect(blocks[b]);
+         auto block_pos = blocks[b]->teleport ? blocks[b]->teleport_pos : blocks[b]->pos;
+         auto block_rect = block_get_rect(block_pos.pixel);
          if(pixel_in_rect(player->pos.pixel, block_rect)){
               PlayerInBlockRectResult_t::Entry_t entry;
               entry.block = blocks[b];
-              entry.block_pos = blocks[b]->pos;
+              entry.block_pos = block_pos;
               entry.portal_rotations = 0;
               result.add_entry(entry);
          }
@@ -544,19 +547,17 @@ CheckBlockCollisionResult_t check_block_collision(World_t* world, Block_t* block
 
 void apply_block_collision(World_t* world, Block_t* block, F32 dt, CheckBlockCollisionResult_t* collision_result){
      if(block->teleport){
-          if(block->teleport_pos_delta.x != 0.0f || block->teleport_pos_delta.y != 0.0f){
-               if(collision_result->collided){
-                    block->teleport_pos_delta = collision_result->pos_delta;
-                    block->teleport_vel = collision_result->vel;
-                    block->teleport_accel = collision_result->accel;
+           if(collision_result->collided){
+                block->teleport_pos_delta = collision_result->pos_delta;
+                block->teleport_vel = collision_result->vel;
+                block->teleport_accel = collision_result->accel;
 
-                    block->teleport_stop_on_pixel_x = collision_result->stop_on_pixel_x;
-                    block->teleport_stop_on_pixel_y = collision_result->stop_on_pixel_y;
+                block->teleport_stop_on_pixel_x = collision_result->stop_on_pixel_x;
+                block->teleport_stop_on_pixel_y = collision_result->stop_on_pixel_y;
 
-                    block->teleport_horizontal_move = collision_result->horizontal_move;
-                    block->teleport_vertical_move = collision_result->vertical_move;
-               }
-          }
+                block->teleport_horizontal_move = collision_result->horizontal_move;
+                block->teleport_vertical_move = collision_result->vertical_move;
+           }
      }else{
           if(collision_result->collided){
                S16 block_index = get_block_index(world, block);
@@ -3175,10 +3176,11 @@ int main(int argc, char** argv){
                               auto& entry = result.entries[e];
                               if(entry.block_pos.z == player->pos.z - HEIGHT_INTERVAL){
                                    auto block_index = get_block_index(&world, entry.block);
-                                   auto rotated_pos_delta = vec_rotate_quadrants_clockwise(entry.block->pos_delta, entry.portal_rotations);
+                                   auto block_pos_delta = entry.block->teleport ? entry.block->teleport_pos_delta : entry.block->pos_delta;
+                                   auto rotated_pos_delta = vec_rotate_quadrants_clockwise(block_pos_delta, entry.portal_rotations);
                                    auto old_carried_pos_delta = player->carried_pos_delta.positive + player->carried_pos_delta.negative;
-
-                                   if(!get_carried_noob(&player->carried_pos_delta, rotated_pos_delta, block_index, false)){
+                                   bool carried = get_carried_noob(&player->carried_pos_delta, rotated_pos_delta, block_index, false);
+                                   if(!carried){
                                         auto new_carried_pos_delta = player->carried_pos_delta.positive + player->carried_pos_delta.negative;
 
                                         if(player->teleport){
