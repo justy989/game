@@ -1437,7 +1437,7 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
 
                          auto push_result = block_push(against_block, against_block_push_dir, world, pushed_by_ice, force, &split_instant_momentum);
 
-                         if(push_result.pushed || push_result.force_flowed_through){
+                         if(push_result.pushed){
                               push_entangled_block(against_block, world, against_block_push_dir, pushed_by_ice, &split_instant_momentum);
 
                               // if this push entangle call results in our velocity changing, update our block_push_vel
@@ -1455,8 +1455,6 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
                                    }
                               }
                          }
-
-                         result.force_flowed_through = true;
 
                          // TODO when transferring momentum, split up the mass by how many blocks we are against that are on ice
                          if(direction_is_horizontal(direction)){
@@ -1524,7 +1522,7 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
 
                     auto push_result = block_push(against_block, against_block_push_dir, world, pushed_by_ice, force, instant_momentum);
 
-                    if(push_result.pushed || push_result.force_flowed_through){
+                    if(push_result.pushed){
                          if(!are_entangled){
                              push_entangled_block(against_block, world, against_block_push_dir, pushed_by_ice, instant_momentum);
                          }

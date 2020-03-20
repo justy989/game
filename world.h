@@ -63,7 +63,6 @@ struct BlockElasticCollision_t{
 
 struct BlockPushResult_t{
      bool pushed = false;
-     bool force_flowed_through = false;
      bool busy = false;
 
      BlockElasticCollision_t collisions[BLOCK_PUSH_MAX_COLLISIONS];

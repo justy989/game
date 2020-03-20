@@ -1924,7 +1924,7 @@ BlockCollisionPushResult_t block_collision_push(BlockPush_t* push, World_t* worl
           auto push_result = block_push(pushee, push_pos, push_pos_delta, push_direction, world, true, 1.0f, &instant_momentum);
 
 #if 0
-          LOG("  push result pushed %d, force_flowed_through %d, busy %d collisions %d\n", push_result.pushed, push_result.force_flowed_through, push_result.busy, push_result.collision_count);
+          LOG("  push result pushed %d, busy %d collisions %d\n", push_result.pushed, push_result.busy, push_result.collision_count);
           for(S16 c = 0; c < push_result.collision_count; c++){
               auto& collision = push_result.collisions[c];
 
@@ -1956,15 +1956,7 @@ BlockCollisionPushResult_t block_collision_push(BlockPush_t* push, World_t* worl
                                                                          world, &push_result, push->pushers[p].collided_with_block_count,
                                                                          push->is_entangled());
 
-                // force could have flowed through in the initial push but due to an entangled block pushing (and it's entanglers pushing), it could actually not move
-                // LOG("push result pushed: %d, force flowed through: %d, deal with push result vel: %f\n", push_result.pushed, push_result.force_flowed_through, deal_with_push_result_result.new_vel);
-
                 result.reapply_push = deal_with_push_result_result.reapply_push;
-
-                if(!push->is_entangled() && (push_result.pushed || push_result.force_flowed_through) && deal_with_push_result_result.new_vel != 0){
-                     auto entangled_pushes = push_entangled_block_pushes(pushee, world, push_direction, pusher, push->pushers[p].collided_with_block_count, &instant_momentum);
-                     result.additional_block_pushes.merge(&entangled_pushes);
-                }
 
                 // TODO: if the block has force thrown back at it through an elastic collision, we should impact the other entangler blocks that are on ice
 
