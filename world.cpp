@@ -319,7 +319,8 @@ void activate(World_t* world, Coord_t coord){
 }
 
 void slow_block_toward_gridlock(World_t* world, Block_t* block, Direction_t direction){
-     if(!block_on_ice(block->pos, block->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt)) return;
+     if(!block_on_ice(block->pos, block->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt) &&
+        !block_on_air(block, &world->tilemap, world->interactive_qt, world->block_qt)) return;
 
      Move_t* move = direction_is_horizontal(direction) ? &block->horizontal_move : &block->vertical_move;
 
@@ -364,15 +365,18 @@ void slow_block_toward_gridlock(World_t* world, Block_t* block, Direction_t dire
 
      auto pos = pos_to_vec(block->pos);
      auto block_mass = get_block_stack_mass(world, block);
+     F32 block_vel = 0;
 
      if(direction_is_horizontal(direction)){
           block->stopped_by_player_horizontal = true;
           auto motion = motion_x_component(block);
           block->accel.x = begin_stopping_grid_aligned_motion(&motion, pos.x, block_mass); // adjust by one tick since we missed this update
+          block_vel = block->vel.x;
      }else{
           block->stopped_by_player_vertical = true;
           auto motion = motion_y_component(block);
           block->accel.y = begin_stopping_grid_aligned_motion(&motion, pos.y, block_mass); // adjust by one tick since we missed this update
+          block_vel = block->vel.y;
      }
 
      auto against_result = block_against_other_blocks(block->pos + block->pos_delta, direction_opposite(direction), world->block_qt,
@@ -380,6 +384,14 @@ void slow_block_toward_gridlock(World_t* world, Block_t* block, Direction_t dire
      for(S16 i = 0; i < against_result.count; i++){
          Direction_t against_direction = direction_rotate_clockwise(direction, against_result.againsts[i].rotations_through_portal);
          Block_t* against_block = against_result.againsts[i].block;
+
+         // we don't want to impact a block that is colliding with the block as we are stopping it, but rather a
+         // gaggle of blocks sliding together that the player is stopping
+         if(direction_is_horizontal(against_direction)){
+             if(block_vel != against_block->vel.x) continue;
+         }else{
+             if(block_vel != against_block->vel.y) continue;
+         }
 
          slow_block_toward_gridlock(world, against_block, against_direction);
      }
