@@ -9,6 +9,7 @@
 
 // linux
 #include <dirent.h>
+#include <float.h>
 #include <string.h>
 #include <math.h>
 #include <stdlib.h>
@@ -328,40 +329,6 @@ void slow_block_toward_gridlock(World_t* world, Block_t* block, Direction_t dire
 
      move->state = MOVE_STATE_STOPPING;
      move->distance = 0;
-
-     auto stop_coord = pos_to_coord(block_get_center(block));
-
-     auto stop_position = coord_to_pos(stop_coord);
-     Vec_t distance_to_stop = pos_to_vec(stop_position - block->pos);
-
-     if(direction_is_horizontal(direction)){
-          // if we are too close to the tile boundary, have the block move to the next grid square, this is a design choice
-          if(fabs(distance_to_stop.x) <= PLAYER_RADIUS){
-               if(direction == DIRECTION_RIGHT){
-                    stop_coord.x++;
-               }else{
-                    stop_coord.x--;
-               }
-               stop_position = coord_to_pos(stop_coord);
-               distance_to_stop = pos_to_vec(stop_position - block->pos);
-          }
-     }else{
-          if(fabs(distance_to_stop.y) <= PLAYER_RADIUS){
-               if(direction == DIRECTION_UP){
-                    stop_coord.y++;
-               }else{
-                    stop_coord.y--;
-               }
-               stop_position = coord_to_pos(stop_coord);
-               distance_to_stop = pos_to_vec(stop_position - block->pos);
-          }
-     }
-
-     // xf = x0 + vt + 1/2at^2
-     // d = xf - x0
-     // d = vt + 1/2at^2
-     // (d - vt) = 1/2at^2
-     // (d - vt) / 1/2t^2 = a
 
      auto pos = pos_to_vec(block->pos);
      auto block_mass = get_block_stack_mass(world, block);
@@ -1623,8 +1590,21 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
                auto moving_dir = vec_direction(horizontal_vel);
 
                if(direction_opposite(moving_dir) == direction){
-                    slow_block_toward_gridlock(world, block, direction_opposite(direction));
-                    return result;
+                    S16 block_mass = get_block_stack_mass(world, block);
+                    F32 normal_block_velocity = get_block_normal_pushed_velocity(block_mass);
+                    F32 final_vel = block->vel.x - normal_block_velocity;
+                    if(fabs(final_vel) <= FLT_EPSILON){
+                        slow_block_toward_gridlock(world, block, direction_opposite(direction));
+                        return result;
+                    }else{
+                        // TODO: This calculation is probably wrong in terms of forces, but gets us the gameplay impact we want, come back to this
+                        block->accel.x = (final_vel - block->vel.x) / BLOCK_ACCEL_TIME;
+                        block->target_vel.x = final_vel;
+                        block->horizontal_move.time_left = BLOCK_ACCEL_TIME;
+                        block->horizontal_move.state = MOVE_STATE_STARTING;
+                        block->started_on_pixel_x = 0;
+                        return result;
+                    }
                }
                break;
           }
@@ -1635,9 +1615,24 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
                Vec_t vertical_vel = {0, block->vel.y};
                auto moving_dir = vec_direction(vertical_vel);
 
+               // TODO: handle instant momentum
+
                if(direction_opposite(moving_dir) == direction){
-                    slow_block_toward_gridlock(world, block, direction_opposite(direction));
-                    return result;
+                    S16 block_mass = get_block_stack_mass(world, block);
+                    F32 normal_block_velocity = get_block_normal_pushed_velocity(block_mass);
+                    F32 final_vel = block->vel.y - normal_block_velocity;
+
+                    if(fabs(final_vel) <= FLT_EPSILON){
+                        slow_block_toward_gridlock(world, block, direction_opposite(direction));
+                        return result;
+                    }else{
+                        block->accel.y = (final_vel - block->vel.y) / BLOCK_ACCEL_TIME;
+                        block->target_vel.y = final_vel;
+                        block->vertical_move.time_left = BLOCK_ACCEL_TIME;
+                        block->vertical_move.state = MOVE_STATE_STARTING;
+                        block->started_on_pixel_y = 0;
+                        return result;
+                    }
                }
                break;
           }

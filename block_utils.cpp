@@ -305,8 +305,7 @@ Block_t* block_against_another_block(Position_t pos, Direction_t direction, Quad
      return nullptr;
 }
 
-Pixel_t get_check_pixel_against_centroid(Pixel_t block_pixel, Direction_t direction, S8 rotations_between)
-{
+Pixel_t get_check_pixel_against_centroid(Pixel_t block_pixel, Direction_t direction, S8 rotations_between){
      Pixel_t check_pixel = {-1, -1};
 
      switch(direction){

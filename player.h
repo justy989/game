@@ -38,6 +38,7 @@ struct Player_t : public Motion_t {
      bool        reface = false;
 
      F32         push_time = 0.0f;
+     F32         entangle_push_time = 0.0f;
      S8          walk_frame = 0;
      S8          walk_frame_delta = 1;
      F32         walk_frame_time = 0.0;

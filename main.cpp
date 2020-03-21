@@ -504,6 +504,7 @@ void raise_players(ObjectArray_t<Player_t>* players){
 
           // gettin raised makes it hard to push stuff
           players->elements[i].push_time = 0.0f;
+          players->elements[i].entangle_push_time = 0.0f;
      }
 }
 
@@ -2704,7 +2705,9 @@ int main(int argc, char** argv){
                                              break;
                                         }
                                         }
-                                   }else if(blocks_are_entangled(block, player_prev_pushing_block, &world.blocks)){
+                                   }else if(blocks_are_entangled(block, player_prev_pushing_block, &world.blocks) &&
+                                            !block_on_ice(block->pos, block->pos_delta, &world.tilemap, world.interactive_qt, world.block_qt) &&
+                                            !block_on_air(block, &world.tilemap, world.interactive_qt, world.block_qt)){
                                         Block_t* entangled_block = player_prev_pushing_block;
 
                                         auto rotations_between = blocks_rotations_between(block, entangled_block);
@@ -3671,6 +3674,7 @@ int main(int argc, char** argv){
                          if(already_moving_fast_enough){
                               // pass
                               player->push_time += dt;
+                              player->entangle_push_time += dt;
                          }else if(direction_in_mask(direction_mask_opposite(block_move_dir_mask), push_block_dir)){
                               // if the player is pushing against a block moving towards them, the block wins
                               player->push_time = 0;
@@ -3680,6 +3684,7 @@ int main(int argc, char** argv){
 
                               // TODO: get back to this once we improve our demo tools
                               player->push_time += dt;
+                              player->entangle_push_time += dt;
                               if(player->push_time > BLOCK_PUSH_TIME){
                                    // if this is the frame that causes the block to be pushed, make a commit
                                    if(save_push_time <= BLOCK_PUSH_TIME) undo_commit(&undo, &world.players, &world.tilemap, &world.blocks, &world.interactives);
@@ -3690,9 +3695,10 @@ int main(int argc, char** argv){
 
                                         if(!push_result.pushed && !push_result.busy){
                                              player->push_time = 0.0f;
-                                        }else if(block_to_push->entangle_index >= 0 && block_to_push->entangle_index < world.blocks.count){
+                                        }else if(player->entangle_push_time > BLOCK_PUSH_TIME && block_to_push->entangle_index >= 0 && block_to_push->entangle_index < world.blocks.count){
                                              player->pushing_block_dir = push_block_dir;
                                              push_entangled_block(block_to_push, &world, push_block_dir, false);
+                                             player->entangle_push_time = 0.0f;
                                         }
 
                                         if(block_to_push->pos.z > 0) player->push_time = -0.5f; // TODO: wtf is this line?
@@ -3701,6 +3707,7 @@ int main(int argc, char** argv){
                          }
                     }else{
                          player->push_time = 0;
+                         player->entangle_push_time = 0;
                     }
                }
 

@@ -353,14 +353,21 @@ void update_motion_grid_aligned(Move_t* move, MotionComponent_t* motion, bool co
      } break;
      case MOVE_STATE_STOPPING:
      {
-          if((motion->ref->prev_vel >= 0 && motion->ref->vel <= 0) || (motion->ref->prev_vel <= 0 && motion->ref->vel >= 0)){
-               move->state = MOVE_STATE_IDLING;
-               move->sign = MOVE_SIGN_ZERO;
+          if((motion->ref->prev_vel >= motion->ref->target_vel && motion->ref->vel <= motion->ref->target_vel) ||
+             (motion->ref->prev_vel <= motion->ref->target_vel && motion->ref->vel >= motion->ref->target_vel)){
+               if(motion->ref->target_vel == 0){
+                   move->state = MOVE_STATE_IDLING;
+                   move->sign = MOVE_SIGN_ZERO;
 
-               motion->ref->stop_on_pixel = closest_grid_center_pixel(TILE_SIZE_IN_PIXELS, (S16)(pos / PIXEL_SIZE));
-               motion->ref->pos_delta = (motion->ref->stop_on_pixel * PIXEL_SIZE) - pos;
-               motion->ref->vel = 0.0;
+                   motion->ref->stop_on_pixel = closest_grid_center_pixel(TILE_SIZE_IN_PIXELS, (S16)(pos / PIXEL_SIZE));
+                   motion->ref->pos_delta = (motion->ref->stop_on_pixel * PIXEL_SIZE) - pos;
+               }else{
+                   move->state = MOVE_STATE_COASTING;
+               }
+
                motion->ref->accel = 0.0;
+               motion->ref->vel = motion->ref->target_vel;
+               motion->ref->target_vel = 0;
           }else if(coast){
                move->state = MOVE_STATE_COASTING;
                motion->ref->accel = 0.0;
