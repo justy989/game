@@ -1623,7 +1623,7 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
                auto moving_dir = vec_direction(horizontal_vel);
 
                if(direction_opposite(moving_dir) == direction){
-                    slow_block_toward_gridlock(world, block, direction);
+                    slow_block_toward_gridlock(world, block, direction_opposite(direction));
                     return result;
                }
                break;
@@ -1636,7 +1636,7 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
                auto moving_dir = vec_direction(vertical_vel);
 
                if(direction_opposite(moving_dir) == direction){
-                    slow_block_toward_gridlock(world, block, direction);
+                    slow_block_toward_gridlock(world, block, direction_opposite(direction));
                     return result;
                }
                break;
