@@ -3298,12 +3298,26 @@ int main(int argc, char** argv){
 
                     // if the block being pushed is entangled, add block pushes for those
                     Block_t* pushee = world.blocks.elements + block_push.pushee_index;
-                    if(!block_push.is_entangled() && pushee->entangle_index >= 0){
+
+                    if(pushee->entangle_index < 0) continue;
+
+                    DirectionMask_t pushable_direction_mask = DIRECTION_MASK_NONE;
+                    for(S8 d = 0; d < DIRECTION_COUNT; d++){
+                        Direction_t direction = static_cast<Direction_t>(d);
+                        if(!direction_in_mask(block_push.direction_mask, direction)) continue;
+                        if(!block_pushable(pushee, direction, &world)) continue;
+                        pushable_direction_mask = direction_mask_add(pushable_direction_mask, direction);
+                    }
+
+                    if(pushable_direction_mask == DIRECTION_MASK_NONE) continue;
+
+                    if(!block_push.is_entangled()){
                          S16 current_entangle_index = pushee->entangle_index;
                          while(current_entangle_index != block_push.pushee_index && current_entangle_index >= 0){
                              Block_t* entangler = world.blocks.elements + current_entangle_index;
                              BlockPush_t new_block_push = block_push;
                              S8 rotations_between_blocks = blocks_rotations_between(entangler, pushee);
+                             new_block_push.direction_mask = pushable_direction_mask;
                              new_block_push.pushee_index = current_entangle_index;
                              new_block_push.portal_rotations = block_push.portal_rotations;
                              new_block_push.entangle_rotations = rotations_between_blocks;
