@@ -16,7 +16,6 @@ Entanglement Puzzles:
 - rotated entangled puzzles where the centroid is on a portal destination coord
 
 Current bugs:
-- map 191, push left on the block through the portal, move above the block moving up from the other portal and push down on it as it comes towards you, seg fault
 - a block travelling diagonally at a wall will stop on both axis' against the wall because of the collision
 - Players standing on blocks going through portals colliding on ice seem to gain speed over time
 - Colliding with and pushing an entangled block on ice should cause force to flow through its entangles, but shouldn't push entanglers that are not on ice
@@ -353,6 +352,9 @@ void copy_block_collision_results(Block_t* block, CheckBlockCollisionResult_t* r
 
      block->horizontal_move = result->horizontal_move;
      block->vertical_move = result->vertical_move;
+
+     block->stopped_by_player_horizontal = result->stopped_by_player_horizontal;
+     block->stopped_by_player_vertical = result->stopped_by_player_vertical;
 }
 
 void build_move_actions_from_player(PlayerAction_t* player_action, Player_t* player, bool* move_actions, S8 move_action_count){
@@ -525,6 +527,8 @@ CheckBlockCollisionResult_t check_block_collision(World_t* world, Block_t* block
                                                               block->stop_on_pixel_y,
                                                               block->teleport_horizontal_move,
                                                               block->teleport_vertical_move,
+                                                              block->stopped_by_player_horizontal,
+                                                              block->stopped_by_player_vertical,
                                                               get_block_index(world, block),
                                                               block->clone_start.x > 0,
                                                               world);
@@ -539,6 +543,8 @@ CheckBlockCollisionResult_t check_block_collision(World_t* world, Block_t* block
                                                               block->stop_on_pixel_y,
                                                               block->horizontal_move,
                                                               block->vertical_move,
+                                                              block->stopped_by_player_horizontal,
+                                                              block->stopped_by_player_vertical,
                                                               get_block_index(world, block),
                                                               block->clone_start.x > 0,
                                                               world);

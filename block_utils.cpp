@@ -955,6 +955,7 @@ bool block_on_air(Block_t* block, TileMap_t* tilemap, QuadTreeNode_t<Interactive
 CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t block_pos, Vec_t block_pos_delta, Vec_t block_vel,
                                                                     Vec_t block_accel, S16 block_stop_on_pixel_x, S16 block_stop_on_pixel_y,
                                                                     Move_t block_horizontal_move, Move_t block_vertical_move,
+                                                                    bool stopped_by_player_horizontal, bool stopped_by_player_vertical,
                                                                     S16 block_index, bool block_is_cloning, World_t* world){
      CheckBlockCollisionResult_t result {};
 
@@ -966,6 +967,9 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
 
      result.stop_on_pixel_x = block_stop_on_pixel_x;
      result.stop_on_pixel_y = block_stop_on_pixel_y;
+
+     result.stopped_by_player_horizontal = stopped_by_player_horizontal;
+     result.stopped_by_player_vertical = stopped_by_player_vertical;
 
      result.horizontal_move = block_horizontal_move;
      result.vertical_move = block_vertical_move;
@@ -1429,8 +1433,19 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                bool last_in_chain_on_frictionless = (block_on_ice(last_block_in_chain->pos, last_block_in_chain->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt) ||
                                                      block_on_air(last_block_in_chain->pos, last_block_in_chain->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt));
 
-               // if the blocks are headed in the same direction but the block is slowing down, slow down with it
-               if(!last_in_chain_on_frictionless){
+               bool being_stopped_by_player = direction_is_horizontal(first_direction) ?
+                                              last_block_in_chain->stopped_by_player_horizontal :
+                                              last_block_in_chain->stopped_by_player_vertical;
+
+               if(being_stopped_by_player){
+                   being_stopped_by_player &= block_against_player(last_block_in_chain, against_direction, &world->players) != NULL;
+               }
+
+
+               // if the blocks are headed in the same direction but the block is slowing down for either friction or
+               // being stop stopped by the player, slow down with it
+               // TODO: handle the case where a block with a lot of momentum collides with a block being stopped by the player
+               if(!last_in_chain_on_frictionless || being_stopped_by_player){
                    switch(first_direction){
                    default:
                         break;
@@ -1440,7 +1455,25 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                            block_inside_result.entries[i].block->vel.x < 0 &&
                            block_vel.x < block_inside_result.entries[i].block->vel.x){
                              result.vel.x = block_inside_result.entries[i].block->vel.x;
-                             if(result.vel.x == 0) result.stop_horizontally();
+
+                             if(result.vel.x == 0){
+                                 result.stop_horizontally();
+                             }else{
+                                 bool stopped_by_player = false;
+                                 F32 accel = 0;
+                                 if(rotations_between_last_in_chain % 2 == 0){
+                                     stopped_by_player = last_block_in_chain->stopped_by_player_horizontal;
+                                     accel = last_block_in_chain->accel.x;
+                                 }else{
+                                     stopped_by_player = last_block_in_chain->stopped_by_player_vertical;
+                                     accel = last_block_in_chain->accel.y;
+                                 }
+                                 if(stopped_by_player){
+                                     result.stopped_by_player_horizontal = stopped_by_player;
+                                     result.horizontal_move.state = MOVE_STATE_STOPPING;
+                                     result.accel.x = accel;
+                                 }
+                             }
                              should_push = false;
                         }
                    } break;
@@ -1450,7 +1483,25 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                            block_inside_result.entries[i].block->vel.x > 0 &&
                            block_vel.x > block_inside_result.entries[i].block->vel.x){
                              result.vel.x = block_inside_result.entries[i].block->vel.x;
-                             if(result.vel.x == 0) result.stop_horizontally();
+
+                             if(result.vel.x == 0){
+                                 result.stop_horizontally();
+                             }else{
+                                 bool stopped_by_player = false;
+                                 F32 accel = 0;
+                                 if(rotations_between_last_in_chain % 2 == 0){
+                                     stopped_by_player = last_block_in_chain->stopped_by_player_horizontal;
+                                     accel = last_block_in_chain->accel.x;
+                                 }else{
+                                     stopped_by_player = last_block_in_chain->stopped_by_player_vertical;
+                                     accel = last_block_in_chain->accel.y;
+                                 }
+                                 if(stopped_by_player){
+                                     result.stopped_by_player_horizontal = stopped_by_player;
+                                     result.horizontal_move.state = MOVE_STATE_STOPPING;
+                                     result.accel.x = accel;
+                                 }
+                             }
                              should_push = false;
                         }
                    } break;
@@ -1460,7 +1511,25 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                            block_inside_result.entries[i].block->vel.y < 0 &&
                            block_vel.y < block_inside_result.entries[i].block->vel.y){
                              result.vel.y = block_inside_result.entries[i].block->vel.y;
-                             if(result.vel.y == 0) result.stop_vertically();
+
+                             if(result.vel.y == 0){
+                                 result.stop_vertically();
+                             }else{
+                                 bool stopped_by_player = false;
+                                 F32 accel = 0;
+                                 if(rotations_between_last_in_chain % 2 == 0){
+                                     stopped_by_player = last_block_in_chain->stopped_by_player_vertical;
+                                     accel = last_block_in_chain->accel.y;
+                                 }else{
+                                     stopped_by_player = last_block_in_chain->stopped_by_player_horizontal;
+                                     accel = last_block_in_chain->accel.x;
+                                 }
+                                 if(stopped_by_player){
+                                     result.stopped_by_player_vertical = stopped_by_player;
+                                     result.vertical_move.state = MOVE_STATE_STOPPING;
+                                     result.accel.y = accel;
+                                 }
+                             }
                              should_push = false;
                         }
                    } break;
@@ -1470,7 +1539,25 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                            block_inside_result.entries[i].block->vel.y >= 0 &&
                            block_vel.y > block_inside_result.entries[i].block->vel.y){
                              result.vel.y = block_inside_result.entries[i].block->vel.y;
-                             if(result.vel.y == 0) result.stop_vertically();
+
+                             if(result.vel.y == 0){
+                                 result.stop_vertically();
+                             }else{
+                                 bool stopped_by_player = false;
+                                 F32 accel = 0;
+                                 if(rotations_between_last_in_chain % 2 == 0){
+                                     stopped_by_player = last_block_in_chain->stopped_by_player_vertical;
+                                     accel = last_block_in_chain->accel.y;
+                                 }else{
+                                     stopped_by_player = last_block_in_chain->stopped_by_player_horizontal;
+                                     accel = last_block_in_chain->accel.x;
+                                 }
+                                 if(stopped_by_player){
+                                     result.stopped_by_player_vertical = stopped_by_player;
+                                     result.vertical_move.state = MOVE_STATE_STOPPING;
+                                     result.accel.y = accel;
+                                 }
+                             }
                              should_push = false;
                         }
                    } break;

@@ -232,6 +232,9 @@ struct CheckBlockCollisionResult_t{
      S16 stop_on_pixel_x;
      S16 stop_on_pixel_y;
 
+     bool stopped_by_player_horizontal;
+     bool stopped_by_player_vertical;
+
      Move_t horizontal_move;
      Move_t vertical_move;
 
@@ -389,6 +392,7 @@ bool block_on_air(Block_t* block, TileMap_t* tilemap, QuadTreeNode_t<Interactive
 CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t block_pos, Vec_t block_pos_delta, Vec_t block_vel,
                                                                     Vec_t block_accel, S16 block_stop_on_pixel_x, S16 block_stop_on_pixel_y,
                                                                     Move_t block_horizontal_move, Move_t block_vertical_move,
+                                                                    bool stopped_by_player_horizontal, bool stopped_by_player_vertical,
                                                                     S16 block_index, bool block_is_cloning, World_t* world);
 
 BlockCollidesWithItselfResult_t resolve_block_colliding_with_itself(Direction_t src_portal_dir, Direction_t dst_portal_dir, DirectionMask_t move_mask,
