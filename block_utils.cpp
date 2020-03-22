@@ -781,66 +781,22 @@ static BlockHeldResult_t block_at_height_in_block_rect(Pixel_t block_to_check_pi
 
      auto block_to_check_coord = pixel_to_coord(block_to_check_center);
 
-     Coord_t surrounding_coords[SURROUNDING_COORD_COUNT];
-     coords_surrounding(surrounding_coords, SURROUNDING_COORD_COUNT, block_to_check_coord);
+     auto found_blocks = find_blocks_through_portals(block_to_check_coord, tilemap, interactive_qt, block_qt);
+     for(S16 i = 0; i < found_blocks.count; i++){
+         auto* found_block = found_blocks.blocks + i;
 
-     // TODO: compress this logic with move_player_through_world()
-     for(S8 d = 0; d < SURROUNDING_COORD_COUNT; d++){
-          Coord_t check_coord = surrounding_coords[d];
-          auto portal_src_pixel = coord_to_pixel_at_center(check_coord);
-          auto interactive = quad_tree_interactive_find_at(interactive_qt, check_coord);
+         if(found_block->position.z != expected_height) continue;
 
-          if(is_active_portal(interactive)){
-               PortalExit_t portal_exits = find_portal_exits(check_coord, tilemap, interactive_qt);
-
-               for(S8 pd = 0; pd < DIRECTION_COUNT; pd++){
-                    auto portal_exit = portal_exits.directions + pd;
-
-                    for(S8 p = 0; p < portal_exit->count; p++){
-                         auto portal_dst_coord = portal_exit->coords[p];
-                         if(portal_dst_coord == check_coord) continue;
-
-                         portal_dst_coord += direction_opposite((Direction_t)(pd));
-
-                         auto check_portal_rect = rect_surrounding_adjacent_coords(portal_dst_coord);
-                         quad_tree_find_in(block_qt, check_portal_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
-
-                         auto portal_dst_center_pixel = coord_to_pixel_at_center(portal_dst_coord);
-
-                         for(S8 b = 0; b < block_count; b++){
-                              Block_t* block = blocks[b];
-
-                              if(block->pos.z != expected_height) continue;
-
-                              auto portal_rotations = direction_rotations_between(interactive->portal.face, direction_opposite((Direction_t)(pd)));
-
-                              auto block_portal_dst_offset = block->pos;
-                              if(include_pos_delta) block_portal_dst_offset += block->pos_delta;
-
-                              block_portal_dst_offset.pixel += HALF_TILE_SIZE_PIXEL;
-                              block_portal_dst_offset.pixel -= portal_dst_center_pixel;
-
-                              Position_t block_pos;
-                              block_pos.pixel = portal_src_pixel;
-                              block_pos.pixel += pixel_rotate_quadrants_clockwise(block_portal_dst_offset.pixel, portal_rotations);
-                              block_pos.pixel -= HALF_TILE_SIZE_PIXEL;
-                              block_pos.decimal = vec_rotate_quadrants_clockwise(block_portal_dst_offset.decimal, portal_rotations);
-                              canonicalize(&block_pos);
-
-                              if(pixel_in_rect(block_pos.pixel, check_rect) ||
-                                 pixel_in_rect(block_top_left_pixel(block_pos.pixel), check_rect) ||
-                                 pixel_in_rect(block_top_right_pixel(block_pos.pixel), check_rect) ||
-                                 pixel_in_rect(block_bottom_right_pixel(block_pos.pixel), check_rect)){
-                                   auto block_rect = block_get_rect(block_pos.pixel);
-                                   auto intserection_area = rect_intersecting_area(block_rect, check_rect);
-                                   if(intserection_area >= min_area){
-                                        add_block_held(&result, block, block_rect);
-                                   }
-                              }
-                         }
-                    }
-               }
-          }
+         if(pixel_in_rect(found_block->position.pixel, check_rect) ||
+            pixel_in_rect(block_top_left_pixel(found_block->position.pixel), check_rect) ||
+            pixel_in_rect(block_top_right_pixel(found_block->position.pixel), check_rect) ||
+            pixel_in_rect(block_bottom_right_pixel(found_block->position.pixel), check_rect)){
+              auto block_rect = block_get_rect(found_block->position.pixel);
+              auto intserection_area = rect_intersecting_area(block_rect, check_rect);
+              if(intserection_area >= min_area){
+                   add_block_held(&result, found_block->block, block_rect);
+              }
+         }
      }
 
      return result;
@@ -2051,4 +2007,63 @@ BlockCollisionPushResult_t block_collision_push(BlockPush_t* push, World_t* worl
      }
 
      return result;
+}
+
+FindBlocksThroughPortalResult_t find_blocks_through_portals(Coord_t coord, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt, QuadTreeNode_t<Block_t>* block_qt){
+    FindBlocksThroughPortalResult_t result;
+
+     S16 block_count = 0;
+     Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
+
+     Coord_t surrounding_coords[SURROUNDING_COORD_COUNT];
+     coords_surrounding(surrounding_coords, SURROUNDING_COORD_COUNT, coord);
+
+     for(S8 c = 0; c < SURROUNDING_COORD_COUNT; c++){
+          Coord_t check_coord = surrounding_coords[c];
+          auto portal_src_pixel = coord_to_pixel_at_center(check_coord);
+          auto interactive = quad_tree_interactive_find_at(interactive_qt, check_coord);
+
+          if(!is_active_portal(interactive)) continue;
+
+          PortalExit_t portal_exits = find_portal_exits(check_coord, tilemap, interactive_qt);
+
+          for(S8 pd = 0; pd < DIRECTION_COUNT; pd++){
+               auto portal_exit = portal_exits.directions + pd;
+
+               for(S8 p = 0; p < portal_exit->count; p++){
+                    auto portal_dst_coord = portal_exit->coords[p];
+                    if(portal_dst_coord == check_coord) continue;
+
+                    portal_dst_coord += direction_opposite((Direction_t)(pd));
+
+                    auto check_portal_rect = rect_surrounding_adjacent_coords(portal_dst_coord);
+                    quad_tree_find_in(block_qt, check_portal_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
+
+                    auto portal_dst_center_pixel = coord_to_pixel_at_center(portal_dst_coord);
+                    sort_blocks_by_ascending_height(blocks, block_count);
+
+                    for(S8 b = 0; b < block_count; b++){
+                         Block_t* block = blocks[b];
+
+                         auto portal_rotations = direction_rotations_between(interactive->portal.face, direction_opposite((Direction_t)(pd)));
+
+                         auto block_portal_dst_offset = block->teleport ? block->teleport_pos + block->teleport_pos_delta : block->pos + block->pos_delta;
+                         block_portal_dst_offset.pixel += HALF_TILE_SIZE_PIXEL;
+                         block_portal_dst_offset.pixel -= portal_dst_center_pixel;
+
+                         Position_t block_pos;
+                         block_pos.pixel = portal_src_pixel;
+                         block_pos.pixel += pixel_rotate_quadrants_clockwise(block_portal_dst_offset.pixel, portal_rotations);
+                         block_pos.pixel -= HALF_TILE_SIZE_PIXEL;
+                         block_pos.decimal = vec_rotate_quadrants_clockwise(block_portal_dst_offset.decimal, portal_rotations);
+                         block_pos.z = block->pos.z;
+                         canonicalize(&block_pos);
+
+                         result.add_block_through_portal(block_pos, block, portal_rotations);
+                    }
+               }
+          }
+     }
+
+    return result;
 }

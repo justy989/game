@@ -415,58 +415,18 @@ PlayerInBlockRectResult_t player_in_block_rect(Player_t* player, TileMap_t* tile
          }
      }
 
-     // TODO: compress this logic with logic in move_player_through_world()
-     for(S8 d = 0; d < DIRECTION_COUNT; d++){
-          Coord_t check_coord = player_coord + (Direction_t)(d);
-          auto portal_src_pixel = coord_to_pixel_at_center(check_coord);
-          auto interactive = quad_tree_interactive_find_at(interactive_qt, check_coord);
+     auto found_blocks = find_blocks_through_portals(player_coord, tilemap, interactive_qt, block_qt);
+     for(S16 i = 0; i < found_blocks.count; i++){
+         auto* found_block = found_blocks.blocks + i;
 
-          if(is_active_portal(interactive)){
-               PortalExit_t portal_exits = find_portal_exits(check_coord, tilemap, interactive_qt);
-
-               for(S8 pd = 0; pd < DIRECTION_COUNT; pd++){
-                    auto portal_exit = portal_exits.directions + pd;
-
-                    for(S8 p = 0; p < portal_exit->count; p++){
-                         auto portal_dst_coord = portal_exit->coords[p];
-                         if(portal_dst_coord == check_coord) continue;
-
-                         portal_dst_coord += direction_opposite((Direction_t)(pd));
-
-                         auto check_portal_rect = rect_surrounding_adjacent_coords(portal_dst_coord);
-                         quad_tree_find_in(block_qt, check_portal_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
-
-                         auto portal_dst_center_pixel = coord_to_pixel_at_center(portal_dst_coord);
-
-                         for(S8 b = 0; b < block_count; b++){
-                              Block_t* block = blocks[b];
-
-                              auto portal_rotations = direction_rotations_between(interactive->portal.face, direction_opposite((Direction_t)(pd)));
-
-                              auto block_portal_dst_offset = block->teleport ? block->teleport_pos + block->teleport_pos_delta : block->pos + block->pos_delta;
-                              block_portal_dst_offset.pixel += HALF_TILE_SIZE_PIXEL;
-                              block_portal_dst_offset.pixel -= portal_dst_center_pixel;
-
-                              Position_t block_pos;
-                              block_pos.pixel = portal_src_pixel;
-                              block_pos.pixel += pixel_rotate_quadrants_clockwise(block_portal_dst_offset.pixel, portal_rotations);
-                              block_pos.pixel -= HALF_TILE_SIZE_PIXEL;
-                              block_pos.decimal = vec_rotate_quadrants_clockwise(block_portal_dst_offset.decimal, portal_rotations);
-                              block_pos.z = block->pos.z;
-                              canonicalize(&block_pos);
-
-                              auto block_rect = block_get_rect(block_pos.pixel);
-                              if(pixel_in_rect(player->pos.pixel, block_rect)){
-                                   PlayerInBlockRectResult_t::Entry_t entry;
-                                   entry.block = blocks[b];
-                                   entry.block_pos = block_pos;
-                                   entry.portal_rotations = portal_rotations;
-                                   result.add_entry(entry);
-                              }
-                         }
-                    }
-               }
-          }
+         auto block_rect = block_get_rect(found_block->position.pixel);
+         if(pixel_in_rect(player->pos.pixel, block_rect)){
+              PlayerInBlockRectResult_t::Entry_t entry;
+              entry.block = found_block->block;
+              entry.block_pos = found_block->position;
+              entry.portal_rotations = found_block->portal_rotations;
+              result.add_entry(entry);
+         }
      }
 
      return result;

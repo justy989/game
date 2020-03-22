@@ -353,6 +353,31 @@ struct BlockCollisionPushResult_t{
      bool reapply_push = false;
 };
 
+struct BlockThroughPortal_t{
+    Position_t position;
+    Block_t* block = NULL;
+    S8 portal_rotations = 0;
+};
+
+#define MAX_BLOCKS_FOUND_THROUGH_PORTALS 16
+
+struct FindBlocksThroughPortalResult_t{
+    BlockThroughPortal_t blocks[MAX_BLOCKS_FOUND_THROUGH_PORTALS];
+    S16 count = 0;
+
+    bool add_block_through_portal(Position_t pos, Block_t* block, S8 portal_rotations){
+        if(count >= MAX_BLOCKS_FOUND_THROUGH_PORTALS){
+            return false;
+        }
+
+        blocks[count].position = pos;
+        blocks[count].block = block;
+        blocks[count].portal_rotations = portal_rotations;
+        count++;
+        return true;
+    }
+};
+
 void add_block_held(BlockHeldResult_t* result, Block_t* block, Rect_t rect);
 void add_interactive_held(InteractiveHeldResult_t* result, Interactive_t* interactive, Rect_t rect);
 
@@ -410,5 +435,7 @@ bool blocks_are_entangled(S16 a_index, S16 b_index, ObjectArray_t<Block_t>* bloc
 
 void apply_block_change(ObjectArray_t<Block_t>* blocks_array, BlockChange_t* change);
 BlockCollisionPushResult_t block_collision_push(BlockPush_t* push, World_t* world);
+
+FindBlocksThroughPortalResult_t find_blocks_through_portals(Coord_t coord, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt, QuadTreeNode_t<Block_t>* block_qt);
 
 extern Pixel_t g_collided_with_pixel;
