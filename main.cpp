@@ -1956,16 +1956,8 @@ int main(int argc, char** argv){
                          demo.seek_frame = (S64)((F32)(demo.last_frame) * mouse_screen.x);
 
                          if(demo.seek_frame < frame_count){
-                              // TODO: compress with same comment elsewhere in this file
-                              fetch_cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
-
-                              reset_map(player_start, &world, &undo);
-
-                              // reset some vars
-                              player_action = {};
-
-                              demo.entry_index = 0;
-                              frame_count = 0;
+                              restart_demo(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives,
+                                           &demo, &frame_count, &player_start, &player_action, &undo);
                          }else if(demo.seek_frame == frame_count){
                               demo.seek_frame = -1;
                          }
