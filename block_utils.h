@@ -356,23 +356,35 @@ struct BlockCollisionPushResult_t{
 struct BlockThroughPortal_t{
     Position_t position;
     Block_t* block = NULL;
+    Direction_t src_portal_dir = DIRECTION_COUNT;
+    Direction_t dst_portal_dir = DIRECTION_COUNT;
+    Coord_t src_portal;
+    Coord_t dst_portal;
     S8 portal_rotations = 0;
+    S8 rotations_between_portals = 0;
 };
 
-#define MAX_BLOCKS_FOUND_THROUGH_PORTALS 16
+#define MAX_BLOCKS_FOUND_THROUGH_PORTALS 64
 
 struct FindBlocksThroughPortalResult_t{
     BlockThroughPortal_t blocks[MAX_BLOCKS_FOUND_THROUGH_PORTALS];
     S16 count = 0;
 
-    bool add_block_through_portal(Position_t pos, Block_t* block, S8 portal_rotations){
+    bool add_block_through_portal(Position_t pos, Block_t* block, Coord_t src_portal, Coord_t dst_portal,
+                                  Direction_t src_portal_dir, Direction_t dst_portal_dir,
+                                  S8 portal_rotations, S8 rotations_between_portals){
         if(count >= MAX_BLOCKS_FOUND_THROUGH_PORTALS){
             return false;
         }
 
         blocks[count].position = pos;
         blocks[count].block = block;
+        blocks[count].src_portal = src_portal;
+        blocks[count].dst_portal = dst_portal;
+        blocks[count].src_portal_dir = src_portal_dir;
+        blocks[count].dst_portal_dir = dst_portal_dir;
         blocks[count].portal_rotations = portal_rotations;
+        blocks[count].rotations_between_portals = rotations_between_portals;
         count++;
         return true;
     }
@@ -422,10 +434,6 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
 
 BlockCollidesWithItselfResult_t resolve_block_colliding_with_itself(Direction_t src_portal_dir, Direction_t dst_portal_dir, DirectionMask_t move_mask,
                                                                     Position_t block_pos);
-
-void search_portal_destination_for_blocks(QuadTreeNode_t<Block_t>* block_qt, Direction_t src_portal_face,
-                                          Direction_t dst_portal_face, Coord_t src_portal_coord,
-                                          Coord_t dst_portal_coord, Block_t** blocks, S16* block_count, Position_t* offsets);
 
 Interactive_t* block_is_teleporting(Block_t* block, QuadTreeNode_t<Interactive_t>* interactive_qt);
 
