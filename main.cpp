@@ -514,6 +514,42 @@ CheckBlockCollisionResult_t check_block_collision(World_t* world, Block_t* block
      return CheckBlockCollisionResult_t{};
 }
 
+void update_stop_on_boundry_while_player_coasting(Direction_t move_dir, DirectionMask_t vel_mask, bool* stop_on_boundary_x, bool* stop_on_boundary_y){
+     switch(move_dir){
+     default:
+          break;
+     case DIRECTION_LEFT:
+          if(vel_mask & DIRECTION_MASK_RIGHT){
+               *stop_on_boundary_x = true;
+          }else if(vel_mask & DIRECTION_MASK_UP || vel_mask & DIRECTION_MASK_DOWN){
+               *stop_on_boundary_y = true;
+          }
+          break;
+     case DIRECTION_RIGHT:
+          if(vel_mask & DIRECTION_MASK_LEFT){
+               *stop_on_boundary_x = true;
+          }else if(vel_mask & DIRECTION_MASK_UP || vel_mask & DIRECTION_MASK_DOWN){
+               *stop_on_boundary_y = true;
+          }
+          break;
+     case DIRECTION_UP:
+          if(vel_mask & DIRECTION_MASK_DOWN){
+               *stop_on_boundary_y = true;
+          }else if(vel_mask & DIRECTION_MASK_LEFT || vel_mask & DIRECTION_MASK_RIGHT){
+               *stop_on_boundary_x = true;
+          }
+          break;
+     case DIRECTION_DOWN:
+          if(vel_mask & DIRECTION_MASK_UP){
+               *stop_on_boundary_y = true;
+          }else if(vel_mask & DIRECTION_MASK_LEFT || vel_mask & DIRECTION_MASK_RIGHT){
+               *stop_on_boundary_x = true;
+          }
+          break;
+     }
+}
+
+
 void apply_block_collision(World_t* world, Block_t* block, F32 dt, CheckBlockCollisionResult_t* collision_result){
      if(block->teleport){
            if(collision_result->collided){
@@ -757,39 +793,7 @@ DoBlockCollisionResults_t do_block_collision(World_t* world, Block_t* block, S16
                     Direction_t entangled_move_dir = vec_direction(entangled_vel);
                     Direction_t move_dir = direction_rotate_clockwise(entangled_move_dir, rotations_between);
 
-                    // TODO: compress this code with the duplicate code below if it matches?
-                    switch(move_dir){
-                    default:
-                         break;
-                    case DIRECTION_LEFT:
-                         if(vel_mask & DIRECTION_MASK_RIGHT){
-                              stop_on_boundary_x = true;
-                         }else if(vel_mask & DIRECTION_MASK_UP || vel_mask & DIRECTION_MASK_DOWN){
-                              stop_on_boundary_y = true;
-                         }
-                         break;
-                    case DIRECTION_RIGHT:
-                         if(vel_mask & DIRECTION_MASK_LEFT){
-                              stop_on_boundary_x = true;
-                         }else if(vel_mask & DIRECTION_MASK_UP || vel_mask & DIRECTION_MASK_DOWN){
-                              stop_on_boundary_y = true;
-                         }
-                         break;
-                    case DIRECTION_UP:
-                         if(vel_mask & DIRECTION_MASK_DOWN){
-                              stop_on_boundary_y = true;
-                         }else if(vel_mask & DIRECTION_MASK_LEFT || vel_mask & DIRECTION_MASK_RIGHT){
-                              stop_on_boundary_x = true;
-                         }
-                         break;
-                    case DIRECTION_DOWN:
-                         if(vel_mask & DIRECTION_MASK_UP){
-                              stop_on_boundary_y = true;
-                         }else if(vel_mask & DIRECTION_MASK_LEFT || vel_mask & DIRECTION_MASK_RIGHT){
-                              stop_on_boundary_x = true;
-                         }
-                         break;
-                    }
+                    update_stop_on_boundry_while_player_coasting(move_dir, vel_mask, &stop_on_boundary_x, &stop_on_boundary_y);
                }
 
                if(coast_vertical == BLOCK_COAST_PLAYER){
@@ -802,38 +806,7 @@ DoBlockCollisionResults_t do_block_collision(World_t* world, Block_t* block, S16
                     Direction_t entangled_move_dir = vec_direction(entangled_vel);
                     Direction_t move_dir = direction_rotate_clockwise(entangled_move_dir, rotations_between);
 
-                    switch(move_dir){
-                    default:
-                         break;
-                    case DIRECTION_LEFT:
-                         if(vel_mask & DIRECTION_MASK_RIGHT){
-                              stop_on_boundary_x = true;
-                         }else if(vel_mask & DIRECTION_MASK_UP || vel_mask & DIRECTION_MASK_DOWN){
-                              stop_on_boundary_y = true;
-                         }
-                         break;
-                    case DIRECTION_RIGHT:
-                         if(vel_mask & DIRECTION_MASK_LEFT){
-                              stop_on_boundary_x = true;
-                         }else if(vel_mask & DIRECTION_MASK_UP || vel_mask & DIRECTION_MASK_DOWN){
-                              stop_on_boundary_y = true;
-                         }
-                         break;
-                    case DIRECTION_UP:
-                         if(vel_mask & DIRECTION_MASK_DOWN){
-                              stop_on_boundary_y = true;
-                         }else if(vel_mask & DIRECTION_MASK_LEFT || vel_mask & DIRECTION_MASK_RIGHT){
-                              stop_on_boundary_x = true;
-                         }
-                         break;
-                    case DIRECTION_DOWN:
-                         if(vel_mask & DIRECTION_MASK_UP){
-                              stop_on_boundary_y = true;
-                         }else if(vel_mask & DIRECTION_MASK_LEFT || vel_mask & DIRECTION_MASK_RIGHT){
-                              stop_on_boundary_x = true;
-                         }
-                         break;
-                    }
+                    update_stop_on_boundry_while_player_coasting(move_dir, vel_mask, &stop_on_boundary_x, &stop_on_boundary_y);
                }
           }
      }
