@@ -1076,6 +1076,20 @@ bool block_pushes_are_the_same_collision(BlockPushes_t<128>& block_pushes, S16 s
              start_push.direction_mask == end_push.direction_mask);
 }
 
+void restart_demo(World_t* world, TileMap_t* demo_starting_tilemap, ObjectArray_t<Block_t>* demo_starting_blocks,
+                  ObjectArray_t<Interactive_t>* demo_starting_interactives, Demo_t* demo, S64* frame_count,
+                  Coord_t* player_start, PlayerAction_t* player_action, Undo_t* undo){
+     fetch_cache_for_demo_seek(world, demo_starting_tilemap, demo_starting_blocks, demo_starting_interactives);
+
+     reset_map(*player_start, world, undo);
+
+     // reset some vars
+     *player_action = {};
+
+     demo->entry_index = 0;
+     *frame_count = 0;
+}
+
 int main(int argc, char** argv){
      const char* load_map_filepath = nullptr;
      bool test = false;
@@ -1405,16 +1419,8 @@ int main(int argc, char** argv){
                               if(frame_count > 0 && demo.seek_frame < 0){
                                    demo.seek_frame = frame_count - 1;
 
-                                   // TODO: compress with same comment elsewhere in this file
-                                   fetch_cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
-
-                                   reset_map(player_start, &world, &undo);
-
-                                   // reset some vars
-                                   player_action = {};
-
-                                   demo.entry_index = 0;
-                                   frame_count = 0;
+                                   restart_demo(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives,
+                                                &demo, &frame_count, &player_start, &player_action, &undo);
                               }
                          }else if(!resetting){
                               player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_LEFT_START,
@@ -1778,16 +1784,8 @@ int main(int argc, char** argv){
                                         demo.seek_frame = (S64)((F32)(demo.last_frame) * mouse_screen.x);
 
                                         if(demo.seek_frame < frame_count){
-                                             // TODO: compress with same comment elsewhere in this file
-                                             fetch_cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
-
-                                             reset_map(player_start, &world, &undo);
-
-                                             // reset some vars
-                                             player_action = {};
-
-                                             demo.entry_index = 0;
-                                             frame_count = 0;
+                                            restart_demo(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives,
+                                                         &demo, &frame_count, &player_start, &player_action, &undo);
                                         }else if(demo.seek_frame == frame_count){
                                              demo.seek_frame = -1;
                                         }
