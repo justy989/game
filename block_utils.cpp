@@ -874,6 +874,116 @@ bool block_on_air(Block_t* block, TileMap_t* tilemap, QuadTreeNode_t<Interactive
      return block_on_air(block->pos, block->pos_delta, tilemap, interactive_qt, block_qt);
 }
 
+void handle_block_on_block_action_horizontal(Position_t block_pos, Direction_t direction, Position_t collided_block_center, DirectionMask_t collided_block_move_mask,
+                                             bool inside_block_on_frictionless, bool both_frictionless, Pixel_t collision_offset,
+                                             BlockInsideBlockResult_t* inside_block_entry, CheckBlockCollisionResult_t* result){
+     if(direction_in_mask(collided_block_move_mask, direction) ||
+        direction_in_mask(collided_block_move_mask, direction_opposite(direction))){
+          Position_t final_stop_pos = collided_block_center + collision_offset;
+          auto new_pos_delta = pos_to_vec(final_stop_pos - block_pos);
+          result->pos_delta.x = new_pos_delta.x;
+
+          if(direction_in_mask(collided_block_move_mask, direction)){
+              if(!inside_block_on_frictionless){
+                  Vec_t collided_block_vel = vec_rotate_quadrants_counter_clockwise(inside_block_entry->block->vel, inside_block_entry->portal_rotations);
+                  result->vel.x = collided_block_vel.x;
+                  if(result->vel.x == 0) result->stop_horizontally();
+              }
+          }
+     }else{
+          Position_t final_stop_pos;
+          if(collided_block_center.decimal.x == 0){
+              // if the block is grid aligned let's keep it that way
+              final_stop_pos = pixel_pos(collided_block_center.pixel + collision_offset);
+              result->stop_on_pixel_x = final_stop_pos.pixel.x;
+          }else{
+              final_stop_pos = collided_block_center + collision_offset;
+          }
+
+          Vec_t pos_delta = pos_to_vec(final_stop_pos - block_pos);
+
+          result->pos_delta.x = pos_delta.x;
+          if(!both_frictionless) result->stop_horizontally();
+     }
+}
+
+void handle_block_on_block_action_vertical(Position_t block_pos, Direction_t direction, Position_t collided_block_center, DirectionMask_t collided_block_move_mask,
+                                           bool inside_block_on_frictionless, bool both_frictionless, Pixel_t collision_offset,
+                                           BlockInsideBlockResult_t* inside_block_entry, CheckBlockCollisionResult_t* result){
+     if(direction_in_mask(collided_block_move_mask, direction) ||
+        direction_in_mask(collided_block_move_mask, direction_opposite(direction))){
+          Position_t final_stop_pos = collided_block_center + collision_offset;
+          auto new_pos_delta = pos_to_vec(final_stop_pos - block_pos);
+          result->pos_delta.y = new_pos_delta.y;
+
+          if(direction_in_mask(collided_block_move_mask, direction)){
+              if(!inside_block_on_frictionless){
+                  Vec_t collided_block_vel = vec_rotate_quadrants_counter_clockwise(inside_block_entry->block->vel, inside_block_entry->portal_rotations);
+                  result->vel.y = collided_block_vel.y;
+                  if(result->vel.y == 0) result->stop_vertically();
+              }
+          }
+     }else{
+          Position_t final_stop_pos;
+          if(collided_block_center.decimal.y == 0){
+              // if the block is grid aligned let's keep it that way
+              final_stop_pos = pixel_pos(collided_block_center.pixel + collision_offset);
+              result->stop_on_pixel_y = final_stop_pos.pixel.y;
+          }else{
+              final_stop_pos = collided_block_center + collision_offset;
+          }
+
+          Vec_t pos_delta = pos_to_vec(final_stop_pos - block_pos);
+
+          result->pos_delta.y = pos_delta.y;
+          if(!both_frictionless) result->stop_vertically();
+     }
+}
+
+void handle_blocks_colliding_moving_in_the_same_direction_horizontal(CheckBlockCollisionResult_t* result, Block_t* last_block_in_chain,
+                                                                     S8 rotations_between_last_in_chain){
+     if(result->vel.x == 0){
+         result->stop_horizontally();
+     }else{
+         bool stopped_by_player = false;
+         F32 accel = 0;
+         if(rotations_between_last_in_chain % 2 == 0){
+             stopped_by_player = last_block_in_chain->stopped_by_player_horizontal;
+             accel = last_block_in_chain->accel.x;
+         }else{
+             stopped_by_player = last_block_in_chain->stopped_by_player_vertical;
+             accel = last_block_in_chain->accel.y;
+         }
+         if(stopped_by_player){
+             result->stopped_by_player_horizontal = stopped_by_player;
+             result->horizontal_move.state = MOVE_STATE_STOPPING;
+             result->accel.x = accel;
+         }
+     }
+}
+
+void handle_blocks_colliding_moving_in_the_same_direction_vertical(CheckBlockCollisionResult_t* result, Block_t* last_block_in_chain,
+                                                                   S8 rotations_between_last_in_chain){
+     if(result->vel.y == 0){
+         result->stop_horizontally();
+     }else{
+         bool stopped_by_player = false;
+         F32 accel = 0;
+         if(rotations_between_last_in_chain % 2 == 0){
+             stopped_by_player = last_block_in_chain->stopped_by_player_vertical;
+             accel = last_block_in_chain->accel.y;
+         }else{
+             stopped_by_player = last_block_in_chain->stopped_by_player_horizontal;
+             accel = last_block_in_chain->accel.x;
+         }
+         if(stopped_by_player){
+             result->stopped_by_player_horizontal = stopped_by_player;
+             result->horizontal_move.state = MOVE_STATE_STOPPING;
+             result->accel.y = accel;
+         }
+     }
+}
+
 CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t block_pos, Vec_t block_pos_delta, Vec_t block_vel,
                                                                     Vec_t block_accel, S16 block_stop_on_pixel_x, S16 block_stop_on_pixel_y,
                                                                     Move_t block_horizontal_move, Move_t block_vertical_move,
@@ -1166,135 +1276,30 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                     } break;
                     case MOVE_DIRECTION_LEFT:
                          if(block_pos_delta.x < 0){
-                              // TODO: compress these cases
-                              if(direction_in_mask(collided_block_move_mask, first_direction) ||
-                                 direction_in_mask(collided_block_move_mask, direction_opposite(first_direction))){
-                                   Position_t final_stop_pos = collided_block_center;
-                                   final_stop_pos.pixel.x += HALF_TILE_SIZE_IN_PIXELS;
-                                   auto new_pos_delta = pos_to_vec(final_stop_pos - block_pos);
-                                   result.pos_delta.x = new_pos_delta.x;
-
-                                   if(direction_in_mask(collided_block_move_mask, first_direction)){
-                                       if(!inside_block_on_frictionless){
-                                           Vec_t collided_block_vel = vec_rotate_quadrants_counter_clockwise(block_inside_result.entries[i].block->vel, block_inside_result.entries[i].portal_rotations);
-                                           result.vel.x = collided_block_vel.x;
-                                           if(result.vel.x == 0) result.stop_horizontally();
-                                       }
-                                   }
-                              }else{
-                                   Position_t final_stop_pos;
-                                   if(collided_block_center.decimal.x == 0){
-                                       // if the block is grid aligned let's keep it that way
-                                       final_stop_pos = pixel_pos(Pixel_t{(S16)(collided_block_center.pixel.x + HALF_TILE_SIZE_IN_PIXELS), 0});
-                                       result.stop_on_pixel_x = final_stop_pos.pixel.x;
-                                   }else{
-                                       final_stop_pos = collided_block_center + Pixel_t{HALF_TILE_SIZE_IN_PIXELS, 0};
-                                   }
-
-                                   Vec_t pos_delta = pos_to_vec(final_stop_pos - block_pos);
-
-                                   result.pos_delta.x = pos_delta.x;
-                                   if(!both_frictionless) result.stop_horizontally();
-                              }
+                              handle_block_on_block_action_horizontal(block_pos, first_direction, collided_block_center, collided_block_move_mask,
+                                                                      inside_block_on_frictionless, both_frictionless, Pixel_t{HALF_TILE_SIZE_IN_PIXELS, 0},
+                                                                      block_inside_result.entries + i, &result);
                          }
                          break;
                     case MOVE_DIRECTION_RIGHT:
                          if(block_pos_delta.x > 0){
-                              if(direction_in_mask(collided_block_move_mask, first_direction) ||
-                                 direction_in_mask(collided_block_move_mask, direction_opposite(first_direction))){
-                                   Position_t final_stop_pos = collided_block_center;
-                                   final_stop_pos.pixel.x -= (HALF_TILE_SIZE_IN_PIXELS + TILE_SIZE_IN_PIXELS);
-                                   auto new_pos_delta = pos_to_vec(final_stop_pos - block_pos);
-                                   result.pos_delta.x = new_pos_delta.x;
-
-                                   if(direction_in_mask(collided_block_move_mask, first_direction)){
-                                       if(!inside_block_on_frictionless){
-                                           Vec_t collided_block_vel = vec_rotate_quadrants_counter_clockwise(block_inside_result.entries[i].block->vel, block_inside_result.entries[i].portal_rotations);
-                                           result.vel.x = collided_block_vel.x;
-                                           if(result.vel.x == 0) result.stop_horizontally();
-                                       }
-                                   }
-                              }else{
-                                   Position_t final_stop_pos;
-                                   if(collided_block_center.decimal.x == 0){
-                                       // if the block is grid aligned let's keep it that way
-                                       final_stop_pos = pixel_pos(Pixel_t{(S16)(collided_block_center.pixel.x - (HALF_TILE_SIZE_IN_PIXELS + TILE_SIZE_IN_PIXELS)), 0});
-                                       result.stop_on_pixel_x = final_stop_pos.pixel.x;
-                                   }else{
-                                       final_stop_pos = collided_block_center - Pixel_t{(S16)(HALF_TILE_SIZE_IN_PIXELS + TILE_SIZE_IN_PIXELS), 0};
-                                   }
-
-                                   Vec_t pos_delta = pos_to_vec(final_stop_pos - block_pos);
-
-                                   result.pos_delta.x = pos_delta.x;
-                                   if(!both_frictionless) result.stop_horizontally();
-                              }
+                              handle_block_on_block_action_horizontal(block_pos, first_direction, collided_block_center, collided_block_move_mask,
+                                                                      inside_block_on_frictionless, both_frictionless, Pixel_t{-(HALF_TILE_SIZE_IN_PIXELS + TILE_SIZE_IN_PIXELS), 0},
+                                                                      block_inside_result.entries + i, &result);
                          }
                          break;
                     case MOVE_DIRECTION_DOWN:
                          if(block_pos_delta.y < 0){
-                              if(direction_in_mask(collided_block_move_mask, first_direction) ||
-                                 direction_in_mask(collided_block_move_mask, direction_opposite(first_direction))){
-                                   Position_t final_stop_pos = collided_block_center;
-                                   final_stop_pos.pixel.y += HALF_TILE_SIZE_IN_PIXELS;
-                                   auto new_pos_delta = pos_to_vec(final_stop_pos - block_pos);
-                                   result.pos_delta.y = new_pos_delta.y;
-
-                                   if(direction_in_mask(collided_block_move_mask, first_direction)){
-                                       if(!inside_block_on_frictionless){
-                                           Vec_t collided_block_vel = vec_rotate_quadrants_counter_clockwise(block_inside_result.entries[i].block->vel, block_inside_result.entries[i].portal_rotations);
-                                           result.vel.y = collided_block_vel.y;
-                                           if(result.vel.y == 0) result.stop_vertically();
-                                       }
-                                   }
-                              }else{
-                                   Position_t final_stop_pos;
-                                   if(collided_block_center.decimal.x == 0){
-                                       // if the block is grid aligned let's keep it that way
-                                       final_stop_pos = pixel_pos(Pixel_t{0, (S16)(collided_block_center.pixel.y + HALF_TILE_SIZE_IN_PIXELS)});
-                                       result.stop_on_pixel_y = final_stop_pos.pixel.y;
-                                   }else{
-                                       final_stop_pos = collided_block_center + Pixel_t{0, HALF_TILE_SIZE_IN_PIXELS};
-                                   }
-
-                                   Vec_t pos_delta = pos_to_vec(final_stop_pos - block_pos);
-
-                                   result.pos_delta.y = pos_delta.y;
-                                   if(!both_frictionless) result.stop_vertically();
-                              }
+                              handle_block_on_block_action_vertical(block_pos, first_direction, collided_block_center, collided_block_move_mask,
+                                                                    inside_block_on_frictionless, both_frictionless, Pixel_t{0, HALF_TILE_SIZE_IN_PIXELS},
+                                                                    block_inside_result.entries + i, &result);
                          }
                          break;
                     case MOVE_DIRECTION_UP:
                          if(block_pos_delta.y > 0){
-                              if(direction_in_mask(collided_block_move_mask, first_direction) ||
-                                 direction_in_mask(collided_block_move_mask, direction_opposite(first_direction))){
-                                   Position_t final_stop_pos = collided_block_center;
-                                   final_stop_pos.pixel.y -= (HALF_TILE_SIZE_IN_PIXELS + TILE_SIZE_IN_PIXELS);
-                                   auto new_pos_delta = pos_to_vec(final_stop_pos - block_pos);
-                                   result.pos_delta.y = new_pos_delta.y;
-
-                                   if(direction_in_mask(collided_block_move_mask, first_direction)){
-                                       if(!inside_block_on_frictionless){
-                                           Vec_t collided_block_vel = vec_rotate_quadrants_counter_clockwise(block_inside_result.entries[i].block->vel, block_inside_result.entries[i].portal_rotations);
-                                           result.vel.y = collided_block_vel.y;
-                                           if(result.vel.y == 0) result.stop_vertically();
-                                       }
-                                   }
-                              }else{
-                                   Position_t final_stop_pos;
-                                   if(collided_block_center.decimal.x == 0){
-                                       // if the block is grid aligned let's keep it that way
-                                       final_stop_pos = pixel_pos(Pixel_t{0, (S16)(collided_block_center.pixel.y - (HALF_TILE_SIZE_IN_PIXELS + TILE_SIZE_IN_PIXELS))});
-                                       result.stop_on_pixel_y = final_stop_pos.pixel.y;
-                                   }else{
-                                       final_stop_pos = collided_block_center - Pixel_t{0, (S16)(HALF_TILE_SIZE_IN_PIXELS + TILE_SIZE_IN_PIXELS)};
-                                   }
-
-                                   Vec_t pos_delta = pos_to_vec(final_stop_pos - block_pos);
-
-                                   result.pos_delta.y = pos_delta.y;
-                                   if(!both_frictionless) result.stop_vertically();
-                              }
+                              handle_block_on_block_action_vertical(block_pos, first_direction, collided_block_center, collided_block_move_mask,
+                                                                    inside_block_on_frictionless, both_frictionless, Pixel_t{0, -(HALF_TILE_SIZE_IN_PIXELS + TILE_SIZE_IN_PIXELS)},
+                                                                    block_inside_result.entries + i, &result);
                          }
                          break;
                     }
@@ -1377,25 +1382,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                            block_inside_result.entries[i].block->vel.x < 0 &&
                            block_vel.x < block_inside_result.entries[i].block->vel.x){
                              result.vel.x = block_inside_result.entries[i].block->vel.x;
-
-                             if(result.vel.x == 0){
-                                 result.stop_horizontally();
-                             }else{
-                                 bool stopped_by_player = false;
-                                 F32 accel = 0;
-                                 if(rotations_between_last_in_chain % 2 == 0){
-                                     stopped_by_player = last_block_in_chain->stopped_by_player_horizontal;
-                                     accel = last_block_in_chain->accel.x;
-                                 }else{
-                                     stopped_by_player = last_block_in_chain->stopped_by_player_vertical;
-                                     accel = last_block_in_chain->accel.y;
-                                 }
-                                 if(stopped_by_player){
-                                     result.stopped_by_player_horizontal = stopped_by_player;
-                                     result.horizontal_move.state = MOVE_STATE_STOPPING;
-                                     result.accel.x = accel;
-                                 }
-                             }
+                             handle_blocks_colliding_moving_in_the_same_direction_horizontal(&result, last_block_in_chain, rotations_between_last_in_chain);
                              should_push = false;
                         }
                    } break;
@@ -1405,25 +1392,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                            block_inside_result.entries[i].block->vel.x > 0 &&
                            block_vel.x > block_inside_result.entries[i].block->vel.x){
                              result.vel.x = block_inside_result.entries[i].block->vel.x;
-
-                             if(result.vel.x == 0){
-                                 result.stop_horizontally();
-                             }else{
-                                 bool stopped_by_player = false;
-                                 F32 accel = 0;
-                                 if(rotations_between_last_in_chain % 2 == 0){
-                                     stopped_by_player = last_block_in_chain->stopped_by_player_horizontal;
-                                     accel = last_block_in_chain->accel.x;
-                                 }else{
-                                     stopped_by_player = last_block_in_chain->stopped_by_player_vertical;
-                                     accel = last_block_in_chain->accel.y;
-                                 }
-                                 if(stopped_by_player){
-                                     result.stopped_by_player_horizontal = stopped_by_player;
-                                     result.horizontal_move.state = MOVE_STATE_STOPPING;
-                                     result.accel.x = accel;
-                                 }
-                             }
+                             handle_blocks_colliding_moving_in_the_same_direction_horizontal(&result, last_block_in_chain, rotations_between_last_in_chain);
                              should_push = false;
                         }
                    } break;
@@ -1433,25 +1402,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                            block_inside_result.entries[i].block->vel.y < 0 &&
                            block_vel.y < block_inside_result.entries[i].block->vel.y){
                              result.vel.y = block_inside_result.entries[i].block->vel.y;
-
-                             if(result.vel.y == 0){
-                                 result.stop_vertically();
-                             }else{
-                                 bool stopped_by_player = false;
-                                 F32 accel = 0;
-                                 if(rotations_between_last_in_chain % 2 == 0){
-                                     stopped_by_player = last_block_in_chain->stopped_by_player_vertical;
-                                     accel = last_block_in_chain->accel.y;
-                                 }else{
-                                     stopped_by_player = last_block_in_chain->stopped_by_player_horizontal;
-                                     accel = last_block_in_chain->accel.x;
-                                 }
-                                 if(stopped_by_player){
-                                     result.stopped_by_player_vertical = stopped_by_player;
-                                     result.vertical_move.state = MOVE_STATE_STOPPING;
-                                     result.accel.y = accel;
-                                 }
-                             }
+                             handle_blocks_colliding_moving_in_the_same_direction_vertical(&result, last_block_in_chain, rotations_between_last_in_chain);
                              should_push = false;
                         }
                    } break;
@@ -1461,25 +1412,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                            block_inside_result.entries[i].block->vel.y >= 0 &&
                            block_vel.y > block_inside_result.entries[i].block->vel.y){
                              result.vel.y = block_inside_result.entries[i].block->vel.y;
-
-                             if(result.vel.y == 0){
-                                 result.stop_vertically();
-                             }else{
-                                 bool stopped_by_player = false;
-                                 F32 accel = 0;
-                                 if(rotations_between_last_in_chain % 2 == 0){
-                                     stopped_by_player = last_block_in_chain->stopped_by_player_vertical;
-                                     accel = last_block_in_chain->accel.y;
-                                 }else{
-                                     stopped_by_player = last_block_in_chain->stopped_by_player_horizontal;
-                                     accel = last_block_in_chain->accel.x;
-                                 }
-                                 if(stopped_by_player){
-                                     result.stopped_by_player_vertical = stopped_by_player;
-                                     result.vertical_move.state = MOVE_STATE_STOPPING;
-                                     result.accel.y = accel;
-                                 }
-                             }
+                             handle_blocks_colliding_moving_in_the_same_direction_vertical(&result, last_block_in_chain, rotations_between_last_in_chain);
                              should_push = false;
                         }
                    } break;
