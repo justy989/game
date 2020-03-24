@@ -1244,6 +1244,105 @@ static F32 get_block_velocity_ratio(World_t* world, Block_t* block, F32 vel, F32
      return fabs(vel) / get_block_expected_player_push_velocity(world, block, force);
 }
 
+void apply_push_horizontal(Block_t* block, Position_t pos, World_t* world, Direction_t direction, TransferMomentum_t* instant_momentum,
+                           bool pushed_by_ice, F32 force, BlockPushResult_t* result){
+      if(pushed_by_ice){
+           auto elastic_result = elastic_transfer_momentum_to_block(instant_momentum, world, block, direction);
+           if(collision_result_overcomes_friction(block->vel.x, elastic_result.second_final_velocity, get_block_stack_mass(world, block))){
+                auto instant_vel = elastic_result.second_final_velocity;
+                auto pushee_momentum = get_block_momentum(world, block, direction);
+                result->add_collision(instant_momentum->mass, elastic_result.first_final_velocity, pushee_momentum.mass, pushee_momentum.vel, elastic_result.second_final_velocity);
+                if(direction == DIRECTION_LEFT){
+                    if(instant_vel > 0) instant_vel = -instant_vel;
+                }else if(direction == DIRECTION_RIGHT){
+                    if(instant_vel < 0) instant_vel = -instant_vel;
+                }
+                block->vel.x = instant_vel;
+                block->horizontal_move.sign = move_sign_from_vel(block->vel.x);
+                block->horizontal_move.state = MOVE_STATE_COASTING;
+
+                auto motion = motion_x_component(block);
+                F32 x_pos = pos_to_vec(block->pos).x;
+                block->horizontal_move.time_left = calc_coast_motion_time_left(&motion, x_pos);
+                if(direction == DIRECTION_LEFT) block->horizontal_move.time_left = -block->horizontal_move.time_left;
+                block->stopped_by_player_horizontal = false;
+           }else{
+                return;
+           }
+      }else if(block->horizontal_move.state == MOVE_STATE_IDLING || block->horizontal_move.state == MOVE_STATE_COASTING){
+           block->horizontal_move.state = MOVE_STATE_STARTING;
+           block->horizontal_move.sign = (direction == DIRECTION_LEFT) ? MOVE_SIGN_NEGATIVE : MOVE_SIGN_POSITIVE;
+
+           F32 half_distance_to_next_grid_center = calc_half_distance_to_next_grid_center(block->pos.pixel.x, block->pos.decimal.x,
+                                                                                          direction == DIRECTION_RIGHT, true);
+           F32 velocity_ratio = get_block_velocity_ratio(world, block, block->vel.x, force);
+
+           block->accel.x = calc_accel_from_stop(half_distance_to_next_grid_center, BLOCK_ACCEL_TIME) * force;
+
+           F32 ideal_accel = calc_accel_from_stop(BLOCK_ACCEL_DISTANCE, BLOCK_ACCEL_TIME) * force;
+           if(direction == DIRECTION_LEFT){
+               ideal_accel = -ideal_accel;
+               block->accel.x = -block->accel.x;
+           }
+           block->coast_vel.x = calc_velocity_motion(0, ideal_accel, BLOCK_ACCEL_TIME);
+           block->horizontal_move.time_left = BLOCK_ACCEL_TIME - (velocity_ratio * BLOCK_ACCEL_TIME);
+      }else{
+           result->busy = true;
+           return;
+      }
+
+      block->started_on_pixel_x = pos.pixel.x;
+}
+
+void apply_push_vertical(Block_t* block, Position_t pos, World_t* world, Direction_t direction, TransferMomentum_t* instant_momentum,
+                         bool pushed_by_ice, F32 force, BlockPushResult_t* result){
+      if(pushed_by_ice){
+           auto elastic_result = elastic_transfer_momentum_to_block(instant_momentum, world, block, direction);
+           if(collision_result_overcomes_friction(block->vel.y, elastic_result.second_final_velocity, get_block_stack_mass(world, block))){
+                auto instant_vel = elastic_result.second_final_velocity;
+                auto pushee_momentum = get_block_momentum(world, block, direction);
+                result->add_collision(instant_momentum->mass, elastic_result.first_final_velocity, pushee_momentum.mass, pushee_momentum.vel, elastic_result.second_final_velocity);
+                if(direction == DIRECTION_DOWN){
+                    if(instant_vel > 0) instant_vel = -instant_vel;
+                }else if(direction == DIRECTION_UP){
+                    if(instant_vel < 0) instant_vel = -instant_vel;
+                }
+                block->vel.y = instant_vel;
+                block->vertical_move.sign = move_sign_from_vel(block->vel.y);
+                block->vertical_move.state = MOVE_STATE_COASTING;
+
+                auto motion = motion_y_component(block);
+                F32 y_pos = pos_to_vec(block->pos).y;
+                block->vertical_move.time_left = calc_coast_motion_time_left(&motion, y_pos);
+                if(direction == DIRECTION_DOWN) block->vertical_move.time_left = -block->vertical_move.time_left;
+                block->stopped_by_player_vertical = false;
+           }else{
+                return;
+           }
+      }else if(block->vertical_move.state == MOVE_STATE_IDLING || block->vertical_move.state == MOVE_STATE_COASTING){
+           block->vertical_move.state = MOVE_STATE_STARTING;
+           block->vertical_move.sign = (direction == DIRECTION_DOWN) ? MOVE_SIGN_NEGATIVE : MOVE_SIGN_POSITIVE;
+
+           F32 half_distance_to_next_grid_center = calc_half_distance_to_next_grid_center(block->pos.pixel.y, block->pos.decimal.y,
+                                                                                          direction == DIRECTION_UP, false);
+           F32 velocity_ratio = get_block_velocity_ratio(world, block, block->vel.y, force);
+           block->accel.y = calc_accel_from_stop(half_distance_to_next_grid_center, BLOCK_ACCEL_TIME) * force;
+
+           F32 ideal_accel = calc_accel_from_stop(BLOCK_ACCEL_DISTANCE, BLOCK_ACCEL_TIME) * force;
+           if(direction == DIRECTION_DOWN){
+               ideal_accel = -ideal_accel;
+               block->accel.y = -block->accel.y;
+           }
+           block->coast_vel.y = calc_velocity_motion(0, ideal_accel, BLOCK_ACCEL_TIME);
+           block->vertical_move.time_left = BLOCK_ACCEL_TIME - (velocity_ratio * BLOCK_ACCEL_TIME);
+      }else{
+           result->busy = true;
+           return;
+      }
+
+      block->started_on_pixel_y = pos.pixel.y;
+}
+
 BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Direction_t direction, World_t* world, bool pushed_by_ice, F32 force, TransferMomentum_t* instant_momentum,
                              bool from_entangler){
      // LOG("block_push() %d -> %s\n", get_block_index(world, block), direction_to_string(direction));
@@ -1560,154 +1659,16 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
      default:
           break;
      case DIRECTION_LEFT:
-          if(pushed_by_ice){
-               auto elastic_result = elastic_transfer_momentum_to_block(instant_momentum, world, block, direction);
-               if(collision_result_overcomes_friction(block->vel.x, elastic_result.second_final_velocity, get_block_stack_mass(world, block))){
-                    auto instant_vel = elastic_result.second_final_velocity;
-                    auto pushee_momentum = get_block_momentum(world, block, direction);
-                    result.add_collision(instant_momentum->mass, elastic_result.first_final_velocity, pushee_momentum.mass, pushee_momentum.vel, elastic_result.second_final_velocity);
-                    // the velocity may be going the wrong way, but we can fix it here
-                    if(instant_vel > 0) instant_vel = -instant_vel;
-                    block->vel.x = instant_vel;
-                    block->horizontal_move.sign = move_sign_from_vel(block->vel.x);
-                    block->horizontal_move.state = MOVE_STATE_COASTING;
-
-                    auto motion = motion_x_component(block);
-                    F32 x_pos = pos_to_vec(block->pos).x;
-                    block->horizontal_move.time_left = -calc_coast_motion_time_left(&motion, x_pos);
-                    block->stopped_by_player_horizontal = false;
-               }else{
-                    return result;
-               }
-          }else if(block->horizontal_move.state == MOVE_STATE_IDLING || block->horizontal_move.state == MOVE_STATE_COASTING){
-               block->horizontal_move.state = MOVE_STATE_STARTING;
-               block->horizontal_move.sign = MOVE_SIGN_NEGATIVE;
-
-               F32 half_distance_to_next_grid_center = calc_half_distance_to_next_grid_center(block->pos.pixel.x, block->pos.decimal.x, false, true);
-               F32 velocity_ratio = get_block_velocity_ratio(world, block, block->vel.x, force);
-
-               block->accel.x = -calc_accel_from_stop(half_distance_to_next_grid_center, BLOCK_ACCEL_TIME) * force;
-
-               F32 ideal_accel = -calc_accel_from_stop(BLOCK_ACCEL_DISTANCE, BLOCK_ACCEL_TIME) * force;
-               block->coast_vel.x = calc_velocity_motion(0, ideal_accel, BLOCK_ACCEL_TIME);
-               block->horizontal_move.time_left = BLOCK_ACCEL_TIME - (velocity_ratio * BLOCK_ACCEL_TIME);
-          }else{
-               result.busy = true;
-               return result;
-          }
-
-          block->started_on_pixel_x = pos.pixel.x;
+          apply_push_horizontal(block, pos, world, direction, instant_momentum, pushed_by_ice, force, &result);
           break;
      case DIRECTION_RIGHT:
-          if(pushed_by_ice){
-               auto elastic_result = elastic_transfer_momentum_to_block(instant_momentum, world, block, direction);
-               if(collision_result_overcomes_friction(block->vel.x, elastic_result.second_final_velocity, get_block_stack_mass(world, block))){
-                    auto instant_vel = elastic_result.second_final_velocity;
-                    auto pushee_momentum = get_block_momentum(world, block, direction);
-                    result.add_collision(instant_momentum->mass, elastic_result.first_final_velocity, pushee_momentum.mass, pushee_momentum.vel, elastic_result.second_final_velocity);
-                    if(instant_vel < 0) instant_vel = -instant_vel;
-                    block->vel.x = instant_vel;
-                    block->horizontal_move.sign = move_sign_from_vel(block->vel.x);
-                    block->horizontal_move.state = MOVE_STATE_COASTING;
-
-                    auto motion = motion_x_component(block);
-                    F32 x_pos = pos_to_vec(block->pos).x;
-                    block->horizontal_move.time_left = calc_coast_motion_time_left(&motion, x_pos);
-                    block->stopped_by_player_horizontal = false;
-               }else{
-                    return result;
-               }
-          }else if(block->horizontal_move.state == MOVE_STATE_IDLING || block->horizontal_move.state == MOVE_STATE_COASTING){
-               block->horizontal_move.state = MOVE_STATE_STARTING;
-               block->horizontal_move.sign = MOVE_SIGN_POSITIVE;
-
-               F32 half_distance_to_next_grid_center = calc_half_distance_to_next_grid_center(block->pos.pixel.x, block->pos.decimal.x, true, true);
-               F32 velocity_ratio = get_block_velocity_ratio(world, block, block->vel.x, force);
-
-               block->accel.x = calc_accel_from_stop(half_distance_to_next_grid_center, BLOCK_ACCEL_TIME) * force;
-
-               F32 ideal_accel = calc_accel_from_stop(BLOCK_ACCEL_DISTANCE, BLOCK_ACCEL_TIME) * force;
-               block->coast_vel.x = calc_velocity_motion(0, ideal_accel, BLOCK_ACCEL_TIME);
-               block->horizontal_move.time_left = BLOCK_ACCEL_TIME - (velocity_ratio * BLOCK_ACCEL_TIME);
-          }else{
-               result.busy = true;
-               return result;
-          }
-
-          block->started_on_pixel_x = pos.pixel.x;
+          apply_push_horizontal(block, pos, world, direction, instant_momentum, pushed_by_ice, force, &result);
           break;
      case DIRECTION_DOWN:
-          if(pushed_by_ice){
-               auto elastic_result = elastic_transfer_momentum_to_block(instant_momentum, world, block, direction);
-               if(collision_result_overcomes_friction(block->vel.y, elastic_result.second_final_velocity, get_block_stack_mass(world, block))){
-                    auto instant_vel = elastic_result.second_final_velocity;
-                    auto pushee_momentum = get_block_momentum(world, block, direction);
-                    result.add_collision(instant_momentum->mass, elastic_result.first_final_velocity, pushee_momentum.mass, pushee_momentum.vel, elastic_result.second_final_velocity);
-                    if(instant_vel > 0) instant_vel = -instant_vel;
-                    block->vel.y = instant_vel;
-                    block->vertical_move.sign = move_sign_from_vel(block->vel.y);
-                    block->vertical_move.state = MOVE_STATE_COASTING;
-
-                    auto motion = motion_y_component(block);
-                    F32 y_pos = pos_to_vec(block->pos).y;
-                    block->vertical_move.time_left = -calc_coast_motion_time_left(&motion, y_pos);
-                    block->stopped_by_player_vertical = false;
-               }else{
-                    return result;
-               }
-          }else if(block->vertical_move.state == MOVE_STATE_IDLING || block->vertical_move.state == MOVE_STATE_COASTING){
-               block->vertical_move.state = MOVE_STATE_STARTING;
-               block->vertical_move.sign = MOVE_SIGN_NEGATIVE;
-
-               F32 half_distance_to_next_grid_center = calc_half_distance_to_next_grid_center(block->pos.pixel.y, block->pos.decimal.y, false, false);
-               F32 velocity_ratio = get_block_velocity_ratio(world, block, block->vel.y, force);
-               block->accel.y = -calc_accel_from_stop(half_distance_to_next_grid_center, BLOCK_ACCEL_TIME) * force;
-
-               F32 ideal_accel = -calc_accel_from_stop(BLOCK_ACCEL_DISTANCE, BLOCK_ACCEL_TIME) * force;
-               block->coast_vel.y = calc_velocity_motion(0, ideal_accel, BLOCK_ACCEL_TIME);
-               block->vertical_move.time_left = BLOCK_ACCEL_TIME - (velocity_ratio * BLOCK_ACCEL_TIME);
-          }else{
-               result.busy = true;
-               return result;
-          }
-
-          block->started_on_pixel_y = pos.pixel.y;
+          apply_push_vertical(block, pos, world, direction, instant_momentum, pushed_by_ice, force, &result);
           break;
      case DIRECTION_UP:
-          if(pushed_by_ice){
-               auto elastic_result = elastic_transfer_momentum_to_block(instant_momentum, world, block, direction);
-               if(collision_result_overcomes_friction(block->vel.y, elastic_result.second_final_velocity, get_block_stack_mass(world, block))){
-                    auto instant_vel = elastic_result.second_final_velocity;
-                    auto pushee_momentum = get_block_momentum(world, block, direction);
-                    result.add_collision(instant_momentum->mass, elastic_result.first_final_velocity, pushee_momentum.mass, pushee_momentum.vel, elastic_result.second_final_velocity);
-                    if(instant_vel < 0) instant_vel = -instant_vel;
-                    block->vel.y = instant_vel;
-                    block->vertical_move.sign = move_sign_from_vel(block->vel.y);
-                    block->vertical_move.state = MOVE_STATE_COASTING;
-
-                    auto motion = motion_y_component(block);
-                    F32 y_pos = pos_to_vec(block->pos).y;
-                    block->vertical_move.time_left = calc_coast_motion_time_left(&motion, y_pos);
-                    block->stopped_by_player_vertical = false;
-               }else{
-                    return result;
-               }
-          }else if(block->vertical_move.state == MOVE_STATE_IDLING || block->vertical_move.state == MOVE_STATE_COASTING){
-               block->vertical_move.state = MOVE_STATE_STARTING;
-               block->vertical_move.sign = MOVE_SIGN_POSITIVE;
-               F32 half_distance_to_next_grid_center = calc_half_distance_to_next_grid_center(block->pos.pixel.y, block->pos.decimal.y, true, false);
-               F32 velocity_ratio = get_block_velocity_ratio(world, block, block->vel.y, force);
-               block->accel.y = calc_accel_from_stop(half_distance_to_next_grid_center, BLOCK_ACCEL_TIME) * force;
-
-               F32 ideal_accel = calc_accel_from_stop(BLOCK_ACCEL_DISTANCE, BLOCK_ACCEL_TIME) * force;
-               block->coast_vel.y = calc_velocity_motion(0, ideal_accel, BLOCK_ACCEL_TIME);
-               block->vertical_move.time_left = BLOCK_ACCEL_TIME - (velocity_ratio * BLOCK_ACCEL_TIME);
-          }else{
-               result.busy = true;
-               return result;
-          }
-
-          block->started_on_pixel_y = pos.pixel.y;
+          apply_push_vertical(block, pos, world, direction, instant_momentum, pushed_by_ice, force, &result);
           break;
      }
 
