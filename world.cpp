@@ -380,7 +380,7 @@ Block_t* player_against_block(Player_t* player, Direction_t direction, QuadTreeN
 
      for(S16 i = 0; i < block_count; i++){
           Block_t* block = blocks[i];
-          Rect_t block_rect = block_get_rect(block);
+          Rect_t block_rect = block_get_inclusive_rect(block);
 
           if(pixel_in_rect(pos_a.pixel, block_rect) || pixel_in_rect(pos_b.pixel, block_rect)){
                return block;
@@ -393,7 +393,7 @@ Block_t* player_against_block(Player_t* player, Direction_t direction, QuadTreeN
 
          if(!block_in_height_range_of_player(found_block->block, player->pos)) continue;
 
-         Rect_t block_rect = block_get_rect(found_block->position.pixel);
+         Rect_t block_rect = block_get_inclusive_rect(found_block->position.pixel, found_block->block->cut);
 
          if(pixel_in_rect(pos_a.pixel, block_rect) || pixel_in_rect(pos_b.pixel, block_rect)){
               return found_block->block;
@@ -2117,7 +2117,7 @@ F32 momentum_term(TransferMomentum_t* transfer_momentum){
 
 static S16 get_player_mass_on_block(World_t* world, Block_t* block){
      S16 mass = 0;
-     auto block_rect = block_get_rect(block);
+     auto block_rect = block_get_inclusive_rect(block);
 
      for(S16 p = 0; p < world->players.count; p++){
           auto player = world->players.elements + p;
@@ -2135,7 +2135,7 @@ S16 get_block_stack_mass(World_t* world, Block_t* block){
      mass += get_player_mass_on_block(world, block);
 
      if(block->element != ELEMENT_ICE && block->element != ELEMENT_ONLY_ICED){
-          auto result = block_held_down_by_another_block(block->pos.pixel, block->pos.z, world->block_qt, world->interactive_qt, &world->tilemap, 0, false);
+          auto result = block_held_down_by_another_block(block->pos.pixel, block->pos.z, block->cut, world->block_qt, world->interactive_qt, &world->tilemap, 0, false);
           for(S16 i = 0; i < result.count; i++){
                mass += get_block_stack_mass(world, result.blocks_held[i].block);
                mass += get_player_mass_on_block(world, result.blocks_held[i].block);

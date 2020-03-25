@@ -23,6 +23,18 @@ enum BlockHeldBy_t{
      BLOCK_HELD_BY_ENTANGLE = 2,
 };
 
+enum BlockCut_t{
+     BLOCK_CUT_WHOLE,
+     BLOCK_CUT_LEFT_HALF,
+     BLOCK_CUT_RIGHT_HALF,
+     BLOCK_CUT_TOP_HALF,
+     BLOCK_CUT_BOTTOM_HALF,
+     BLOCK_CUT_TOP_LEFT_QUARTER,
+     BLOCK_CUT_TOP_RIGHT_QUARTER,
+     BLOCK_CUT_BOTTOM_LEFT_QUARTER,
+     BLOCK_CUT_BOTTOM_RIGHT_QUARTER,
+};
+
 struct TransferMomentum_t{
      S16 mass;
      F32 vel;
@@ -39,6 +51,8 @@ struct Block_t : public GridMotion_t{
      S8              clone_id; // helps when we are entangled in determining which portal we come out of
      DirectionMask_t cur_push_mask;
      DirectionMask_t prev_push_mask;
+
+     BlockCut_t cut = BLOCK_CUT_WHOLE;
 
      // these could all be flags one day when they grow up
      // TODO: this is set to a mix of enum values and true/false so fix it man
@@ -77,13 +91,23 @@ Position_t block_get_center(Position_t pos);
 Coord_t block_get_coord(Block_t* block);
 Coord_t block_get_coord(Position_t pos);
 bool blocks_at_collidable_height(S8 a_z, S8 b_z);
-Rect_t block_get_rect(Block_t* block);
-Rect_t block_get_rect(Pixel_t pixel);
+Rect_t block_get_inclusive_rect(Block_t* block);
+Rect_t block_get_inclusive_rect(Pixel_t pixel, BlockCut_t cut);
 void block_set_pos_from_center(Block_t* block, Position_t pos);
+S16 block_get_width_in_pixels(Block_t* block);
+S16 block_get_height_in_pixels(Block_t* block);
 
-Pixel_t block_bottom_right_pixel(Pixel_t block);
-Pixel_t block_top_left_pixel(Pixel_t block);
-Pixel_t block_top_right_pixel(Pixel_t block);
+S16 block_get_width_in_pixels(BlockCut_t cut);
+S16 block_get_height_in_pixels(BlockCut_t cut);
+
+S16 block_get_right_inclusive_pixel(Block_t* block);
+S16 block_get_right_inclusive_pixel(S16 pixel, BlockCut_t cut);
+S16 block_get_top_inclusive_pixel(Block_t* block);
+S16 block_get_top_inclusive_pixel(S16 pixel, BlockCut_t cut);
+
+Pixel_t block_bottom_right_pixel(Pixel_t block, BlockCut_t cut);
+Pixel_t block_top_left_pixel(Pixel_t block, BlockCut_t cut);
+Pixel_t block_top_right_pixel(Pixel_t block, BlockCut_t cut);
 
 void block_stop_horizontally(Block_t* block);
 void block_stop_vertically(Block_t* block);

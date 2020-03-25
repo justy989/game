@@ -405,7 +405,7 @@ PlayerInBlockRectResult_t player_in_block_rect(Player_t* player, TileMap_t* tile
      quad_tree_find_in(block_qt, search_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
      for(S16 b = 0; b < block_count; b++){
          auto block_pos = blocks[b]->teleport ? blocks[b]->teleport_pos + blocks[b]->teleport_pos_delta : blocks[b]->pos + blocks[b]->pos_delta;
-         auto block_rect = block_get_rect(block_pos.pixel);
+         auto block_rect = block_get_inclusive_rect(block_pos.pixel, blocks[b]->cut);
          if(pixel_in_rect(player->pos.pixel, block_rect)){
               PlayerInBlockRectResult_t::Entry_t entry;
               entry.block = blocks[b];
@@ -419,7 +419,7 @@ PlayerInBlockRectResult_t player_in_block_rect(Player_t* player, TileMap_t* tile
      for(S16 i = 0; i < found_blocks.count; i++){
          auto* found_block = found_blocks.blocks + i;
 
-         auto block_rect = block_get_rect(found_block->position.pixel);
+         auto block_rect = block_get_inclusive_rect(found_block->position.pixel, found_block->block->cut);
          if(pixel_in_rect(player->pos.pixel, block_rect)){
               PlayerInBlockRectResult_t::Entry_t entry;
               entry.block = found_block->block;
@@ -483,6 +483,7 @@ CheckBlockCollisionResult_t check_block_collision(World_t* world, Block_t* block
                                                               block->teleport_pos_delta,
                                                               block->teleport_vel,
                                                               block->teleport_accel,
+                                                              block->cut,
                                                               block->stop_on_pixel_x,
                                                               block->stop_on_pixel_y,
                                                               block->teleport_horizontal_move,
@@ -499,6 +500,7 @@ CheckBlockCollisionResult_t check_block_collision(World_t* world, Block_t* block
                                                               block->pos_delta,
                                                               block->vel,
                                                               block->accel,
+                                                              block->cut,
                                                               block->stop_on_pixel_x,
                                                               block->stop_on_pixel_y,
                                                               block->horizontal_move,
@@ -640,11 +642,15 @@ void apply_block_collision(World_t* world, Block_t* block, F32 dt, CheckBlockCol
                               if(move_dir_to_stop == DIRECTION_COUNT){
                                    copy_block_collision_results(block, collision_result);
                               }else{
-                                   bool block_on_ice_or_air = block_on_ice(block->pos, block->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt) ||
-                                   block_on_air(block->pos, block->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt);
+                                   bool block_on_ice_or_air = block_on_ice(block->pos, block->pos_delta,
+                                                                           &world->tilemap, world->interactive_qt, world->block_qt) ||
+                                                              block_on_air(block->pos, block->pos_delta, block->cut,
+                                                                           &world->tilemap, world->interactive_qt, world->block_qt);
 
-                                   bool entangled_block_on_ice_or_air = block_on_ice(entangled_block->pos, entangled_block->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt) ||
-                                   block_on_air(entangled_block->pos, entangled_block->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt);
+                                   bool entangled_block_on_ice_or_air = block_on_ice(entangled_block->pos, entangled_block->pos_delta,
+                                                                                     &world->tilemap, world->interactive_qt, world->block_qt) ||
+                                                                        block_on_air(entangled_block->pos, entangled_block->pos_delta, entangled_block->cut,
+                                                                                     &world->tilemap, world->interactive_qt, world->block_qt);
 
                                    if(block_on_ice_or_air && entangled_block_on_ice_or_air){
                                         // TODO: handle this case for blocks not entangled on ice
@@ -2052,7 +2058,7 @@ int main(int argc, char** argv){
                     quad_tree_find_in(world.block_qt, coord_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
                     for(S16 b = 0; b < block_count; b++){
                          // blocks on the coordinate and on the ground block light
-                         Rect_t block_rect = block_get_rect(blocks[b]);
+                         Rect_t block_rect = block_get_inclusive_rect(blocks[b]);
                          S16 block_index = (S16)(blocks[b] - world.blocks.elements);
                          S8 block_bottom = blocks[b]->pos.z;
                          S8 block_top = block_bottom + HEIGHT_INTERVAL;
@@ -2508,12 +2514,14 @@ int main(int argc, char** argv){
                     auto check_y_pixel = passes_over_grid_pixel(block->pos.pixel.y, final_pos.pixel.y);
                     if(check_y_pixel >= 0) final_pixel.y = check_y_pixel;
 
-                    auto block_rect = block_get_rect(final_pixel);
+                    auto block_rect = block_get_inclusive_rect(final_pixel, block->cut);
                     get_rect_coords(block_rect, rect_coords);
                     for(S8 c = 0; c < 4; c++){
                          auto* interactive = quad_tree_interactive_find_at(world.interactive_qt, rect_coords[c]);
                          if(interactive){
-                              auto interactive_rect = block_get_rect(coord_to_pixel(rect_coords[c]));
+                              // TODO: it is not kewl to use block_get_inclusive_rect to get a rect for the interactive, we have
+                              // functions for this in utils
+                              auto interactive_rect = block_get_inclusive_rect(coord_to_pixel(rect_coords[c]), BLOCK_CUT_WHOLE);
                               if(!rect_in_rect(block_rect, interactive_rect)) continue;
 
                               if(interactive->type == INTERACTIVE_TYPE_POPUP){
@@ -2806,7 +2814,7 @@ int main(int argc, char** argv){
                          if(block->pos_delta.x == 0 && block->pos_delta.y == 0) continue;
                          if(block->pos.z == 0) continue; // TODO: if we bring back pits, remove this line
 
-                         auto block_rect = block_get_rect(block);
+                         auto block_rect = block_get_inclusive_rect(block);
                          auto coord = block_get_coord(block);
                          auto search_rect = rect_surrounding_adjacent_coords(coord);
 
@@ -3650,17 +3658,17 @@ int main(int argc, char** argv){
 
                                              DirectionMask_t bottom_right_mask = direction_mask_add(DIRECTION_MASK_DOWN, DIRECTION_MASK_RIGHT);
                                              Position_t bottom_right_pos{};
-                                             bottom_right_pos.pixel = block_bottom_right_pixel(blocks[b]->pos.pixel);
+                                             bottom_right_pos.pixel = block_bottom_right_pixel(blocks[b]->pos.pixel, blocks[b]->cut);
                                              bottom_right_pos.decimal = blocks[b]->pos.decimal;
 
                                              DirectionMask_t top_right_mask = direction_mask_add(DIRECTION_MASK_UP, DIRECTION_MASK_RIGHT);
                                              Position_t top_right_pos{};
-                                             top_right_pos.pixel = block_top_right_pixel(blocks[b]->pos.pixel);
+                                             top_right_pos.pixel = block_top_right_pixel(blocks[b]->pos.pixel, blocks[b]->cut);
                                              top_right_pos.decimal = blocks[b]->pos.decimal;
 
                                              DirectionMask_t top_left_mask = direction_mask_add(DIRECTION_MASK_UP, DIRECTION_MASK_LEFT);
                                              Position_t top_left_pos{};
-                                             top_left_pos.pixel = block_top_left_pixel(blocks[b]->pos.pixel);
+                                             top_left_pos.pixel = block_top_left_pixel(blocks[b]->pos.pixel, blocks[b]->cut);
                                              top_left_pos.decimal = blocks[b]->pos.decimal;
 
                                              Coord_t bottom_left = pixel_to_coord(get_corner_pixel_from_pos(bottom_left_pos, bottom_left_mask));

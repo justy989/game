@@ -350,7 +350,7 @@ Block_t* check_portal_for_centroid_with_block(PortalExit_t* portal_exits, Coord_
                     check_block_portal_offset = pixel_rotate_quadrants_counter_clockwise(check_block_portal_offset, portal_rotations);
 
                     auto check_block_pixel = portal_coord_center_pixel + check_block_portal_offset - HALF_TILE_SIZE_PIXEL;
-                    auto check_block_rect = block_get_rect(check_block_pixel);
+                    auto check_block_rect = block_get_inclusive_rect(check_block_pixel, check_block->cut);
                     auto check_pixel = get_check_pixel_against_centroid(block->pos.pixel, block_move_dir, rotations_between);
 
                     if(pixel_in_rect(check_pixel, check_block_rect)) return check_block;
@@ -376,7 +376,7 @@ Block_t* rotated_entangled_blocks_against_centroid(Block_t* block, Direction_t d
           Block_t* check_block = blocks[i];
           if(!blocks_are_entangled(block, check_block, blocks_array)) continue;
 
-          auto check_block_rect = block_get_rect(check_block);
+          auto check_block_rect = block_get_inclusive_rect(check_block);
           S8 rotations_between = blocks_rotations_between(block, check_block);
 
           auto check_pixel = get_check_pixel_against_centroid(block->pos.pixel, direction, rotations_between);
@@ -532,7 +532,7 @@ Block_t* pixel_inside_block(Pixel_t pixel, S8 z, TileMap_t* tilemap, QuadTreeNod
      quad_tree_find_in(block_qt, search_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
 
      for(S8 i = 0; i < block_count; i++){
-          if(blocks_at_collidable_height(z, blocks[i]->pos.z) && pixel_in_rect(pixel, block_get_rect(blocks[i]))){
+          if(blocks_at_collidable_height(z, blocks[i]->pos.z) && pixel_in_rect(pixel, block_get_inclusive_rect(blocks[i]))){
                return blocks[i];
           }
      }
@@ -661,7 +661,7 @@ Tile_t* block_against_solid_tile(Position_t block_pos, Vec_t pos_delta, Directio
 }
 
 Player_t* block_against_player(Block_t* block, Direction_t direction, ObjectArray_t<Player_t>* players){
-     auto block_rect = block_get_rect(block);
+     auto block_rect = block_get_inclusive_rect(block);
 
      // extend the block rect to give the player some room
      switch(direction){
@@ -692,16 +692,17 @@ Player_t* block_against_player(Block_t* block, Direction_t direction, ObjectArra
      return nullptr;
 }
 
-InteractiveHeldResult_t block_held_up_by_popup(Position_t block_pos, QuadTreeNode_t<Interactive_t>* interactive_qt, S16 min_area){
+InteractiveHeldResult_t block_held_up_by_popup(Position_t block_pos, BlockCut_t cut, QuadTreeNode_t<Interactive_t>* interactive_qt, S16 min_area){
      InteractiveHeldResult_t result;
-     auto block_rect = block_get_rect(block_pos.pixel);
+     auto block_rect = block_get_inclusive_rect(block_pos.pixel, cut);
      Coord_t rect_coords[4];
      get_rect_coords(block_rect, rect_coords);
      for(S8 i = 0; i < 4; i++){
           auto* interactive = quad_tree_interactive_find_at(interactive_qt, rect_coords[i]);
           if(interactive && interactive->type == INTERACTIVE_TYPE_POPUP){
                if(block_pos.z == (interactive->popup.lift.ticks - 1)){
-                    auto popup_rect = block_get_rect(coord_to_pixel(rect_coords[i]));
+                    // TODO: again, not kewl using block_get_inclusive_rect() for this, utils has stuff for this
+                    auto popup_rect = block_get_inclusive_rect(coord_to_pixel(rect_coords[i]), BLOCK_CUT_WHOLE);
                     auto intserection_area = rect_intersecting_area(block_rect, popup_rect);
                     if(intserection_area >= min_area){
                          add_interactive_held(&result, interactive, popup_rect);
@@ -713,14 +714,14 @@ InteractiveHeldResult_t block_held_up_by_popup(Position_t block_pos, QuadTreeNod
      return result;
 }
 
-static BlockHeldResult_t block_at_height_in_block_rect(Pixel_t block_to_check_pixel, QuadTreeNode_t<Block_t>* block_qt,
+static BlockHeldResult_t block_at_height_in_block_rect(Pixel_t block_to_check_pixel, BlockCut_t cut, QuadTreeNode_t<Block_t>* block_qt,
                                                        S8 expected_height, QuadTreeNode_t<Interactive_t>* interactive_qt,
                                                        TileMap_t* tilemap, S16 min_area = 0, bool include_pos_delta = true){
      BlockHeldResult_t result;
 
      // TODO: need more complicated function to detect this
      auto block_to_check_center = block_center_pixel(block_to_check_pixel);
-     Rect_t check_rect = block_get_rect(block_to_check_pixel);
+     Rect_t check_rect = block_get_inclusive_rect(block_to_check_pixel, cut);
      Rect_t surrounding_rect = rect_to_check_surrounding_blocks(block_to_check_center);
 
      S16 block_count = 0;
@@ -734,10 +735,10 @@ static BlockHeldResult_t block_at_height_in_block_rect(Pixel_t block_to_check_pi
           if(include_pos_delta) block_pos += block->pos_delta;
 
           if(pixel_in_rect(block_pos.pixel, check_rect) ||
-             pixel_in_rect(block_top_left_pixel(block_pos.pixel), check_rect) ||
-             pixel_in_rect(block_top_right_pixel(block_pos.pixel), check_rect) ||
-             pixel_in_rect(block_bottom_right_pixel(block_pos.pixel), check_rect)){
-               auto block_rect = block_get_rect(block_pos.pixel);
+             pixel_in_rect(block_top_left_pixel(block_pos.pixel, block->cut), check_rect) ||
+             pixel_in_rect(block_top_right_pixel(block_pos.pixel, block->cut), check_rect) ||
+             pixel_in_rect(block_bottom_right_pixel(block_pos.pixel, block->cut), check_rect)){
+               auto block_rect = block_get_inclusive_rect(block_pos.pixel, block->cut);
                auto intserection_area = rect_intersecting_area(block_rect, check_rect);
                if(intserection_area >= min_area){
                     add_block_held(&result, block, block_rect);
@@ -754,10 +755,10 @@ static BlockHeldResult_t block_at_height_in_block_rect(Pixel_t block_to_check_pi
          if(found_block->position.z != expected_height) continue;
 
          if(pixel_in_rect(found_block->position.pixel, check_rect) ||
-            pixel_in_rect(block_top_left_pixel(found_block->position.pixel), check_rect) ||
-            pixel_in_rect(block_top_right_pixel(found_block->position.pixel), check_rect) ||
-            pixel_in_rect(block_bottom_right_pixel(found_block->position.pixel), check_rect)){
-              auto block_rect = block_get_rect(found_block->position.pixel);
+            pixel_in_rect(block_top_left_pixel(found_block->position.pixel, found_block->block->cut), check_rect) ||
+            pixel_in_rect(block_top_right_pixel(found_block->position.pixel, found_block->block->cut), check_rect) ||
+            pixel_in_rect(block_bottom_right_pixel(found_block->position.pixel, found_block->block->cut), check_rect)){
+              auto block_rect = block_get_inclusive_rect(found_block->position.pixel, found_block->block->cut);
               auto intserection_area = rect_intersecting_area(block_rect, check_rect);
               if(intserection_area >= min_area){
                    add_block_held(&result, found_block->block, block_rect);
@@ -769,19 +770,19 @@ static BlockHeldResult_t block_at_height_in_block_rect(Pixel_t block_to_check_pi
 }
 
 BlockHeldResult_t block_held_up_by_another_block(Block_t* block, QuadTreeNode_t<Block_t>* block_qt,
-                                        QuadTreeNode_t<Interactive_t>* interactive_qt, TileMap_t* tilemap, S16 min_area){
+                                                 QuadTreeNode_t<Interactive_t>* interactive_qt, TileMap_t* tilemap, S16 min_area){
      if(block->teleport){
           auto final_pos = block->teleport_pos + block->teleport_pos_delta;
           final_pos.pixel.x = passes_over_pixel(block->teleport_pos.pixel.x, final_pos.pixel.x);
           final_pos.pixel.y = passes_over_pixel(block->teleport_pos.pixel.y, final_pos.pixel.y);
-          return block_at_height_in_block_rect(final_pos.pixel, block_qt,
+          return block_at_height_in_block_rect(final_pos.pixel, block->cut, block_qt,
                                                block->teleport_pos.z - HEIGHT_INTERVAL, interactive_qt, tilemap, min_area);
      }
 
      auto final_pos = block->pos + block->pos_delta;
      final_pos.pixel.x = passes_over_pixel(block->pos.pixel.x, final_pos.pixel.x);
      final_pos.pixel.y = passes_over_pixel(block->pos.pixel.y, final_pos.pixel.y);
-     return block_at_height_in_block_rect(final_pos.pixel, block_qt,
+     return block_at_height_in_block_rect(final_pos.pixel, block->cut, block_qt,
                                           block->pos.z - HEIGHT_INTERVAL, interactive_qt, tilemap, min_area);
 }
 
@@ -791,21 +792,21 @@ BlockHeldResult_t block_held_down_by_another_block(Block_t* block, QuadTreeNode_
           auto final_pos = block->teleport_pos + block->teleport_pos_delta;
           final_pos.pixel.x = passes_over_pixel(block->teleport_pos.pixel.x, final_pos.pixel.x);
           final_pos.pixel.y = passes_over_pixel(block->teleport_pos.pixel.y, final_pos.pixel.y);
-          return block_at_height_in_block_rect(final_pos.pixel, block_qt,
+          return block_at_height_in_block_rect(final_pos.pixel, block->cut, block_qt,
                                                block->teleport_pos.z + HEIGHT_INTERVAL, interactive_qt, tilemap, min_area);
      }
 
      auto final_pos = block->pos + block->pos_delta;
      final_pos.pixel.x = passes_over_pixel(block->pos.pixel.x, final_pos.pixel.x);
      final_pos.pixel.y = passes_over_pixel(block->pos.pixel.y, final_pos.pixel.y);
-     return block_at_height_in_block_rect(final_pos.pixel, block_qt,
+     return block_at_height_in_block_rect(final_pos.pixel, block->cut, block_qt,
                                           block->pos.z + HEIGHT_INTERVAL, interactive_qt, tilemap, min_area);
 }
 
-BlockHeldResult_t block_held_down_by_another_block(Pixel_t block_pixel, S8 block_z, QuadTreeNode_t<Block_t>* block_qt,
+BlockHeldResult_t block_held_down_by_another_block(Pixel_t block_pixel, S8 block_z, BlockCut_t cut, QuadTreeNode_t<Block_t>* block_qt,
                                                    QuadTreeNode_t<Interactive_t>* interactive_qt, TileMap_t* tilemap,
                                                    S16 min_area, bool include_pos_delta){
-     return block_at_height_in_block_rect(block_pixel, block_qt, block_z + HEIGHT_INTERVAL, interactive_qt, tilemap, min_area, include_pos_delta);
+     return block_at_height_in_block_rect(block_pixel, cut, block_qt, block_z + HEIGHT_INTERVAL, interactive_qt, tilemap, min_area, include_pos_delta);
 }
 
 bool block_on_ice(Position_t pos, Vec_t pos_delta, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt,
@@ -838,7 +839,7 @@ bool block_on_ice(Position_t pos, Vec_t pos_delta, TileMap_t* tilemap, QuadTreeN
 
      for(S16 i = 0; i < block_count; i++){
           auto block = blocks[i];
-          auto block_rect = block_get_rect(block);
+          auto block_rect = block_get_inclusive_rect(block);
 
           if(block->pos.z + HEIGHT_INTERVAL != pos.z) continue;
           if(!pixel_in_rect(pixel_to_check, block_rect)) continue;
@@ -851,18 +852,18 @@ bool block_on_ice(Position_t pos, Vec_t pos_delta, TileMap_t* tilemap, QuadTreeN
      return false;
 }
 
-bool block_on_air(Position_t pos, Vec_t pos_delta, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt, QuadTreeNode_t<Block_t>* block_qt){
+bool block_on_air(Position_t pos, Vec_t pos_delta, BlockCut_t cut, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt, QuadTreeNode_t<Block_t>* block_qt){
      if(pos.z == 0) return false; // TODO: if we add pits, check for a pit obv
 
      auto final_pos = pos + pos_delta;
      auto block_center = block_center_pixel(final_pos);
-     auto block_result = block_at_height_in_block_rect(final_pos.pixel, block_qt,
+     auto block_result = block_at_height_in_block_rect(final_pos.pixel, cut, block_qt,
                                                        final_pos.z - HEIGHT_INTERVAL, interactive_qt, tilemap);
      for(S16 i = 0; i < block_result.count; i++){
           if(pixel_in_rect(block_center, block_result.blocks_held[i].rect)) return false;
      }
 
-     auto interactive_result = block_held_up_by_popup(final_pos, interactive_qt);
+     auto interactive_result = block_held_up_by_popup(final_pos, cut, interactive_qt);
      for(S16 i = 0; i < interactive_result.count; i++){
           if(pixel_in_rect(block_center, interactive_result.interactives_held[i].rect)) return false;
      }
@@ -871,7 +872,7 @@ bool block_on_air(Position_t pos, Vec_t pos_delta, TileMap_t* tilemap, QuadTreeN
 }
 
 bool block_on_air(Block_t* block, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt, QuadTreeNode_t<Block_t>* block_qt){
-     return block_on_air(block->pos, block->pos_delta, tilemap, interactive_qt, block_qt);
+     return block_on_air(block->pos, block->pos_delta, block->cut, tilemap, interactive_qt, block_qt);
 }
 
 void handle_block_on_block_action_horizontal(Position_t block_pos, Direction_t direction, Position_t collided_block_center, DirectionMask_t collided_block_move_mask,
@@ -985,10 +986,11 @@ void handle_blocks_colliding_moving_in_the_same_direction_vertical(CheckBlockCol
 }
 
 CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t block_pos, Vec_t block_pos_delta, Vec_t block_vel,
-                                                                    Vec_t block_accel, S16 block_stop_on_pixel_x, S16 block_stop_on_pixel_y,
-                                                                    Move_t block_horizontal_move, Move_t block_vertical_move,
-                                                                    bool stopped_by_player_horizontal, bool stopped_by_player_vertical,
-                                                                    S16 block_index, bool block_is_cloning, World_t* world){
+                                                                    Vec_t block_accel, BlockCut_t cut, S16 block_stop_on_pixel_x,
+                                                                    S16 block_stop_on_pixel_y, Move_t block_horizontal_move,
+                                                                    Move_t block_vertical_move, bool stopped_by_player_horizontal,
+                                                                    bool stopped_by_player_vertical, S16 block_index,
+                                                                    bool block_is_cloning, World_t* world){
      CheckBlockCollisionResult_t result {};
 
      result.block_index = block_index;
@@ -1020,7 +1022,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
           S16 collided_with_blocks_on_ice = 0;
 
           if(block_on_ice(block_pos, block_pos_delta, &world->tilemap, world->interactive_qt, world->block_qt) ||
-             block_on_air(block_pos, block_pos_delta, &world->tilemap, world->interactive_qt, world->block_qt)){
+             block_on_air(block_pos, block_pos_delta, cut, &world->tilemap, world->interactive_qt, world->block_qt)){
                // calculate the momentum if we are on ice for later
                for(S8 i = 0; i < block_inside_result.count; i++){
                     // find the closest pixel in the collision rect to our block
@@ -1033,7 +1035,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                     collision_rect.right = collision_center_pixel.x + HALF_TILE_SIZE_IN_PIXELS;
                     collision_rect.top = collision_center_pixel.y + HALF_TILE_SIZE_IN_PIXELS;
 
-                    auto block_rect = block_get_rect(block_pos.pixel);
+                    auto block_rect = block_get_inclusive_rect(block_pos.pixel, cut);
 
                     auto block_closest_pixel = closest_pixel_in_rect(collision_center_pixel, block_rect);
                     auto closest_pixel = closest_pixel_in_rect(block_closest_pixel, collision_rect);
@@ -1099,8 +1101,10 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                for(S8 i = 0; i < block_inside_result.count; i++){
                     if(block_inside_result.entries[i].invalidated) continue;
 
-                    if(block_on_ice(block_inside_result.entries[i].block->pos, block_inside_result.entries[i].block->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt) ||
-                       block_on_air(block_inside_result.entries[i].block->pos, block_inside_result.entries[i].block->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt)){
+                    if(block_on_ice(block_inside_result.entries[i].block->pos, block_inside_result.entries[i].block->pos_delta,
+                                    &world->tilemap, world->interactive_qt, world->block_qt) ||
+                       block_on_air(block_inside_result.entries[i].block->pos, block_inside_result.entries[i].block->pos_delta,
+                                    block_inside_result.entries[i].block->cut, &world->tilemap, world->interactive_qt, world->block_qt)){
                          collided_with_blocks_on_ice++;
                     }
                }
@@ -1139,10 +1143,11 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
 
                // check if they are on ice before we adjust the position on our block to check
                bool a_on_ice_or_air = block_on_ice(block_pos, result.pos_delta, &world->tilemap, world->interactive_qt, world->block_qt) ||
-                                      block_on_air(block_pos, result.pos_delta, &world->tilemap, world->interactive_qt, world->block_qt);
+                                      block_on_air(block_pos, result.pos_delta, cut, &world->tilemap, world->interactive_qt, world->block_qt);
                bool b_on_ice_or_air = block_on_ice(block_inside_result.entries[i].block->pos, block_inside_result.entries[i].block->pos_delta,
                                                    &world->tilemap, world->interactive_qt, world->block_qt) ||
-                   block_on_air(block_inside_result.entries[i].block->pos, block_inside_result.entries[i].block->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt);
+                                      block_on_air(block_inside_result.entries[i].block->pos, block_inside_result.entries[i].block->pos_delta,
+                                                   block_inside_result.entries[i].block->cut, &world->tilemap, world->interactive_qt, world->block_qt);
                bool both_frictionless = a_on_ice_or_air && b_on_ice_or_air;
 
                S16 block_inside_index = -1;
@@ -1189,8 +1194,10 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
 
                if(block_inside_index != block_index){
                     Block_t* collided_block = block_inside_result.entries[i].block;
-                    bool inside_block_on_frictionless = (block_on_ice(collided_block->pos, collided_block->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt) ||
-                                                         block_on_air(collided_block->pos, collided_block->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt));
+                    bool inside_block_on_frictionless = (block_on_ice(collided_block->pos, collided_block->pos_delta,
+                                                                      &world->tilemap, world->interactive_qt, world->block_qt) ||
+                                                         block_on_air(collided_block->pos, collided_block->pos_delta, collided_block->cut,
+                                                                      &world->tilemap, world->interactive_qt, world->block_qt));
 
                     switch(move_direction){
                     default:
@@ -1357,8 +1364,10 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                     }
                }
 
-               bool last_in_chain_on_frictionless = (block_on_ice(last_block_in_chain->pos, last_block_in_chain->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt) ||
-                                                     block_on_air(last_block_in_chain->pos, last_block_in_chain->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt));
+               bool last_in_chain_on_frictionless = (block_on_ice(last_block_in_chain->pos, last_block_in_chain->pos_delta,
+                                                                  &world->tilemap, world->interactive_qt, world->block_qt) ||
+                                                     block_on_air(last_block_in_chain->pos, last_block_in_chain->pos_delta,
+                                                                  last_block_in_chain->cut, &world->tilemap, world->interactive_qt, world->block_qt));
 
                bool being_stopped_by_player = direction_is_horizontal(first_direction) ?
                                               last_block_in_chain->stopped_by_player_horizontal :
@@ -1478,7 +1487,7 @@ BlockCollidesWithItselfResult_t resolve_block_colliding_with_itself(Direction_t 
 
 Interactive_t* block_is_teleporting(Block_t* block, QuadTreeNode_t<Interactive_t>* interactive_qt){
      auto block_coord = block_get_coord(block);
-     auto block_rect = block_get_rect(block);
+     auto block_rect = block_get_inclusive_rect(block);
      auto min = block_coord - Coord_t{1, 1};
      auto max = block_coord + Coord_t{1, 1};
 

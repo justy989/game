@@ -418,7 +418,7 @@ void apply_stamp(Stamp_t* stamp, Coord_t coord, TileMap_t* tilemap, ObjectArray_
 
           for(S16 i = 0; i < block_array->count; i++){
                auto block = block_array->elements + i;
-               Rect_t block_rect = block_get_rect(block);
+               Rect_t block_rect = block_get_inclusive_rect(block);
                if(block->pos.z + HEIGHT_INTERVAL > z && rect_in_rect(coord_rect, block_rect)){
                     z = block->pos.z + HEIGHT_INTERVAL;
                }

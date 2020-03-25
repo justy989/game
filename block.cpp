@@ -64,33 +64,97 @@ bool blocks_at_collidable_height(S8 a_z, S8 b_z){
      return false;
 }
 
-Rect_t block_get_rect(Block_t* b){
+Rect_t block_get_inclusive_rect(Block_t* b){
      Rect_t block_rect = {(S16)(b->pos.pixel.x),
                           (S16)(b->pos.pixel.y),
-                          (S16)(b->pos.pixel.x + BLOCK_SOLID_SIZE_IN_PIXELS),
-                          (S16)(b->pos.pixel.y + BLOCK_SOLID_SIZE_IN_PIXELS)};
+                          (S16)(b->pos.pixel.x + block_get_width_in_pixels(b) - 1),
+                          (S16)(b->pos.pixel.y + block_get_height_in_pixels(b) - 1)};
      return block_rect;
 }
 
-Rect_t block_get_rect(Pixel_t pixel){
+Rect_t block_get_inclusive_rect(Pixel_t pixel, BlockCut_t cut){
      Rect_t block_rect = {(S16)(pixel.x),
                           (S16)(pixel.y),
-                          (S16)(pixel.x + BLOCK_SOLID_SIZE_IN_PIXELS),
-                          (S16)(pixel.y + BLOCK_SOLID_SIZE_IN_PIXELS)};
+                          (S16)(pixel.x + block_get_width_in_pixels(cut) - 1),
+                          (S16)(pixel.y + block_get_height_in_pixels(cut) - 1)};
      return block_rect;
 }
 
-Pixel_t block_bottom_right_pixel(Pixel_t block_pixel){
-     return Pixel_t{(S16)(block_pixel.x + BLOCK_SOLID_SIZE_IN_PIXELS), block_pixel.y};
+Pixel_t block_bottom_right_pixel(Pixel_t block_pixel, BlockCut_t cut){
+     return Pixel_t{block_get_right_inclusive_pixel(block_pixel.x, cut), block_pixel.y};
 }
 
-Pixel_t block_top_left_pixel(Pixel_t block_pixel){
-     return Pixel_t{block_pixel.x, (S16)(block_pixel.y + BLOCK_SOLID_SIZE_IN_PIXELS)};
+Pixel_t block_top_left_pixel(Pixel_t block_pixel, BlockCut_t cut){
+     return Pixel_t{block_pixel.x, block_get_right_inclusive_pixel(block_pixel.y, cut)};
 }
 
-Pixel_t block_top_right_pixel(Pixel_t block_pixel){
-     return Pixel_t{(S16)(block_pixel.x + BLOCK_SOLID_SIZE_IN_PIXELS),
-                    (S16)(block_pixel.y + BLOCK_SOLID_SIZE_IN_PIXELS)};
+Pixel_t block_top_right_pixel(Pixel_t block_pixel, BlockCut_t cut){
+     return Pixel_t{block_get_right_inclusive_pixel(block_pixel.x, cut),
+                    block_get_right_inclusive_pixel(block_pixel.y, cut)};
+}
+
+S16 block_get_width_in_pixels(BlockCut_t cut){
+    switch(cut){
+    default:
+        return 0;
+     case BLOCK_CUT_WHOLE:
+     case BLOCK_CUT_TOP_HALF:
+     case BLOCK_CUT_BOTTOM_HALF:
+        return TILE_SIZE_IN_PIXELS;
+     case BLOCK_CUT_LEFT_HALF:
+     case BLOCK_CUT_RIGHT_HALF:
+     case BLOCK_CUT_TOP_LEFT_QUARTER:
+     case BLOCK_CUT_TOP_RIGHT_QUARTER:
+     case BLOCK_CUT_BOTTOM_LEFT_QUARTER:
+     case BLOCK_CUT_BOTTOM_RIGHT_QUARTER:
+        return HALF_TILE_SIZE_IN_PIXELS;
+    }
+
+    return 0;
+}
+
+S16 block_get_width_in_pixels(Block_t* block){
+    return block_get_width_in_pixels(block->cut);
+}
+
+S16 block_get_height_in_pixels(BlockCut_t cut){
+    switch(cut){
+    default:
+        return 0;
+     case BLOCK_CUT_WHOLE:
+     case BLOCK_CUT_LEFT_HALF:
+     case BLOCK_CUT_RIGHT_HALF:
+        return TILE_SIZE_IN_PIXELS;
+     case BLOCK_CUT_TOP_HALF:
+     case BLOCK_CUT_BOTTOM_HALF:
+     case BLOCK_CUT_TOP_LEFT_QUARTER:
+     case BLOCK_CUT_TOP_RIGHT_QUARTER:
+     case BLOCK_CUT_BOTTOM_LEFT_QUARTER:
+     case BLOCK_CUT_BOTTOM_RIGHT_QUARTER:
+        return HALF_TILE_SIZE_IN_PIXELS;
+    }
+
+    return 0;
+}
+
+S16 block_get_height_in_pixels(Block_t* block){
+    return block_get_height_in_pixels(block->cut);
+}
+
+S16 block_get_right_inclusive_pixel(Block_t* block){
+    return block_get_right_inclusive_pixel(block->pos.pixel.x, block->cut);
+}
+
+S16 block_get_right_inclusive_pixel(S16 pixel, BlockCut_t cut){
+    return pixel + block_get_width_in_pixels(cut) - 1;
+}
+
+S16 block_get_top_inclusive_pixel(Block_t* block){
+    return block_get_right_inclusive_pixel(block->pos.pixel.y, block->cut);
+}
+
+S16 block_get_top_inclusive_pixel(S16 pixel, BlockCut_t cut){
+    return pixel + block_get_height_in_pixels(cut) - 1;
 }
 
 void block_stop_horizontally(Block_t* block){
