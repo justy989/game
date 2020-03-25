@@ -320,7 +320,7 @@ void activate(World_t* world, Coord_t coord){
 }
 
 void slow_block_toward_gridlock(World_t* world, Block_t* block, Direction_t direction){
-     if(!block_on_ice(block->pos, block->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt) &&
+     if(!block_on_ice(block->pos, block->pos_delta, block->cut, &world->tilemap, world->interactive_qt, world->block_qt) &&
         !block_on_air(block, &world->tilemap, world->interactive_qt, world->block_qt)) return;
 
      Move_t* move = direction_is_horizontal(direction) ? &block->horizontal_move : &block->vertical_move;
@@ -346,8 +346,8 @@ void slow_block_toward_gridlock(World_t* world, Block_t* block, Direction_t dire
           block_vel = block->vel.y;
      }
 
-     auto against_result = block_against_other_blocks(block->pos + block->pos_delta, direction_opposite(direction), world->block_qt,
-                                                      world->interactive_qt, &world->tilemap);
+     auto against_result = block_against_other_blocks(block->pos + block->pos_delta, block->cut, direction_opposite(direction),
+                                                      world->block_qt, world->interactive_qt, &world->tilemap);
      for(S16 i = 0; i < against_result.count; i++){
          Direction_t against_direction = direction_rotate_clockwise(direction, against_result.againsts[i].rotations_through_portal);
          Block_t* against_block = against_result.againsts[i].block;
@@ -486,9 +486,9 @@ void stop_against_blocks_moving_with_block(World_t* world, Block_t* block, Direc
         block->stopped_by_player_vertical = false;
     }
 
-    Position_t block_center = block_get_center(adjusted_stop_pos);
-    auto against_result = block_against_other_blocks(block->pos + block->pos_delta, direction, world->block_qt,
-                                                     world->interactive_qt, &world->tilemap);
+    Position_t block_center = block_get_center(adjusted_stop_pos, block->cut);
+    auto against_result = block_against_other_blocks(block->pos + block->pos_delta, block->cut, direction,
+                                                     world->block_qt, world->interactive_qt, &world->tilemap);
     for(S16 i = 0; i < against_result.count; i++){
         Direction_t against_direction = direction_rotate_clockwise(direction, against_result.againsts[i].rotations_through_portal);
         Block_t* against_block = against_result.againsts[i].block;
@@ -838,7 +838,8 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
           auto rotated_player_face = direction_rotate_counter_clockwise(player_face, collision.portal_rotations);
 
           bool held_down = block_held_down_by_another_block(collision.block, world->block_qt, world->interactive_qt, &world->tilemap).held();
-          bool on_ice = block_on_ice(collision.block->pos, collision.block->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt);
+          bool on_ice = block_on_ice(collision.block->pos, collision.block->pos_delta, collision.block->cut,
+                                     &world->tilemap, world->interactive_qt, world->block_qt);
           bool pushable = block_pushable(collision.block, rotated_player_face, world);
 
           if(use_this_collision && collision.dir == player_face && (player_vel.x != 0.0f || player_vel.y != 0.0f) && (!held_down || (on_ice && pushable))){
@@ -1351,9 +1352,10 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
      // }
 
      BlockPushResult_t result {};
-     auto against_result = block_against_other_blocks(pos + pos_delta, direction, world->block_qt, world->interactive_qt, &world->tilemap);
+     auto against_result = block_against_other_blocks(pos + pos_delta, block->cut, direction, world->block_qt, world->interactive_qt,
+                                                      &world->tilemap);
      bool both_on_ice = false;
-     bool pushed_block_on_ice = block_on_ice(pos, pos_delta, &world->tilemap, world->interactive_qt, world->block_qt);
+     bool pushed_block_on_ice = block_on_ice(pos, pos_delta, block->cut, &world->tilemap, world->interactive_qt, world->block_qt);
      bool transfers_force = false;
 
      F32 block_push_vel = 0;
@@ -1374,12 +1376,14 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
           bool on_ice = false;
 
           if(against_block == block){
-               if(pushed_by_ice && block_on_ice(against_block->pos, against_block->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt)){
+               if(pushed_by_ice && block_on_ice(against_block->pos, against_block->pos_delta, against_block->cut,
+                                                &world->tilemap, world->interactive_qt, world->block_qt)){
                     // pass
                }else{
                     return result;
                }
-          }else if((on_ice = block_on_ice(against_block->pos, against_block->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt))){
+          }else if((on_ice = block_on_ice(against_block->pos, against_block->pos_delta, against_block->cut,
+                                          &world->tilemap, world->interactive_qt, world->block_qt))){
                if(pushed_by_ice && instant_momentum){
                     // check if we are able to move or if we transfer our force to the block
                     transfers_force = true;
@@ -1523,12 +1527,14 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
                     Direction_t check_direction = against_block_push_dir;
 
                     auto next_against_block = block_against_another_block(entangled_against_block->pos + entangled_against_block->pos_delta,
+                                                                          entangled_against_block->cut,
                                                                           check_direction, world->block_qt,
                                                                           world->interactive_qt, &world->tilemap,
                                                                           &check_direction);
                     if(next_against_block == nullptr) break;
                     if(!blocks_are_entangled(entangled_against_block, next_against_block, &world->blocks) &&
-                       !block_on_ice(next_against_block->pos, entangled_against_block->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt)){
+                       !block_on_ice(next_against_block->pos, entangled_against_block->pos_delta, entangled_against_block->cut,
+                                     &world->tilemap, world->interactive_qt, world->block_qt)){
                          only_against_entanglers = false;
                          break;
                     }
@@ -1681,7 +1687,7 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
 
 bool block_pushable(Block_t* block, Direction_t direction, World_t* world){
      Direction_t collided_block_push_dir = DIRECTION_COUNT;
-     Block_t* collided_block = block_against_another_block(block->pos + block->pos_delta, direction, world->block_qt,
+     Block_t* collided_block = block_against_another_block(block->pos + block->pos_delta, block->cut, direction, world->block_qt,
                                                            world->interactive_qt, &world->tilemap, &collided_block_push_dir);
      if(collided_block){
           if(collided_block == block){
@@ -2212,13 +2218,15 @@ ElasticCollisionResult_t elastic_transfer_momentum_to_block(TransferMomentum_t* 
 }
 
 static void get_touching_blocks_in_direction(World_t* world, Block_t* block, Direction_t direction, BlockList_t* block_list){
-     auto result = block_against_other_blocks(block->pos + block->pos_delta, direction, world->block_qt, world->interactive_qt, &world->tilemap);
+     auto result = block_against_other_blocks(block->pos + block->pos_delta, block->cut, direction, world->block_qt,
+                                              world->interactive_qt, &world->tilemap);
      for(S16 i = 0; i < result.count; i++){
           Direction_t result_direction = direction;
           result_direction = direction_rotate_clockwise(result_direction, result.againsts[i].rotations_through_portal);
           auto result_block = result.againsts[i].block;
 
-          if(block_on_ice(result_block->pos, result_block->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt)){
+          if(block_on_ice(result_block->pos, result_block->pos_delta, result_block->cut,
+                          &world->tilemap, world->interactive_qt, world->block_qt)){
                get_block_stack(world, result_block, block_list, result.againsts[i].rotations_through_portal);
                get_touching_blocks_in_direction(world, result_block, result_direction, block_list);
           }
@@ -2240,7 +2248,8 @@ S16 get_block_mass_in_direction(World_t* world, Block_t* block, Direction_t dire
      BlockList_t block_list;
      get_block_stack(world, block, &block_list, DIRECTION_COUNT);
 
-     if(block_on_ice(block->pos, block->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt)){
+     if(block_on_ice(block->pos, block->pos_delta, block->cut,
+                     &world->tilemap, world->interactive_qt, world->block_qt)){
           get_touching_blocks_in_direction(world, block, direction, &block_list);
 
           // accumulate all blocks mass but reduce duplication of mass for entangled blocks
@@ -2292,7 +2301,7 @@ AllowedToPushResult_t allowed_to_push(World_t* world, Block_t* block, Direction_
      F32 total_block_mass = get_block_mass_in_direction(world, block, direction);
      result.mass_ratio = (F32)(BLOCK_BASELINE_MASS) / (F32)(total_block_mass);
 
-     if(block_on_ice(block->pos, Vec_t{}, &world->tilemap, world->interactive_qt, world->block_qt)){
+     if(block_on_ice(block->pos, Vec_t{}, block->cut, &world->tilemap, world->interactive_qt, world->block_qt)){
           // player applies a force to accelerate the block by BLOCK_ACCEL
           if(instant_momentum){
                auto elastic_result = elastic_transfer_momentum_to_block(instant_momentum, world, block, direction);

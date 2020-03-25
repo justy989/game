@@ -396,9 +396,9 @@ void add_interactive_held(InteractiveHeldResult_t* result, Interactive_t* intera
 bool block_adjacent_pixels_to_check(Position_t pos, Vec_t pos_delta, Direction_t direction, Pixel_t* a, Pixel_t* b);
 
 Block_t* block_against_block_in_list(Position_t pos, Block_t** blocks, S16 block_count, Direction_t direction, Position_t* portal_offsets);
-Block_t* block_against_another_block(Position_t pos, Direction_t direction, QuadTreeNode_t<Block_t>* block_qt,
+Block_t* block_against_another_block(Position_t pos, BlockCut_t cut, Direction_t direction, QuadTreeNode_t<Block_t>* block_qt,
                                      QuadTreeNode_t<Interactive_t>* interactive_quad_tree, TileMap_t* tilemap, Direction_t* push_dir);
-BlockAgainstOthersResult_t block_against_other_blocks(Position_t pos, Direction_t direction, QuadTreeNode_t<Block_t>* block_qt,
+BlockAgainstOthersResult_t block_against_other_blocks(Position_t pos, BlockCut_t cut, Direction_t direction, QuadTreeNode_t<Block_t>* block_qt,
                                                       QuadTreeNode_t<Interactive_t>* interactive_quad_tree, TileMap_t* tilemap);
 Block_t* rotated_entangled_blocks_against_centroid(Block_t* block, Direction_t direction, QuadTreeNode_t<Block_t>* block_qt,
                                                    ObjectArray_t<Block_t>* blocks_array,
@@ -406,10 +406,11 @@ Block_t* rotated_entangled_blocks_against_centroid(Block_t* block, Direction_t d
 Interactive_t* block_against_solid_interactive(Block_t* block_to_check, Direction_t direction,
                                                TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt);
 
-BlockInsideOthersResult_t block_inside_others(Position_t block_to_check_pos, Vec_t block_to_check_pos_delta, S16 block_to_check_index,
-                                               bool block_to_check_cloning, QuadTreeNode_t<Block_t>* block_qt,
-                                               QuadTreeNode_t<Interactive_t>* interactive_quad_tree, TileMap_t* tilemap,
-                                               ObjectArray_t<Block_t>* block_array);
+BlockInsideOthersResult_t block_inside_others(Position_t block_to_check_pos, Vec_t block_to_check_pos_delta,
+                                              BlockCut_t cut, S16 block_to_check_index,
+                                              bool block_to_check_cloning, QuadTreeNode_t<Block_t>* block_qt,
+                                              QuadTreeNode_t<Interactive_t>* interactive_quad_tree, TileMap_t* tilemap,
+                                              ObjectArray_t<Block_t>* block_array);
 Tile_t* block_against_solid_tile(Block_t* block_to_check, Direction_t direction, TileMap_t* tilemap);
 Tile_t* block_against_solid_tile(Position_t block_pos, Vec_t pos_delta, Direction_t direction, TileMap_t* tilemap);
 Player_t* block_against_player(Block_t* block_to_check, Direction_t direction, ObjectArray_t<Player_t>* players);
@@ -423,7 +424,7 @@ BlockHeldResult_t block_held_down_by_another_block(Pixel_t block_pixel, S8 block
                                                    QuadTreeNode_t<Block_t>* block_qt, QuadTreeNode_t<Interactive_t>* interactive_qt,
                                                    TileMap_t* tilemap, S16 min_area = 0, bool include_pos_delta = true);
 
-bool block_on_ice(Position_t pos, Vec_t pos_delta, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree,
+bool block_on_ice(Position_t pos, Vec_t pos_delta, BlockCut_t cut, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree,
                   QuadTreeNode_t<Block_t>* block_qt);
 
 bool block_on_air(Position_t pos, Vec_t pos_delta, BlockCut_t cut, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt, QuadTreeNode_t<Block_t>* block_qt);

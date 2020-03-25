@@ -16,6 +16,7 @@ Entanglement Puzzles:
 - rotated entangled puzzles where the centroid is on a portal destination coord
 
 Current bugs:
+- two opposite entangled blocks moving towards each other do not do what I expect (stop halfway grid aligned, touching)
 - a block travelling diagonally at a wall will stop on both axis' against the wall because of the collision
 - Players standing on blocks going through portals colliding on ice seem to gain speed over time
 - Colliding with and pushing an entangled block on ice should cause force to flow through its entangles, but shouldn't push entanglers that are not on ice
@@ -591,7 +592,7 @@ void apply_block_collision(World_t* world, Block_t* block, F32 dt, CheckBlockCol
 
                     // if positions are diagonal to each other and the rotation between them is odd, check if we are moving into each other
                     if(pos_dimension_delta <= FLT_EPSILON && (total_rotations_between) % 2 == 1){
-                         auto entangle_inside_result = block_inside_others(entangled_block->pos, entangled_block->pos_delta, get_block_index(world, entangled_block),
+                         auto entangle_inside_result = block_inside_others(entangled_block->pos, entangled_block->pos_delta, entangled_block->cut, get_block_index(world, entangled_block),
                                                                            entangled_block->clone_id > 0, world->block_qt, world->interactive_qt, &world->tilemap, &world->blocks);
                          if(entangle_inside_result.count > 0 && entangle_inside_result.entries[0].block == block){
                               // stop the blocks moving toward each other
@@ -642,12 +643,12 @@ void apply_block_collision(World_t* world, Block_t* block, F32 dt, CheckBlockCol
                               if(move_dir_to_stop == DIRECTION_COUNT){
                                    copy_block_collision_results(block, collision_result);
                               }else{
-                                   bool block_on_ice_or_air = block_on_ice(block->pos, block->pos_delta,
+                                   bool block_on_ice_or_air = block_on_ice(block->pos, block->pos_delta, block->cut,
                                                                            &world->tilemap, world->interactive_qt, world->block_qt) ||
                                                               block_on_air(block->pos, block->pos_delta, block->cut,
                                                                            &world->tilemap, world->interactive_qt, world->block_qt);
 
-                                   bool entangled_block_on_ice_or_air = block_on_ice(entangled_block->pos, entangled_block->pos_delta,
+                                   bool entangled_block_on_ice_or_air = block_on_ice(entangled_block->pos, entangled_block->pos_delta, entangled_block->cut,
                                                                                      &world->tilemap, world->interactive_qt, world->block_qt) ||
                                                                         block_on_air(entangled_block->pos, entangled_block->pos_delta, entangled_block->cut,
                                                                                      &world->tilemap, world->interactive_qt, world->block_qt);
@@ -773,7 +774,8 @@ DoBlockCollisionResults_t do_block_collision(World_t* world, Block_t* block, S16
      }
 
      // this instance of last_block_pushed is to keep the pushing smooth and not have it stop at the tile boundaries
-     if(block != block_pushed && !block_on_ice(block->pos, block->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt) &&
+     if(block != block_pushed &&
+        !block_on_ice(block->pos, block->pos_delta, block->cut, &world->tilemap, world->interactive_qt, world->block_qt) &&
         !block_on_air(block, &world->tilemap, world->interactive_qt, world->block_qt)){
           if(block_pushed && blocks_are_entangled(block_pushed, block, &world->blocks)){
                Block_t* entangled_block = block_pushed;
@@ -2578,16 +2580,16 @@ int main(int argc, char** argv){
 
                          auto block_center = block_get_center(block);
                          auto premove_coord = block_get_coord(block);
-                         auto coord = block_get_coord(block->pos + block->pos_delta);
+                         auto coord = block_get_coord(block->pos + block->pos_delta, block->cut);
                          auto teleport_result = teleport_position_across_portal(block_center, block->pos_delta, &world, premove_coord, coord);
                          if(teleport_result.count > block->clone_id){
                               auto pos = teleport_result.results[block->clone_id].pos;
                               pos.pixel -= HALF_TILE_SIZE_PIXEL;
                               auto pos_delta = teleport_result.results[block->clone_id].delta;
-                              would_teleport_onto_ice = block_on_ice(pos, pos_delta, &world.tilemap, world.interactive_qt, world.block_qt);
+                              would_teleport_onto_ice = block_on_ice(pos, pos_delta, block->cut, &world.tilemap, world.interactive_qt, world.block_qt);
                          }
 
-                         if(block_on_ice(block->pos, block->pos_delta, &world.tilemap, world.interactive_qt, world.block_qt) || would_teleport_onto_ice){
+                         if(block_on_ice(block->pos, block->pos_delta, block->cut, &world.tilemap, world.interactive_qt, world.block_qt) || would_teleport_onto_ice){
                               block->coast_horizontal = BLOCK_COAST_ICE;
                               block->coast_vertical = BLOCK_COAST_ICE;
                          }else if(block_on_air(block, &world.tilemap, world.interactive_qt, world.block_qt)){
@@ -2643,7 +2645,7 @@ int main(int argc, char** argv){
                                         }
                                         }
                                    }else if(blocks_are_entangled(block, player_prev_pushing_block, &world.blocks) &&
-                                            !block_on_ice(block->pos, block->pos_delta, &world.tilemap, world.interactive_qt, world.block_qt) &&
+                                            !block_on_ice(block->pos, block->pos_delta, block->cut, &world.tilemap, world.interactive_qt, world.block_qt) &&
                                             !block_on_air(block, &world.tilemap, world.interactive_qt, world.block_qt)){
                                         Block_t* entangled_block = player_prev_pushing_block;
 
@@ -2903,7 +2905,7 @@ int main(int argc, char** argv){
 
                          auto block_center = block_get_center(block);
                          auto premove_coord = block_get_coord(block);
-                         auto coord = block_get_coord(block->pos + block->pos_delta);
+                         auto coord = block_get_coord(block->pos + block->pos_delta, block->cut);
                          auto teleport_result = teleport_position_across_portal(block_center, block->pos_delta, &world, premove_coord, coord);
                          if(teleport_result.count > block->clone_id){
                               block->teleport = true;
@@ -3838,7 +3840,7 @@ int main(int argc, char** argv){
 
           glEnd();
 
-#if 0
+#if 1
           // light
           glBindTexture(GL_TEXTURE_2D, 0);
           glBegin(GL_QUADS);

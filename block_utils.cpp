@@ -191,11 +191,11 @@ Block_t* block_against_block_in_list(Position_t pos, Block_t** blocks, S16 block
      return nullptr;
 }
 
-BlockAgainstOthersResult_t block_against_other_blocks(Position_t pos, Direction_t direction, QuadTreeNode_t<Block_t>* block_qt,
+BlockAgainstOthersResult_t block_against_other_blocks(Position_t pos, BlockCut_t cut, Direction_t direction, QuadTreeNode_t<Block_t>* block_qt,
                                                       QuadTreeNode_t<Interactive_t>* interactive_qt, TileMap_t* tilemap){
      BlockAgainstOthersResult_t result;
 
-     auto block_center = block_get_center(pos);
+     auto block_center = block_get_center(pos, cut);
      Rect_t surrounding_rect = rect_to_check_surrounding_blocks(block_center.pixel);
 
      Position_t portal_offsets[MAX_BLOCKS_FOUND_THROUGH_PORTALS];
@@ -231,9 +231,9 @@ BlockAgainstOthersResult_t block_against_other_blocks(Position_t pos, Direction_
      return result;
 }
 
-Block_t* block_against_another_block(Position_t pos, Direction_t direction, QuadTreeNode_t<Block_t>* block_qt,
+Block_t* block_against_another_block(Position_t pos, BlockCut_t cut, Direction_t direction, QuadTreeNode_t<Block_t>* block_qt,
                                      QuadTreeNode_t<Interactive_t>* interactive_qt, TileMap_t* tilemap, Direction_t* push_dir){
-     auto block_center = block_get_center(pos);
+     auto block_center = block_get_center(pos, cut);
      Rect_t rect = rect_to_check_surrounding_blocks(block_center.pixel);
 
      S16 block_count = 0;
@@ -542,31 +542,14 @@ Block_t* pixel_inside_block(Pixel_t pixel, S8 z, TileMap_t* tilemap, QuadTreeNod
      return nullptr;
 }
 
-void search_portal_destination_for_blocks(QuadTreeNode_t<Block_t>* block_qt, Direction_t src_portal_face,
-                                          Direction_t dst_portal_face, Coord_t src_portal_coord,
-                                          Coord_t dst_portal_coord, Block_t** blocks, S16* block_count, Position_t* portal_offsets){
-     U8 rotations_between_portals = portal_rotations_between(dst_portal_face, src_portal_face);
-     Coord_t dst_coord = dst_portal_coord + direction_opposite(dst_portal_face);
-     Position_t src_portal_center_pos = pixel_to_pos(coord_to_pixel_at_center(src_portal_coord));
-     Position_t dst_center_pos = pixel_to_pos(coord_to_pixel_at_center(dst_coord));
-     Rect_t rect = rect_surrounding_adjacent_coords(dst_coord);
-     quad_tree_find_in(block_qt, rect, blocks, block_count, BLOCK_QUAD_TREE_MAX_QUERY);
-
-     for(S8 o = 0; o < *block_count; o++){
-          Position_t block_center = block_get_center(blocks[o]->pos + blocks[o]->pos_delta);
-          Position_t dst_offset = block_center - dst_center_pos;
-          Position_t src_fake_pos = src_portal_center_pos + position_rotate_quadrants_clockwise(dst_offset, rotations_between_portals);
-          portal_offsets[o] = src_fake_pos - block_center;
-     }
-}
-
-BlockInsideOthersResult_t block_inside_others(Position_t block_to_check_pos, Vec_t block_to_check_pos_delta, S16 block_to_check_index,
+BlockInsideOthersResult_t block_inside_others(Position_t block_to_check_pos, Vec_t block_to_check_pos_delta,
+                                              BlockCut_t cut, S16 block_to_check_index,
                                               bool block_to_check_cloning, QuadTreeNode_t<Block_t>* block_qt,
                                               QuadTreeNode_t<Interactive_t>* interactive_qt, TileMap_t* tilemap,
                                               ObjectArray_t<Block_t>* block_array){
      BlockInsideOthersResult_t result = {};
 
-     auto block_to_check_center_pixel = block_center_pixel(block_to_check_pos);
+     auto block_to_check_center_pixel = block_center_pixel(block_to_check_pos, cut);
 
      // TODO: need more complicated function to detect this
      Rect_t surrounding_rect = rect_to_check_surrounding_blocks(block_to_check_center_pixel);
@@ -720,7 +703,7 @@ static BlockHeldResult_t block_at_height_in_block_rect(Pixel_t block_to_check_pi
      BlockHeldResult_t result;
 
      // TODO: need more complicated function to detect this
-     auto block_to_check_center = block_center_pixel(block_to_check_pixel);
+     auto block_to_check_center = block_center_pixel(block_to_check_pixel, cut);
      Rect_t check_rect = block_get_inclusive_rect(block_to_check_pixel, cut);
      Rect_t surrounding_rect = rect_to_check_surrounding_blocks(block_to_check_center);
 
@@ -809,11 +792,11 @@ BlockHeldResult_t block_held_down_by_another_block(Pixel_t block_pixel, S8 block
      return block_at_height_in_block_rect(block_pixel, cut, block_qt, block_z + HEIGHT_INTERVAL, interactive_qt, tilemap, min_area, include_pos_delta);
 }
 
-bool block_on_ice(Position_t pos, Vec_t pos_delta, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt,
+bool block_on_ice(Position_t pos, Vec_t pos_delta, BlockCut_t cut, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt,
                   QuadTreeNode_t<Block_t>* block_qt){
      auto block_pos = pos + pos_delta;
 
-     Pixel_t pixel_to_check = block_get_center(block_pos).pixel;
+     Pixel_t pixel_to_check = block_get_center(block_pos, cut).pixel;
      Coord_t coord_to_check = pixel_to_coord(pixel_to_check);
 
      if(pos.z == 0){
@@ -856,7 +839,7 @@ bool block_on_air(Position_t pos, Vec_t pos_delta, BlockCut_t cut, TileMap_t* ti
      if(pos.z == 0) return false; // TODO: if we add pits, check for a pit obv
 
      auto final_pos = pos + pos_delta;
-     auto block_center = block_center_pixel(final_pos);
+     auto block_center = block_center_pixel(final_pos, cut);
      auto block_result = block_at_height_in_block_rect(final_pos.pixel, cut, block_qt,
                                                        final_pos.z - HEIGHT_INTERVAL, interactive_qt, tilemap);
      for(S16 i = 0; i < block_result.count; i++){
@@ -1011,6 +994,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
 
      auto block_inside_result = block_inside_others(block_pos,
                                                     result.pos_delta,
+                                                    cut,
                                                     block_index,
                                                     block_is_cloning,
                                                     world->block_qt,
@@ -1021,7 +1005,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
      if(block_inside_result.count > 0 ){
           S16 collided_with_blocks_on_ice = 0;
 
-          if(block_on_ice(block_pos, block_pos_delta, &world->tilemap, world->interactive_qt, world->block_qt) ||
+          if(block_on_ice(block_pos, block_pos_delta, cut, &world->tilemap, world->interactive_qt, world->block_qt) ||
              block_on_air(block_pos, block_pos_delta, cut, &world->tilemap, world->interactive_qt, world->block_qt)){
                // calculate the momentum if we are on ice for later
                for(S8 i = 0; i < block_inside_result.count; i++){
@@ -1102,7 +1086,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                     if(block_inside_result.entries[i].invalidated) continue;
 
                     if(block_on_ice(block_inside_result.entries[i].block->pos, block_inside_result.entries[i].block->pos_delta,
-                                    &world->tilemap, world->interactive_qt, world->block_qt) ||
+                                    block_inside_result.entries[i].block->cut, &world->tilemap, world->interactive_qt, world->block_qt) ||
                        block_on_air(block_inside_result.entries[i].block->pos, block_inside_result.entries[i].block->pos_delta,
                                     block_inside_result.entries[i].block->cut, &world->tilemap, world->interactive_qt, world->block_qt)){
                          collided_with_blocks_on_ice++;
@@ -1135,17 +1119,17 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                     collided_block_center.decimal.y = 0;
                }
 
-               auto moved_block_pos = block_get_center(block_pos);
+               auto moved_block_pos = block_get_center(block_pos, cut);
                auto move_direction = move_direction_between(moved_block_pos, block_inside_result.entries[i].collision_pos);
                Direction_t first_direction;
                Direction_t second_direction;
                move_direction_to_directions(move_direction, &first_direction, &second_direction);
 
                // check if they are on ice before we adjust the position on our block to check
-               bool a_on_ice_or_air = block_on_ice(block_pos, result.pos_delta, &world->tilemap, world->interactive_qt, world->block_qt) ||
+               bool a_on_ice_or_air = block_on_ice(block_pos, result.pos_delta, cut, &world->tilemap, world->interactive_qt, world->block_qt) ||
                                       block_on_air(block_pos, result.pos_delta, cut, &world->tilemap, world->interactive_qt, world->block_qt);
                bool b_on_ice_or_air = block_on_ice(block_inside_result.entries[i].block->pos, block_inside_result.entries[i].block->pos_delta,
-                                                   &world->tilemap, world->interactive_qt, world->block_qt) ||
+                                                   block_inside_result.entries[i].block->cut, &world->tilemap, world->interactive_qt, world->block_qt) ||
                                       block_on_air(block_inside_result.entries[i].block->pos, block_inside_result.entries[i].block->pos_delta,
                                                    block_inside_result.entries[i].block->cut, &world->tilemap, world->interactive_qt, world->block_qt);
                bool both_frictionless = a_on_ice_or_air && b_on_ice_or_air;
@@ -1194,7 +1178,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
 
                if(block_inside_index != block_index){
                     Block_t* collided_block = block_inside_result.entries[i].block;
-                    bool inside_block_on_frictionless = (block_on_ice(collided_block->pos, collided_block->pos_delta,
+                    bool inside_block_on_frictionless = (block_on_ice(collided_block->pos, collided_block->pos_delta, collided_block->cut,
                                                                       &world->tilemap, world->interactive_qt, world->block_qt) ||
                                                          block_on_air(collided_block->pos, collided_block->pos_delta, collided_block->cut,
                                                                       &world->tilemap, world->interactive_qt, world->block_qt));
@@ -1311,7 +1295,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                          break;
                     }
                }else{
-                    Coord_t block_coord = block_get_coord(block_pos);
+                    Coord_t block_coord = block_get_coord(block_pos, cut);
                     Direction_t src_portal_dir = direction_between(block_coord, block_inside_result.entries[i].src_portal_coord);
                     Direction_t dst_portal_dir = direction_between(block_coord, block_inside_result.entries[i].dst_portal_coord);
                     DirectionMask_t move_mask = vec_direction_mask(result.vel);
@@ -1353,8 +1337,8 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
 
                while(true){
                     // TODO: handle multiple against blocks
-                    auto against_result = block_against_other_blocks(last_block_in_chain->pos + last_block_in_chain->pos_delta, against_direction, world->block_qt,
-                                                                     world->interactive_qt, &world->tilemap);
+                    auto against_result = block_against_other_blocks(last_block_in_chain->pos + last_block_in_chain->pos_delta, last_block_in_chain->cut,
+                                                                     against_direction, world->block_qt, world->interactive_qt, &world->tilemap);
                     if(against_result.count > 0){
                          last_block_in_chain = against_result.againsts[0].block;
                          against_direction = direction_rotate_clockwise(against_direction, against_result.againsts[0].rotations_through_portal);
@@ -1365,7 +1349,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                }
 
                bool last_in_chain_on_frictionless = (block_on_ice(last_block_in_chain->pos, last_block_in_chain->pos_delta,
-                                                                  &world->tilemap, world->interactive_qt, world->block_qt) ||
+                                                                  last_block_in_chain->cut, &world->tilemap, world->interactive_qt, world->block_qt) ||
                                                      block_on_air(last_block_in_chain->pos, last_block_in_chain->pos_delta,
                                                                   last_block_in_chain->cut, &world->tilemap, world->interactive_qt, world->block_qt));
 
@@ -1534,8 +1518,8 @@ DealWithPushResult_t deal_with_push_result(Block_t* pusher, Direction_t directio
          auto block_receiving_force_final_pos = block_receiving_force->pos + block_receiving_force->pos_delta;
          if(block_receiving_force->teleport) block_receiving_force_final_pos = block_receiving_force->teleport_pos + block_receiving_force->teleport_pos_delta;
 
-         auto adjacent_results = block_against_other_blocks(block_receiving_force_final_pos, direction_to_check, world->block_qt,
-                                                            world->interactive_qt, &world->tilemap);
+         auto adjacent_results = block_against_other_blocks(block_receiving_force_final_pos, block_receiving_force->cut, direction_to_check,
+                                                            world->block_qt, world->interactive_qt, &world->tilemap);
 
          // ignore if we are against ourselves
          if(adjacent_results.count && adjacent_results.againsts[0].block != block_receiving_force){
@@ -1625,7 +1609,8 @@ void push_entangled_block(Block_t* block, World_t* world, Direction_t push_dir, 
      while(entangle_index != block_index && entangle_index >= 0){
           Block_t* entangled_block = world->blocks.elements + entangle_index;
           bool held_down = block_held_down_by_another_block(entangled_block, world->block_qt, world->interactive_qt, &world->tilemap).held();
-          bool on_ice = block_on_ice(entangled_block->pos, entangled_block->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt);
+          bool on_ice = block_on_ice(entangled_block->pos, entangled_block->pos_delta, entangled_block->cut,
+                                     &world->tilemap, world->interactive_qt, world->block_qt);
           if(!held_down || on_ice){
                auto rotations_between = direction_rotations_between(static_cast<Direction_t>(entangled_block->rotation), static_cast<Direction_t>(block->rotation));
                Direction_t rotated_dir = direction_rotate_clockwise(push_dir, rotations_between);
@@ -1674,7 +1659,8 @@ BlockPushes_t<MAX_BLOCK_PUSHES> push_entangled_block_pushes(Block_t* block, Worl
      while(entangle_index != block_index && entangle_index >= 0){
           Block_t* entangled_block = world->blocks.elements + entangle_index;
           bool held_down = block_held_down_by_another_block(entangled_block, world->block_qt, world->interactive_qt, &world->tilemap).held();
-          bool on_ice = block_on_ice(entangled_block->pos, entangled_block->pos_delta, &world->tilemap, world->interactive_qt, world->block_qt);
+          bool on_ice = block_on_ice(entangled_block->pos, entangled_block->pos_delta, entangled_block->cut,
+                                     &world->tilemap, world->interactive_qt, world->block_qt);
           if(!held_down || on_ice){
                auto rotations_between = direction_rotations_between(static_cast<Direction_t>(entangled_block->rotation), static_cast<Direction_t>(block->rotation));
                Direction_t rotated_dir = direction_rotate_clockwise(push_dir, rotations_between);
@@ -1942,7 +1928,7 @@ FindBlocksThroughPortalResult_t find_blocks_through_portals(Coord_t coord, TileM
                          auto portal_rotations = direction_rotations_between(interactive->portal.face, direction_opposite(current_portal_dir));
 
                          auto block_real_pos = block->teleport ? block->teleport_pos + block->teleport_pos_delta : block->pos + block->pos_delta;
-                         auto block_center = block_get_center(block_real_pos);
+                         auto block_center = block_get_center(block_real_pos, block->cut);
                          auto dst_offset = block_center - portal_dst_output_center;
                          auto src_coord_center = pixel_to_pos(portal_src_pixel);
                          auto block_final_pos = src_coord_center + position_rotate_quadrants_clockwise(dst_offset, compatibility_rot);

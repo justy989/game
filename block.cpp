@@ -12,40 +12,44 @@ S16 get_object_y(Block_t* block){
      return block->pos.pixel.y + HALF_TILE_SIZE_IN_PIXELS;
 }
 
+static Pixel_t block_center_pixel_offset(BlockCut_t cut){
+    return Pixel_t{(S16)(block_get_width_in_pixels(cut) / 2), (S16)(block_get_height_in_pixels(cut) / 2)};
+}
+
 Pixel_t block_center_pixel(Block_t* block){
-     return block->pos.pixel + HALF_TILE_SIZE_PIXEL;
+     return block->pos.pixel + block_center_pixel_offset(block->cut);
 }
 
-Pixel_t block_center_pixel(Position_t pos){
-     return pos.pixel + HALF_TILE_SIZE_PIXEL;
+Pixel_t block_center_pixel(Position_t pos, BlockCut_t cut){
+     return pos.pixel + block_center_pixel_offset(cut);
 }
 
-Pixel_t block_center_pixel(Pixel_t pixel){
-     return pixel + HALF_TILE_SIZE_PIXEL;
+Pixel_t block_center_pixel(Pixel_t pixel, BlockCut_t cut){
+     return pixel + block_center_pixel_offset(cut);
 }
 
 Position_t block_get_center(Block_t* block){
      Position_t pos = block->pos;
-     pos.pixel += HALF_TILE_SIZE_PIXEL;
+     pos.pixel += block_center_pixel_offset(block->cut);
      return pos;
 }
 
-Position_t block_get_center(Position_t pos){
-     pos.pixel += HALF_TILE_SIZE_PIXEL;
+Position_t block_get_center(Position_t pos, BlockCut_t cut){
+     pos.pixel += block_center_pixel_offset(cut);
      return pos;
 }
 
 void block_set_pos_from_center(Block_t* block, Position_t pos){
-    block->pos = pos - HALF_TILE_SIZE_PIXEL;
+    block->pos = pos - block_center_pixel_offset(block->cut);
 }
 
 Coord_t block_get_coord(Block_t* block){
-     Pixel_t center = block->pos.pixel + HALF_TILE_SIZE_PIXEL;
+     Pixel_t center = block->pos.pixel + block_center_pixel_offset(block->cut);
      return pixel_to_coord(center);
 }
 
-Coord_t block_get_coord(Position_t pos){
-     Pixel_t center = pos.pixel + HALF_TILE_SIZE_PIXEL;
+Coord_t block_get_coord(Position_t pos, BlockCut_t cut){
+     Pixel_t center = pos.pixel + block_center_pixel_offset(cut);
      return pixel_to_coord(center);
 }
 
@@ -199,6 +203,5 @@ S8 blocks_rotations_between(Block_t* a, Block_t* b){
 }
 
 S16 block_get_mass(Block_t* b){
-     (void)(b);
-     return TILE_SIZE_IN_PIXELS * TILE_SIZE_IN_PIXELS;
+     return block_get_width_in_pixels(b) * block_get_height_in_pixels(b);
 }
