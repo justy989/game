@@ -1608,7 +1608,9 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
                if(direction_opposite(moving_dir) == direction){
                     S16 block_mass = get_block_stack_mass(world, block);
                     F32 normal_block_velocity = get_block_normal_pushed_velocity(block_mass);
+                    if(block->vel.x < 0) normal_block_velocity = -normal_block_velocity;
                     F32 final_vel = block->vel.x - normal_block_velocity;
+
                     if(fabs(final_vel) <= FLT_EPSILON){
                         slow_block_toward_gridlock(world, block, direction_opposite(direction));
                         return result;
@@ -1636,6 +1638,7 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
                if(direction_opposite(moving_dir) == direction){
                     S16 block_mass = get_block_stack_mass(world, block);
                     F32 normal_block_velocity = get_block_normal_pushed_velocity(block_mass);
+                    if(block->vel.y < 0) normal_block_velocity = -normal_block_velocity;
                     F32 final_vel = block->vel.y - normal_block_velocity;
 
                     if(fabs(final_vel) <= FLT_EPSILON){
