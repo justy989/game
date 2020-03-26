@@ -83,6 +83,7 @@ struct Block_t : public GridMotion_t{
 
 S16 get_object_x(Block_t* block);
 S16 get_object_y(Block_t* block);
+Pixel_t block_center_pixel_offset(BlockCut_t cut);
 Pixel_t block_center_pixel(Block_t* block);
 Pixel_t block_center_pixel(Position_t pos, BlockCut_t cut);
 Pixel_t block_center_pixel(Pixel_t pos, BlockCut_t cut);

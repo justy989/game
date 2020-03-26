@@ -12,7 +12,7 @@ S16 get_object_y(Block_t* block){
      return block->pos.pixel.y + (block_get_height_in_pixels(block->cut) / 2);
 }
 
-static Pixel_t block_center_pixel_offset(BlockCut_t cut){
+Pixel_t block_center_pixel_offset(BlockCut_t cut){
     return Pixel_t{(S16)(block_get_width_in_pixels(cut) / 2), (S16)(block_get_height_in_pixels(cut) / 2)};
 }
 

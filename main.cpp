@@ -578,7 +578,7 @@ void apply_block_collision(World_t* world, Block_t* block, F32 dt, CheckBlockCol
                     auto entangled_block_pos = collision_result->collided_pos;
 
                     // the result collided position is the center of the block, so handle this
-                    entangled_block_pos.pixel -= HALF_TILE_SIZE_PIXEL;
+                    entangled_block_pos.pixel -= block_center_pixel_offset(entangled_block->cut);
 
                     auto final_block_pos = block->pos + block->pos_delta;
                     auto pos_diff = pos_to_vec(final_block_pos - entangled_block_pos);
@@ -2584,7 +2584,7 @@ int main(int argc, char** argv){
                          auto teleport_result = teleport_position_across_portal(block_center, block->pos_delta, &world, premove_coord, coord);
                          if(teleport_result.count > block->clone_id){
                               auto pos = teleport_result.results[block->clone_id].pos;
-                              pos.pixel -= HALF_TILE_SIZE_PIXEL;
+                              pos.pixel -= block_center_pixel_offset(block->cut);
                               auto pos_delta = teleport_result.results[block->clone_id].delta;
                               would_teleport_onto_ice = block_on_ice(pos, pos_delta, block->cut, &world.tilemap, world.interactive_qt, world.block_qt);
                          }
@@ -2910,7 +2910,7 @@ int main(int argc, char** argv){
                          if(teleport_result.count > block->clone_id){
                               block->teleport = true;
                               block->teleport_pos = teleport_result.results[block->clone_id].pos;
-                              block->teleport_pos.pixel -= HALF_TILE_SIZE_PIXEL;
+                              block->teleport_pos.pixel -= block_center_pixel_offset(block->cut);
 
                               block->teleport_pos_delta = teleport_result.results[block->clone_id].delta;
                               block->teleport_vel = vec_rotate_quadrants_clockwise(block->vel, teleport_result.results[block->clone_id].rotations);
