@@ -24,14 +24,14 @@ Vec_t collide_circle_with_line(Vec_t circle_center, F32 circle_radius, Vec_t a, 
      return vec_zero();
 }
 
-void position_collide_with_rect(Position_t pos, Position_t rect_pos, F32 rect_dimension_size, Vec_t* pos_delta, bool* collides){
+void position_collide_with_rect(Position_t pos, Position_t rect_pos, F32 rect_width, F32 rect_height, Vec_t* pos_delta, bool* collides){
      Position_t relative = rect_pos - pos;
      Vec_t bottom_left = pos_to_vec(relative);
-     if(vec_magnitude(bottom_left) > (2 * rect_dimension_size)) return;
+     if(vec_magnitude(bottom_left) > (rect_width + rect_height)) return;
 
-     Vec_t top_left {bottom_left.x, bottom_left.y + rect_dimension_size};
-     Vec_t top_right {bottom_left.x + rect_dimension_size, bottom_left.y + rect_dimension_size};
-     Vec_t bottom_right {bottom_left.x + rect_dimension_size, bottom_left.y};
+     Vec_t top_left {bottom_left.x, bottom_left.y + rect_height};
+     Vec_t top_right {bottom_left.x + rect_width, bottom_left.y + rect_height};
+     Vec_t bottom_right {bottom_left.x + rect_width, bottom_left.y};
 
      // TODO: pass in radius
      *pos_delta += collide_circle_with_line(*pos_delta, PLAYER_RADIUS, bottom_left, top_left, collides);

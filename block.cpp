@@ -3,13 +3,13 @@
 #include "conversion.h"
 
 S16 get_object_x(Block_t* block){
-     if(block->teleport) return block->teleport_pos.pixel.x + HALF_TILE_SIZE_IN_PIXELS;
-     return block->pos.pixel.x + HALF_TILE_SIZE_IN_PIXELS;
+     if(block->teleport) return block->teleport_pos.pixel.x + (block_get_width_in_pixels(block->cut) / 2);
+     return block->pos.pixel.x + (block_get_width_in_pixels(block->cut) / 2);
 }
 
 S16 get_object_y(Block_t* block){
-     if(block->teleport) return block->teleport_pos.pixel.y + HALF_TILE_SIZE_IN_PIXELS;
-     return block->pos.pixel.y + HALF_TILE_SIZE_IN_PIXELS;
+     if(block->teleport) return block->teleport_pos.pixel.y + (block_get_height_in_pixels(block->cut) / 2);
+     return block->pos.pixel.y + (block_get_height_in_pixels(block->cut) / 2);
 }
 
 static Pixel_t block_center_pixel_offset(BlockCut_t cut){

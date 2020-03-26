@@ -500,22 +500,22 @@ void stop_against_blocks_moving_with_block(World_t* world, Block_t* block, Direc
         default:
             break;
         case DIRECTION_LEFT:
-            new_against_center.pixel.x = block_center.pixel.x - TILE_SIZE_IN_PIXELS;
+            new_against_center.pixel.x = block_center.pixel.x - block_get_width_in_pixels(against_block->cut);
             new_against_center.decimal.x = block_center.decimal.x;
             against_block->pos_delta.x = pos_to_vec(new_against_center - against_center).x;
             break;
         case DIRECTION_RIGHT:
-            new_against_center.pixel.x = block_center.pixel.x + TILE_SIZE_IN_PIXELS;
+            new_against_center.pixel.x = block_center.pixel.x + block_get_width_in_pixels(against_block->cut);
             new_against_center.decimal.x = block_center.decimal.x;
             against_block->pos_delta.x = pos_to_vec(new_against_center - against_center).x;
             break;
         case DIRECTION_DOWN:
-            new_against_center.pixel.y = block_center.pixel.y - TILE_SIZE_IN_PIXELS;
+            new_against_center.pixel.y = block_center.pixel.y - block_get_height_in_pixels(against_block->cut);
             new_against_center.decimal.y = block_center.decimal.y;
             against_block->pos_delta.y = pos_to_vec(new_against_center - against_center).y;
             break;
         case DIRECTION_UP:
-            new_against_center.pixel.y = block_center.pixel.y + TILE_SIZE_IN_PIXELS;
+            new_against_center.pixel.y = block_center.pixel.y + block_get_height_in_pixels(against_block->cut);
             new_against_center.decimal.y = block_center.decimal.y;
             against_block->pos_delta.y = pos_to_vec(new_against_center - against_center).y;
             break;
@@ -568,13 +568,16 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
 
           Position_t block_pos = block->teleport ? (block->teleport_pos + block->teleport_pos_delta) : (block->pos + block->pos_delta);
           bool collided = false;
-          position_collide_with_rect(player_pos, block_pos, TILE_SIZE, &collision.player_pos_delta, &collided);
+          position_collide_with_rect(player_pos, block_pos,
+                                     block_get_width_in_pixels(block) * PIXEL_SIZE,
+                                     block_get_height_in_pixels(block) * PIXEL_SIZE,
+                                     &collision.player_pos_delta, &collided);
           if(collided){
                result.collided = true;
 
                collision.block = block;
                collision.pos = block_pos;
-               collision.dir = relative_quadrant(player_pos.pixel, block_pos.pixel + HALF_TILE_SIZE_PIXEL);
+               collision.dir = relative_quadrant(player_pos.pixel, block_get_center(block_pos, block->cut).pixel);
                collision.player_pos_delta_mag = vec_magnitude(collision.player_pos_delta);
 
                block_collisions.add(collision);
@@ -592,7 +595,10 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
          collision.player_pos_delta = result.pos_delta;
 
          bool collided = false;
-         position_collide_with_rect(player_pos, found_block->position, TILE_SIZE, &collision.player_pos_delta, &collided);
+         position_collide_with_rect(player_pos, found_block->position,
+                                    block_get_width_in_pixels(found_block->block) * PIXEL_SIZE,
+                                    block_get_height_in_pixels(found_block->block) * PIXEL_SIZE,
+                                    &collision.player_pos_delta, &collided);
 
          if(collided){
               result.collided = true;
@@ -600,7 +606,7 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
               collision.through_portal = true;
               collision.block = found_block->block;
               collision.pos = found_block->position;
-              collision.dir = relative_quadrant(player_pos.pixel, found_block->position.pixel + HALF_TILE_SIZE_PIXEL);
+              collision.dir = relative_quadrant(player_pos.pixel, block_get_center(found_block->position, found_block->block->cut).pixel);
               collision.portal_rotations = found_block->portal_rotations;
               collision.player_pos_delta_mag = vec_magnitude(collision.player_pos_delta);
 
@@ -663,7 +669,8 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                               collision.block->pos_delta.x = new_pos_delta;
                          }
                     }else if(!(collision.block->pos.z > player->pos.z && block_held_up_by_another_block(collision.block, world->block_qt, world->interactive_qt, &world->tilemap).held())){
-                         auto new_pos = collision.pos + Vec_t{TILE_SIZE + PLAYER_RADIUS, 0};
+                         F32 block_width = block_get_width_in_pixels(collision.block) * PIXEL_SIZE;
+                         auto new_pos = collision.pos + Vec_t{block_width + PLAYER_RADIUS, 0};
                          result.pos_delta.x = pos_to_vec(new_pos - player_pos).x;
 
                          if(momentum < PLAYER_SQUISH_MOMENTUM){
@@ -816,7 +823,8 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                               collision.block->pos_delta.y = new_pos_delta;
                          }
                     }else if(!(collision.block->pos.z > player->pos.z && block_held_up_by_another_block(collision.block, world->block_qt, world->interactive_qt, &world->tilemap).held())){
-                         auto new_pos = collision.pos + Vec_t{0, TILE_SIZE + PLAYER_RADIUS};
+                         F32 block_height = block_get_height_in_pixels(collision.block) * PIXEL_SIZE;
+                         auto new_pos = collision.pos + Vec_t{0, block_height + PLAYER_RADIUS};
                          result.pos_delta.y = pos_to_vec(new_pos - player_pos).y;
 
                          if(momentum < PLAYER_SQUISH_MOMENTUM){
@@ -899,7 +907,7 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
           if(distance > PLAYER_RADIUS_IN_SUB_PIXELS * 3.0f) continue;
           bool collided = false;
           Position_t other_player_bottom_left = other_player->pos - Vec_t{PLAYER_RADIUS, PLAYER_RADIUS};
-          position_collide_with_rect(player_pos, other_player_bottom_left, 2.0f * PLAYER_RADIUS, &result.pos_delta, &collided);
+          position_collide_with_rect(player_pos, other_player_bottom_left, 2.0f * PLAYER_RADIUS, 2.0f * PLAYER_RADIUS, &result.pos_delta, &collided);
      }
 
      return result;
@@ -1573,7 +1581,7 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
           }
      }
 
-     if(block_against_solid_tile(pos, pos_delta, direction, &world->tilemap)){
+     if(block_against_solid_tile(pos, pos_delta, block->cut, direction, &world->tilemap)){
           return result;
      }
      if(block_against_solid_interactive(block, direction, &world->tilemap, world->interactive_qt)){

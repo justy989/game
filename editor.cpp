@@ -185,7 +185,7 @@ bool init(Editor_t* editor){
      tile_flags_category->elements[34].elements[0].tile_flags = TILE_FLAG_RESET_IMMUNE;
 
      auto* block_category = editor->category_array.elements + EDITOR_CATEGORY_BLOCK;
-     init(block_category, 16);
+     init(block_category, 24);
      for(S16 d = 0; d < DIRECTION_COUNT; d++){
           for(S16 i = 0; i < ELEMENT_COUNT; i++){
                S16 index = i + (d * ELEMENT_COUNT);
@@ -197,6 +197,38 @@ bool init(Editor_t* editor){
                block_category->elements[index].elements[0].block.rotation = d;
           }
      }
+
+     init(block_category->elements + 16, 1);
+     block_category->elements[16].elements[0].type = STAMP_TYPE_BLOCK;
+     block_category->elements[16].elements[0].block.cut = BLOCK_CUT_LEFT_HALF;
+
+     init(block_category->elements + 17, 1);
+     block_category->elements[17].elements[0].type = STAMP_TYPE_BLOCK;
+     block_category->elements[17].elements[0].block.cut = BLOCK_CUT_RIGHT_HALF;
+
+     init(block_category->elements + 18, 1);
+     block_category->elements[18].elements[0].type = STAMP_TYPE_BLOCK;
+     block_category->elements[18].elements[0].block.cut = BLOCK_CUT_TOP_HALF;
+
+     init(block_category->elements + 19, 1);
+     block_category->elements[19].elements[0].type = STAMP_TYPE_BLOCK;
+     block_category->elements[19].elements[0].block.cut = BLOCK_CUT_BOTTOM_HALF;
+
+     init(block_category->elements + 20, 1);
+     block_category->elements[20].elements[0].type = STAMP_TYPE_BLOCK;
+     block_category->elements[20].elements[0].block.cut = BLOCK_CUT_TOP_LEFT_QUARTER;
+
+     init(block_category->elements + 21, 1);
+     block_category->elements[21].elements[0].type = STAMP_TYPE_BLOCK;
+     block_category->elements[21].elements[0].block.cut = BLOCK_CUT_TOP_RIGHT_QUARTER;
+
+     init(block_category->elements + 22, 1);
+     block_category->elements[22].elements[0].type = STAMP_TYPE_BLOCK;
+     block_category->elements[22].elements[0].block.cut = BLOCK_CUT_BOTTOM_LEFT_QUARTER;
+
+     init(block_category->elements + 23, 1);
+     block_category->elements[23].elements[0].type = STAMP_TYPE_BLOCK;
+     block_category->elements[23].elements[0].block.cut = BLOCK_CUT_BOTTOM_RIGHT_QUARTER;
 
      auto* interactive_lever_category = editor->category_array.elements + EDITOR_CATEGORY_INTERACTIVE_LEVER;
      init(interactive_lever_category, 1);
@@ -437,6 +469,7 @@ void apply_stamp(Stamp_t* stamp, Coord_t coord, TileMap_t* tilemap, ObjectArray_
           block->element = stamp->block.element;
           block->rotation = stamp->block.rotation;
           block->entangle_index = -1;
+          block->cut = stamp->block.cut;
      } break;
      case STAMP_TYPE_INTERACTIVE:
      {

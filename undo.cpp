@@ -126,6 +126,7 @@ void undo_snapshot(Undo_t* undo, ObjectArray_t<Player_t>* players, TileMap_t* ti
           undo_block->rotation = block->rotation;
           undo_block->horizontal_move = block->horizontal_move;
           undo_block->vertical_move = block->vertical_move;
+          undo_block->cut = block->cut;
      }
 
      if(undo->interactives.count != interactives->count){
@@ -257,7 +258,8 @@ void undo_commit(Undo_t* undo, ObjectArray_t<Player_t>* players, TileMap_t* tile
                        last_block->element == block->element &&
                        last_block->entangle_index == block->entangle_index &&
                        last_block->horizontal_move == block->horizontal_move &&
-                       last_block->vertical_move == block->vertical_move){
+                       last_block->vertical_move == block->vertical_move &&
+                       last_block->cut == block->cut){
                          found = true;
                          auto* undo_block_entry = (UndoBlock_t*)(undo->history.current);
                          *undo_block_entry = undo->blocks.elements[i];
@@ -287,7 +289,8 @@ void undo_commit(Undo_t* undo, ObjectArray_t<Player_t>* players, TileMap_t* tile
              undo_block->element != block->element ||
              undo_block->entangle_index != block->entangle_index ||
              undo_block->horizontal_move != block->horizontal_move ||
-             undo_block->vertical_move != block->vertical_move){
+             undo_block->vertical_move != block->vertical_move ||
+             undo_block->cut != block->cut){
                auto* undo_block_entry = (UndoBlock_t*)(undo->history.current);
                *undo_block_entry = *undo_block;
                undo_history_add(&undo->history, UNDO_DIFF_TYPE_BLOCK, i);
@@ -416,6 +419,7 @@ void undo_revert(Undo_t* undo, ObjectArray_t<Player_t>* players, TileMap_t* tile
                block->rotation = block_entry->rotation;
                block->horizontal_move = block_entry->horizontal_move;
                block->vertical_move = block_entry->vertical_move;
+               block->cut = block_entry->cut;
           } break;
           case UNDO_DIFF_TYPE_BLOCK_INSERT:
           {
@@ -440,6 +444,7 @@ void undo_revert(Undo_t* undo, ObjectArray_t<Player_t>* players, TileMap_t* tile
                block->rotation = block_entry->rotation;
                block->horizontal_move = block_entry->horizontal_move;
                block->vertical_move = block_entry->vertical_move;
+               block->cut = block_entry->cut;
           } break;
           case UNDO_DIFF_TYPE_BLOCK_REMOVE:
           {

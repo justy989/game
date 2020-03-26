@@ -139,8 +139,14 @@ void draw_tile_flags(U16 flags, Vec_t tile_pos){
 void draw_block(Block_t* block, Vec_t pos_vec, U8 portal_rotations){
      static const F32 block_shadow_opacity = 0.3f;
 
-     U8 rotation = (block->rotation + portal_rotations) % static_cast<U8>(DIRECTION_COUNT);
-     Vec_t tex_vec = theme_frame(rotation, 29);
+     Vec_t tex_vec = vec_zero();
+     if(block->cut == BLOCK_CUT_WHOLE){
+         U8 rotation = (block->rotation + portal_rotations) % static_cast<U8>(DIRECTION_COUNT);
+         tex_vec = theme_frame(rotation, 29);
+     }else{
+         tex_vec = theme_frame(DIRECTION_COUNT + (static_cast<int>(block->cut) - 1), 29);
+     }
+
      draw_double_theme_frame(pos_vec, tex_vec);
 
      if(block->element == ELEMENT_ONLY_ICED || block->element == ELEMENT_ICE ){
@@ -697,6 +703,7 @@ static Block_t block_from_stamp(Stamp_t* stamp){
      block.entangle_index = -1;
      block.clone_start = Coord_t{};
      block.clone_id = 0;
+     block.cut = stamp->block.cut;
      return block;
 }
 

@@ -393,7 +393,7 @@ struct FindBlocksThroughPortalResult_t{
 void add_block_held(BlockHeldResult_t* result, Block_t* block, Rect_t rect);
 void add_interactive_held(InteractiveHeldResult_t* result, Interactive_t* interactive, Rect_t rect);
 
-bool block_adjacent_pixels_to_check(Position_t pos, Vec_t pos_delta, Direction_t direction, Pixel_t* a, Pixel_t* b);
+bool block_adjacent_pixels_to_check(Position_t pos, Vec_t pos_delta, BlockCut_t cut, Direction_t direction, Pixel_t* a, Pixel_t* b);
 
 Block_t* block_against_block_in_list(Position_t pos, Block_t** blocks, S16 block_count, Direction_t direction, Position_t* portal_offsets);
 Block_t* block_against_another_block(Position_t pos, BlockCut_t cut, Direction_t direction, QuadTreeNode_t<Block_t>* block_qt,
@@ -412,7 +412,7 @@ BlockInsideOthersResult_t block_inside_others(Position_t block_to_check_pos, Vec
                                               QuadTreeNode_t<Interactive_t>* interactive_quad_tree, TileMap_t* tilemap,
                                               ObjectArray_t<Block_t>* block_array);
 Tile_t* block_against_solid_tile(Block_t* block_to_check, Direction_t direction, TileMap_t* tilemap);
-Tile_t* block_against_solid_tile(Position_t block_pos, Vec_t pos_delta, Direction_t direction, TileMap_t* tilemap);
+Tile_t* block_against_solid_tile(Position_t block_pos, Vec_t pos_delta, BlockCut_t cut, Direction_t direction, TileMap_t* tilemap);
 Player_t* block_against_player(Block_t* block_to_check, Direction_t direction, ObjectArray_t<Player_t>* players);
 
 InteractiveHeldResult_t block_held_up_by_popup(Position_t block_pos, BlockCut_t cut, QuadTreeNode_t<Interactive_t>* interactive_qt, S16 min_area = 0);

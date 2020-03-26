@@ -16,6 +16,7 @@ struct UndoBlock_t{
      S8 rotation;
      Move_t horizontal_move;
      Move_t vertical_move;
+     BlockCut_t cut;
 };
 
 struct UndoPlayer_t{

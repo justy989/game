@@ -24,7 +24,7 @@ void add_interactive_held(InteractiveHeldResult_t* result, Interactive_t* intera
      }
 }
 
-bool block_adjacent_pixels_to_check(Position_t pos, Vec_t pos_delta, Direction_t direction, Pixel_t* a, Pixel_t* b){
+bool block_adjacent_pixels_to_check(Position_t pos, Vec_t pos_delta, BlockCut_t cut, Direction_t direction, Pixel_t* a, Pixel_t* b){
      auto block_to_check_pos = pos + pos_delta;
 
      // TODO: account for width/height
@@ -39,7 +39,7 @@ bool block_adjacent_pixels_to_check(Position_t pos, Vec_t pos_delta, Direction_t
           *a = pixel;
 
           // top corner
-          pixel.y += BLOCK_SOLID_SIZE_IN_PIXELS;
+          pixel.y += block_get_height_in_pixels(cut) - 1;
           *b = pixel;
           return true;
      };
@@ -47,11 +47,11 @@ bool block_adjacent_pixels_to_check(Position_t pos, Vec_t pos_delta, Direction_t
      {
           // check bottom corner
           Pixel_t pixel = block_to_check_pos.pixel;
-          pixel.x += TILE_SIZE_IN_PIXELS;
+          pixel.x += block_get_width_in_pixels(cut);
           *a = pixel;
 
           // check top corner
-          pixel.y += BLOCK_SOLID_SIZE_IN_PIXELS;
+          pixel.y += block_get_height_in_pixels(cut) - 1;
           *b = pixel;
           return true;
      };
@@ -63,7 +63,7 @@ bool block_adjacent_pixels_to_check(Position_t pos, Vec_t pos_delta, Direction_t
           *a = pixel;
 
           // check right corner
-          pixel.x += BLOCK_SOLID_SIZE_IN_PIXELS;
+          pixel.x += block_get_width_in_pixels(cut) - 1;
           *b = pixel;
           return true;
      };
@@ -71,11 +71,11 @@ bool block_adjacent_pixels_to_check(Position_t pos, Vec_t pos_delta, Direction_t
      {
           // check left corner
           Pixel_t pixel = block_to_check_pos.pixel;
-          pixel.y += TILE_SIZE_IN_PIXELS;
+          pixel.y += block_get_height_in_pixels(cut);
           *a = pixel;
 
           // check right corner
-          pixel.x += BLOCK_SOLID_SIZE_IN_PIXELS;
+          pixel.x += block_get_width_in_pixels(cut) - 1;
           *b = pixel;
           return true;
      };
@@ -410,7 +410,8 @@ Interactive_t* block_against_solid_interactive(Block_t* block_to_check, Directio
      Pixel_t pixel_a;
      Pixel_t pixel_b;
 
-     if(!block_adjacent_pixels_to_check(block_to_check->pos, block_to_check->pos_delta, direction, &pixel_a, &pixel_b)){
+     if(!block_adjacent_pixels_to_check(block_to_check->pos, block_to_check->pos_delta, block_to_check->cut,
+                                        direction, &pixel_a, &pixel_b)){
           return nullptr;
      }
 
@@ -605,7 +606,8 @@ Tile_t* block_against_solid_tile(Block_t* block_to_check, Direction_t direction,
      Pixel_t pixel_a {};
      Pixel_t pixel_b {};
 
-     if(!block_adjacent_pixels_to_check(block_to_check->pos, block_to_check->pos_delta, direction, &pixel_a, &pixel_b)){
+     if(!block_adjacent_pixels_to_check(block_to_check->pos, block_to_check->pos_delta, block_to_check->cut,
+                                        direction, &pixel_a, &pixel_b)){
           return nullptr;
      }
 
@@ -622,11 +624,11 @@ Tile_t* block_against_solid_tile(Block_t* block_to_check, Direction_t direction,
      return nullptr;
 }
 
-Tile_t* block_against_solid_tile(Position_t block_pos, Vec_t pos_delta, Direction_t direction, TileMap_t* tilemap){
+Tile_t* block_against_solid_tile(Position_t block_pos, Vec_t pos_delta, BlockCut_t cut, Direction_t direction, TileMap_t* tilemap){
      Pixel_t pixel_a {};
      Pixel_t pixel_b {};
 
-     if(!block_adjacent_pixels_to_check(block_pos, pos_delta, direction, &pixel_a, &pixel_b)){
+     if(!block_adjacent_pixels_to_check(block_pos, pos_delta, cut, direction, &pixel_a, &pixel_b)){
           return nullptr;
      }
 

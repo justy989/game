@@ -21,6 +21,7 @@ struct StampBlock_t{
      Direction_t face;
      U8 rotation;
      U8 z;
+     BlockCut_t cut;
 };
 
 struct Stamp_t{

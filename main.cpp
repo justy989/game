@@ -321,7 +321,7 @@ bool check_direction_from_block_for_adjacent_walls(Block_t* block, TileMap_t* ti
                                                    Direction_t direction){
      Pixel_t pixel_a {};
      Pixel_t pixel_b {};
-     block_adjacent_pixels_to_check(block->pos, block->pos_delta, direction, &pixel_a, &pixel_b);
+     block_adjacent_pixels_to_check(block->pos, block->pos_delta, block->cut, direction, &pixel_a, &pixel_b);
      Coord_t coord_a = pixel_to_coord(pixel_a);
      Coord_t coord_b = pixel_to_coord(pixel_b);
 
@@ -3840,7 +3840,7 @@ int main(int argc, char** argv){
 
           glEnd();
 
-#if 1
+#if 0
           // light
           glBindTexture(GL_TEXTURE_2D, 0);
           glBegin(GL_QUADS);
