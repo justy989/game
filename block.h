@@ -1,5 +1,6 @@
 #pragma once
 
+#include "block_cut.h"
 #include "position.h"
 #include "motion.h"
 #include "direction.h"
@@ -21,18 +22,6 @@ enum BlockHeldBy_t{
      BLOCK_HELD_BY_NONE = 0,
      BLOCK_HELD_BY_SOLID = 1,
      BLOCK_HELD_BY_ENTANGLE = 2,
-};
-
-enum BlockCut_t{
-     BLOCK_CUT_WHOLE,
-     BLOCK_CUT_LEFT_HALF,
-     BLOCK_CUT_RIGHT_HALF,
-     BLOCK_CUT_TOP_HALF,
-     BLOCK_CUT_BOTTOM_HALF,
-     BLOCK_CUT_TOP_LEFT_QUARTER,
-     BLOCK_CUT_TOP_RIGHT_QUARTER,
-     BLOCK_CUT_BOTTOM_LEFT_QUARTER,
-     BLOCK_CUT_BOTTOM_RIGHT_QUARTER,
 };
 
 struct TransferMomentum_t{

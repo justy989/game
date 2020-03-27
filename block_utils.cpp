@@ -84,7 +84,7 @@ bool block_adjacent_pixels_to_check(Position_t pos, Vec_t pos_delta, BlockCut_t 
      return false;
 }
 
-Block_t* block_against_block_in_list(Position_t pos, Block_t** blocks, S16 block_count, Direction_t direction, Position_t* portal_offsets){
+Block_t* block_against_block_in_list(Position_t pos, BlockCut_t cut, Block_t** blocks, S16 block_count, Direction_t direction, Position_t* portal_offsets){
      // intentionally use the original pos without pos_delta
      // TODO: account for block width/height
      switch(direction){
@@ -93,6 +93,7 @@ Block_t* block_against_block_in_list(Position_t pos, Block_t** blocks, S16 block
      case DIRECTION_LEFT:
           for(S16 i = 0; i < block_count; i++){
                Block_t* adjacent_block = blocks[i];
+
                if(!blocks_at_collidable_height(pos.z, adjacent_block->pos.z)) continue;
 
                auto adjacent_pos = adjacent_block->teleport ?
@@ -100,11 +101,11 @@ Block_t* block_against_block_in_list(Position_t pos, Block_t** blocks, S16 block
                                    : adjacent_block->pos + adjacent_block->pos_delta;
                adjacent_pos += portal_offsets[i];
 
-               auto boundary_check_pos = adjacent_pos + Pixel_t{TILE_SIZE_IN_PIXELS, 0};
+               auto boundary_check_pos = adjacent_pos + Pixel_t{block_get_width_in_pixels(adjacent_block), 0};
                auto distance_to_boundary = fabs(pos_to_vec(boundary_check_pos - pos).x);
 
-               auto bottom_boundary_pos = pos + Pixel_t{0, -BLOCK_SOLID_SIZE_IN_PIXELS};
-               auto top_boundary_pos = pos + Pixel_t{0, TILE_SIZE_IN_PIXELS};
+               auto bottom_boundary_pos = pos + Pixel_t{0, (S16)(-(block_get_height_in_pixels(adjacent_block) - 1))};
+               auto top_boundary_pos = pos + Pixel_t{0, block_get_width_in_pixels(cut)};
 
                // check if they are on the expected boundary
                if(distance_to_boundary <= DISTANCE_EPSILON &&
@@ -125,10 +126,10 @@ Block_t* block_against_block_in_list(Position_t pos, Block_t** blocks, S16 block
                adjacent_pos += portal_offsets[i];
 
                auto boundary_check_pos = adjacent_pos;
-               auto distance_to_boundary = fabs(pos_to_vec(boundary_check_pos - (pos + Pixel_t{TILE_SIZE_IN_PIXELS, 0})).x);
+               auto distance_to_boundary = fabs(pos_to_vec(boundary_check_pos - (pos + Pixel_t{block_get_width_in_pixels(cut), 0})).x);
 
-               auto bottom_boundary_pos = pos + Pixel_t{0, -BLOCK_SOLID_SIZE_IN_PIXELS};
-               auto top_boundary_pos = pos + Pixel_t{0, TILE_SIZE_IN_PIXELS};
+               auto bottom_boundary_pos = pos + Pixel_t{0, (S16)(-(block_get_height_in_pixels(adjacent_block) - 1))};
+               auto top_boundary_pos = pos + Pixel_t{0, block_get_height_in_pixels(cut)};
 
                // check if they are on the expected boundary
                if(distance_to_boundary <= DISTANCE_EPSILON &&
@@ -148,11 +149,11 @@ Block_t* block_against_block_in_list(Position_t pos, Block_t** blocks, S16 block
                                    : adjacent_block->pos + adjacent_block->pos_delta;
                adjacent_pos += portal_offsets[i];
 
-               auto boundary_check_pos = adjacent_pos + Pixel_t{0, TILE_SIZE_IN_PIXELS};
+               auto boundary_check_pos = adjacent_pos + Pixel_t{0, block_get_height_in_pixels(cut)};
                auto distance_to_boundary = fabs(pos_to_vec(boundary_check_pos - pos).y);
 
-               auto left_boundary_pos = pos + Pixel_t{-BLOCK_SOLID_SIZE_IN_PIXELS, 0};
-               auto right_boundary_pos = pos + Pixel_t{TILE_SIZE_IN_PIXELS, 0};
+               auto left_boundary_pos = pos + Pixel_t{(S16)(-(block_get_width_in_pixels(adjacent_block) - 1)), 0};
+               auto right_boundary_pos = pos + Pixel_t{block_get_width_in_pixels(cut), 0};
 
                // check if they are on the expected boundary
                if(distance_to_boundary <= DISTANCE_EPSILON &&
@@ -173,10 +174,10 @@ Block_t* block_against_block_in_list(Position_t pos, Block_t** blocks, S16 block
                adjacent_pos += portal_offsets[i];
 
                auto boundary_check_pos = adjacent_pos;
-               auto distance_to_boundary = fabs(pos_to_vec(boundary_check_pos - (pos + Pixel_t{0, TILE_SIZE_IN_PIXELS})).y);
+               auto distance_to_boundary = fabs(pos_to_vec(boundary_check_pos - (pos + Pixel_t{0, block_get_height_in_pixels(cut)})).y);
 
-               auto left_boundary_pos = pos + Pixel_t{-BLOCK_SOLID_SIZE_IN_PIXELS, 0};
-               auto right_boundary_pos = pos + Pixel_t{TILE_SIZE_IN_PIXELS, 0};
+               auto left_boundary_pos = pos + Pixel_t{(S16)(-(block_get_width_in_pixels(adjacent_block) - 1)), 0};
+               auto right_boundary_pos = pos + Pixel_t{block_get_width_in_pixels(cut), 0};
 
                // check if they are on the expected boundary
                if(distance_to_boundary <= DISTANCE_EPSILON &&
@@ -207,7 +208,7 @@ BlockAgainstOthersResult_t block_against_other_blocks(Position_t pos, BlockCut_t
 
      for(S16 i = 0; i < block_count; i++){
           // lol at me misusing this function, but watevs
-          if(block_against_block_in_list(pos, blocks + i, 1, direction, portal_offsets)){
+          if(block_against_block_in_list(pos, cut, blocks + i, 1, direction, portal_offsets)){
                BlockAgainstOther_t against_other;
                against_other.block = blocks[i];
                result.add(against_other);
@@ -220,7 +221,7 @@ BlockAgainstOthersResult_t block_against_other_blocks(Position_t pos, BlockCut_t
          blocks[i] = found_block->block;
          portal_offsets[i] = found_block->position - found_block->block->pos;
 
-         if(block_against_block_in_list(pos, blocks + i, 1, direction, portal_offsets + i)){
+         if(block_against_block_in_list(pos, cut, blocks + i, 1, direction, portal_offsets + i)){
               BlockAgainstOther_t against_other;
               against_other.block = blocks[i];
               against_other.rotations_through_portal = found_block->rotations_between_portals;
@@ -243,7 +244,7 @@ Block_t* block_against_another_block(Position_t pos, BlockCut_t cut, Direction_t
      Position_t portal_offsets[BLOCK_QUAD_TREE_MAX_QUERY];
      memset(portal_offsets, 0, sizeof(portal_offsets));
 
-     Block_t* collided_block = block_against_block_in_list(pos, blocks, block_count, direction, portal_offsets);
+     Block_t* collided_block = block_against_block_in_list(pos, cut, blocks, block_count, direction, portal_offsets);
      if(collided_block){
           *push_dir = direction;
           return collided_block;
@@ -256,7 +257,7 @@ Block_t* block_against_another_block(Position_t pos, BlockCut_t cut, Direction_t
          auto block_pos = found_block->block->teleport ? found_block->block->teleport_pos + found_block->block->teleport_pos_delta : found_block->block->pos + found_block->block->pos_delta;
          portal_offsets[i] = found_block->position - block_pos;
 
-         collided_block = block_against_block_in_list(pos, blocks + i, 1, direction, portal_offsets + i);
+         collided_block = block_against_block_in_list(pos, cut, blocks + i, 1, direction, portal_offsets + i);
          if(collided_block){
               *push_dir = direction_rotate_clockwise(direction, found_block->rotations_between_portals);
               return collided_block;
@@ -475,14 +476,17 @@ struct BlockInsideBlockListResult_t{
 };
 
 BlockInsideBlockListResult_t block_inside_block_list(Position_t block_to_check_pos, Vec_t block_to_check_pos_delta,
-                                                     S16 block_to_check_index, bool block_to_check_cloning,
+                                                     BlockCut_t cut, S16 block_to_check_index, bool block_to_check_cloning,
                                                      Block_t** blocks, S16 block_count, ObjectArray_t<Block_t>* blocks_array,
                                                      Position_t* portal_offsets){
      BlockInsideBlockListResult_t result;
 
      auto final_block_to_check_pos = block_to_check_pos + block_to_check_pos_delta;
 
-     Quad_t quad = {0, 0, TILE_SIZE, TILE_SIZE};
+     S16 block_width = block_get_width_in_pixels(cut);
+     S16 block_height = block_get_height_in_pixels(cut);
+
+     Quad_t quad = {0, 0, (block_width * PIXEL_SIZE), (block_height * PIXEL_SIZE)};
 
      for(S16 i = 0; i < block_count; i++){
           Block_t* block = blocks[i];
@@ -501,7 +505,10 @@ BlockInsideBlockListResult_t block_inside_block_list(Position_t block_to_check_p
           auto pos_diff = final_block_pos - final_block_to_check_pos;
           auto check_vec = pos_to_vec(pos_diff);
 
-          Quad_t quad_to_check = {check_vec.x, check_vec.y, check_vec.x + TILE_SIZE, check_vec.y + TILE_SIZE};
+          block_width = block_get_width_in_pixels(cut);
+          block_height = block_get_height_in_pixels(cut);
+
+          Quad_t quad_to_check = {check_vec.x, check_vec.y, check_vec.x + (block_width * PIXEL_SIZE), check_vec.y + (block_height * PIXEL_SIZE)};
 
           if(block_to_check_index == (block - blocks_array->elements)){
                // if, after applying the portal offsets it is the same quad to check and it is the same index,
@@ -562,7 +569,7 @@ BlockInsideOthersResult_t block_inside_others(Position_t block_to_check_pos, Vec
      memset(portal_offsets, 0, sizeof(portal_offsets));
 
      auto inside_list_result = block_inside_block_list(block_to_check_pos, block_to_check_pos_delta,
-                                                       block_to_check_index,
+                                                       cut, block_to_check_index,
                                                        block_to_check_cloning, blocks, block_count,
                                                        block_array, portal_offsets);
      for(S8 i = 0; i < inside_list_result.count; i++){
@@ -580,7 +587,7 @@ BlockInsideOthersResult_t block_inside_others(Position_t block_to_check_pos, Vec
      }
 
      inside_list_result = block_inside_block_list(block_to_check_pos, block_to_check_pos_delta,
-                                                  block_to_check_index, block_to_check_cloning,
+                                                  cut, block_to_check_index, block_to_check_cloning,
                                                   blocks, found_blocks.count, block_array, portal_offsets);
 
      for(S8 i = 0; i < inside_list_result.count; i++){

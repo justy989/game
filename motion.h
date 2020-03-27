@@ -2,6 +2,7 @@
 
 #include "position.h"
 #include "direction.h"
+#include "block_cut.h"
 
 enum MoveState_t{
      MOVE_STATE_IDLING,
@@ -101,18 +102,18 @@ MotionComponent_t motion_x_component(Motion_t* motion);
 MotionComponent_t motion_y_component(Motion_t* motion);
 
 Motion_t copy_motion_from_component(MotionComponent_t* motion);
-F32 calc_coast_motion_time_left(MotionComponent_t* motion, F32 pos);
-F32 calc_coast_motion_time_left(F32 pos, F32 vel);
+F32 calc_coast_motion_time_left(BlockCut_t cut, MotionComponent_t* motion, F32 pos);
+F32 calc_coast_motion_time_left(BlockCut_t cut, F32 pos, F32 vel);
 
 F32 calc_accel_from_stop(F32 distance, F32 time);
 F32 calc_accel_across_distance(F32 vel, F32 distance, F32 time);
 DecelToStopResult_t calc_decel_to_stop(F32 initial_pos, F32 final_pos, F32 initial_velocity);
 
-F32 begin_stopping_grid_aligned_motion(MotionComponent_t* motion, F32 pos, S16 mass);
+F32 begin_stopping_grid_aligned_motion(BlockCut_t cut, MotionComponent_t* motion, F32 pos, S16 mass);
 
 void update_motion_free_form(Move_t* move, MotionComponent_t* motion, bool positive_key_down, bool negative_key_down,
                              F32 dt, F32 accel, F32 accel_distance);
-void update_motion_grid_aligned(Move_t* move, MotionComponent_t* motion, bool coast, F32 dt, F32 pos, S16 mass);
+void update_motion_grid_aligned(BlockCut_t cut, Move_t* move, MotionComponent_t* motion, bool coast, F32 dt, F32 pos, S16 mass);
 
 F32 calc_position_motion(F32 v, F32 a, F32 dt);
 F32 calc_velocity_motion(F32 v, F32 a, F32 dt);

@@ -2,6 +2,7 @@
 #include "defines.h"
 #include "conversion.h"
 #include "portal_exit.h"
+#include "block.h"
 
 Direction_t direction_between(Coord_t a, Coord_t b){
      if(a == b) return DIRECTION_COUNT;
@@ -378,17 +379,24 @@ bool direction_in_vec(Vec_t vec, Direction_t direction){
      return false;
 }
 
-F32 get_block_normal_pushed_velocity(S16 mass, F32 force){
-     F32 block_mass_ratio = (F32)BLOCK_BASELINE_MASS / (F32)mass;
+F32 get_block_normal_pushed_velocity(BlockCut_t cut, S16 mass, F32 force){
+     S16 width = block_get_width_in_pixels(cut);
+     S16 height = block_get_height_in_pixels(cut);
+
+     // the way in which mass can be different is if blocks are stacked on each other
+     F32 block_mass_ratio = (F32)(width * height) / (F32)mass;
+
+     S16 half_lowest_dim = (width > height) ? height / 2 : width / 2;
+     F32 block_accel_distance = half_lowest_dim * PIXEL_SIZE;
 
      // accurately accumulate floating point error in the same way simulating does lol
      F32 time_left = BLOCK_ACCEL_TIME;
      F32 result = 0;
      while(time_left >= 0){
           if(time_left > FRAME_TIME){
-               result += block_mass_ratio * FRAME_TIME * BLOCK_ACCEL * force;
+               result += block_mass_ratio * FRAME_TIME * BLOCK_ACCEL(block_accel_distance) * force;
           }else{
-               result += block_mass_ratio * time_left * BLOCK_ACCEL * force;
+               result += block_mass_ratio * time_left * BLOCK_ACCEL(block_accel_distance) * force;
                break;
           }
 

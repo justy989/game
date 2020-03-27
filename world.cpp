@@ -337,12 +337,12 @@ void slow_block_toward_gridlock(World_t* world, Block_t* block, Direction_t dire
      if(direction_is_horizontal(direction)){
           block->stopped_by_player_horizontal = true;
           auto motion = motion_x_component(block);
-          block->accel.x = begin_stopping_grid_aligned_motion(&motion, pos.x, block_mass); // adjust by one tick since we missed this update
+          block->accel.x = begin_stopping_grid_aligned_motion(block->cut, &motion, pos.x, block_mass); // adjust by one tick since we missed this update
           block_vel = block->vel.x;
      }else{
           block->stopped_by_player_vertical = true;
           auto motion = motion_y_component(block);
-          block->accel.y = begin_stopping_grid_aligned_motion(&motion, pos.y, block_mass); // adjust by one tick since we missed this update
+          block->accel.y = begin_stopping_grid_aligned_motion(block->cut, &motion, pos.y, block_mass); // adjust by one tick since we missed this update
           block_vel = block->vel.y;
      }
 
@@ -1197,12 +1197,12 @@ BlockPushResult_t block_push(Block_t* block, Direction_t direction, World_t* wor
      return block_push(block, block->pos, block->pos_delta, direction, world, pushed_by_ice, force, instant_momentum, from_entangler);
 }
 
-static float calc_half_distance_to_next_grid_center(S16 pixel, F32 decimal, bool positive, bool is_x){
+static float calc_half_distance_to_next_grid_center(S16 pixel, F32 decimal, S16 block_len, bool positive, bool is_x){
      // if the position is not grid aligned
-     if(pixel % TILE_SIZE_IN_PIXELS != 0 || decimal != 0){
+     if(pixel % block_len != 0 || decimal != 0){
           // find the next grid center
-          S16 next_grid_center_pixel = (pixel - (pixel % TILE_SIZE_IN_PIXELS));
-          if(positive) next_grid_center_pixel += TILE_SIZE_IN_PIXELS;
+          S16 next_grid_center_pixel = (pixel - (pixel % block_len));
+          if(positive) next_grid_center_pixel += block_len;
 
           // convert it to world space
           F32 goal = ((F32)(next_grid_center_pixel) * PIXEL_SIZE);
@@ -1227,7 +1227,7 @@ static float calc_half_distance_to_next_grid_center(S16 pixel, F32 decimal, bool
           return (current - goal) * 0.5f;
      }
 
-     return BLOCK_ACCEL_DISTANCE;
+     return (block_len / 2) * PIXEL_SIZE;
 }
 
 F32 get_block_static_friction(S16 mass){
@@ -1246,7 +1246,7 @@ static bool collision_result_overcomes_friction(F32 original_vel, F32 final_vel,
 
 F32 get_block_expected_player_push_velocity(World_t* world, Block_t* block, F32 force){
      S16 mass = get_block_stack_mass(world, block);
-     return get_block_normal_pushed_velocity(mass, force);
+     return get_block_normal_pushed_velocity(block->cut, mass, force);
 }
 
 static F32 get_block_velocity_ratio(World_t* world, Block_t* block, F32 vel, F32 force){
@@ -1272,7 +1272,7 @@ void apply_push_horizontal(Block_t* block, Position_t pos, World_t* world, Direc
 
                 auto motion = motion_x_component(block);
                 F32 x_pos = pos_to_vec(block->pos).x;
-                block->horizontal_move.time_left = calc_coast_motion_time_left(&motion, x_pos);
+                block->horizontal_move.time_left = calc_coast_motion_time_left(block->cut, &motion, x_pos);
                 if(direction == DIRECTION_LEFT) block->horizontal_move.time_left = -block->horizontal_move.time_left;
                 block->stopped_by_player_horizontal = false;
            }else{
@@ -1282,13 +1282,18 @@ void apply_push_horizontal(Block_t* block, Position_t pos, World_t* world, Direc
            block->horizontal_move.state = MOVE_STATE_STARTING;
            block->horizontal_move.sign = (direction == DIRECTION_LEFT) ? MOVE_SIGN_NEGATIVE : MOVE_SIGN_POSITIVE;
 
+           S16 block_width = block_get_width_in_pixels(block->cut);
+           S16 block_height = block_get_height_in_pixels(block->cut);
+           S16 lower_dim = block_width > block_height ? block_height : block_width;
+
            F32 half_distance_to_next_grid_center = calc_half_distance_to_next_grid_center(block->pos.pixel.x, block->pos.decimal.x,
+                                                                                          lower_dim,
                                                                                           direction == DIRECTION_RIGHT, true);
            F32 velocity_ratio = get_block_velocity_ratio(world, block, block->vel.x, force);
 
            block->accel.x = calc_accel_from_stop(half_distance_to_next_grid_center, BLOCK_ACCEL_TIME) * force;
 
-           F32 ideal_accel = calc_accel_from_stop(BLOCK_ACCEL_DISTANCE, BLOCK_ACCEL_TIME) * force;
+           F32 ideal_accel = calc_accel_from_stop(block_center_pixel_offset(block->cut).x * PIXEL_SIZE, BLOCK_ACCEL_TIME) * force;
            if(direction == DIRECTION_LEFT){
                ideal_accel = -ideal_accel;
                block->accel.x = -block->accel.x;
@@ -1322,7 +1327,7 @@ void apply_push_vertical(Block_t* block, Position_t pos, World_t* world, Directi
 
                 auto motion = motion_y_component(block);
                 F32 y_pos = pos_to_vec(block->pos).y;
-                block->vertical_move.time_left = calc_coast_motion_time_left(&motion, y_pos);
+                block->vertical_move.time_left = calc_coast_motion_time_left(block->cut, &motion, y_pos);
                 if(direction == DIRECTION_DOWN) block->vertical_move.time_left = -block->vertical_move.time_left;
                 block->stopped_by_player_vertical = false;
            }else{
@@ -1332,12 +1337,18 @@ void apply_push_vertical(Block_t* block, Position_t pos, World_t* world, Directi
            block->vertical_move.state = MOVE_STATE_STARTING;
            block->vertical_move.sign = (direction == DIRECTION_DOWN) ? MOVE_SIGN_NEGATIVE : MOVE_SIGN_POSITIVE;
 
+           S16 block_width = block_get_width_in_pixels(block->cut);
+           S16 block_height = block_get_height_in_pixels(block->cut);
+           S16 lower_dim = block_width > block_height ? block_height : block_width;
+
            F32 half_distance_to_next_grid_center = calc_half_distance_to_next_grid_center(block->pos.pixel.y, block->pos.decimal.y,
+                                                                                          lower_dim,
                                                                                           direction == DIRECTION_UP, false);
            F32 velocity_ratio = get_block_velocity_ratio(world, block, block->vel.y, force);
+
            block->accel.y = calc_accel_from_stop(half_distance_to_next_grid_center, BLOCK_ACCEL_TIME) * force;
 
-           F32 ideal_accel = calc_accel_from_stop(BLOCK_ACCEL_DISTANCE, BLOCK_ACCEL_TIME) * force;
+           F32 ideal_accel = calc_accel_from_stop(block_center_pixel_offset(block->cut).y * PIXEL_SIZE, BLOCK_ACCEL_TIME) * force;
            if(direction == DIRECTION_DOWN){
                ideal_accel = -ideal_accel;
                block->accel.y = -block->accel.y;
@@ -1621,7 +1632,7 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
 
                if(direction_opposite(moving_dir) == direction){
                     S16 block_mass = get_block_stack_mass(world, block);
-                    F32 normal_block_velocity = get_block_normal_pushed_velocity(block_mass);
+                    F32 normal_block_velocity = get_block_normal_pushed_velocity(block->cut, block_mass);
                     if(block->vel.x < 0) normal_block_velocity = -normal_block_velocity;
                     F32 final_vel = block->vel.x - normal_block_velocity;
 
@@ -1651,7 +1662,7 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
 
                if(direction_opposite(moving_dir) == direction){
                     S16 block_mass = get_block_stack_mass(world, block);
-                    F32 normal_block_velocity = get_block_normal_pushed_velocity(block_mass);
+                    F32 normal_block_velocity = get_block_normal_pushed_velocity(block->cut, block_mass);
                     if(block->vel.y < 0) normal_block_velocity = -normal_block_velocity;
                     F32 final_vel = block->vel.y - normal_block_velocity;
 
@@ -2306,8 +2317,11 @@ AllowedToPushResult_t allowed_to_push(World_t* world, Block_t* block, Direction_
      AllowedToPushResult_t result;
      result.push = true;
 
+     S16 block_width = block_get_width_in_pixels(block);
+     S16 block_height = block_get_height_in_pixels(block);
+
      F32 total_block_mass = get_block_mass_in_direction(world, block, direction);
-     result.mass_ratio = (F32)(BLOCK_BASELINE_MASS) / (F32)(total_block_mass);
+     result.mass_ratio = (F32)(block_width * block_height) / (F32)(total_block_mass);
 
      if(block_on_ice(block->pos, Vec_t{}, block->cut, &world->tilemap, world->interactive_qt, world->block_qt)){
           // player applies a force to accelerate the block by BLOCK_ACCEL
@@ -2315,7 +2329,7 @@ AllowedToPushResult_t allowed_to_push(World_t* world, Block_t* block, Direction_
                auto elastic_result = elastic_transfer_momentum_to_block(instant_momentum, world, block, direction);
                result.push = collision_result_overcomes_friction(block->vel.y, elastic_result.second_final_velocity, total_block_mass);
           }else{
-               F32 block_acceleration = (result.mass_ratio * BLOCK_ACCEL);
+               F32 block_acceleration = (result.mass_ratio * BLOCK_ACCEL((block_center_pixel_offset(block->cut).y * PIXEL_SIZE)));
                F32 applied_force = (F32)(total_block_mass) * block_acceleration / BLOCK_ACCEL_TIME;
                F32 static_friction = 0;
 

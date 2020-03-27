@@ -9,6 +9,7 @@
 #include "interactive.h"
 #include "quad.h"
 #include "player.h"
+#include "block_cut.h"
 
 Direction_t direction_between(Coord_t a, Coord_t b);
 bool directions_meet_expectations(Direction_t a, Direction_t b, Direction_t first_expectation, Direction_t second_expectation);
@@ -60,5 +61,5 @@ void get_rect_coords(Rect_t rect, Coord_t* coords);
 Pixel_t closest_pixel_in_rect(Pixel_t pixel, Rect_t rect);
 
 bool direction_in_vec(Vec_t vec, Direction_t direction);
-F32 get_block_normal_pushed_velocity(S16 mass, F32 force = 1.0);
+F32 get_block_normal_pushed_velocity(BlockCut_t cut, S16 mass, F32 force = 1.0);
 F32 rotate_vec_to_see_if_negates(F32 value, bool x, S8 rotations);

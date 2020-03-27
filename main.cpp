@@ -2744,11 +2744,11 @@ int main(int argc, char** argv){
 
                     S16 mass = get_block_stack_mass(&world, block);
 
-                    update_motion_grid_aligned(&block->horizontal_move, &x_component,
+                    update_motion_grid_aligned(block->cut, &block->horizontal_move, &x_component,
                                                coasting_horizontally, dt,
                                                pos_vec.x, mass);
 
-                    update_motion_grid_aligned(&block->vertical_move, &y_component,
+                    update_motion_grid_aligned(block->cut, &block->vertical_move, &y_component,
                                                coasting_vertically, dt,
                                                pos_vec.y, mass);
                }
