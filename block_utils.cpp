@@ -505,8 +505,8 @@ BlockInsideBlockListResult_t block_inside_block_list(Position_t block_to_check_p
           auto pos_diff = final_block_pos - final_block_to_check_pos;
           auto check_vec = pos_to_vec(pos_diff);
 
-          block_width = block_get_width_in_pixels(cut);
-          block_height = block_get_height_in_pixels(cut);
+          block_width = block_get_width_in_pixels(block->cut);
+          block_height = block_get_height_in_pixels(block->cut);
 
           Quad_t quad_to_check = {check_vec.x, check_vec.y, check_vec.x + (block_width * PIXEL_SIZE), check_vec.y + (block_height * PIXEL_SIZE)};
 
@@ -1288,7 +1288,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                          break;
                     case MOVE_DIRECTION_RIGHT:
                          if(block_pos_delta.x > 0){
-                              S16 offset = -(block_center_pixel_offset(collided_block->cut).x + block_get_width_in_pixels(collided_block->cut));
+                              S16 offset = -(block_center_pixel_offset(collided_block->cut).x + block_get_width_in_pixels(cut));
                               handle_block_on_block_action_horizontal(block_pos, first_direction, collided_block_center, collided_block_move_mask,
                                                                       inside_block_on_frictionless, both_frictionless,
                                                                       Pixel_t{offset, 0}, block_inside_result.entries + i, &result);
@@ -1304,7 +1304,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                          break;
                     case MOVE_DIRECTION_UP:
                          if(block_pos_delta.y > 0){
-                              S16 offset = -(block_center_pixel_offset(collided_block->cut).y + block_get_height_in_pixels(collided_block->cut));
+                              S16 offset = -(block_center_pixel_offset(collided_block->cut).y + block_get_height_in_pixels(cut));
                               handle_block_on_block_action_vertical(block_pos, first_direction, collided_block_center, collided_block_move_mask,
                                                                     inside_block_on_frictionless, both_frictionless,
                                                                     Pixel_t{0, offset}, block_inside_result.entries + i, &result);

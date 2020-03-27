@@ -35,6 +35,7 @@ Big Features:
 - 3D
      - if we put a popup on the other side of a portal and a block 1 interval high goes through the portal, will it work the way we expect?
      - how does a stack of entangled blocks move? really f***ing weird right now tbh
+- 2 adjacent cut blocks can be pushed, if the mass is <= 1 full block
 - Visually show forces? Maybe just show blocks or walls on solid ground absorbing impacts
 - When pushing blocks against blocks that are off-grid (due to pushing against a player), sometimes the blocks can't move towards other off-grid blocks
 - Players impact carry velocity until the block teleports
@@ -3397,6 +3398,7 @@ int main(int argc, char** argv){
                               }else{
                                    block->horizontal_move.state = MOVE_STATE_COASTING;
                                    block->horizontal_move.sign = move_sign_from_vel(block->vel.x);
+                                   block->accel.x = 0;
                               }
                               block->horizontal_move.time_left = 0;
                          }else{
@@ -3406,6 +3408,7 @@ int main(int argc, char** argv){
                               }else{
                                    block->vertical_move.state = MOVE_STATE_COASTING;
                                    block->vertical_move.sign = move_sign_from_vel(block->vel.y);
+                                   block->accel.y = 0;
                               }
                               block->vertical_move.time_left = 0;
                          }
