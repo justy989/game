@@ -393,7 +393,7 @@ Block_t* player_against_block(Player_t* player, Direction_t direction, QuadTreeN
 
          if(!block_in_height_range_of_player(found_block->block, player->pos)) continue;
 
-         Rect_t block_rect = block_get_inclusive_rect(found_block->position.pixel, found_block->block->cut);
+         Rect_t block_rect = block_get_inclusive_rect(found_block->position.pixel, found_block->rotated_cut);
 
          if(pixel_in_rect(pos_a.pixel, block_rect) || pixel_in_rect(pos_b.pixel, block_rect)){
               return found_block->block;
@@ -596,8 +596,8 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
 
          bool collided = false;
          position_collide_with_rect(player_pos, found_block->position,
-                                    block_get_width_in_pixels(found_block->block) * PIXEL_SIZE,
-                                    block_get_height_in_pixels(found_block->block) * PIXEL_SIZE,
+                                    block_get_width_in_pixels(found_block->rotated_cut) * PIXEL_SIZE,
+                                    block_get_height_in_pixels(found_block->rotated_cut) * PIXEL_SIZE,
                                     &collision.player_pos_delta, &collided);
 
          if(collided){
@@ -606,7 +606,7 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
               collision.through_portal = true;
               collision.block = found_block->block;
               collision.pos = found_block->position;
-              collision.dir = relative_quadrant(player_pos.pixel, block_get_center(found_block->position, found_block->block->cut).pixel);
+              collision.dir = relative_quadrant(player_pos.pixel, block_get_center(found_block->position, found_block->rotated_cut).pixel);
               collision.portal_rotations = found_block->portal_rotations;
               collision.player_pos_delta_mag = vec_magnitude(collision.player_pos_delta);
 

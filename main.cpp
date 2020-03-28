@@ -421,7 +421,7 @@ PlayerInBlockRectResult_t player_in_block_rect(Player_t* player, TileMap_t* tile
      for(S16 i = 0; i < found_blocks.count; i++){
          auto* found_block = found_blocks.blocks + i;
 
-         auto block_rect = block_get_inclusive_rect(found_block->position.pixel, found_block->block->cut);
+         auto block_rect = block_get_inclusive_rect(found_block->position.pixel, found_block->rotated_cut);
          if(pixel_in_rect(player->pos.pixel, block_rect)){
               PlayerInBlockRectResult_t::Entry_t entry;
               entry.block = found_block->block;

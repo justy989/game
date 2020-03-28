@@ -225,7 +225,7 @@ BlockAgainstOthersResult_t block_against_other_blocks(Position_t pos, BlockCut_t
          blocks[i] = found_block->block;
          portal_offsets[i] = found_block->position - found_block->block->pos;
 
-         if(block_against_block_in_list(pos, cut, blocks + i, 1, direction, portal_offsets + i)){
+         if(block_against_block(pos, cut, blocks[i], found_block->rotated_cut, direction, portal_offsets[i])){
               BlockAgainstOther_t against_other;
               against_other.block = blocks[i];
               against_other.rotations_through_portal = found_block->rotations_between_portals;
@@ -261,8 +261,7 @@ Block_t* block_against_another_block(Position_t pos, BlockCut_t cut, Direction_t
          auto block_pos = found_block->block->teleport ? found_block->block->teleport_pos + found_block->block->teleport_pos_delta : found_block->block->pos + found_block->block->pos_delta;
          portal_offsets[i] = found_block->position - block_pos;
 
-         collided_block = block_against_block_in_list(pos, cut, blocks + i, 1, direction, portal_offsets + i);
-         if(collided_block){
+         if(block_against_block(pos, cut, blocks[i], found_block->rotated_cut, direction, portal_offsets[i])){
               *push_dir = direction_rotate_clockwise(direction, found_block->rotations_between_portals);
               return collided_block;
          }
@@ -482,7 +481,7 @@ struct BlockInsideBlockListResult_t{
 BlockInsideBlockListResult_t block_inside_block_list(Position_t block_to_check_pos, Vec_t block_to_check_pos_delta,
                                                      BlockCut_t cut, S16 block_to_check_index, bool block_to_check_cloning,
                                                      Block_t** blocks, S16 block_count, ObjectArray_t<Block_t>* blocks_array,
-                                                     Position_t* portal_offsets){
+                                                     BlockCut_t* cuts, Position_t* portal_offsets){
      BlockInsideBlockListResult_t result;
 
      auto final_block_to_check_pos = block_to_check_pos + block_to_check_pos_delta;
@@ -509,8 +508,8 @@ BlockInsideBlockListResult_t block_inside_block_list(Position_t block_to_check_p
           auto pos_diff = final_block_pos - final_block_to_check_pos;
           auto check_vec = pos_to_vec(pos_diff);
 
-          block_width = block_get_width_in_pixels(block->cut);
-          block_height = block_get_height_in_pixels(block->cut);
+          block_width = block_get_width_in_pixels(cuts[i]);
+          block_height = block_get_height_in_pixels(cuts[i]);
 
           Quad_t quad_to_check = {check_vec.x, check_vec.y, check_vec.x + (block_width * PIXEL_SIZE), check_vec.y + (block_height * PIXEL_SIZE)};
 
@@ -572,10 +571,13 @@ BlockInsideOthersResult_t block_inside_others(Position_t block_to_check_pos, Vec
      Position_t portal_offsets[BLOCK_QUAD_TREE_MAX_QUERY];
      memset(portal_offsets, 0, sizeof(portal_offsets));
 
+     BlockCut_t cuts[BLOCK_QUAD_TREE_MAX_QUERY];
+     for(S16 i = 0; i < block_count; i++) cuts[i] = blocks[i]->cut;
+
      auto inside_list_result = block_inside_block_list(block_to_check_pos, block_to_check_pos_delta,
                                                        cut, block_to_check_index,
                                                        block_to_check_cloning, blocks, block_count,
-                                                       block_array, portal_offsets);
+                                                       block_array, cuts, portal_offsets);
      for(S8 i = 0; i < inside_list_result.count; i++){
           result.add(inside_list_result.entries[i].block, inside_list_result.entries[i].collided_pos, 0, Coord_t{-1, -1}, Coord_t{-1, -1});
      }
@@ -588,11 +590,12 @@ BlockInsideOthersResult_t block_inside_others(Position_t block_to_check_pos, Vec
          blocks[i] = found_block->block;
          auto block_pos = found_block->block->teleport ? found_block->block->teleport_pos + found_block->block->teleport_pos_delta : found_block->block->pos + found_block->block->pos_delta;
          portal_offsets[i] = found_block->position - block_pos;
+         cuts[i] = found_block->rotated_cut;
      }
 
      inside_list_result = block_inside_block_list(block_to_check_pos, block_to_check_pos_delta,
                                                   cut, block_to_check_index, block_to_check_cloning,
-                                                  blocks, found_blocks.count, block_array, portal_offsets);
+                                                  blocks, found_blocks.count, block_array, cuts, portal_offsets);
 
      for(S8 i = 0; i < inside_list_result.count; i++){
          BlockThroughPortal_t* associated_found_block = found_blocks.blocks + inside_list_result.entries[i].entry_index;
@@ -751,10 +754,10 @@ static BlockHeldResult_t block_at_height_in_block_rect(Pixel_t block_to_check_pi
          if(found_block->position.z != expected_height) continue;
 
          if(pixel_in_rect(found_block->position.pixel, check_rect) ||
-            pixel_in_rect(block_top_left_pixel(found_block->position.pixel, found_block->block->cut), check_rect) ||
-            pixel_in_rect(block_top_right_pixel(found_block->position.pixel, found_block->block->cut), check_rect) ||
-            pixel_in_rect(block_bottom_right_pixel(found_block->position.pixel, found_block->block->cut), check_rect)){
-              auto block_rect = block_get_inclusive_rect(found_block->position.pixel, found_block->block->cut);
+            pixel_in_rect(block_top_left_pixel(found_block->position.pixel, found_block->rotated_cut), check_rect) ||
+            pixel_in_rect(block_top_right_pixel(found_block->position.pixel, found_block->rotated_cut), check_rect) ||
+            pixel_in_rect(block_bottom_right_pixel(found_block->position.pixel, found_block->rotated_cut), check_rect)){
+              auto block_rect = block_get_inclusive_rect(found_block->position.pixel, found_block->rotated_cut);
               auto intserection_area = rect_intersecting_area(block_rect, check_rect);
               if(intserection_area >= min_area){
                    add_block_held(&result, found_block->block, block_rect);
