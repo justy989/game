@@ -227,10 +227,7 @@ void update_motion_free_form(Move_t* move, MotionComponent_t* motion, bool posit
 }
 
 F32 begin_stopping_grid_aligned_motion(BlockCut_t cut, MotionComponent_t* motion, F32 pos, S16 mass){
-     S16 block_width = block_get_width_in_pixels(cut);
-     S16 block_height = block_get_height_in_pixels(cut);
-
-     S16 lower_dim = (block_width > block_height) ? block_height : block_width;
+     S16 lower_dim = block_get_lowest_dimension(cut);
 
      F32 final_pos = pos + motion->ref->pos_delta;
 
@@ -267,10 +264,7 @@ F32 begin_stopping_grid_aligned_motion(BlockCut_t cut, MotionComponent_t* motion
 }
 
 static F32 find_next_grid_center(BlockCut_t cut, F32 pos, F32 vel){
-     // TODO: This code of calculating the lower dimension can be compressed
-     S16 block_width = block_get_width_in_pixels(cut);
-     S16 block_height = block_get_height_in_pixels(cut);
-     S16 lower_dim = (block_width > block_height) ? block_height : block_width;
+     S16 lower_dim = block_get_lowest_dimension(cut);
 
      // find the next grid center
      S16 current_pixel = (pos / PIXEL_SIZE);
@@ -369,10 +363,7 @@ void update_motion_grid_aligned(BlockCut_t cut, Move_t* move, MotionComponent_t*
                    move->state = MOVE_STATE_IDLING;
                    move->sign = MOVE_SIGN_ZERO;
 
-                   S16 block_width = block_get_width_in_pixels(cut);
-                   S16 block_height = block_get_height_in_pixels(cut);
-
-                   S16 lower_dim = (block_width > block_height) ? block_height : block_width;
+                   S16 lower_dim = block_get_lowest_dimension(cut);
 
                    motion->ref->stop_on_pixel = closest_grid_center_pixel(lower_dim, (S16)(pos / PIXEL_SIZE));
                    motion->ref->pos_delta = (motion->ref->stop_on_pixel * PIXEL_SIZE) - pos;

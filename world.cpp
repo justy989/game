@@ -1282,24 +1282,27 @@ void apply_push_horizontal(Block_t* block, Position_t pos, World_t* world, Direc
            block->horizontal_move.state = MOVE_STATE_STARTING;
            block->horizontal_move.sign = (direction == DIRECTION_LEFT) ? MOVE_SIGN_NEGATIVE : MOVE_SIGN_POSITIVE;
 
-           S16 block_width = block_get_width_in_pixels(block->cut);
-           S16 block_height = block_get_height_in_pixels(block->cut);
-           S16 lower_dim = block_width > block_height ? block_height : block_width;
+           F32 accel_time = BLOCK_ACCEL_TIME;
+           S16 lower_dim = block_get_lowest_dimension(block);
+
+           if(lower_dim == HALF_TILE_SIZE_IN_PIXELS) accel_time *= SMALL_BLOCK_ACCEL_MULTIPLIER;
 
            F32 half_distance_to_next_grid_center = calc_half_distance_to_next_grid_center(block->pos.pixel.x, block->pos.decimal.x,
                                                                                           lower_dim,
                                                                                           direction == DIRECTION_RIGHT, true);
            F32 velocity_ratio = get_block_velocity_ratio(world, block, block->vel.x, force);
 
-           block->accel.x = calc_accel_from_stop(half_distance_to_next_grid_center, BLOCK_ACCEL_TIME) * force;
+           block->accel.x = calc_accel_from_stop(half_distance_to_next_grid_center, accel_time) * force;
 
-           F32 ideal_accel = calc_accel_from_stop(block_center_pixel_offset(block->cut).x * PIXEL_SIZE, BLOCK_ACCEL_TIME) * force;
+           F32 ideal_accel = calc_accel_from_stop((lower_dim / 2) * PIXEL_SIZE, accel_time) * force;
+
            if(direction == DIRECTION_LEFT){
                ideal_accel = -ideal_accel;
                block->accel.x = -block->accel.x;
            }
-           block->coast_vel.x = calc_velocity_motion(0, ideal_accel, BLOCK_ACCEL_TIME);
-           block->horizontal_move.time_left = BLOCK_ACCEL_TIME - (velocity_ratio * BLOCK_ACCEL_TIME);
+
+           block->coast_vel.x = calc_velocity_motion(0, ideal_accel, accel_time);
+           block->horizontal_move.time_left = accel_time - (velocity_ratio * accel_time);
       }else{
            result->busy = true;
            return;
@@ -1337,24 +1340,25 @@ void apply_push_vertical(Block_t* block, Position_t pos, World_t* world, Directi
            block->vertical_move.state = MOVE_STATE_STARTING;
            block->vertical_move.sign = (direction == DIRECTION_DOWN) ? MOVE_SIGN_NEGATIVE : MOVE_SIGN_POSITIVE;
 
-           S16 block_width = block_get_width_in_pixels(block->cut);
-           S16 block_height = block_get_height_in_pixels(block->cut);
-           S16 lower_dim = block_width > block_height ? block_height : block_width;
+           F32 accel_time = BLOCK_ACCEL_TIME;
+           S16 lower_dim = block_get_lowest_dimension(block);
+
+           if(lower_dim == HALF_TILE_SIZE_IN_PIXELS) accel_time *= SMALL_BLOCK_ACCEL_MULTIPLIER;
 
            F32 half_distance_to_next_grid_center = calc_half_distance_to_next_grid_center(block->pos.pixel.y, block->pos.decimal.y,
                                                                                           lower_dim,
                                                                                           direction == DIRECTION_UP, false);
            F32 velocity_ratio = get_block_velocity_ratio(world, block, block->vel.y, force);
 
-           block->accel.y = calc_accel_from_stop(half_distance_to_next_grid_center, BLOCK_ACCEL_TIME) * force;
+           block->accel.y = calc_accel_from_stop(half_distance_to_next_grid_center, accel_time) * force;
 
-           F32 ideal_accel = calc_accel_from_stop(block_center_pixel_offset(block->cut).y * PIXEL_SIZE, BLOCK_ACCEL_TIME) * force;
+           F32 ideal_accel = calc_accel_from_stop(block_center_pixel_offset(block->cut).y * PIXEL_SIZE, accel_time) * force;
            if(direction == DIRECTION_DOWN){
                ideal_accel = -ideal_accel;
                block->accel.y = -block->accel.y;
            }
-           block->coast_vel.y = calc_velocity_motion(0, ideal_accel, BLOCK_ACCEL_TIME);
-           block->vertical_move.time_left = BLOCK_ACCEL_TIME - (velocity_ratio * BLOCK_ACCEL_TIME);
+           block->coast_vel.y = calc_velocity_motion(0, ideal_accel, accel_time);
+           block->vertical_move.time_left = accel_time - (velocity_ratio * accel_time);
       }else{
            result->busy = true;
            return;
@@ -2329,7 +2333,10 @@ AllowedToPushResult_t allowed_to_push(World_t* world, Block_t* block, Direction_
                auto elastic_result = elastic_transfer_momentum_to_block(instant_momentum, world, block, direction);
                result.push = collision_result_overcomes_friction(block->vel.y, elastic_result.second_final_velocity, total_block_mass);
           }else{
-               F32 block_acceleration = (result.mass_ratio * BLOCK_ACCEL((block_center_pixel_offset(block->cut).y * PIXEL_SIZE)));
+               F32 accel_time = BLOCK_ACCEL_TIME;
+               if(block_width == HALF_TILE_SIZE_IN_PIXELS || block_height == HALF_TILE_SIZE_IN_PIXELS) accel_time *= SMALL_BLOCK_ACCEL_MULTIPLIER;
+
+               F32 block_acceleration = (result.mass_ratio * BLOCK_ACCEL((block_center_pixel_offset(block->cut).y * PIXEL_SIZE), accel_time));
                F32 applied_force = (F32)(total_block_mass) * block_acceleration / BLOCK_ACCEL_TIME;
                F32 static_friction = 0;
 

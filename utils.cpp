@@ -271,13 +271,6 @@ Vec_t coord_to_screen_position(Coord_t coord){
      return pos_to_vec(relative_loc);
 }
 
-Vec_t mass_move(Vec_t* vel, Vec_t accel, F32 dt){
-     Vec_t pos_dt = (accel * dt * dt * 0.5f) + (*vel * dt);
-     *vel += accel * dt;
-     *vel *= MASS_DRAG;
-     return pos_dt;
-}
-
 bool vec_in_quad(const Quad_t* q, Vec_t v){
      return (v.x >= q->left && v.x <= q->right &&
              v.y >= q->bottom && v.y <= q->top);
@@ -391,12 +384,19 @@ F32 get_block_normal_pushed_velocity(BlockCut_t cut, S16 mass, F32 force){
 
      // accurately accumulate floating point error in the same way simulating does lol
      F32 time_left = BLOCK_ACCEL_TIME;
+     F32 accel_time = BLOCK_ACCEL_TIME;
+
+     if(width == HALF_TILE_SIZE_IN_PIXELS || height == HALF_TILE_SIZE_IN_PIXELS){
+         time_left *= SMALL_BLOCK_ACCEL_MULTIPLIER;
+         accel_time *= SMALL_BLOCK_ACCEL_MULTIPLIER;
+     }
+
      F32 result = 0;
      while(time_left >= 0){
           if(time_left > FRAME_TIME){
-               result += block_mass_ratio * FRAME_TIME * BLOCK_ACCEL(block_accel_distance) * force;
+               result += block_mass_ratio * FRAME_TIME * BLOCK_ACCEL(block_accel_distance, accel_time) * force;
           }else{
-               result += block_mass_ratio * time_left * BLOCK_ACCEL(block_accel_distance) * force;
+               result += block_mass_ratio * time_left * BLOCK_ACCEL(block_accel_distance, accel_time) * force;
                break;
           }
 

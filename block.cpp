@@ -145,6 +145,16 @@ S16 block_get_height_in_pixels(Block_t* block){
     return block_get_height_in_pixels(block->cut);
 }
 
+S16 block_get_lowest_dimension(BlockCut_t cut){
+    S16 block_width = block_get_width_in_pixels(cut);
+    S16 block_height = block_get_height_in_pixels(cut);
+    return block_width > block_height ? block_height : block_width;
+}
+
+S16 block_get_lowest_dimension(Block_t* block){
+    return block_get_lowest_dimension(block->cut);
+}
+
 S16 block_get_right_inclusive_pixel(Block_t* block){
     return block_get_right_inclusive_pixel(block->pos.pixel.x, block->cut);
 }

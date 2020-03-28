@@ -57,8 +57,6 @@
 
 #define MELT_SPREAD_HEIGHT (HEIGHT_INTERVAL + HEIGHT_INTERVAL / 2)
 
-#define MASS_DRAG 0.625f
-
 #define BLOCK_SOLID_SIZE_IN_PIXELS (TILE_SIZE_IN_PIXELS - (S16)(1))
 #define BLOCK_SOLID_SIZE (static_cast<float>(BLOCK_SOLID_SIZE_IN_PIXELS) * PIXEL_SIZE)
 
@@ -71,8 +69,9 @@
 #define PLAYER_PUSH_FORCE 3500.0f
 
 #define BLOCK_ACCEL_TIME (0.35f)
-#define BLOCK_ACCEL(accel_distance) ((2.0f * accel_distance) / (BLOCK_ACCEL_TIME * BLOCK_ACCEL_TIME))
-#define BLOCK_BASELINE_MASS (TILE_SIZE_IN_PIXELS * TILE_SIZE_IN_PIXELS)
+#define BLOCK_ACCEL(accel_distance, accel_time) ((2.0f * accel_distance) / (accel_time * accel_time))
+
+#define SMALL_BLOCK_ACCEL_MULTIPLIER 0.5f
 
 #define BLOCK_FRICTION_AREA (BLOCK_SOLID_SIZE_IN_PIXELS * (BLOCK_SOLID_SIZE_IN_PIXELS / 2))
 

@@ -86,9 +86,11 @@ Rect_t block_get_inclusive_rect(Pixel_t pixel, BlockCut_t cut);
 void block_set_pos_from_center(Block_t* block, Position_t pos);
 S16 block_get_width_in_pixels(Block_t* block);
 S16 block_get_height_in_pixels(Block_t* block);
+S16 block_get_lowest_dimension(Block_t* block);
 
 S16 block_get_width_in_pixels(BlockCut_t cut);
 S16 block_get_height_in_pixels(BlockCut_t cut);
+S16 block_get_lowest_dimension(BlockCut_t cut);
 
 S16 block_get_right_inclusive_pixel(Block_t* block);
 S16 block_get_right_inclusive_pixel(S16 pixel, BlockCut_t cut);

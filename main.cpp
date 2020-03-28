@@ -1196,6 +1196,8 @@ int main(int argc, char** argv){
           return -1;
      }
 
+     LOG("player accel: %f\n", PLAYER_ACCEL);
+
      if(test && !load_map_filepath && !suite){
           LOG("cannot test without specifying a map to load\n");
           return 1;
@@ -3567,7 +3569,7 @@ int main(int argc, char** argv){
                          }
 
                          auto total_block_mass = get_block_mass_in_direction(&world, block_to_push, push_block_dir);
-                         auto mass_ratio = (F32)(BLOCK_BASELINE_MASS) / (F32)(total_block_mass);
+                         auto mass_ratio = (F32)(block_get_mass(block_to_push)) / (F32)(total_block_mass);
 
                          auto expected_final_velocity = get_block_expected_player_push_velocity(&world, block_to_push, mass_ratio);
                          bool already_moving_fast_enough = false;

@@ -49,8 +49,6 @@ Vec_t coord_to_screen_position(Coord_t coord);
 
 bool vec_in_quad(const Quad_t* q, Vec_t v);
 
-Vec_t mass_move(Vec_t* vel, Vec_t accel, F32 dt);
-
 S16 closest_grid_center_pixel(S16 grid_width, S16 v);
 S16 closest_pixel(S16 pixel, F32 decimal);
 S16 passes_over_grid_pixel(S16 pixel_a, S16 pixel_b);
