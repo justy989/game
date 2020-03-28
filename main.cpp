@@ -3561,21 +3561,25 @@ int main(int argc, char** argv){
                     if(player->prev_pushing_block >= 0 && player->prev_pushing_block == player->pushing_block){
                          Block_t* block_to_push = world.blocks.elements + player->prev_pushing_block;
                          DirectionMask_t block_move_dir_mask = vec_direction_mask(block_to_push->vel);
+                         DirectionMask_t teleport_block_move_dir_mask = block_move_dir_mask;
                          auto push_block_dir = player->pushing_block_dir;
-                         if(block_to_push->teleport) push_block_dir = direction_rotate_clockwise(push_block_dir, block_to_push->teleport_rotation);
+                         auto teleport_push_block_dir = push_block_dir;
 
-                         if(direction_in_mask(block_move_dir_mask, push_block_dir)){
-                              block_to_push->cur_push_mask = direction_mask_add(block_to_push->cur_push_mask, push_block_dir);
+                         if(block_to_push->teleport){
+                             teleport_push_block_dir = direction_rotate_clockwise(push_block_dir, block_to_push->teleport_rotation);
+                             teleport_block_move_dir_mask = direction_mask_rotate_clockwise(teleport_block_move_dir_mask, block_to_push->teleport_rotation);
                          }
 
-                         auto total_block_mass = get_block_mass_in_direction(&world, block_to_push, push_block_dir);
+                         auto total_block_mass = get_block_mass_in_direction(&world, block_to_push, teleport_push_block_dir);
                          auto mass_ratio = (F32)(block_get_mass(block_to_push)) / (F32)(total_block_mass);
 
                          auto expected_final_velocity = get_block_expected_player_push_velocity(&world, block_to_push, mass_ratio);
                          bool already_moving_fast_enough = false;
 
-                         if(direction_in_mask(block_move_dir_mask, push_block_dir)){
-                              switch(push_block_dir){
+                         if(direction_in_mask(teleport_block_move_dir_mask, teleport_push_block_dir)){
+                              block_to_push->cur_push_mask = direction_mask_add(block_to_push->cur_push_mask, teleport_push_block_dir);
+
+                              switch(teleport_push_block_dir){
                               default:
                                    break;
                               case DIRECTION_LEFT:
@@ -3597,7 +3601,7 @@ int main(int argc, char** argv){
                               // pass
                               player->push_time += dt;
                               player->entangle_push_time += dt;
-                         }else if(direction_in_mask(direction_mask_opposite(block_move_dir_mask), push_block_dir)){
+                         }else if(direction_in_mask(direction_mask_opposite(teleport_block_move_dir_mask), teleport_push_block_dir)){
                               // if the player is pushing against a block moving towards them, the block wins
                               player->push_time = 0;
                               player->pushing_block = -1;
