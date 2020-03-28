@@ -84,109 +84,113 @@ bool block_adjacent_pixels_to_check(Position_t pos, Vec_t pos_delta, BlockCut_t 
      return false;
 }
 
-Block_t* block_against_block_in_list(Position_t pos, BlockCut_t cut, Block_t** blocks, S16 block_count, Direction_t direction, Position_t* portal_offsets){
+bool block_against_block(Position_t pos, BlockCut_t cut, Block_t* check_block, BlockCut_t check_cut, Direction_t direction, Position_t portal_offset){
      // intentionally use the original pos without pos_delta
-     // TODO: account for block width/height
      switch(direction){
      default:
           break;
      case DIRECTION_LEFT:
-          for(S16 i = 0; i < block_count; i++){
-               Block_t* adjacent_block = blocks[i];
+          {
+               if(!blocks_at_collidable_height(pos.z, check_block->pos.z)) break;
 
-               if(!blocks_at_collidable_height(pos.z, adjacent_block->pos.z)) continue;
+               auto adjacent_pos = check_block->teleport ?
+                                   check_block->teleport_pos + check_block->teleport_pos_delta
+                                   : check_block->pos + check_block->pos_delta;
+               adjacent_pos += portal_offset;
 
-               auto adjacent_pos = adjacent_block->teleport ?
-                                   adjacent_block->teleport_pos + adjacent_block->teleport_pos_delta
-                                   : adjacent_block->pos + adjacent_block->pos_delta;
-               adjacent_pos += portal_offsets[i];
-
-               auto boundary_check_pos = adjacent_pos + Pixel_t{block_get_width_in_pixels(adjacent_block), 0};
+               auto boundary_check_pos = adjacent_pos + Pixel_t{block_get_width_in_pixels(check_cut), 0};
                auto distance_to_boundary = fabs(pos_to_vec(boundary_check_pos - pos).x);
 
-               auto bottom_boundary_pos = pos + Pixel_t{0, (S16)(-(block_get_height_in_pixels(adjacent_block) - 1))};
+               auto bottom_boundary_pos = pos + Pixel_t{0, (S16)(-(block_get_height_in_pixels(check_cut) - 1))};
                auto top_boundary_pos = pos + Pixel_t{0, block_get_width_in_pixels(cut)};
 
                // check if they are on the expected boundary
                if(distance_to_boundary <= DISTANCE_EPSILON &&
                   position_y_greater_than(adjacent_pos, bottom_boundary_pos) &&
                   position_y_less_than(adjacent_pos, top_boundary_pos)){
-                    return adjacent_block;
+                    return true;
                }
           }
           break;
      case DIRECTION_RIGHT:
-          for(S16 i = 0; i < block_count; i++){
-               Block_t* adjacent_block = blocks[i];
-               if(!blocks_at_collidable_height(pos.z, adjacent_block->pos.z)) continue;
+          {
+               if(!blocks_at_collidable_height(pos.z, check_block->pos.z)) break;
 
-               auto adjacent_pos = adjacent_block->teleport ?
-                                   adjacent_block->teleport_pos + adjacent_block->teleport_pos_delta
-                                   : adjacent_block->pos + adjacent_block->pos_delta;
-               adjacent_pos += portal_offsets[i];
+               auto adjacent_pos = check_block->teleport ?
+                                   check_block->teleport_pos + check_block->teleport_pos_delta
+                                   : check_block->pos + check_block->pos_delta;
+               adjacent_pos += portal_offset;
 
                auto boundary_check_pos = adjacent_pos;
                auto distance_to_boundary = fabs(pos_to_vec(boundary_check_pos - (pos + Pixel_t{block_get_width_in_pixels(cut), 0})).x);
 
-               auto bottom_boundary_pos = pos + Pixel_t{0, (S16)(-(block_get_height_in_pixels(adjacent_block) - 1))};
+               auto bottom_boundary_pos = pos + Pixel_t{0, (S16)(-(block_get_height_in_pixels(check_cut) - 1))};
                auto top_boundary_pos = pos + Pixel_t{0, block_get_height_in_pixels(cut)};
 
                // check if they are on the expected boundary
                if(distance_to_boundary <= DISTANCE_EPSILON &&
                   position_y_greater_than(adjacent_pos, bottom_boundary_pos) &&
                   position_y_less_than(adjacent_pos, top_boundary_pos)){
-                    return adjacent_block;
+                    return true;
                }
           }
           break;
      case DIRECTION_DOWN:
-          for(S16 i = 0; i < block_count; i++){
-               Block_t* adjacent_block = blocks[i];
-               if(!blocks_at_collidable_height(pos.z, adjacent_block->pos.z)) continue;
+          {
+               if(!blocks_at_collidable_height(pos.z, check_block->pos.z)) break;
 
-               auto adjacent_pos = adjacent_block->teleport ?
-                                   adjacent_block->teleport_pos + adjacent_block->teleport_pos_delta
-                                   : adjacent_block->pos + adjacent_block->pos_delta;
-               adjacent_pos += portal_offsets[i];
+               auto adjacent_pos = check_block->teleport ?
+                                   check_block->teleport_pos + check_block->teleport_pos_delta
+                                   : check_block->pos + check_block->pos_delta;
+               adjacent_pos += portal_offset;
 
                auto boundary_check_pos = adjacent_pos + Pixel_t{0, block_get_height_in_pixels(cut)};
                auto distance_to_boundary = fabs(pos_to_vec(boundary_check_pos - pos).y);
 
-               auto left_boundary_pos = pos + Pixel_t{(S16)(-(block_get_width_in_pixels(adjacent_block) - 1)), 0};
+               auto left_boundary_pos = pos + Pixel_t{(S16)(-(block_get_width_in_pixels(check_cut) - 1)), 0};
                auto right_boundary_pos = pos + Pixel_t{block_get_width_in_pixels(cut), 0};
 
                // check if they are on the expected boundary
                if(distance_to_boundary <= DISTANCE_EPSILON &&
                   position_x_greater_than(adjacent_pos, left_boundary_pos) &&
                   position_x_less_than(adjacent_pos, right_boundary_pos)){
-                    return adjacent_block;
+                    return true;
                }
           }
           break;
      case DIRECTION_UP:
-          for(S16 i = 0; i < block_count; i++){
-               Block_t* adjacent_block = blocks[i];
-               if(!blocks_at_collidable_height(pos.z, adjacent_block->pos.z)) continue;
+          {
+               if(!blocks_at_collidable_height(pos.z, check_block->pos.z)) break;
 
-               auto adjacent_pos = adjacent_block->teleport ?
-                                   adjacent_block->teleport_pos + adjacent_block->teleport_pos_delta
-                                   : adjacent_block->pos + adjacent_block->pos_delta;
-               adjacent_pos += portal_offsets[i];
+               auto adjacent_pos = check_block->teleport ?
+                                   check_block->teleport_pos + check_block->teleport_pos_delta
+                                   : check_block->pos + check_block->pos_delta;
+               adjacent_pos += portal_offset;
 
                auto boundary_check_pos = adjacent_pos;
                auto distance_to_boundary = fabs(pos_to_vec(boundary_check_pos - (pos + Pixel_t{0, block_get_height_in_pixels(cut)})).y);
 
-               auto left_boundary_pos = pos + Pixel_t{(S16)(-(block_get_width_in_pixels(adjacent_block) - 1)), 0};
+               auto left_boundary_pos = pos + Pixel_t{(S16)(-(block_get_width_in_pixels(check_cut) - 1)), 0};
                auto right_boundary_pos = pos + Pixel_t{block_get_width_in_pixels(cut), 0};
 
                // check if they are on the expected boundary
                if(distance_to_boundary <= DISTANCE_EPSILON &&
                   position_x_greater_than(adjacent_pos, left_boundary_pos) &&
                   position_x_less_than(adjacent_pos, right_boundary_pos)){
-                    return adjacent_block;
+                    return true;
                }
           }
           break;
+     }
+
+     return false;
+}
+
+Block_t* block_against_block_in_list(Position_t pos, BlockCut_t cut, Block_t** blocks, S16 block_count, Direction_t direction, Position_t* portal_offsets){
+     for(S16 i = 0; i < block_count; i++){
+          if(block_against_block(pos, cut, blocks[i], blocks[i]->cut, direction, portal_offsets[i])){
+              return blocks[i];
+          }
      }
 
      return nullptr;
