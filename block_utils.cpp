@@ -1952,11 +1952,12 @@ FindBlocksThroughPortalResult_t find_blocks_through_portals(Coord_t coord, TileM
                          auto portal_rotations = direction_rotations_between(interactive->portal.face, direction_opposite(current_portal_dir));
 
                          auto block_real_pos = block->teleport ? block->teleport_pos + block->teleport_pos_delta : block->pos + block->pos_delta;
-                         auto block_center = block_get_center(block_real_pos, block->cut);
+                         auto block_cut = block->teleport ? block->teleport_cut : block->cut;
+                         auto block_center = block_get_center(block_real_pos, block_cut);
                          auto dst_offset = block_center - portal_dst_output_center;
                          auto src_coord_center = pixel_to_pos(portal_src_pixel);
                          auto block_final_pos = src_coord_center + position_rotate_quadrants_clockwise(dst_offset, compatibility_rot);
-                         auto rotated_cut = block_cut_rotate_clockwise(block->cut, portal_rotations);
+                         auto rotated_cut = block_cut_rotate_clockwise(block_cut, portal_rotations);
 
                          block_final_pos.pixel -= block_center_pixel_offset(rotated_cut);
 
