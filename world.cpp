@@ -1352,7 +1352,7 @@ void apply_push_vertical(Block_t* block, Position_t pos, World_t* world, Directi
 
            block->accel.y = calc_accel_from_stop(half_distance_to_next_grid_center, accel_time) * force;
 
-           F32 ideal_accel = calc_accel_from_stop(block_center_pixel_offset(block->cut).y * PIXEL_SIZE, accel_time) * force;
+           F32 ideal_accel = calc_accel_from_stop((lower_dim / 2) * PIXEL_SIZE, accel_time) * force;
            if(direction == DIRECTION_DOWN){
                ideal_accel = -ideal_accel;
                block->accel.y = -block->accel.y;
