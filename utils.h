@@ -39,7 +39,7 @@ bool portal_has_destination(Coord_t coord, TileMap_t* tilemap, QuadTreeNode_t<In
 
 Interactive_t* player_is_teleporting(const Player_t* player, QuadTreeNode_t<Interactive_t>* interactive_qt);
 
-S16 range_passes_tile_boundary(S16 a, S16 b, S16 ignore);
+S16 range_passes_boundary(S16 a, S16 b, S16 boundary_size, S16 ignore);
 
 Pixel_t mouse_select_pixel(Vec_t mouse_screen);
 Pixel_t mouse_select_world_pixel(Vec_t mouse_screen, Position_t camera);

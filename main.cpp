@@ -824,7 +824,7 @@ DoBlockCollisionResults_t do_block_collision(World_t* world, Block_t* block, S16
 
      if(stop_on_boundary_x){
           // stop on tile boundaries separately for each axis
-          S16 boundary_x = range_passes_tile_boundary(block->pos.pixel.x, final_pos.pixel.x, block->started_on_pixel_x);
+          S16 boundary_x = range_passes_boundary(block->pos.pixel.x, final_pos.pixel.x, block_get_width_in_pixels(block), block->started_on_pixel_x);
           if(boundary_x){
                result.repeat_collision_pass = true;
 
@@ -841,7 +841,7 @@ DoBlockCollisionResults_t do_block_collision(World_t* world, Block_t* block, S16
      }
 
      if(stop_on_boundary_y){
-          S16 boundary_y = range_passes_tile_boundary(block->pos.pixel.y, final_pos.pixel.y, block->started_on_pixel_y);
+          S16 boundary_y = range_passes_boundary(block->pos.pixel.y, final_pos.pixel.y, block_get_height_in_pixels(block), block->started_on_pixel_y);
           if(boundary_y){
                result.repeat_collision_pass = true;
 

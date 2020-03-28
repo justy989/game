@@ -233,15 +233,15 @@ Interactive_t* player_is_teleporting(const Player_t* player, QuadTreeNode_t<Inte
      return nullptr;
 }
 
-S16 range_passes_tile_boundary(S16 a, S16 b, S16 ignore){
+S16 range_passes_boundary(S16 a, S16 b, S16 boundary_size, S16 ignore){
      if(a == b) return 0;
      if(a > b){
-          if((b % TILE_SIZE_IN_PIXELS) == 0) return 0;
+          if((b % boundary_size) == 0) return 0;
           SWAP(a, b);
      }
 
      for(S16 i = a; i <= b; i++){
-          if((i % TILE_SIZE_IN_PIXELS) == 0 && i != ignore){
+          if((i % boundary_size) == 0 && i != ignore){
                return i;
           }
      }
