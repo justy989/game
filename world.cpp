@@ -1751,6 +1751,7 @@ void describe_block(World_t* world, Block_t* block){
          block->pos.decimal.x, block->pos.decimal.y,
          block->rotation, element_to_string(block->element),
          block->entangle_index, block->clone_id);
+     LOG("     cut : %s\n", block_cut_to_string(block->cut));
      LOG("  accel  : %f, %f\n", block->accel.x, block->accel.y);
      LOG("    vel  : %f, %f prev_vel: %f, %f\n", block->vel.x, block->vel.y, block->prev_vel.x, block->prev_vel.y);
      LOG(" pos dt  : %f, %f\n", block->pos_delta.x, block->pos_delta.y);

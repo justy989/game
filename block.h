@@ -57,6 +57,7 @@ struct Block_t : public GridMotion_t{
      Move_t     teleport_horizontal_move;
      Move_t     teleport_vertical_move;
      S8         teleport_rotation;
+     BlockCut_t teleport_cut;
 
      bool successfully_moved = false;
      BlockCoast_t coast_horizontal = BLOCK_COAST_NONE;

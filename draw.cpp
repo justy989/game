@@ -144,7 +144,8 @@ void draw_block(Block_t* block, Vec_t pos_vec, U8 portal_rotations){
          U8 rotation = (block->rotation + portal_rotations) % static_cast<U8>(DIRECTION_COUNT);
          tex_vec = theme_frame(rotation, 29);
      }else{
-         tex_vec = theme_frame(DIRECTION_COUNT + (static_cast<int>(block->cut) - 1), 29);
+         auto final_cut = block_cut_rotate_clockwise(block->cut, portal_rotations);
+         tex_vec = theme_frame(DIRECTION_COUNT + (static_cast<int>(final_cut) - 1), 29);
      }
 
      draw_double_theme_frame(pos_vec, tex_vec);
@@ -476,7 +477,7 @@ void draw_portal_blocks(Block_t** blocks, S16 block_count, Coord_t source_coord,
      for(S16 i = 0; i < block_count; i++){
           Block_t* block = blocks[i];
           Position_t draw_pos = block->pos;
-          draw_pos.pixel += HALF_TILE_SIZE_PIXEL;
+          draw_pos.pixel += block_center_pixel_offset(block->cut);
 
           Position_t destination_pos = coord_to_pos_at_tile_center(destination_coord);
           Position_t source_pos = coord_to_pos_at_tile_center(source_coord);
@@ -484,7 +485,9 @@ void draw_portal_blocks(Block_t** blocks, S16 block_count, Coord_t source_coord,
           center_delta = position_rotate_quadrants_clockwise(center_delta, portal_rotations);
           draw_pos = destination_pos + center_delta;
 
-          draw_pos.pixel -= HALF_TILE_SIZE_PIXEL;
+          BlockCut_t final_cut = block_cut_rotate_clockwise(block->cut, portal_rotations);
+
+          draw_pos.pixel -= block_center_pixel_offset(final_cut);
           draw_pos += camera;
           draw_pos.pixel.y += block->pos.z;
           draw_block(block, pos_to_vec(draw_pos), portal_rotations);

@@ -1196,8 +1196,6 @@ int main(int argc, char** argv){
           return -1;
      }
 
-     LOG("player accel: %f\n", PLAYER_ACCEL);
-
      if(test && !load_map_filepath && !suite){
           LOG("cannot test without specifying a map to load\n");
           return 1;
@@ -2913,7 +2911,8 @@ int main(int argc, char** argv){
                          if(teleport_result.count > block->clone_id){
                               block->teleport = true;
                               block->teleport_pos = teleport_result.results[block->clone_id].pos;
-                              block->teleport_pos.pixel -= block_center_pixel_offset(block->cut);
+                              block->teleport_cut = block_cut_rotate_clockwise(block->cut, teleport_result.results[block->clone_id].rotations);
+                              block->teleport_pos.pixel -= block_center_pixel_offset(block->teleport_cut);
 
                               block->teleport_pos_delta = teleport_result.results[block->clone_id].delta;
                               block->teleport_vel = vec_rotate_quadrants_clockwise(block->vel, teleport_result.results[block->clone_id].rotations);
@@ -3513,6 +3512,7 @@ int main(int argc, char** argv){
                          block->rotation = (block->rotation + block->teleport_rotation) % static_cast<U8>(DIRECTION_COUNT);
                          block->horizontal_move = block->teleport_horizontal_move;
                          block->vertical_move = block->teleport_vertical_move;
+                         block->cut = block->teleport_cut;
 
                          // reset started_on_pixel since we teleported and no longer want to follow those as a rule
                          block->started_on_pixel_x = 0;

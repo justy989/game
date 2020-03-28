@@ -1949,10 +1949,13 @@ FindBlocksThroughPortalResult_t find_blocks_through_portals(Coord_t coord, TileM
                          auto dst_offset = block_center - portal_dst_output_center;
                          auto src_coord_center = pixel_to_pos(portal_src_pixel);
                          auto block_final_pos = src_coord_center + position_rotate_quadrants_clockwise(dst_offset, compatibility_rot);
+                         auto rotated_cut = block_cut_rotate_clockwise(block->cut, portal_rotations);
 
-                         block_final_pos.pixel -= block_center_pixel_offset(block->cut);
+                         block_final_pos.pixel -= block_center_pixel_offset(rotated_cut);
 
-                         result.add_block_through_portal(block_final_pos, block, check_coord, portal_dst_coord, interactive->portal.face, current_portal_dir, portal_rotations, rotations_between_portals);
+                         result.add_block_through_portal(block_final_pos, block, check_coord, portal_dst_coord,
+                                                         interactive->portal.face, current_portal_dir, portal_rotations,
+                                                         rotations_between_portals, rotated_cut);
                     }
                }
           }

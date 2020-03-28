@@ -362,6 +362,7 @@ struct BlockThroughPortal_t{
     Coord_t dst_portal;
     S8 portal_rotations = 0;
     S8 rotations_between_portals = 0;
+    BlockCut_t rotated_cut = BLOCK_CUT_WHOLE;
 };
 
 #define MAX_BLOCKS_FOUND_THROUGH_PORTALS 64
@@ -372,7 +373,7 @@ struct FindBlocksThroughPortalResult_t{
 
     bool add_block_through_portal(Position_t pos, Block_t* block, Coord_t src_portal, Coord_t dst_portal,
                                   Direction_t src_portal_dir, Direction_t dst_portal_dir,
-                                  S8 portal_rotations, S8 rotations_between_portals){
+                                  S8 portal_rotations, S8 rotations_between_portals, BlockCut_t cut){
         if(count >= MAX_BLOCKS_FOUND_THROUGH_PORTALS){
             return false;
         }
@@ -385,6 +386,7 @@ struct FindBlocksThroughPortalResult_t{
         blocks[count].dst_portal_dir = dst_portal_dir;
         blocks[count].portal_rotations = portal_rotations;
         blocks[count].rotations_between_portals = rotations_between_portals;
+        blocks[count].rotated_cut = cut;
         count++;
         return true;
     }
