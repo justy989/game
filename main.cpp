@@ -3006,82 +3006,194 @@ int main(int argc, char** argv){
 
                               Interactive_t* src_portal = quad_tree_interactive_find_at(world.interactive_qt, teleport_result.results[block->clone_id].src_portal);
                               Interactive_t* dst_portal = quad_tree_interactive_find_at(world.interactive_qt, teleport_result.results[block->clone_id].dst_portal);
-                              if(src_portal && src_portal->type == INTERACTIVE_TYPE_PORTAL && src_portal->portal.wants_to_turn_off &&
-                                 dst_portal && dst_portal->type == INTERACTIVE_TYPE_PORTAL && dst_portal->portal.wants_to_turn_off){
+                              if(src_portal && src_portal->type == INTERACTIVE_TYPE_PORTAL &&
+                                 dst_portal && dst_portal->type == INTERACTIVE_TYPE_PORTAL){
                                   Direction_t src_portal_dir = src_portal->portal.face;
                                   Direction_t dst_portal_dir = dst_portal->portal.face;
 
-                                  // BlockCut_t original_dst_cut = block->teleport_cut;
-                                  BlockCut_t original_src_cut = block->cut;
-                                  BlockCut_t final_src_cut = BLOCK_CUT_WHOLE;
-                                  BlockCut_t final_dst_cut = BLOCK_CUT_WHOLE;
-                                  Pixel_t final_dst_offset{0, 0};
-                                  Pixel_t final_src_offset{0, 0};
+                                  // to fight the battle against floating point error, track any blocks we are connected to (going the same speed)
+                                  {
+                                      auto against_direction = direction_opposite(src_portal_dir);
+                                      auto against_result = block_against_other_blocks(block->pos + block->pos_delta,
+                                                                                       block->cut, against_direction, world.block_qt,
+                                                                                       world.interactive_qt, &world.tilemap);
 
-                                  if(original_src_cut == BLOCK_CUT_TOP_LEFT_QUARTER ||
-                                     original_src_cut == BLOCK_CUT_TOP_RIGHT_QUARTER ||
-                                     original_src_cut == BLOCK_CUT_BOTTOM_LEFT_QUARTER ||
-                                     original_src_cut == BLOCK_CUT_BOTTOM_RIGHT_QUARTER ||
-                                     (direction_is_horizontal(src_portal_dir) &&
-                                      (original_src_cut == BLOCK_CUT_LEFT_HALF || original_src_cut == BLOCK_CUT_RIGHT_HALF)) ||
-                                     (!direction_is_horizontal(src_portal_dir) &&
-                                      (original_src_cut == BLOCK_CUT_TOP_HALF || original_src_cut == BLOCK_CUT_BOTTOM_HALF))){
-                                      // we kill the block
-                                  }else if(original_src_cut == BLOCK_CUT_WHOLE){
-                                      switch(src_portal_dir){
-                                      default:
-                                         break;
-                                      case DIRECTION_LEFT:
-                                         final_src_cut = BLOCK_CUT_RIGHT_HALF;
-                                         final_src_offset.x = block_center_pixel_offset(block->cut).x;
-                                         break;
-                                      case DIRECTION_RIGHT:
-                                         final_src_cut = BLOCK_CUT_LEFT_HALF;
-                                         break;
-                                      case DIRECTION_DOWN:
-                                         final_src_cut = BLOCK_CUT_TOP_HALF;
-                                         final_src_offset.y = block_center_pixel_offset(block->cut).y;
-                                         break;
-                                      case DIRECTION_UP:
-                                         final_src_cut = BLOCK_CUT_BOTTOM_HALF;
-                                         break;
+                                      F32 block_vel = 0;
+                                      F32 block_pos_delta = 0;
+
+                                      if(direction_is_horizontal(against_direction)){
+                                          block_vel = block->vel.x;
+                                          block_pos_delta = block->pos_delta.x;
+                                      }else{
+                                          block_vel = block->vel.y;
+                                          block_pos_delta = block->pos_delta.y;
                                       }
 
-                                      switch(dst_portal_dir){
-                                      default:
-                                         break;
-                                      case DIRECTION_LEFT:
-                                         final_dst_cut = BLOCK_CUT_RIGHT_HALF;
-                                         final_dst_offset.x = block_center_pixel_offset(block->teleport_cut).x;
-                                         break;
-                                      case DIRECTION_RIGHT:
-                                         final_dst_cut = BLOCK_CUT_LEFT_HALF;
-                                         break;
-                                      case DIRECTION_DOWN:
-                                         final_dst_cut = BLOCK_CUT_TOP_HALF;
-                                         final_dst_offset.y = block_center_pixel_offset(block->teleport_cut).y;
-                                         break;
-                                      case DIRECTION_UP:
-                                         final_dst_cut = BLOCK_CUT_BOTTOM_HALF;
-                                         break;
+                                      for(S16 a = 0; a < against_result.count; a++){
+                                          auto* against_other = against_result.againsts + a;
+
+                                          F32 against_block_vel = 0;
+                                          F32 against_block_pos_delta = 0;
+
+                                          if(direction_is_horizontal(against_direction)){
+                                              against_block_vel = against_other->block->vel.x;
+                                              against_block_pos_delta = against_other->block->pos_delta.x;
+                                          }else{
+                                              against_block_vel = against_other->block->vel.y;
+                                              against_block_pos_delta = against_other->block->pos_delta.y;
+                                          }
+
+                                          if(block_vel != against_block_vel || block_pos_delta != against_block_pos_delta) continue;
+
+                                          auto final_against_dir = direction_rotate_clockwise(against_direction, teleport_result.results[block->clone_id].rotations);
+
+                                          against_other->block->connected_teleport.block_index = i;
+                                          against_other->block->connected_teleport.direction = direction_opposite(final_against_dir);
                                       }
                                   }
 
-                                  S16 new_block_index = world.blocks.count;
-                                  if(resize(&world.blocks, world.blocks.count + (S16)(1))){
-                                      // a resize will kill our block ptr, so we gotta update it
-                                      block = world.blocks.elements + i;
-                                      Block_t* new_block = world.blocks.elements + new_block_index;
-                                      *new_block = *block;
-                                      new_block->teleport = false;
-                                      new_block->cut = final_src_cut;
-                                      new_block->pos.pixel += final_src_offset;
-                                      new_block->previous_mass = get_block_stack_mass(&world, new_block);
+                                  if(block->connected_teleport.block_index >= 0)
+                                  {
+                                      auto against_result = block_against_other_blocks(block->teleport_pos + block->teleport_pos_delta,
+                                                                                       block->cut, block->connected_teleport.direction, world.block_qt,
+                                                                                       world.interactive_qt, &world.tilemap);
+
+                                      F32 block_vel = 0;
+                                      F32 block_pos_delta = 0;
+
+                                      if(direction_is_horizontal(block->connected_teleport.direction)){
+                                          block_vel = block->teleport_vel.x;
+                                          block_pos_delta = block->teleport_pos_delta.x;
+                                      }else{
+                                          block_vel = block->teleport_vel.y;
+                                          block_pos_delta = block->teleport_pos_delta.y;
+                                      }
+
+                                      for(S16 a = 0; a < against_result.count; a++){
+                                          auto* against_other = against_result.againsts + a;
+
+                                          if(get_block_index(&world, against_other->block) != block->connected_teleport.block_index) continue;
+
+                                          F32 against_block_vel = 0;
+                                          F32 against_block_pos_delta = 0;
+
+                                          if(direction_is_horizontal(block->connected_teleport.direction)){
+                                              against_block_vel = against_other->block->vel.x;
+                                              against_block_pos_delta = against_other->block->pos_delta.x;
+                                          }else{
+                                              against_block_vel = against_other->block->vel.y;
+                                              against_block_pos_delta = against_other->block->pos_delta.y;
+                                          }
+
+                                          if(block_vel != against_block_vel || block_pos_delta != against_block_pos_delta) continue;
+
+                                          switch(block->connected_teleport.direction){
+                                          default:
+                                              break;
+                                          case DIRECTION_LEFT:
+                                          {
+                                              block->teleport_pos.pixel.x = against_other->block->pos.pixel.x + block_get_height_in_pixels(block->cut);
+                                              block->teleport_pos.decimal.x = against_other->block->pos.decimal.x;
+                                              break;
+                                          }
+                                          case DIRECTION_RIGHT:
+                                          {
+                                              block->teleport_pos.pixel.x = against_other->block->pos.pixel.x - block_get_height_in_pixels(against_other->block->cut);
+                                              block->teleport_pos.decimal.x = against_other->block->pos.decimal.x;
+                                              break;
+                                          }
+                                          case DIRECTION_DOWN:
+                                          {
+                                              block->teleport_pos.pixel.y = against_other->block->pos.pixel.y + block_get_height_in_pixels(against_other->block->cut);
+                                              block->teleport_pos.decimal.y = against_other->block->pos.decimal.y;
+                                              break;
+                                          }
+                                          case DIRECTION_UP:
+                                          {
+                                              block->teleport_pos.pixel.y = against_other->block->pos.pixel.y - block_get_height_in_pixels(block->cut);
+                                              block->teleport_pos.decimal.y = against_other->block->pos.decimal.y;
+                                              break;
+                                          }
+                                          }
+                                      }
+
+                                      // clear dis
+                                      block->connected_teleport.block_index = -1;
                                   }
 
-                                  block->teleport_pos.pixel += final_dst_offset;
-                                  block->teleport_cut = final_dst_cut;
-                                  block->teleport_split = true;
+                                  if(src_portal->portal.wants_to_turn_off && dst_portal->portal.wants_to_turn_off){
+                                      // BlockCut_t original_dst_cut = block->teleport_cut;
+                                      BlockCut_t original_src_cut = block->cut;
+                                      BlockCut_t final_src_cut = BLOCK_CUT_WHOLE;
+                                      BlockCut_t final_dst_cut = BLOCK_CUT_WHOLE;
+                                      Pixel_t final_dst_offset{0, 0};
+                                      Pixel_t final_src_offset{0, 0};
+
+                                      if(original_src_cut == BLOCK_CUT_TOP_LEFT_QUARTER ||
+                                         original_src_cut == BLOCK_CUT_TOP_RIGHT_QUARTER ||
+                                         original_src_cut == BLOCK_CUT_BOTTOM_LEFT_QUARTER ||
+                                         original_src_cut == BLOCK_CUT_BOTTOM_RIGHT_QUARTER ||
+                                         (direction_is_horizontal(src_portal_dir) &&
+                                          (original_src_cut == BLOCK_CUT_LEFT_HALF || original_src_cut == BLOCK_CUT_RIGHT_HALF)) ||
+                                         (!direction_is_horizontal(src_portal_dir) &&
+                                          (original_src_cut == BLOCK_CUT_TOP_HALF || original_src_cut == BLOCK_CUT_BOTTOM_HALF))){
+                                          // we kill the block
+                                      }else if(original_src_cut == BLOCK_CUT_WHOLE){
+                                          switch(src_portal_dir){
+                                          default:
+                                             break;
+                                          case DIRECTION_LEFT:
+                                             final_src_cut = BLOCK_CUT_RIGHT_HALF;
+                                             final_src_offset.x = block_center_pixel_offset(block->cut).x;
+                                             break;
+                                          case DIRECTION_RIGHT:
+                                             final_src_cut = BLOCK_CUT_LEFT_HALF;
+                                             break;
+                                          case DIRECTION_DOWN:
+                                             final_src_cut = BLOCK_CUT_TOP_HALF;
+                                             final_src_offset.y = block_center_pixel_offset(block->cut).y;
+                                             break;
+                                          case DIRECTION_UP:
+                                             final_src_cut = BLOCK_CUT_BOTTOM_HALF;
+                                             break;
+                                          }
+
+                                          switch(dst_portal_dir){
+                                          default:
+                                             break;
+                                          case DIRECTION_LEFT:
+                                             final_dst_cut = BLOCK_CUT_RIGHT_HALF;
+                                             final_dst_offset.x = block_center_pixel_offset(block->teleport_cut).x;
+                                             break;
+                                          case DIRECTION_RIGHT:
+                                             final_dst_cut = BLOCK_CUT_LEFT_HALF;
+                                             break;
+                                          case DIRECTION_DOWN:
+                                             final_dst_cut = BLOCK_CUT_TOP_HALF;
+                                             final_dst_offset.y = block_center_pixel_offset(block->teleport_cut).y;
+                                             break;
+                                          case DIRECTION_UP:
+                                             final_dst_cut = BLOCK_CUT_BOTTOM_HALF;
+                                             break;
+                                          }
+                                      }
+
+                                      S16 new_block_index = world.blocks.count;
+                                      if(resize(&world.blocks, world.blocks.count + (S16)(1))){
+                                          // a resize will kill our block ptr, so we gotta update it
+                                          block = world.blocks.elements + i;
+                                          Block_t* new_block = world.blocks.elements + new_block_index;
+                                          *new_block = *block;
+                                          new_block->teleport = false;
+                                          new_block->cut = final_src_cut;
+                                          new_block->pos.pixel += final_src_offset;
+                                          new_block->previous_mass = get_block_stack_mass(&world, new_block);
+                                      }
+
+                                      block->teleport_pos.pixel += final_dst_offset;
+                                      block->teleport_cut = final_dst_cut;
+                                      block->teleport_split = true;
+                                  }
                               }
 
                               // TODO: maybe only do this one time per loop in case multiple blocks teleport in a frame

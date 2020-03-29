@@ -29,6 +29,11 @@ struct TransferMomentum_t{
      F32 vel;
 };
 
+struct ConnectedTeleport_t{
+    S16 block_index = -1;
+    Direction_t direction = DIRECTION_COUNT;
+};
+
 struct Block_t : public GridMotion_t{
      Position_t      pos;
      Element_t       element;
@@ -70,6 +75,8 @@ struct Block_t : public GridMotion_t{
      CarriedPosDelta_t carried_pos_delta;
 
      S16 previous_mass;
+
+     ConnectedTeleport_t connected_teleport;
 };
 
 S16 get_object_x(Block_t* block);

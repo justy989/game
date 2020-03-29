@@ -502,8 +502,9 @@ BlockInsideBlockListResult_t block_inside_block_list(Position_t block_to_check_p
 
           if(!blocks_at_collidable_height(final_block_to_check_pos.z, block->pos.z)) continue;
 
-          auto final_block_pos = block->teleport ? block->teleport_pos + block->teleport_pos_delta : block->pos + block->pos_delta;
-          final_block_pos += portal_offsets[i];
+          auto block_pos = block->teleport ? block->teleport_pos : block->pos;
+          auto block_pos_delta = block->teleport ? block->teleport_pos_delta : block->pos_delta;
+          auto final_block_pos = block_pos + block_pos_delta + portal_offsets[i];
 
           auto pos_diff = final_block_pos - final_block_to_check_pos;
           auto check_vec = pos_to_vec(pos_diff);
@@ -572,7 +573,7 @@ BlockInsideOthersResult_t block_inside_others(Position_t block_to_check_pos, Vec
      memset(portal_offsets, 0, sizeof(portal_offsets));
 
      BlockCut_t cuts[BLOCK_QUAD_TREE_MAX_QUERY];
-     for(S16 i = 0; i < block_count; i++) cuts[i] = blocks[i]->cut;
+     for(S16 i = 0; i < block_count; i++) cuts[i] = blocks[i]->teleport ? blocks[i]->teleport_cut : blocks[i]->cut;
 
      auto inside_list_result = block_inside_block_list(block_to_check_pos, block_to_check_pos_delta,
                                                        cut, block_to_check_index,
