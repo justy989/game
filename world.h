@@ -139,7 +139,7 @@ bool block_in_height_range_of_player(Block_t* block, Position_t player);
 
 void get_block_stack(World_t* world, Block_t* block, BlockList_t* block_list, S8 rotations_through_portal);
 S16 get_block_stack_mass(World_t* world, Block_t* block);
-S16 get_block_mass_in_direction(World_t* world, Block_t* block, Direction_t direction);
+S16 get_block_mass_in_direction(World_t* world, Block_t* block, Direction_t direction, bool require_on_ice = true);
 
 F32 momentum_term(F32 mass, F32 vel);
 F32 momentum_term(TransferMomentum_t* transfer_momentum);

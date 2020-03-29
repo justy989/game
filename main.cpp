@@ -1099,6 +1099,27 @@ void restart_demo(World_t* world, TileMap_t* demo_starting_tilemap, ObjectArray_
      *frame_count = 0;
 }
 
+void set_against_blocks_coasting_from_player(Block_t* block, Direction_t direction, World_t* world){
+     auto block_pos = block->teleport ? block->teleport_pos + block->teleport_pos_delta : block->pos + block->pos_delta;
+
+     auto against_result = block_against_other_blocks(block_pos,
+                                                      block->teleport ? block->teleport_cut : block->cut,
+                                                      direction, world->block_qt, world->interactive_qt, &world->tilemap);
+
+     for(S16 a = 0; a < against_result.count; a++){
+         auto* against_other = against_result.againsts + a;
+         Direction_t against_direction = direction_rotate_clockwise(direction, against_other->rotations_through_portal);
+
+         if(direction_is_horizontal(against_direction)){
+             against_other->block->coast_horizontal = BLOCK_COAST_PLAYER;
+         }else{
+             against_other->block->coast_vertical = BLOCK_COAST_PLAYER;
+         }
+
+         set_against_blocks_coasting_from_player(against_other->block, against_direction, world);
+     }
+}
+
 int main(int argc, char** argv){
      const char* load_map_filepath = nullptr;
      bool test = false;
@@ -2648,6 +2669,8 @@ int main(int argc, char** argv){
 
                                    Block_t* player_prev_pushing_block = world.blocks.elements + player->prev_pushing_block;
                                    if(player_prev_pushing_block == block){
+                                        bool set_block_coasting_from_player = false;
+
                                         switch(player->face){
                                         default:
                                              break;
@@ -2661,10 +2684,12 @@ int main(int argc, char** argv){
 
                                                   if(player->pushing_block_dir == vec_direction(block_vel)){
                                                        block->coast_vertical = BLOCK_COAST_PLAYER;
+                                                       set_block_coasting_from_player = true;
                                                   }
                                              }else{
                                                   if(player->pushing_block_dir == vec_direction(block_vel)){
                                                        block->coast_horizontal = BLOCK_COAST_PLAYER;
+                                                       set_block_coasting_from_player = true;
                                                   }
                                              }
                                              break;
@@ -2677,14 +2702,20 @@ int main(int argc, char** argv){
                                                   block_vel = Vec_t{block->vel.x, 0};
                                                   if(player->pushing_block_dir == vec_direction(block_vel)){
                                                        block->coast_horizontal = BLOCK_COAST_PLAYER;
+                                                       set_block_coasting_from_player = true;
                                                   }
                                              }else{
                                                   if(player->pushing_block_dir == vec_direction(block_vel)){
                                                        block->coast_vertical = BLOCK_COAST_PLAYER;
+                                                       set_block_coasting_from_player = true;
                                                   }
                                              }
                                              break;
                                         }
+                                        }
+
+                                        if(set_block_coasting_from_player){
+                                            set_against_blocks_coasting_from_player(block, player->face, &world);
                                         }
                                    }else if(blocks_are_entangled(block, player_prev_pushing_block, &world.blocks) &&
                                             !block_on_ice(block->pos, block->pos_delta, block->cut, &world.tilemap, world.interactive_qt, world.block_qt) &&
@@ -3029,6 +3060,7 @@ int main(int argc, char** argv){
                                           block_pos_delta = block->pos_delta.y;
                                       }
 
+                                      // TODO: we may need to handle the against portal rotation data it gives us
                                       for(S16 a = 0; a < against_result.count; a++){
                                           auto* against_other = against_result.againsts + a;
 
@@ -3069,6 +3101,7 @@ int main(int argc, char** argv){
                                           block_pos_delta = block->teleport_pos_delta.y;
                                       }
 
+                                      // TODO: we may need to handle the against portal rotation data it gives us
                                       for(S16 a = 0; a < against_result.count; a++){
                                           auto* against_other = against_result.againsts + a;
 

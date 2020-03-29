@@ -1588,7 +1588,22 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
                     return result;
                }
           }else if(!on_ice){
-               return result;
+               F32 total_block_mass = get_block_mass_in_direction(world, block, direction, false);
+
+               if(total_block_mass <= PLAYER_MAX_PUSH_MASS_ON_FRICTION){
+                   bool are_entangled = blocks_are_entangled(block, against_block, &world->blocks);
+                   auto push_result = block_push(against_block, against_block_push_dir, world, pushed_by_ice, force, instant_momentum);
+
+                   if(push_result.pushed){
+                        if(!are_entangled){
+                            push_entangled_block(against_block, world, against_block_push_dir, pushed_by_ice, instant_momentum);
+                        }
+                   }else{
+                        return result;
+                   }
+               }else{
+                   return result;
+               }
           }
      }
 
@@ -2249,7 +2264,8 @@ ElasticCollisionResult_t elastic_transfer_momentum_to_block(TransferMomentum_t* 
      return result;
 }
 
-static void get_touching_blocks_in_direction(World_t* world, Block_t* block, Direction_t direction, BlockList_t* block_list){
+static void get_touching_blocks_in_direction(World_t* world, Block_t* block, Direction_t direction, BlockList_t* block_list,
+                                             bool require_on_ice = true){
      auto result = block_against_other_blocks(block->pos + block->pos_delta, block->cut, direction, world->block_qt,
                                               world->interactive_qt, &world->tilemap);
      for(S16 i = 0; i < result.count; i++){
@@ -2257,10 +2273,11 @@ static void get_touching_blocks_in_direction(World_t* world, Block_t* block, Dir
           result_direction = direction_rotate_clockwise(result_direction, result.againsts[i].rotations_through_portal);
           auto result_block = result.againsts[i].block;
 
-          if(block_on_ice(result_block->pos, result_block->pos_delta, result_block->cut,
-                          &world->tilemap, world->interactive_qt, world->block_qt)){
+          if((require_on_ice && block_on_ice(result_block->pos, result_block->pos_delta, result_block->cut,
+                                             &world->tilemap, world->interactive_qt, world->block_qt)) ||
+              !require_on_ice){
                get_block_stack(world, result_block, block_list, result.againsts[i].rotations_through_portal);
-               get_touching_blocks_in_direction(world, result_block, result_direction, block_list);
+               get_touching_blocks_in_direction(world, result_block, result_direction, block_list, require_on_ice);
           }
      }
 }
@@ -2276,13 +2293,14 @@ void get_block_stack(World_t* world, Block_t* block, BlockList_t* block_list, S8
      }
 }
 
-S16 get_block_mass_in_direction(World_t* world, Block_t* block, Direction_t direction){
+S16 get_block_mass_in_direction(World_t* world, Block_t* block, Direction_t direction, bool require_on_ice){
      BlockList_t block_list;
      get_block_stack(world, block, &block_list, DIRECTION_COUNT);
 
-     if(block_on_ice(block->pos, block->pos_delta, block->cut,
-                     &world->tilemap, world->interactive_qt, world->block_qt)){
-          get_touching_blocks_in_direction(world, block, direction, &block_list);
+     if((require_on_ice && block_on_ice(block->pos, block->pos_delta, block->cut,
+                                       &world->tilemap, world->interactive_qt, world->block_qt)) ||
+        !require_on_ice){
+          get_touching_blocks_in_direction(world, block, direction, &block_list, require_on_ice);
 
           // accumulate all blocks mass but reduce duplication of mass for entangled blocks
           // TODO: n^2 * m, if we sort the blocks we can speed this up using a binary search bringing it to n log n * m
