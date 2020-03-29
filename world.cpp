@@ -108,7 +108,13 @@ static void toggle_electricity(TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>
                                                          interactive->door.face, from_wire, true);
                break;
           case INTERACTIVE_TYPE_PORTAL:
-               if(from_wire) interactive->portal.on = !interactive->portal.on;
+               if(from_wire){
+                   if(interactive->portal.has_block_inside){
+                       interactive->portal.wants_to_turn_off = true;
+                   }else{
+                       interactive->portal.on = !interactive->portal.on;
+                   }
+               }
                break;
           }
      }
@@ -914,7 +920,7 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
 }
 
 TeleportPositionResult_t teleport_position_across_portal(Position_t position, Vec_t pos_delta, World_t* world, Coord_t premove_coord,
-                                                         Coord_t postmove_coord){
+                                                         Coord_t postmove_coord, bool require_on){
      TeleportPositionResult_t result {};
 
      if(postmove_coord == premove_coord) return result;
@@ -923,7 +929,7 @@ TeleportPositionResult_t teleport_position_across_portal(Position_t position, Ve
      if(interactive->portal.face != direction_opposite(direction_between(postmove_coord, premove_coord))) return result;
 
      Position_t offset_from_center = position - coord_to_pos_at_tile_center(postmove_coord);
-     PortalExit_t portal_exit = find_portal_exits(postmove_coord, &world->tilemap, world->interactive_qt);
+     PortalExit_t portal_exit = find_portal_exits(postmove_coord, &world->tilemap, world->interactive_qt, require_on);
 
      for(S8 d = 0; d < DIRECTION_COUNT; d++){
           for(S8 p = 0; p < portal_exit.directions[d].count; p++){
@@ -938,6 +944,8 @@ TeleportPositionResult_t teleport_position_across_portal(Position_t position, Ve
                result.results[result.count].rotations = portal_rotations_between(interactive->portal.face, (Direction_t)(d));
                result.results[result.count].delta = vec_rotate_quadrants_clockwise(pos_delta, result.results[result.count].rotations);
                result.results[result.count].pos = coord_to_pos_at_tile_center(portal_exit.directions[d].coords[p] + opposite) + final_offset;
+               result.results[result.count].src_portal = postmove_coord;
+               result.results[result.count].dst_portal = portal_exit.directions[d].coords[p];
                result.count++;
           }
      }

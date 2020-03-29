@@ -67,6 +67,8 @@ struct Door_t{
 struct Portal_t{
      Direction_t face;
      bool on;
+     bool has_block_inside;
+     bool wants_to_turn_off;
 };
 
 struct WireCross_t{

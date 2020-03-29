@@ -485,7 +485,7 @@ CheckBlockCollisionResult_t check_block_collision(World_t* world, Block_t* block
                                                               block->teleport_pos_delta,
                                                               block->teleport_vel,
                                                               block->teleport_accel,
-                                                              block->cut,
+                                                              block->teleport_cut,
                                                               block->stop_on_pixel_x,
                                                               block->stop_on_pixel_y,
                                                               block->teleport_horizontal_move,
@@ -2431,6 +2431,19 @@ int main(int argc, char** argv){
                     }
                }
 
+               // override portals knowing whether or not they have blocks inside
+               for(S16 i = 0; i < world.interactives.count; i++){
+                    Interactive_t* interactive = world.interactives.elements + i;
+                    if(interactive->type == INTERACTIVE_TYPE_PORTAL){
+                        if(interactive->portal.on && interactive->portal.wants_to_turn_off && !interactive->portal.has_block_inside){
+                            // TODO: kill player if they are in the portal
+                            interactive->portal.on = false;
+                            interactive->portal.wants_to_turn_off = false;
+                        }
+                        interactive->portal.has_block_inside = false;
+                    }
+               }
+
                // block movement
 
                // do a pass moving the block as far as possible, so that collision doesn't rely on order of blocks in the array
@@ -2488,12 +2501,17 @@ int main(int argc, char** argv){
                     block->pos_delta.y = calc_position_motion(block->vel.y, block->accel.y, dt);
                     block->vel.y = calc_velocity_motion(block->vel.y, block->accel.y, dt);
 
-                    block->teleport = false;
                     carried_pos_delta_reset(&block->carried_pos_delta);
                     block->held_up = BLOCK_HELD_BY_NONE;
 
                     block->coast_horizontal = BLOCK_COAST_NONE;
                     block->coast_vertical = BLOCK_COAST_NONE;
+
+                    block->teleport = false;
+                    block->teleport_cut = block->cut;
+                    block->teleport_vel = block->vel;
+                    block->teleport_accel = block->accel;
+                    block->teleport_split = false;
                }
 
                // TODO: for these next 2 passes, do we need to care about teleport position? Probably just the next loop?
@@ -2524,7 +2542,7 @@ int main(int argc, char** argv){
                          if(interactive){
                               // TODO: it is not kewl to use block_get_inclusive_rect to get a rect for the interactive, we have
                               // functions for this in utils
-                              auto interactive_rect = block_get_inclusive_rect(coord_to_pixel(rect_coords[c]), BLOCK_CUT_WHOLE);
+                              auto interactive_rect = block_get_inclusive_rect(coord_to_pixel(rect_coords[c]), block->cut);
                               if(!rect_in_rect(block_rect, interactive_rect)) continue;
 
                               if(interactive->type == INTERACTIVE_TYPE_POPUP){
@@ -2540,6 +2558,29 @@ int main(int argc, char** argv){
                                    }else if(!block->held_up && block->pos.z == (interactive->popup.lift.ticks - 1)){
                                         block->held_up |= BLOCK_HELD_BY_SOLID;
                                    }
+                              }
+                         }
+                    }
+
+                    // if a block is inside a portal, set a flag for that portal and any connected portals
+                    for(S16 c = 0; c < 4; c++){
+                         Interactive_t* interactive = quad_tree_interactive_find_at(world.interactive_qt, rect_coords[c]);
+                         if(!is_active_portal(interactive)) continue;
+                         interactive->portal.has_block_inside = true;
+
+                         PortalExit_t portal_exits = find_portal_exits(rect_coords[c], &world.tilemap, world.interactive_qt, false);
+
+                         for(S8 d = 0; d < DIRECTION_COUNT; d++){
+                              auto portal_exit = portal_exits.directions + d;
+
+                              for(S8 p = 0; p < portal_exit->count; p++){
+                                  auto portal_coord = portal_exit->coords[p];
+                                  if(portal_coord == rect_coords[c]) continue;
+
+                                  Interactive_t* through_portal_interactive = quad_tree_interactive_find_at(world.interactive_qt, portal_coord);
+                                  if(!through_portal_interactive) continue;
+                                  if(through_portal_interactive->type != INTERACTIVE_TYPE_PORTAL) continue;
+                                  through_portal_interactive->portal.has_block_inside = true;
                               }
                          }
                     }
@@ -2582,7 +2623,7 @@ int main(int argc, char** argv){
                          auto block_center = block_get_center(block);
                          auto premove_coord = block_get_coord(block);
                          auto coord = block_get_coord(block->pos + block->pos_delta, block->cut);
-                         auto teleport_result = teleport_position_across_portal(block_center, block->pos_delta, &world, premove_coord, coord);
+                         auto teleport_result = teleport_position_across_portal(block_center, block->pos_delta, &world, premove_coord, coord, false);
                          if(teleport_result.count > block->clone_id){
                               auto pos = teleport_result.results[block->clone_id].pos;
                               pos.pixel -= block_center_pixel_offset(block->cut);
@@ -2907,7 +2948,7 @@ int main(int argc, char** argv){
                          auto block_center = block_get_center(block);
                          auto premove_coord = block_get_coord(block);
                          auto coord = block_get_coord(block->pos + block->pos_delta, block->cut);
-                         auto teleport_result = teleport_position_across_portal(block_center, block->pos_delta, &world, premove_coord, coord);
+                         auto teleport_result = teleport_position_across_portal(block_center, block->pos_delta, &world, premove_coord, coord, false);
                          if(teleport_result.count > block->clone_id){
                               block->teleport = true;
                               block->teleport_pos = teleport_result.results[block->clone_id].pos;
@@ -2961,6 +3002,86 @@ int main(int argc, char** argv){
                                    if(direction_is_positive(prev_horizontal_dir) != direction_is_positive(cur_horizontal_dir)){
                                         move_flip_sign(&block->teleport_horizontal_move);
                                    }
+                              }
+
+                              Interactive_t* src_portal = quad_tree_interactive_find_at(world.interactive_qt, teleport_result.results[block->clone_id].src_portal);
+                              Interactive_t* dst_portal = quad_tree_interactive_find_at(world.interactive_qt, teleport_result.results[block->clone_id].dst_portal);
+                              if(src_portal && src_portal->type == INTERACTIVE_TYPE_PORTAL && src_portal->portal.wants_to_turn_off &&
+                                 dst_portal && dst_portal->type == INTERACTIVE_TYPE_PORTAL && dst_portal->portal.wants_to_turn_off){
+                                  Direction_t src_portal_dir = src_portal->portal.face;
+                                  Direction_t dst_portal_dir = dst_portal->portal.face;
+
+                                  // BlockCut_t original_dst_cut = block->teleport_cut;
+                                  BlockCut_t original_src_cut = block->cut;
+                                  BlockCut_t final_src_cut = BLOCK_CUT_WHOLE;
+                                  BlockCut_t final_dst_cut = BLOCK_CUT_WHOLE;
+                                  Pixel_t final_dst_offset{0, 0};
+                                  Pixel_t final_src_offset{0, 0};
+
+                                  if(original_src_cut == BLOCK_CUT_TOP_LEFT_QUARTER ||
+                                     original_src_cut == BLOCK_CUT_TOP_RIGHT_QUARTER ||
+                                     original_src_cut == BLOCK_CUT_BOTTOM_LEFT_QUARTER ||
+                                     original_src_cut == BLOCK_CUT_BOTTOM_RIGHT_QUARTER ||
+                                     (direction_is_horizontal(src_portal_dir) &&
+                                      (original_src_cut == BLOCK_CUT_LEFT_HALF || original_src_cut == BLOCK_CUT_RIGHT_HALF)) ||
+                                     (!direction_is_horizontal(src_portal_dir) &&
+                                      (original_src_cut == BLOCK_CUT_TOP_HALF || original_src_cut == BLOCK_CUT_BOTTOM_HALF))){
+                                      // we kill the block
+                                  }else if(original_src_cut == BLOCK_CUT_WHOLE){
+                                      switch(src_portal_dir){
+                                      default:
+                                         break;
+                                      case DIRECTION_LEFT:
+                                         final_src_cut = BLOCK_CUT_RIGHT_HALF;
+                                         final_src_offset.x = block_center_pixel_offset(block->cut).x;
+                                         break;
+                                      case DIRECTION_RIGHT:
+                                         final_src_cut = BLOCK_CUT_LEFT_HALF;
+                                         break;
+                                      case DIRECTION_DOWN:
+                                         final_src_cut = BLOCK_CUT_TOP_HALF;
+                                         final_src_offset.y = block_center_pixel_offset(block->cut).y;
+                                         break;
+                                      case DIRECTION_UP:
+                                         final_src_cut = BLOCK_CUT_BOTTOM_HALF;
+                                         break;
+                                      }
+
+                                      switch(dst_portal_dir){
+                                      default:
+                                         break;
+                                      case DIRECTION_LEFT:
+                                         final_dst_cut = BLOCK_CUT_RIGHT_HALF;
+                                         final_dst_offset.x = block_center_pixel_offset(block->teleport_cut).x;
+                                         break;
+                                      case DIRECTION_RIGHT:
+                                         final_dst_cut = BLOCK_CUT_LEFT_HALF;
+                                         break;
+                                      case DIRECTION_DOWN:
+                                         final_dst_cut = BLOCK_CUT_TOP_HALF;
+                                         final_dst_offset.y = block_center_pixel_offset(block->teleport_cut).y;
+                                         break;
+                                      case DIRECTION_UP:
+                                         final_dst_cut = BLOCK_CUT_BOTTOM_HALF;
+                                         break;
+                                      }
+                                  }
+
+                                  S16 new_block_index = world.blocks.count;
+                                  if(resize(&world.blocks, world.blocks.count + (S16)(1))){
+                                      // a resize will kill our block ptr, so we gotta update it
+                                      block = world.blocks.elements + i;
+                                      Block_t* new_block = world.blocks.elements + new_block_index;
+                                      *new_block = *block;
+                                      new_block->teleport = false;
+                                      new_block->cut = final_src_cut;
+                                      new_block->pos.pixel += final_src_offset;
+                                      new_block->previous_mass = get_block_stack_mass(&world, new_block);
+                                  }
+
+                                  block->teleport_pos.pixel += final_dst_offset;
+                                  block->teleport_cut = final_dst_cut;
+                                  block->teleport_split = true;
                               }
 
                               // TODO: maybe only do this one time per loop in case multiple blocks teleport in a frame
@@ -3513,6 +3634,11 @@ int main(int argc, char** argv){
                          block->horizontal_move = block->teleport_horizontal_move;
                          block->vertical_move = block->teleport_vertical_move;
                          block->cut = block->teleport_cut;
+
+                         if(block->teleport_split){
+                             // TODO: unsure about this *fix*
+                             block->previous_mass = get_block_stack_mass(&world, block);
+                         }
 
                          // reset started_on_pixel since we teleported and no longer want to follow those as a rule
                          block->started_on_pixel_x = 0;

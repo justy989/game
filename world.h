@@ -28,6 +28,8 @@ struct TeleportPosition_t{
      Position_t pos;
      Vec_t delta;
      U8 rotations = 0;
+     Coord_t src_portal;
+     Coord_t dst_portal;
 };
 
 struct TeleportPositionResult_t{
@@ -110,7 +112,7 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                                                          S8 player_pushing_block_rotation, World_t* world);
 
 TeleportPositionResult_t teleport_position_across_portal(Position_t position, Vec_t pos_delta, World_t* world,
-                                                         Coord_t premove_coord, Coord_t postmove_coord);
+                                                         Coord_t premove_coord, Coord_t postmove_coord, bool require_on = true);
 
 void illuminate(Coord_t coord, U8 value, World_t* world, Coord_t from_portal = Coord_t{-1, -1});
 

@@ -50,6 +50,11 @@ struct MapDoorV1_t{
      Direction_t face;
 };
 
+struct PortalV1_t{
+    Direction_t face;
+    bool on;
+};
+
 struct MapInteractiveV1_t{
      InteractiveType_t type;
      Coord_t coord;
@@ -60,7 +65,7 @@ struct MapInteractiveV1_t{
           MapPopupV1_t popup;
           Stairs_t stairs;
           MapDoorV1_t door; // up or down
-          Portal_t portal;
+          PortalV1_t portal;
           WireCross_t wire_cross;
      };
 };
