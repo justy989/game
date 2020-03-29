@@ -3138,43 +3138,112 @@ int main(int argc, char** argv){
                                          (!direction_is_horizontal(src_portal_dir) &&
                                           (original_src_cut == BLOCK_CUT_TOP_HALF || original_src_cut == BLOCK_CUT_BOTTOM_HALF))){
                                           // we kill the block
-                                      }else if(original_src_cut == BLOCK_CUT_WHOLE){
+                                      }else{
+                                          if(original_src_cut == BLOCK_CUT_WHOLE){
+                                              switch(src_portal_dir){
+                                              default:
+                                                 break;
+                                              case DIRECTION_LEFT:
+                                                 final_src_cut = BLOCK_CUT_RIGHT_HALF;
+                                                 final_dst_cut = BLOCK_CUT_LEFT_HALF;
+                                                 break;
+                                              case DIRECTION_RIGHT:
+                                                 final_src_cut = BLOCK_CUT_LEFT_HALF;
+                                                 final_dst_cut = BLOCK_CUT_RIGHT_HALF;
+                                                 break;
+                                              case DIRECTION_DOWN:
+                                                 final_src_cut = BLOCK_CUT_TOP_HALF;
+                                                 final_dst_cut = BLOCK_CUT_BOTTOM_HALF;
+                                                 break;
+                                              case DIRECTION_UP:
+                                                 final_src_cut = BLOCK_CUT_BOTTOM_HALF;
+                                                 final_dst_cut = BLOCK_CUT_TOP_HALF;
+                                                 break;
+                                              }
+                                          }else if(original_src_cut == BLOCK_CUT_LEFT_HALF){
+                                              switch(src_portal_dir){
+                                              default:
+                                                 break;
+                                              case DIRECTION_DOWN:
+                                                 final_src_cut = BLOCK_CUT_TOP_LEFT_QUARTER;
+                                                 final_dst_cut = BLOCK_CUT_BOTTOM_LEFT_QUARTER;
+                                                 break;
+                                              case DIRECTION_UP:
+                                                 final_src_cut = BLOCK_CUT_BOTTOM_LEFT_QUARTER;
+                                                 final_dst_cut = BLOCK_CUT_TOP_LEFT_QUARTER;
+                                                 break;
+                                              }
+                                          }else if(original_src_cut == BLOCK_CUT_RIGHT_HALF){
+                                              switch(src_portal_dir){
+                                              default:
+                                                 break;
+                                              case DIRECTION_DOWN:
+                                                 final_src_cut = BLOCK_CUT_TOP_RIGHT_QUARTER;
+                                                 final_dst_cut = BLOCK_CUT_BOTTOM_RIGHT_QUARTER;
+                                                 break;
+                                              case DIRECTION_UP:
+                                                 final_src_cut = BLOCK_CUT_BOTTOM_RIGHT_QUARTER;
+                                                 final_dst_cut = BLOCK_CUT_TOP_RIGHT_QUARTER;
+                                                 break;
+                                              }
+                                          }else if(original_src_cut == BLOCK_CUT_TOP_HALF){
+                                              switch(src_portal_dir){
+                                              default:
+                                                 break;
+                                              case DIRECTION_LEFT:
+                                                 final_src_cut = BLOCK_CUT_TOP_RIGHT_QUARTER;
+                                                 final_dst_cut = BLOCK_CUT_TOP_LEFT_QUARTER;
+                                                 break;
+                                              case DIRECTION_RIGHT:
+                                                 final_src_cut = BLOCK_CUT_TOP_LEFT_QUARTER;
+                                                 final_dst_cut = BLOCK_CUT_TOP_RIGHT_QUARTER;
+                                                 break;
+                                              }
+                                          }else if(original_src_cut == BLOCK_CUT_BOTTOM_HALF){
+                                              switch(src_portal_dir){
+                                              default:
+                                                 break;
+                                              case DIRECTION_LEFT:
+                                                 final_src_cut = BLOCK_CUT_BOTTOM_RIGHT_QUARTER;
+                                                 final_dst_cut = BLOCK_CUT_BOTTOM_LEFT_QUARTER;
+                                                 break;
+                                              case DIRECTION_RIGHT:
+                                                 final_src_cut = BLOCK_CUT_BOTTOM_LEFT_QUARTER;
+                                                 final_dst_cut = BLOCK_CUT_BOTTOM_RIGHT_QUARTER;
+                                                 break;
+                                              }
+                                          }
+
+                                          final_dst_cut = block_cut_rotate_clockwise(final_dst_cut, teleport_result.results[block->clone_id].rotations);
+
                                           switch(src_portal_dir){
                                           default:
                                              break;
                                           case DIRECTION_LEFT:
-                                             final_src_cut = BLOCK_CUT_RIGHT_HALF;
                                              final_src_offset.x = block_center_pixel_offset(block->cut).x;
                                              break;
                                           case DIRECTION_RIGHT:
-                                             final_src_cut = BLOCK_CUT_LEFT_HALF;
                                              break;
                                           case DIRECTION_DOWN:
-                                             final_src_cut = BLOCK_CUT_TOP_HALF;
                                              final_src_offset.y = block_center_pixel_offset(block->cut).y;
                                              break;
                                           case DIRECTION_UP:
-                                             final_src_cut = BLOCK_CUT_BOTTOM_HALF;
                                              break;
                                           }
 
                                           switch(dst_portal_dir){
                                           default:
-                                             break;
+                                              break;
                                           case DIRECTION_LEFT:
-                                             final_dst_cut = BLOCK_CUT_RIGHT_HALF;
-                                             final_dst_offset.x = block_center_pixel_offset(block->teleport_cut).x;
-                                             break;
+                                              final_dst_offset.x = block_center_pixel_offset(block->teleport_cut).x;
+                                              break;
                                           case DIRECTION_RIGHT:
-                                             final_dst_cut = BLOCK_CUT_LEFT_HALF;
-                                             break;
+                                              break;
                                           case DIRECTION_DOWN:
-                                             final_dst_cut = BLOCK_CUT_TOP_HALF;
-                                             final_dst_offset.y = block_center_pixel_offset(block->teleport_cut).y;
-                                             break;
+                                              final_dst_offset.y = block_center_pixel_offset(block->teleport_cut).y;
+                                              break;
                                           case DIRECTION_UP:
-                                             final_dst_cut = BLOCK_CUT_BOTTOM_HALF;
-                                             break;
+                                              break;
                                           }
                                       }
 
