@@ -3138,6 +3138,8 @@ int main(int argc, char** argv){
                                          (!direction_is_horizontal(src_portal_dir) &&
                                           (original_src_cut == BLOCK_CUT_TOP_HALF || original_src_cut == BLOCK_CUT_BOTTOM_HALF))){
                                           // we kill the block
+                                          // TODO: I'm hesitant to actually kill it because things use block index as references, so we move it to the origin
+                                          block->teleport_pos.pixel = Pixel_t{-TILE_SIZE_IN_PIXELS, -TILE_SIZE_IN_PIXELS};
                                       }else{
                                           if(original_src_cut == BLOCK_CUT_WHOLE){
                                               switch(src_portal_dir){
@@ -3245,23 +3247,23 @@ int main(int argc, char** argv){
                                           case DIRECTION_UP:
                                               break;
                                           }
-                                      }
 
-                                      S16 new_block_index = world.blocks.count;
-                                      if(resize(&world.blocks, world.blocks.count + (S16)(1))){
-                                          // a resize will kill our block ptr, so we gotta update it
-                                          block = world.blocks.elements + i;
-                                          Block_t* new_block = world.blocks.elements + new_block_index;
-                                          *new_block = *block;
-                                          new_block->teleport = false;
-                                          new_block->cut = final_src_cut;
-                                          new_block->pos.pixel += final_src_offset;
-                                          new_block->previous_mass = get_block_stack_mass(&world, new_block);
-                                      }
+                                          S16 new_block_index = world.blocks.count;
+                                          if(resize(&world.blocks, world.blocks.count + (S16)(1))){
+                                              // a resize will kill our block ptr, so we gotta update it
+                                              block = world.blocks.elements + i;
+                                              Block_t* new_block = world.blocks.elements + new_block_index;
+                                              *new_block = *block;
+                                              new_block->teleport = false;
+                                              new_block->cut = final_src_cut;
+                                              new_block->pos.pixel += final_src_offset;
+                                              new_block->previous_mass = get_block_stack_mass(&world, new_block);
+                                          }
 
-                                      block->teleport_pos.pixel += final_dst_offset;
-                                      block->teleport_cut = final_dst_cut;
-                                      block->teleport_split = true;
+                                          block->teleport_pos.pixel += final_dst_offset;
+                                          block->teleport_cut = final_dst_cut;
+                                          block->teleport_split = true;
+                                      }
                                   }
                               }
 
