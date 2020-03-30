@@ -1629,6 +1629,7 @@ DealWithPushResult_t deal_with_push_result(Block_t* pusher, Direction_t directio
 void push_entangled_block(Block_t* block, World_t* world, Direction_t push_dir, bool pushed_by_ice, TransferMomentum_t* instant_momentum){
      if(block->entangle_index < 0) return;
 
+     S16 block_mass = block_get_mass(block);
      S16 block_index = block - world->blocks.elements;
      S16 entangle_index = block->entangle_index;
      while(entangle_index != block_index && entangle_index >= 0){
@@ -1639,6 +1640,9 @@ void push_entangled_block(Block_t* block, World_t* world, Direction_t push_dir, 
           if(!held_down || on_ice){
                auto rotations_between = direction_rotations_between(static_cast<Direction_t>(entangled_block->rotation), static_cast<Direction_t>(block->rotation));
                Direction_t rotated_dir = direction_rotate_clockwise(push_dir, rotations_between);
+
+               S16 entangled_block_mass = block_get_mass(entangled_block);
+               F32 mass_ratio = (F32)(block_mass) / (F32)(entangled_block_mass);
 
                if(instant_momentum){
                     auto rotated_instant_momentum = *instant_momentum;
@@ -1660,14 +1664,14 @@ void push_entangled_block(Block_t* block, World_t* world, Direction_t push_dir, 
                          break;
                     }
 
-                    auto allowed_result = allowed_to_push(world, entangled_block, rotated_dir, &rotated_instant_momentum);
+                    auto allowed_result = allowed_to_push(world, entangled_block, rotated_dir, mass_ratio, &rotated_instant_momentum);
                     if(allowed_result.push){
-                         block_push(entangled_block, rotated_dir, world, pushed_by_ice, allowed_result.mass_ratio, &rotated_instant_momentum, true);
+                         block_push(entangled_block, rotated_dir, world, pushed_by_ice, mass_ratio * allowed_result.mass_ratio, &rotated_instant_momentum, true);
                     }
                }else{
-                    auto allowed_result = allowed_to_push(world, entangled_block, rotated_dir);
+                    auto allowed_result = allowed_to_push(world, entangled_block, rotated_dir, mass_ratio);
                     if(allowed_result.push){
-                         block_push(entangled_block, rotated_dir, world, pushed_by_ice, allowed_result.mass_ratio);
+                         block_push(entangled_block, rotated_dir, world, pushed_by_ice, mass_ratio * allowed_result.mass_ratio);
                     }
                }
           }
@@ -1679,6 +1683,7 @@ BlockPushes_t<MAX_BLOCK_PUSHES> push_entangled_block_pushes(Block_t* block, Worl
      BlockPushes_t<MAX_BLOCK_PUSHES> result;
      if(block->entangle_index < 0) return result;
 
+     S16 block_mass = block_get_mass(block);
      S16 block_index = block - world->blocks.elements;
      S16 entangle_index = block->entangle_index;
      while(entangle_index != block_index && entangle_index >= 0){
@@ -1709,12 +1714,16 @@ BlockPushes_t<MAX_BLOCK_PUSHES> push_entangled_block_pushes(Block_t* block, Worl
                     break;
                }
 
-               auto allowed_result = allowed_to_push(world, entangled_block, rotated_dir, &rotated_instant_momentum);
+               S16 entangled_block_mass = block_get_mass(entangled_block);
+               F32 mass_ratio = (F32)(block_mass) / (F32)(entangled_block_mass);
+
+               auto allowed_result = allowed_to_push(world, entangled_block, rotated_dir, mass_ratio, &rotated_instant_momentum);
                if(allowed_result.push){
                     BlockPush_t push;
                     push.add_pusher(get_block_index(world, pusher), collided_with_block_count);
                     push.pushee_index = get_block_index(world, entangled_block);
                     push.direction_mask = direction_to_direction_mask(rotated_dir);
+                    push.force = mass_ratio;
                     push.portal_rotations = 0;
                     // TODO: this is not correct, we need to calculate the correct index, I'm not sure how at the moment
                     push.entangled_with_push_index = 0;
@@ -1864,7 +1873,7 @@ BlockCollisionPushResult_t block_collision_push(BlockPush_t* push, World_t* worl
 
           instant_momentum.vel = total_momentum / instant_momentum.mass;
 
-          auto push_result = block_push(pushee, push_pos, push_pos_delta, push_direction, world, true, 1.0f, &instant_momentum);
+          auto push_result = block_push(pushee, push_pos, push_pos_delta, push_direction, world, true, push->force, &instant_momentum);
 
 #if 0
           LOG("  push result pushed %d, busy %d collisions %d\n", push_result.pushed, push_result.busy, push_result.collision_count);

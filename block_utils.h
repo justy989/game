@@ -144,6 +144,7 @@ struct BlockPush_t{
      S8 entangle_rotations = 0;
      bool invalidated = false;
      S8 entangled_with_push_index = -1;
+     F32 force = 1.0f;
 
      bool add_pusher(S16 index, S16 collided_with_block_count = 1, bool hit_entangler = false,
                      S8 pusher_entangle_rotations = 0, S8 pusher_portal_rotations = 0){

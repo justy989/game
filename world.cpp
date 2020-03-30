@@ -1377,7 +1377,7 @@ void apply_push_vertical(Block_t* block, Position_t pos, World_t* world, Directi
 
 BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Direction_t direction, World_t* world, bool pushed_by_ice, F32 force, TransferMomentum_t* instant_momentum,
                              bool from_entangler){
-     // LOG("block_push() %d -> %s\n", get_block_index(world, block), direction_to_string(direction));
+     // LOG("block_push() %d -> %s with force %f\n", get_block_index(world, block), direction_to_string(direction), force);
      // if(instant_momentum){
      //     LOG(" instant momentum %d, %f\n", instant_momentum->mass, instant_momentum->vel);
      // }
@@ -2344,7 +2344,7 @@ S16 get_block_mass_in_direction(World_t* world, Block_t* block, Direction_t dire
      return mass;
 }
 
-AllowedToPushResult_t allowed_to_push(World_t* world, Block_t* block, Direction_t direction, TransferMomentum_t* instant_momentum){
+AllowedToPushResult_t allowed_to_push(World_t* world, Block_t* block, Direction_t direction, F32 force, TransferMomentum_t* instant_momentum){
      AllowedToPushResult_t result;
      result.push = true;
 
@@ -2361,6 +2361,7 @@ AllowedToPushResult_t allowed_to_push(World_t* world, Block_t* block, Direction_
                result.push = collision_result_overcomes_friction(block->vel.y, elastic_result.second_final_velocity, total_block_mass);
           }else{
                F32 accel_time = BLOCK_ACCEL_TIME;
+
                if(block_width == HALF_TILE_SIZE_IN_PIXELS || block_height == HALF_TILE_SIZE_IN_PIXELS) accel_time *= SMALL_BLOCK_ACCEL_MULTIPLIER;
 
                F32 block_acceleration = (result.mass_ratio * BLOCK_ACCEL((block_center_pixel_offset(block->cut).y * PIXEL_SIZE), accel_time));
@@ -2374,6 +2375,24 @@ AllowedToPushResult_t allowed_to_push(World_t* world, Block_t* block, Direction_
                }
 
                if(applied_force < static_friction) result.push = false;
+          }
+     }else{
+          switch(block->cut){
+          case BLOCK_CUT_WHOLE:
+              if(force < 1.0f) result.push = false;
+              break;
+          case BLOCK_CUT_LEFT_HALF:
+          case BLOCK_CUT_RIGHT_HALF:
+          case BLOCK_CUT_TOP_HALF:
+          case BLOCK_CUT_BOTTOM_HALF:
+              if(force < 0.5f) result.push = false;
+              break;
+          case BLOCK_CUT_TOP_LEFT_QUARTER:
+          case BLOCK_CUT_TOP_RIGHT_QUARTER:
+          case BLOCK_CUT_BOTTOM_LEFT_QUARTER:
+          case BLOCK_CUT_BOTTOM_RIGHT_QUARTER:
+              if(force < 0.25f) result.push = false;
+              break;
           }
      }
 

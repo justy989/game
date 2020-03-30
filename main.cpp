@@ -18,13 +18,7 @@ Entanglement Puzzles:
 Current bugs:
 - two opposite entangled blocks moving towards each other do not do what I expect (stop halfway grid aligned, touching)
 - a block travelling diagonally at a wall will stop on both axis' against the wall because of the collision
-- Players standing on blocks going through portals colliding on ice seem to gain speed over time
-- Colliding with and pushing an entangled block on ice should cause force to flow through its entangles, but shouldn't push entanglers that are not on ice
-- in map 42, when I had 4 blocks lined up on the column of the pressure plate, and 1 block to the right at the bottom
-  of the collumn. When I pushed that 1 block up, the bottom block in the column of 4 disappeared
 - for collision, can shorten things pos_deltas before we cause pushes to happen on ice in the same frame due to collisions ?
-- if a collision happens to an entangled block on ice, where the entangled block is moving towards the collider, the entangled block's entanglers do not get pushed
-- We can have a stack overflow in our quad tree queries for blocks, not sure how yet
 - pressure plates don't see blocks as 1 pixel too small on the right and top, so their activation is delayed in those directions
 - A block on the tile outside a portal pushed into the portal to clone, the clone has weird behavior and ends up on the portal block
 - When pushing a block through a portal that turns off, the block keeps going
@@ -32,6 +26,10 @@ Current bugs:
 - Pushing a block and shooting an arrow causes the player to go invisible
 
 Big Features:
+- Split blocks
+  - pressure platers require at least a half block to push down
+  - entangled split blocks of different sizes that are pushed caused their entanglers to travel different distances
+- Bring back da pits
 - 3D
      - if we put a popup on the other side of a portal and a block 1 interval high goes through the portal, will it work the way we expect?
      - how does a stack of entangled blocks move? really f***ing weird right now tbh
@@ -40,10 +38,9 @@ Big Features:
 - When pushing blocks against blocks that are off-grid (due to pushing against a player), sometimes the blocks can't move towards other off-grid blocks
 - Players impact carry velocity until the block teleports
 - update get mass and block push to handle infinite mass cases
-- A way to tell which blocks are entangled
+- A visual way to tell which blocks are entangled
 - arrow kills player
 - arrow entanglement
-- Block splitting
 - Multiple players pushing blocks at once
 
 Cleanup:
@@ -2741,10 +2738,13 @@ int main(int argc, char** argv){
                                                   Vec_t block_horizontal_vel = {entangled_block->vel.x, 0};
                                                   auto block_move_dir = vec_direction(block_horizontal_vel);
                                                   if(block_move_dir != DIRECTION_COUNT){
+                                                       S16 block_mass = block_get_mass(player_prev_pushing_block);
+                                                       S16 entangled_block_mass = block_get_mass(block);
+                                                       F32 mass_ratio = (F32)(block_mass) / (F32)(entangled_block_mass);
                                                        auto direction_to_push = direction_rotate_clockwise(block_move_dir, rotations_between);
-                                                       auto allowed_result = allowed_to_push(&world, block, direction_to_push);
+                                                       auto allowed_result = allowed_to_push(&world, block, direction_to_push, mass_ratio);
                                                        if(allowed_result.push){
-                                                            block_push(block, direction_to_push, &world, false, allowed_result.mass_ratio);
+                                                            block_push(block, direction_to_push, &world, false, mass_ratio * allowed_result.mass_ratio);
                                                        }
                                                   }
                                              }
@@ -2766,10 +2766,13 @@ int main(int argc, char** argv){
                                                   Vec_t block_vertical_vel = {0, entangled_block->vel.y};
                                                   auto block_move_dir = vec_direction(block_vertical_vel);
                                                   if(block_move_dir != DIRECTION_COUNT){
+                                                       S16 block_mass = block_get_mass(player_prev_pushing_block);
+                                                       S16 entangled_block_mass = block_get_mass(block);
+                                                       F32 mass_ratio = (F32)(block_mass) / (F32)(entangled_block_mass);
                                                        auto direction_to_push = direction_rotate_clockwise(block_move_dir, rotations_between);
-                                                       auto allowed_result = allowed_to_push(&world, block, direction_to_push);
+                                                       auto allowed_result = allowed_to_push(&world, block, direction_to_push, mass_ratio);
                                                        if(allowed_result.push){
-                                                            block_push(block, direction_to_push, &world, false, allowed_result.mass_ratio);
+                                                            block_push(block, direction_to_push, &world, false, mass_ratio * allowed_result.mass_ratio);
                                                        }
                                                   }
                                              }

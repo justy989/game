@@ -54,6 +54,8 @@ DecelToStopResult_t calc_decel_to_stop(F32 initial_pos, F32 final_pos, F32 initi
      // (vf - vi) / t = a
      if(result.time != 0){
           result.accel = -initial_velocity / result.time;
+     }else{
+         result.accel = 0;
      }
 
      return result;
@@ -245,21 +247,20 @@ F32 begin_stopping_grid_aligned_motion(BlockCut_t cut, MotionComponent_t* motion
      }
 
      F32 normal_velocity = get_block_normal_pushed_velocity(cut, mass);
-     F32 normal_momentum = normal_velocity * (F32)(mass);
-
-     F32 current_momentum = motion->ref->vel * (F32)(mass);
 
      // we travel more grid cells when slowing down if there is a lot of momentum
-     S16 grid_cells_to_travel = (current_momentum / normal_momentum) - 1;
+     S16 grid_cells_to_travel = (motion->ref->vel / normal_velocity) - 1;
      if(grid_cells_to_travel < 0) grid_cells_to_travel = 0;
 
      if(positive){
-          goal += (lower_dim * PIXEL_SIZE) * (F32)(grid_cells_to_travel);
+          goal += (TILE_SIZE_IN_PIXELS * PIXEL_SIZE) * (F32)(grid_cells_to_travel);
      }else{
-          goal -= (lower_dim * PIXEL_SIZE) * (F32)(grid_cells_to_travel);
+          goal -= (TILE_SIZE_IN_PIXELS * PIXEL_SIZE) * (F32)(grid_cells_to_travel);
      }
 
      auto decel_result = calc_decel_to_stop(final_pos, goal, motion->ref->vel);
+     // LOG("giving block with vel %f (normally %f) (a %f ratio) at %f going to %f an accel of %f\n",
+     //     motion->ref->vel, normal_velocity, motion->ref->vel / normal_velocity, final_pos, goal, decel_result.accel);
      return decel_result.accel;
 }
 
