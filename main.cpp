@@ -18,8 +18,9 @@ Entanglement Puzzles:
 Current bugs:
 - two opposite entangled blocks moving towards each other do not do what I expect (stop halfway grid aligned, touching)
 - a block travelling diagonally at a wall will stop on both axis' against the wall because of the collision
+- player is able to get into a block sometimes when standing on a popup that is going down and pushing a block that has fallen off of it
+- infinite recursion for entangled against pushes (may or may not be important that the pushes go through portals)
 - for collision, can shorten things pos_deltas before we cause pushes to happen on ice in the same frame due to collisions ?
-- pressure plates don't see blocks as 1 pixel too small on the right and top, so their activation is delayed in those directions
 - A block on the tile outside a portal pushed into the portal to clone, the clone has weird behavior and ends up on the portal block
 - When pushing a block through a portal that turns off, the block keeps going
 - Getting a block and it's rotated entangler to push into the centroid causes any other entangled blocks to alternate pushing
