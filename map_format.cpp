@@ -218,6 +218,7 @@ bool load_map_from_file_v1(FILE* file, Coord_t* player_start, TileMap_t* tilemap
           case INTERACTIVE_TYPE_DOOR:
                interactive->door.lift.up = map_interactives[i].door.up;
                interactive->door.lift.timer = 0.0f;
+               interactive->door.lift.ticks = DOOR_MAX_HEIGHT;
                interactive->door.face = map_interactives[i].door.face;
                break;
           case INTERACTIVE_TYPE_PORTAL:

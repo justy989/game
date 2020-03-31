@@ -879,7 +879,8 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                if(world->tilemap.tiles[y][x].id){
                     Coord_t coord {x, y};
                     bool collide_with_tile = false;
-                    position_slide_against_rect(player_pos, coord, PLAYER_RADIUS, &result.pos_delta, &collide_with_tile);
+                    Rect_t coord_rect = rect_surrounding_coord(coord);
+                    position_slide_against_rect(player_pos, coord_rect, PLAYER_RADIUS, &result.pos_delta, &collide_with_tile);
                     if(collide_with_tile){
                         result.collided = true;
                         collided_tile_dir = direction_between(player_coord, coord);
@@ -893,13 +894,89 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
           for(S16 x = min.x; x <= max.x; x++){
                Coord_t coord {x, y};
 
-               Interactive_t* interactive = quad_tree_interactive_solid_at(world->interactive_qt, &world->tilemap, coord, player_pos.z);
+               Interactive_t* interactive = quad_tree_interactive_solid_at(world->interactive_qt, &world->tilemap, coord, player_pos.z, true);
                if(interactive){
                     bool collided = false;
-                    position_slide_against_rect(player_pos, coord, PLAYER_RADIUS, &result.pos_delta, &collided);
-                    if(collided && !result.collided){
-                         result.collided = true;
-                         collided_interactive_dir = direction_between(player_coord, coord);
+                    bool empty_pit = true;
+                    if(interactive->type == INTERACTIVE_TYPE_PIT){
+                         Rect_t pit_rect = rect_surrounding_coord(coord);
+                         quad_tree_find_in(world->block_qt, pit_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
+
+                         bool cover_top_left = false;
+                         bool cover_top_right = false;
+                         bool cover_bottom_left = false;
+                         bool cover_bottom_right = false;
+
+                         Rect_t top_left_corner {pit_rect.left, (S16)(pit_rect.bottom + HALF_TILE_SIZE_IN_PIXELS), (S16)(pit_rect.left + HALF_TILE_SIZE_IN_PIXELS - 1), pit_rect.top};
+                         Rect_t top_right_corner {(S16)(pit_rect.left + HALF_TILE_SIZE_IN_PIXELS), (S16)(pit_rect.bottom + HALF_TILE_SIZE_IN_PIXELS), pit_rect.right, pit_rect.top};
+                         Rect_t bottom_left_corner {pit_rect.left, pit_rect.bottom, (S16)(pit_rect.left + HALF_TILE_SIZE_IN_PIXELS - 1), (S16)(pit_rect.bottom + HALF_TILE_SIZE_IN_PIXELS - 1)};
+                         Rect_t bottom_right_corner {(S16)(pit_rect.left + HALF_TILE_SIZE_IN_PIXELS), pit_rect.bottom, pit_rect.right, (S16)(pit_rect.bottom + HALF_TILE_SIZE_IN_PIXELS - 1)};
+
+                         for(S16 b = 0; b < block_count; b++){
+                              if(blocks[b]->pos.z > -HEIGHT_INTERVAL) continue;
+
+                              auto block_rect = block_get_inclusive_rect(blocks[b]);
+
+                              if(!rect_completely_in_rect(block_rect, pit_rect)) continue;
+
+                              if(rect_in_rect(top_left_corner, block_rect)){
+                                  cover_top_left = true;
+                                  empty_pit = false;
+                              }
+                              if(rect_in_rect(top_right_corner, block_rect)){
+                                  cover_top_right = true;
+                                  empty_pit = false;
+                              }
+                              if(rect_in_rect(bottom_left_corner, block_rect)){
+                                  cover_bottom_left = true;
+                                  empty_pit = false;
+                              }
+                              if(rect_in_rect(bottom_right_corner, block_rect)){
+                                  cover_bottom_right = true;
+                                  empty_pit = false;
+                              }
+                         }
+
+                         if(!cover_top_left){
+                             position_slide_against_rect(player_pos, top_left_corner, PLAYER_RADIUS, &result.pos_delta, &collided);
+                             if(collided && !result.collided){
+                                  result.collided = true;
+                                  collided_interactive_dir = direction_between(player_coord, coord);
+                             }
+                         }
+
+                         if(!cover_top_right){
+                             position_slide_against_rect(player_pos, top_right_corner, PLAYER_RADIUS, &result.pos_delta, &collided);
+                             if(collided && !result.collided){
+                                  result.collided = true;
+                                  collided_interactive_dir = direction_between(player_coord, coord);
+                             }
+                         }
+
+                         if(!cover_bottom_left){
+                             position_slide_against_rect(player_pos, bottom_left_corner, PLAYER_RADIUS, &result.pos_delta, &collided);
+                             if(collided && !result.collided){
+                                  result.collided = true;
+                                  collided_interactive_dir = direction_between(player_coord, coord);
+                             }
+                         }
+
+                         if(!cover_bottom_right){
+                             position_slide_against_rect(player_pos, bottom_right_corner, PLAYER_RADIUS, &result.pos_delta, &collided);
+                             if(collided && !result.collided){
+                                  result.collided = true;
+                                  collided_interactive_dir = direction_between(player_coord, coord);
+                             }
+                         }
+                    }
+
+                    if(empty_pit){
+                         Rect_t coord_rect = rect_surrounding_coord(coord);
+                         position_slide_against_rect(player_pos, coord_rect, PLAYER_RADIUS, &result.pos_delta, &collided);
+                         if(collided && !result.collided){
+                              result.collided = true;
+                              collided_interactive_dir = direction_between(player_coord, coord);
+                         }
                     }
                }
           }
@@ -1926,6 +2003,9 @@ void describe_coord(Coord_t coord, World_t* world){
                break;
           case INTERACTIVE_TYPE_PROMPT:
                type_string = "PROMPT";
+               break;
+          case INTERACTIVE_TYPE_PIT:
+               type_string = "PIT";
                break;
           }
 

@@ -304,6 +304,9 @@ void draw_interactive(Interactive_t* interactive, Vec_t pos_vec, Coord_t coord,
      case INTERACTIVE_TYPE_CLONE_KILLER:
           draw_theme_frame(pos_vec, theme_frame(4, 27));
           break;
+     case INTERACTIVE_TYPE_PIT:
+          draw_theme_frame(pos_vec, theme_frame(15, 8));
+          break;
      }
 }
 

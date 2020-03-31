@@ -87,3 +87,10 @@ S16 rect_intersecting_area(Rect_t a, Rect_t b){
      auto vertical = MINIMUM(a.top, b.top) - MAXIMUM(a.bottom, b.bottom);
      return abs(horizontal * vertical);
 }
+
+bool rect_completely_in_rect(Rect_t a, Rect_t b){
+    return (a.left >= b.left && a.left <= b.right &&
+            a.right >= b.left && a.right <= b.right &&
+            a.bottom >= b.bottom && a.bottom <= b.top &&
+            a.top >= b.bottom && a.top <= b.top);
+}

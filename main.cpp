@@ -2649,7 +2649,34 @@ int main(int argc, char** argv){
                for(S16 i = 0; i < world.blocks.count; i++){
                     auto block = world.blocks.elements + i;
 
-                    if(block->pos.z == 0) continue;
+                    if(block->pos.z <= 0){
+                         if(block->pos.z <= -HEIGHT_INTERVAL) continue;
+
+                         bool over_pit = false;
+
+                         auto coord = block_get_coord(block);
+                         auto* interactive = quad_tree_interactive_find_at(world.interactive_qt, coord);
+
+                         if(interactive && interactive->type == INTERACTIVE_TYPE_PIT){
+                              auto coord_rect = rect_surrounding_coord(coord);
+                              auto block_rect = block_get_inclusive_rect(block);
+                              if(rect_completely_in_rect(block_rect, coord_rect)){
+                                   block->vel.x = 0;
+                                   block->vel.y = 0;
+                                   block->accel.x = 0;
+                                   block->accel.y = 0;
+                                   block->pos.decimal.x = 0;
+                                   block->pos.decimal.y = 0;
+                                   block->pos_delta.x = 0;
+                                   block->pos_delta.y = 0;
+                                   reset_move(&block->horizontal_move);
+                                   reset_move(&block->vertical_move);
+                                   over_pit = true;
+                              }
+                         }
+
+                         if(!over_pit) continue;
+                    }
 
                     if(block->entangle_index >= 0){
                          S16 entangle_index = block->entangle_index;

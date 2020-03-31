@@ -30,6 +30,7 @@ enum InteractiveType_t{
      INTERACTIVE_TYPE_PROMPT,
      INTERACTIVE_TYPE_WIRE_CROSS,
      INTERACTIVE_TYPE_CLONE_KILLER,
+     INTERACTIVE_TYPE_PIT,
 };
 
 struct PressurePlate_t{

@@ -360,6 +360,12 @@ bool init(Editor_t* editor){
      interactive_clone_killer_category->elements[0].elements[0].type = STAMP_TYPE_INTERACTIVE;
      interactive_clone_killer_category->elements[0].elements[0].interactive.type = INTERACTIVE_TYPE_CLONE_KILLER;
 
+     auto* interactive_pit_category = editor->category_array.elements + EDITOR_CATEGORY_INTERACTIVE_PIT;
+     init(interactive_pit_category, 1);
+     init(interactive_pit_category->elements, 1);
+     interactive_pit_category->elements[0].elements[0].type = STAMP_TYPE_INTERACTIVE;
+     interactive_pit_category->elements[0].elements[0].interactive.type = INTERACTIVE_TYPE_PIT;
+
      return true;
 }
 
