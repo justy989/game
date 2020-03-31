@@ -1626,8 +1626,21 @@ DealWithPushResult_t deal_with_push_result(Block_t* pusher, Direction_t directio
 }
 
 
-void push_entangled_block(Block_t* block, World_t* world, Direction_t push_dir, bool pushed_by_ice, TransferMomentum_t* instant_momentum){
+void push_entangled_block(Block_t* block, World_t* world, Direction_t push_dir, bool pushed_by_ice, F32 force, TransferMomentum_t* instant_momentum){
      if(block->entangle_index < 0) return;
+
+     PushFromEntangler_t from_entangler;
+
+     if(direction_is_horizontal(push_dir)){
+         from_entangler.accel = block->accel.x / force;
+         from_entangler.move_time_left = block->horizontal_move.time_left;
+         from_entangler.coast_vel = block->coast_vel.x / force;
+     }else{
+         from_entangler.accel = block->accel.y / force;
+         from_entangler.move_time_left = block->vertical_move.time_left;
+         from_entangler.coast_vel = block->coast_vel.y / force;
+     }
+     from_entangler.cut = block->cut;
 
      S16 block_mass = block_get_mass(block);
      S16 block_index = block - world->blocks.elements;
@@ -1666,12 +1679,12 @@ void push_entangled_block(Block_t* block, World_t* world, Direction_t push_dir, 
 
                     auto allowed_result = allowed_to_push(world, entangled_block, rotated_dir, mass_ratio, &rotated_instant_momentum);
                     if(allowed_result.push){
-                         block_push(entangled_block, rotated_dir, world, pushed_by_ice, mass_ratio * allowed_result.mass_ratio, &rotated_instant_momentum, true);
+                         block_push(entangled_block, rotated_dir, world, pushed_by_ice, mass_ratio * allowed_result.mass_ratio, &rotated_instant_momentum, &from_entangler);
                     }
                }else{
                     auto allowed_result = allowed_to_push(world, entangled_block, rotated_dir, mass_ratio);
                     if(allowed_result.push){
-                         block_push(entangled_block, rotated_dir, world, pushed_by_ice, mass_ratio * allowed_result.mass_ratio);
+                         block_push(entangled_block, rotated_dir, world, pushed_by_ice, mass_ratio * allowed_result.mass_ratio, nullptr, &from_entangler);
                     }
                }
           }

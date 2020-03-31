@@ -319,21 +319,39 @@ bool check_direction_from_block_for_adjacent_walls(Block_t* block, TileMap_t* ti
                                                    Direction_t direction){
      Pixel_t pixel_a {};
      Pixel_t pixel_b {};
-     block_adjacent_pixels_to_check(block->pos, block->pos_delta, block->cut, direction, &pixel_a, &pixel_b);
+     auto block_pos = block->teleport ? block->teleport_pos : block->pos;
+     auto block_pos_delta = block->teleport ? block->teleport_pos_delta : block->pos_delta;
+     block_adjacent_pixels_to_check(block_pos, block_pos_delta, block->cut, direction, &pixel_a, &pixel_b);
      Coord_t coord_a = pixel_to_coord(pixel_a);
      Coord_t coord_b = pixel_to_coord(pixel_b);
 
      if(tilemap_is_solid(tilemap, coord_a)){
-          if(!tilemap_is_solid(tilemap, coord_a - direction)) return true;
+          if(!tilemap_is_solid(tilemap, coord_a - direction)){
+              return true;
+          }
      }else if(tilemap_is_solid(tilemap, coord_b)){
-          if(!tilemap_is_solid(tilemap, coord_b - direction)) return true;
+          if(!tilemap_is_solid(tilemap, coord_b - direction)){
+              return true;
+          }
      }
 
      Interactive_t* a = quad_tree_interactive_solid_at(interactive_qt, tilemap, coord_a, block->pos.z);
      Interactive_t* b = quad_tree_interactive_solid_at(interactive_qt, tilemap, coord_b, block->pos.z);
 
-     if(a) return true;
-     if(b) return true;
+     if(a){
+         if(is_active_portal(a) && a->portal.has_block_inside && a->portal.wants_to_turn_off){
+             // pass
+         }else{
+             return true;
+         }
+     }
+     if(b){
+         if(is_active_portal(a) && a->portal.has_block_inside && a->portal.wants_to_turn_off){
+             // pass
+         }else{
+             return true;
+         }
+     }
 
      return false;
 }
@@ -515,36 +533,42 @@ CheckBlockCollisionResult_t check_block_collision(World_t* world, Block_t* block
      return CheckBlockCollisionResult_t{};
 }
 
-void update_stop_on_boundry_while_player_coasting(Direction_t move_dir, DirectionMask_t vel_mask, bool* stop_on_boundary_x, bool* stop_on_boundary_y){
+enum StopOnBoundary_t{
+    DO_NOT_STOP_ON_BOUNDARY,
+    STOP_ON_BOUNDARY_TRACKING_START,
+    STOP_ON_BOUNDARY_IGNORING_START,
+};
+
+void update_stop_on_boundry_while_player_coasting(Direction_t move_dir, DirectionMask_t vel_mask, StopOnBoundary_t* stop_on_boundary_x, StopOnBoundary_t* stop_on_boundary_y){
      switch(move_dir){
      default:
           break;
      case DIRECTION_LEFT:
           if(vel_mask & DIRECTION_MASK_RIGHT){
-               *stop_on_boundary_x = true;
+               *stop_on_boundary_x = STOP_ON_BOUNDARY_IGNORING_START;
           }else if(vel_mask & DIRECTION_MASK_UP || vel_mask & DIRECTION_MASK_DOWN){
-               *stop_on_boundary_y = true;
+               *stop_on_boundary_y = STOP_ON_BOUNDARY_IGNORING_START;
           }
           break;
      case DIRECTION_RIGHT:
           if(vel_mask & DIRECTION_MASK_LEFT){
-               *stop_on_boundary_x = true;
+               *stop_on_boundary_x = STOP_ON_BOUNDARY_IGNORING_START;
           }else if(vel_mask & DIRECTION_MASK_UP || vel_mask & DIRECTION_MASK_DOWN){
-               *stop_on_boundary_y = true;
+               *stop_on_boundary_y = STOP_ON_BOUNDARY_IGNORING_START;
           }
           break;
      case DIRECTION_UP:
           if(vel_mask & DIRECTION_MASK_DOWN){
-               *stop_on_boundary_y = true;
+               *stop_on_boundary_y = STOP_ON_BOUNDARY_IGNORING_START;
           }else if(vel_mask & DIRECTION_MASK_LEFT || vel_mask & DIRECTION_MASK_RIGHT){
-               *stop_on_boundary_x = true;
+               *stop_on_boundary_x = STOP_ON_BOUNDARY_IGNORING_START;
           }
           break;
      case DIRECTION_DOWN:
           if(vel_mask & DIRECTION_MASK_UP){
-               *stop_on_boundary_y = true;
+               *stop_on_boundary_y = STOP_ON_BOUNDARY_IGNORING_START;
           }else if(vel_mask & DIRECTION_MASK_LEFT || vel_mask & DIRECTION_MASK_RIGHT){
-               *stop_on_boundary_x = true;
+               *stop_on_boundary_x = STOP_ON_BOUNDARY_IGNORING_START;
           }
           break;
      }
@@ -728,37 +752,37 @@ DoBlockCollisionResults_t do_block_collision(World_t* world, Block_t* block, S16
 
      S16 block_index = get_block_index(world, block);
 
-     bool stop_on_boundary_x = false;
-     bool stop_on_boundary_y = false;
+     StopOnBoundary_t stop_on_boundary_x = DO_NOT_STOP_ON_BOUNDARY;
+     StopOnBoundary_t stop_on_boundary_y = DO_NOT_STOP_ON_BOUNDARY;
 
      // if we are being stopped by the player and have moved more than the player radius (which is
      // a check to ensure we don't stop a block instantaneously) then stop on the coordinate boundaries
      if(block->stopped_by_player_horizontal && block->vel.x != 0){
-          stop_on_boundary_x = true;
+          stop_on_boundary_x = STOP_ON_BOUNDARY_TRACKING_START;
      }
 
      if(block->stopped_by_player_vertical && block->vel.y != 0){
-          stop_on_boundary_y = true;
+          stop_on_boundary_y = STOP_ON_BOUNDARY_TRACKING_START;
      }
 
      // check for adjacent walls
      if(block->pos_delta.x > 0.0f){
           if(check_direction_from_block_for_adjacent_walls(block, &world->tilemap, world->interactive_qt, DIRECTION_RIGHT)){
-               stop_on_boundary_x = true;
+               stop_on_boundary_x = STOP_ON_BOUNDARY_IGNORING_START;
           }
      }else if(block->pos_delta.x < 0.0f){
           if(check_direction_from_block_for_adjacent_walls(block, &world->tilemap, world->interactive_qt, DIRECTION_LEFT)){
-               stop_on_boundary_x = true;
+               stop_on_boundary_x = STOP_ON_BOUNDARY_IGNORING_START;
           }
      }
 
      if(block->pos_delta.y > 0.0f){
           if(check_direction_from_block_for_adjacent_walls(block, &world->tilemap, world->interactive_qt, DIRECTION_UP)){
-               stop_on_boundary_y = true;
+               stop_on_boundary_y = STOP_ON_BOUNDARY_IGNORING_START;
           }
      }else if(block->pos_delta.y < 0.0f){
           if(check_direction_from_block_for_adjacent_walls(block, &world->tilemap, world->interactive_qt, DIRECTION_DOWN)){
-               stop_on_boundary_y = true;
+               stop_on_boundary_y = STOP_ON_BOUNDARY_IGNORING_START;
           }
      }
 
@@ -821,7 +845,8 @@ DoBlockCollisionResults_t do_block_collision(World_t* world, Block_t* block, S16
 
      if(stop_on_boundary_x){
           // stop on tile boundaries separately for each axis
-          S16 boundary_x = range_passes_boundary(block->pos.pixel.x, final_pos.pixel.x, block_get_width_in_pixels(block), block->started_on_pixel_x);
+          S16 boundary_x = range_passes_boundary(block->pos.pixel.x, final_pos.pixel.x, block_get_lowest_dimension(block),
+                                                 stop_on_boundary_x == STOP_ON_BOUNDARY_TRACKING_START ? block->started_on_pixel_x : 0);
           if(boundary_x){
                result.repeat_collision_pass = true;
 
@@ -838,7 +863,8 @@ DoBlockCollisionResults_t do_block_collision(World_t* world, Block_t* block, S16
      }
 
      if(stop_on_boundary_y){
-          S16 boundary_y = range_passes_boundary(block->pos.pixel.y, final_pos.pixel.y, block_get_height_in_pixels(block), block->started_on_pixel_y);
+          S16 boundary_y = range_passes_boundary(block->pos.pixel.y, final_pos.pixel.y, block_get_lowest_dimension(block),
+                                                 stop_on_boundary_y == STOP_ON_BOUNDARY_TRACKING_START ? block->started_on_pixel_y : 0);
           if(boundary_y){
                result.repeat_collision_pass = true;
 
@@ -1712,6 +1738,22 @@ int main(int argc, char** argv){
                     case SDL_SCANCODE_M:
                          if(editor.mode == EDITOR_MODE_CATEGORY_SELECT){
                               player_start = mouse_select_world(mouse_screen, camera);
+                         }else if(editor.mode == EDITOR_MODE_OFF){
+                              resetting = true;
+                         }
+                         break;
+                    case SDL_SCANCODE_R:
+                         if(editor.mode == EDITOR_MODE_CATEGORY_SELECT){
+                              auto coord = mouse_select_world(mouse_screen, camera);
+                              auto rect = rect_surrounding_coord(coord);
+
+                              S16 block_count = 0;
+                              Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
+                              quad_tree_find_in(world.block_qt, rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
+                              for(S16 i = 0; i < block_count; i++){
+                                   blocks[i]->rotation += 1;
+                                   blocks[i]->rotation %= DIRECTION_COUNT;
+                              }
                          }else if(editor.mode == EDITOR_MODE_OFF){
                               resetting = true;
                          }
@@ -2818,7 +2860,7 @@ int main(int argc, char** argv){
                          }
                     }
 
-                    S16 mass = get_block_stack_mass(&world, block);
+                    S16 mass = block_get_mass(block);
 
                     update_motion_grid_aligned(block->cut, &block->horizontal_move, &x_component,
                                                coasting_horizontally, dt,
@@ -3300,6 +3342,11 @@ int main(int argc, char** argv){
                                           block->teleport_cut = final_dst_cut;
                                           block->teleport_split = true;
                                       }
+
+                                      src_portal->portal.on = false;
+                                      dst_portal->portal.on = false;
+                                      src_portal->portal.wants_to_turn_off = false;
+                                      dst_portal->portal.wants_to_turn_off = false;
                                   }
                               }
 
@@ -3968,7 +4015,7 @@ int main(int argc, char** argv){
                                              player->push_time = 0.0f;
                                         }else if(player->entangle_push_time > BLOCK_PUSH_TIME && block_to_push->entangle_index >= 0 && block_to_push->entangle_index < world.blocks.count){
                                              player->pushing_block_dir = push_block_dir;
-                                             push_entangled_block(block_to_push, &world, push_block_dir, false);
+                                             push_entangled_block(block_to_push, &world, push_block_dir, false, allowed_result.mass_ratio);
                                              player->entangle_push_time = 0.0f;
                                         }
 

@@ -98,6 +98,13 @@ struct AllowedToPushResult_t{
      F32 mass_ratio = 0.0f;
 };
 
+struct PushFromEntangler_t{
+    F32 accel = 0.0f;
+    F32 move_time_left = 0.0f;
+    F32 coast_vel = 0.0f;
+    BlockCut_t cut = BLOCK_CUT_WHOLE;
+};
+
 void sort_blocks_by_ascending_height(Block_t** blocks, S16 block_count);
 void sort_blocks_by_descending_height(Block_t** blocks, S16 block_count);
 
@@ -119,10 +126,13 @@ void illuminate(Coord_t coord, U8 value, World_t* world, Coord_t from_portal = C
 void spread_ice(Coord_t center, S8 height, S16 radius, World_t* world, bool teleported = false);
 void melt_ice(Coord_t center, S8 height, S16 radius, World_t* world, bool teleported = false);
 
-BlockPushMoveDirectionResult_t block_push(Block_t* block, MoveDirection_t move_direction, World_t* world, bool pushed_by_ice, F32 force = 1.0f, TransferMomentum_t* instant_momentum = nullptr);
-BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Direction_t direction, World_t* world, bool pushed_by_ice, F32 force = 1.0f, TransferMomentum_t* instant_momentum = nullptr,
-                             bool from_entangler = false);
-BlockPushResult_t block_push(Block_t* block, Direction_t direction, World_t* world, bool pushed_by_ice, F32 force = 1.0f, TransferMomentum_t* instant_momentum = nullptr, bool from_entangler = false);
+BlockPushMoveDirectionResult_t block_push(Block_t* block, MoveDirection_t move_direction, World_t* world, bool pushed_by_ice,
+                                          F32 force = 1.0f, TransferMomentum_t* instant_momentum = nullptr);
+BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Direction_t direction, World_t* world,
+                             bool pushed_by_ice, F32 force = 1.0f, TransferMomentum_t* instant_momentum = nullptr,
+                             PushFromEntangler_t* from_entangler = NULL);
+BlockPushResult_t block_push(Block_t* block, Direction_t direction, World_t* world, bool pushed_by_ice, F32 force = 1.0f,
+                             TransferMomentum_t* instant_momentum = nullptr, PushFromEntangler_t* from_entangler = NULL);
 bool block_pushable(Block_t* block, Direction_t direction, World_t* world);
 bool reset_players(ObjectArray_t<Player_t>* players);
 

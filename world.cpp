@@ -1201,7 +1201,7 @@ BlockPushMoveDirectionResult_t block_push(Block_t* block, MoveDirection_t move_d
 }
 
 BlockPushResult_t block_push(Block_t* block, Direction_t direction, World_t* world, bool pushed_by_ice, F32 force, TransferMomentum_t* instant_momentum,
-                             bool from_entangler){
+                             PushFromEntangler_t* from_entangler){
      return block_push(block, block->pos, block->pos_delta, direction, world, pushed_by_ice, force, instant_momentum, from_entangler);
 }
 
@@ -1262,7 +1262,8 @@ static F32 get_block_velocity_ratio(World_t* world, Block_t* block, F32 vel, F32
 }
 
 void apply_push_horizontal(Block_t* block, Position_t pos, World_t* world, Direction_t direction, TransferMomentum_t* instant_momentum,
-                           bool pushed_by_ice, F32 force, BlockPushResult_t* result){
+                           bool pushed_by_ice, F32 force, PushFromEntangler_t* from_entangler, BlockPushResult_t* result){
+      auto original_move_state = block->horizontal_move.state;
       if(pushed_by_ice){
            auto elastic_result = elastic_transfer_momentum_to_block(instant_momentum, world, block, direction);
            if(collision_result_overcomes_friction(block->vel.x, elastic_result.second_final_velocity, get_block_stack_mass(world, block))){
@@ -1290,27 +1291,45 @@ void apply_push_horizontal(Block_t* block, Position_t pos, World_t* world, Direc
            block->horizontal_move.state = MOVE_STATE_STARTING;
            block->horizontal_move.sign = (direction == DIRECTION_LEFT) ? MOVE_SIGN_NEGATIVE : MOVE_SIGN_POSITIVE;
 
-           F32 accel_time = BLOCK_ACCEL_TIME;
-           S16 lower_dim = block_get_lowest_dimension(block);
+           if(from_entangler){
+               block->accel.x = from_entangler->accel * force;
+               block->coast_vel.x = from_entangler->coast_vel * force;
+               block->horizontal_move.time_left = from_entangler->move_time_left;
 
-           if(lower_dim == HALF_TILE_SIZE_IN_PIXELS) accel_time *= SMALL_BLOCK_ACCEL_MULTIPLIER;
+               if(original_move_state == MOVE_STATE_IDLING){
+                   block->stop_distance_pixel_x = (S16)(block_get_lowest_dimension(from_entangler->cut) * force) * 0.5f;
+               }
 
-           F32 half_distance_to_next_grid_center = calc_half_distance_to_next_grid_center(block->pos.pixel.x, block->pos.decimal.x,
-                                                                                          lower_dim,
-                                                                                          direction == DIRECTION_RIGHT, true);
-           F32 velocity_ratio = get_block_velocity_ratio(world, block, block->vel.x, force);
+               if(direction == DIRECTION_LEFT && block->accel.x > 0){
+                   block->accel.x = -block->accel.x;
+                   block->coast_vel.x = -block->coast_vel.x;
+               }else if(direction == DIRECTION_RIGHT && block->accel.x < 0){
+                   block->accel.x = -block->accel.x;
+                   block->coast_vel.x = -block->coast_vel.x;
+               }
+           }else{
+               F32 accel_time = BLOCK_ACCEL_TIME;
+               S16 lower_dim = block_get_lowest_dimension(block->cut);
 
-           block->accel.x = calc_accel_from_stop(half_distance_to_next_grid_center, accel_time) * force;
+               if(lower_dim == HALF_TILE_SIZE_IN_PIXELS) accel_time *= SMALL_BLOCK_ACCEL_MULTIPLIER;
 
-           F32 ideal_accel = calc_accel_from_stop((lower_dim / 2) * PIXEL_SIZE, accel_time) * force;
+               F32 half_distance_to_next_grid_center = calc_half_distance_to_next_grid_center(block->pos.pixel.x, block->pos.decimal.x,
+                                                                                              lower_dim,
+                                                                                              direction == DIRECTION_RIGHT, true);
+               F32 velocity_ratio = get_block_velocity_ratio(world, block, block->vel.x, force);
 
-           if(direction == DIRECTION_LEFT){
-               ideal_accel = -ideal_accel;
-               block->accel.x = -block->accel.x;
+               block->accel.x = calc_accel_from_stop(half_distance_to_next_grid_center, accel_time) * force;
+
+               F32 ideal_accel = calc_accel_from_stop((lower_dim / 2) * PIXEL_SIZE, accel_time) * force;
+
+               if(direction == DIRECTION_LEFT){
+                   ideal_accel = -ideal_accel;
+                   block->accel.x = -block->accel.x;
+               }
+
+               block->coast_vel.x = calc_velocity_motion(0, ideal_accel, accel_time);
+               block->horizontal_move.time_left = accel_time - (velocity_ratio * accel_time);
            }
-
-           block->coast_vel.x = calc_velocity_motion(0, ideal_accel, accel_time);
-           block->horizontal_move.time_left = accel_time - (velocity_ratio * accel_time);
       }else{
            result->busy = true;
            return;
@@ -1320,7 +1339,8 @@ void apply_push_horizontal(Block_t* block, Position_t pos, World_t* world, Direc
 }
 
 void apply_push_vertical(Block_t* block, Position_t pos, World_t* world, Direction_t direction, TransferMomentum_t* instant_momentum,
-                         bool pushed_by_ice, F32 force, BlockPushResult_t* result){
+                         bool pushed_by_ice, F32 force, PushFromEntangler_t* from_entangler, BlockPushResult_t* result){
+      auto original_move_state = block->vertical_move.state;
       if(pushed_by_ice){
            auto elastic_result = elastic_transfer_momentum_to_block(instant_momentum, world, block, direction);
            if(collision_result_overcomes_friction(block->vel.y, elastic_result.second_final_velocity, get_block_stack_mass(world, block))){
@@ -1348,25 +1368,43 @@ void apply_push_vertical(Block_t* block, Position_t pos, World_t* world, Directi
            block->vertical_move.state = MOVE_STATE_STARTING;
            block->vertical_move.sign = (direction == DIRECTION_DOWN) ? MOVE_SIGN_NEGATIVE : MOVE_SIGN_POSITIVE;
 
-           F32 accel_time = BLOCK_ACCEL_TIME;
-           S16 lower_dim = block_get_lowest_dimension(block);
+           if(from_entangler){
+               block->accel.y = from_entangler->accel * force;
+               block->coast_vel.y = from_entangler->coast_vel * force;
+               block->vertical_move.time_left = from_entangler->move_time_left;
 
-           if(lower_dim == HALF_TILE_SIZE_IN_PIXELS) accel_time *= SMALL_BLOCK_ACCEL_MULTIPLIER;
+               if(original_move_state == MOVE_STATE_IDLING){
+                   block->stop_distance_pixel_y = (S16)(block_get_lowest_dimension(from_entangler->cut) * force) * 0.5f;
+               }
 
-           F32 half_distance_to_next_grid_center = calc_half_distance_to_next_grid_center(block->pos.pixel.y, block->pos.decimal.y,
-                                                                                          lower_dim,
-                                                                                          direction == DIRECTION_UP, false);
-           F32 velocity_ratio = get_block_velocity_ratio(world, block, block->vel.y, force);
+               if(direction == DIRECTION_DOWN && block->accel.y > 0){
+                   block->accel.y = -block->accel.y;
+                   block->coast_vel.y = -block->coast_vel.y;
+               }else if(direction == DIRECTION_UP && block->accel.y < 0){
+                   block->accel.y = -block->accel.y;
+                   block->coast_vel.y = -block->coast_vel.y;
+               }
+           }else{
+               F32 accel_time = BLOCK_ACCEL_TIME;
+               S16 lower_dim = block_get_lowest_dimension(block->cut);
 
-           block->accel.y = calc_accel_from_stop(half_distance_to_next_grid_center, accel_time) * force;
+               if(lower_dim == HALF_TILE_SIZE_IN_PIXELS) accel_time *= SMALL_BLOCK_ACCEL_MULTIPLIER;
 
-           F32 ideal_accel = calc_accel_from_stop((lower_dim / 2) * PIXEL_SIZE, accel_time) * force;
-           if(direction == DIRECTION_DOWN){
-               ideal_accel = -ideal_accel;
-               block->accel.y = -block->accel.y;
+               F32 half_distance_to_next_grid_center = calc_half_distance_to_next_grid_center(block->pos.pixel.y, block->pos.decimal.y,
+                                                                                              lower_dim,
+                                                                                              direction == DIRECTION_UP, false);
+               F32 velocity_ratio = get_block_velocity_ratio(world, block, block->vel.y, force);
+
+               block->accel.y = calc_accel_from_stop(half_distance_to_next_grid_center, accel_time) * force;
+
+               F32 ideal_accel = calc_accel_from_stop((lower_dim / 2) * PIXEL_SIZE, accel_time) * force;
+               if(direction == DIRECTION_DOWN){
+                   ideal_accel = -ideal_accel;
+                   block->accel.y = -block->accel.y;
+               }
+               block->coast_vel.y = calc_velocity_motion(0, ideal_accel, accel_time);
+               block->vertical_move.time_left = accel_time - (velocity_ratio * accel_time);
            }
-           block->coast_vel.y = calc_velocity_motion(0, ideal_accel, accel_time);
-           block->vertical_move.time_left = accel_time - (velocity_ratio * accel_time);
       }else{
            result->busy = true;
            return;
@@ -1376,7 +1414,7 @@ void apply_push_vertical(Block_t* block, Position_t pos, World_t* world, Directi
 }
 
 BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Direction_t direction, World_t* world, bool pushed_by_ice, F32 force, TransferMomentum_t* instant_momentum,
-                             bool from_entangler){
+                             PushFromEntangler_t* from_entangler){
      // LOG("block_push() %d -> %s with force %f\n", get_block_index(world, block), direction_to_string(direction), force);
      // if(instant_momentum){
      //     LOG(" instant momentum %d, %f\n", instant_momentum->mass, instant_momentum->vel);
@@ -1456,7 +1494,7 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
                          auto push_result = block_push(against_block, against_block_push_dir, world, pushed_by_ice, force, &split_instant_momentum);
 
                          if(push_result.pushed){
-                              push_entangled_block(against_block, world, against_block_push_dir, pushed_by_ice, &split_instant_momentum);
+                              push_entangled_block(against_block, world, against_block_push_dir, pushed_by_ice, force, &split_instant_momentum);
 
                               // if this push entangle call results in our velocity changing, update our block_push_vel
                               if(from_entangler){
@@ -1542,7 +1580,7 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
 
                     if(push_result.pushed){
                          if(!are_entangled){
-                             push_entangled_block(against_block, world, against_block_push_dir, pushed_by_ice, instant_momentum);
+                             push_entangled_block(against_block, world, against_block_push_dir, pushed_by_ice, force, instant_momentum);
                          }
                     }else{
                          return result;
@@ -1596,7 +1634,7 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
 
                    if(push_result.pushed){
                         if(!are_entangled){
-                            push_entangled_block(against_block, world, against_block_push_dir, pushed_by_ice, instant_momentum);
+                            push_entangled_block(against_block, world, against_block_push_dir, pushed_by_ice, force, instant_momentum);
                         }
                    }else{
                         return result;
@@ -1673,6 +1711,7 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
                         block->horizontal_move.time_left = BLOCK_ACCEL_TIME;
                         block->horizontal_move.state = MOVE_STATE_STARTING;
                         block->started_on_pixel_x = 0;
+                        block->stop_distance_pixel_x = 0;
                         return result;
                     }
                }
@@ -1702,6 +1741,7 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
                         block->vertical_move.time_left = BLOCK_ACCEL_TIME;
                         block->vertical_move.state = MOVE_STATE_STARTING;
                         block->started_on_pixel_y = 0;
+                        block->stop_distance_pixel_y = 0;
                         return result;
                     }
                }
@@ -1714,16 +1754,16 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
      default:
           break;
      case DIRECTION_LEFT:
-          apply_push_horizontal(block, pos, world, direction, instant_momentum, pushed_by_ice, force, &result);
+          apply_push_horizontal(block, pos, world, direction, instant_momentum, pushed_by_ice, force, from_entangler, &result);
           break;
      case DIRECTION_RIGHT:
-          apply_push_horizontal(block, pos, world, direction, instant_momentum, pushed_by_ice, force, &result);
+          apply_push_horizontal(block, pos, world, direction, instant_momentum, pushed_by_ice, force, from_entangler, &result);
           break;
      case DIRECTION_DOWN:
-          apply_push_vertical(block, pos, world, direction, instant_momentum, pushed_by_ice, force, &result);
+          apply_push_vertical(block, pos, world, direction, instant_momentum, pushed_by_ice, force, from_entangler, &result);
           break;
      case DIRECTION_UP:
-          apply_push_vertical(block, pos, world, direction, instant_momentum, pushed_by_ice, force, &result);
+          apply_push_vertical(block, pos, world, direction, instant_momentum, pushed_by_ice, force, from_entangler, &result);
           break;
      }
 
@@ -1833,7 +1873,7 @@ void describe_coord(Coord_t coord, World_t* world){
      auto* interactive = quad_tree_find_at(world->interactive_qt, coord.x, coord.y);
      if(interactive){
           const char* type_string = "INTERACTIVE_TYPE_UKNOWN";
-          const int info_string_len = 32;
+          const int info_string_len = 128;
           char info_string[info_string_len];
           memset(info_string, 0, info_string_len);
 
@@ -1872,8 +1912,8 @@ void describe_coord(Coord_t coord, World_t* world){
                break;
           case INTERACTIVE_TYPE_PORTAL:
                type_string = "PORTAL";
-               snprintf(info_string, info_string_len, "face: %s, on: %d", direction_to_string(interactive->portal.face),
-                        interactive->portal.on);
+               snprintf(info_string, info_string_len, "face: %s, on: %d has_block_inside: %d wants_to_turn_off: %d", direction_to_string(interactive->portal.face),
+                        interactive->portal.on, interactive->portal.has_block_inside, interactive->portal.wants_to_turn_off);
                break;
           case INTERACTIVE_TYPE_BOMB:
                type_string = "BOMB";
@@ -2377,23 +2417,7 @@ AllowedToPushResult_t allowed_to_push(World_t* world, Block_t* block, Direction_
                if(applied_force < static_friction) result.push = false;
           }
      }else{
-          switch(block->cut){
-          case BLOCK_CUT_WHOLE:
-              if(force < 1.0f) result.push = false;
-              break;
-          case BLOCK_CUT_LEFT_HALF:
-          case BLOCK_CUT_RIGHT_HALF:
-          case BLOCK_CUT_TOP_HALF:
-          case BLOCK_CUT_BOTTOM_HALF:
-              if(force < 0.5f) result.push = false;
-              break;
-          case BLOCK_CUT_TOP_LEFT_QUARTER:
-          case BLOCK_CUT_TOP_RIGHT_QUARTER:
-          case BLOCK_CUT_BOTTOM_LEFT_QUARTER:
-          case BLOCK_CUT_BOTTOM_RIGHT_QUARTER:
-              if(force < 0.25f) result.push = false;
-              break;
-          }
+          if(force < 1.0f) result.push = false;
      }
 
      return result;

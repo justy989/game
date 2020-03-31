@@ -39,6 +39,7 @@ struct Move_t{
      };
 };
 
+#pragma pack(push, 1)
 struct Motion_t{
      Vec_t pos_delta;
      Vec_t prev_vel;
@@ -53,6 +54,13 @@ struct Motion_t{
 
 struct GridMotion_t : public Motion_t{
      union{
+         S16 stop_distance_pixel_x;
+         F32 padding_1;
+     };
+
+     S16 stop_distance_pixel_y;
+
+     union{
           S16 started_on_pixel_x;
           F32 padding_2;
      };
@@ -61,7 +69,7 @@ struct GridMotion_t : public Motion_t{
 
      union{
           S16 stop_on_pixel_x;
-          F32 padding_0;
+          F32 padding_3;
      };
 
      S16 stop_on_pixel_y;
@@ -72,9 +80,9 @@ struct GridMotion_t : public Motion_t{
 
 struct MotionComponentRef_t{
      F32 pos_delta;
-     F32 padding_0;
-     F32 prev_vel;
      F32 padding_1;
+     F32 prev_vel;
+     F32 padding_2;
      F32 vel;
      F32 padding_3;
      F32 accel;
@@ -83,10 +91,13 @@ struct MotionComponentRef_t{
      F32 padding_5;
      F32 target_vel;
      F32 padding_6;
-     S16 start_on_pixel;
+     S16 stop_distance_pixel;
      F32 padding_7;
+     S16 start_on_pixel;
+     F32 padding_8;
      S16 stop_on_pixel;
 };
+#pragma pack(pop)
 
 struct MotionComponent_t{
      MotionComponentRef_t* ref = nullptr;
@@ -101,7 +112,7 @@ struct DecelToStopResult_t{
 MotionComponent_t motion_x_component(Motion_t* motion);
 MotionComponent_t motion_y_component(Motion_t* motion);
 
-Motion_t copy_motion_from_component(MotionComponent_t* motion);
+GridMotion_t copy_motion_from_component(MotionComponent_t* motion);
 F32 calc_coast_motion_time_left(BlockCut_t cut, MotionComponent_t* motion, F32 pos);
 F32 calc_coast_motion_time_left(BlockCut_t cut, F32 pos, F32 vel);
 

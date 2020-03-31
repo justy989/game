@@ -155,6 +155,16 @@ S16 block_get_lowest_dimension(Block_t* block){
     return block_get_lowest_dimension(block->cut);
 }
 
+S16 block_get_highest_dimension(BlockCut_t cut){
+    S16 block_width = block_get_width_in_pixels(cut);
+    S16 block_height = block_get_height_in_pixels(cut);
+    return block_width < block_height ? block_height : block_width;
+}
+
+S16 block_get_highest_dimension(Block_t* block){
+    return block_get_highest_dimension(block->cut);
+}
+
 S16 block_get_right_inclusive_pixel(Block_t* block){
     return block_get_right_inclusive_pixel(block->pos.pixel.x, block->cut);
 }
@@ -213,5 +223,9 @@ S8 blocks_rotations_between(Block_t* a, Block_t* b){
 }
 
 S16 block_get_mass(Block_t* b){
-     return block_get_width_in_pixels(b) * block_get_height_in_pixels(b);
+     return block_get_mass(b->cut);;
+}
+
+S16 block_get_mass(BlockCut_t cut){
+     return block_get_width_in_pixels(cut) * block_get_height_in_pixels(cut);
 }
