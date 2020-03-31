@@ -76,6 +76,14 @@ Rect_t block_get_inclusive_rect(Block_t* b){
      return block_rect;
 }
 
+Rect_t block_get_exclusive_rect(Block_t* b){
+     Rect_t block_rect = {(S16)(b->pos.pixel.x),
+                          (S16)(b->pos.pixel.y),
+                          (S16)(b->pos.pixel.x + block_get_width_in_pixels(b)),
+                          (S16)(b->pos.pixel.y + block_get_height_in_pixels(b))};
+     return block_rect;
+}
+
 Rect_t block_get_inclusive_rect(Pixel_t pixel, BlockCut_t cut){
      Rect_t block_rect = {(S16)(pixel.x),
                           (S16)(pixel.y),

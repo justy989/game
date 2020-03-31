@@ -86,7 +86,8 @@ DemoEntries_t demo_entries_get(FILE* file){
      return entries;
 }
 
-bool demo_play_frame(Demo_t* demo, PlayerAction_t* player_action, ObjectArray_t<Player_t>* players, S64 frame_count){
+bool demo_play_frame(Demo_t* demo, PlayerAction_t* player_action, ObjectArray_t<Player_t>* players, S64 frame_count,
+                     Demo_t* record_demo){
      if(demo->entries.entries[demo->entry_index].player_action_type == PLAYER_ACTION_TYPE_END_DEMO){
           if(frame_count > demo->entries.entries[demo->entry_index].frame){
                return true;
@@ -94,8 +95,8 @@ bool demo_play_frame(Demo_t* demo, PlayerAction_t* player_action, ObjectArray_t<
      }else{
           while(frame_count == demo->entries.entries[demo->entry_index].frame){
                player_action_perform(player_action, players,
-                                     demo->entries.entries[demo->entry_index].player_action_type, demo->mode,
-                                     demo->file, frame_count);
+                                     demo->entries.entries[demo->entry_index].player_action_type, record_demo->mode,
+                                     record_demo->file, frame_count);
                demo->entry_index++;
           }
      }

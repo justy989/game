@@ -24,11 +24,11 @@ Current bugs:
 - When pushing a block through a portal that turns off, the block keeps going
 - Getting a block and it's rotated entangler to push into the centroid causes any other entangled blocks to alternate pushing
 - Pushing a block and shooting an arrow causes the player to go invisible
+- The -test command line option used on it's own with -play cannot load the map from the demo
 
 Big Features:
 - Split blocks
-  - pressure platers require at least a half block to push down
-  - entangled split blocks of different sizes that are pushed caused their entanglers to travel different distances
+  - detect split block centroids correctly
 - Bring back da pits
 - 3D
      - if we put a popup on the other side of a portal and a block 1 interval high goes through the portal, will it work the way we expect?
@@ -1158,19 +1158,20 @@ int main(int argc, char** argv){
      int window_x = SDL_WINDOWPOS_CENTERED;
      int window_y = SDL_WINDOWPOS_CENTERED;
 
-     Demo_t demo {};
+     Demo_t play_demo {};
+     Demo_t record_demo {};
 
      for(int i = 1; i < argc; i++){
           if(strcmp(argv[i], "-play") == 0){
                int next = i + 1;
                if(next >= argc) continue;
-               demo.filepath = argv[next];
-               demo.mode = DEMO_MODE_PLAY;
+               play_demo.filepath = argv[next];
+               play_demo.mode = DEMO_MODE_PLAY;
           }else if(strcmp(argv[i], "-record") == 0){
                int next = i + 1;
                if(next >= argc) continue;
-               demo.filepath = argv[next];
-               demo.mode = DEMO_MODE_RECORD;
+               record_demo.filepath = argv[next];
+               record_demo.mode = DEMO_MODE_RECORD;
           }else if(strcmp(argv[i], "-load") == 0){
                int next = i + 1;
                if(next >= argc) continue;
@@ -1194,7 +1195,8 @@ int main(int argc, char** argv){
           }else if(strcmp(argv[i], "-speed") == 0){
                int next = i + 1;
                if(next >= argc) continue;
-               demo.dt_scalar = (F32)(atof(argv[next]));
+               play_demo.dt_scalar = (F32)(atof(argv[next]));
+               record_demo.dt_scalar = (F32)(atof(argv[next]));
           }else if(strcmp(argv[i], "-failslow") == 0){
                fail_slow = true;
           }else if(strcmp(argv[i], "-winw") == 0){
@@ -1293,8 +1295,14 @@ int main(int argc, char** argv){
           if(text_texture == 0) return 1;
      }
 
-     if(demo.mode != DEMO_MODE_NONE){
-          if(!demo_begin(&demo)){
+     if(play_demo.mode != DEMO_MODE_NONE){
+          if(!demo_begin(&play_demo)){
+               return 1;
+          }
+     }
+
+     if(record_demo.mode != DEMO_MODE_NONE){
+          if(!demo_begin(&record_demo)){
                return 1;
           }
      }
@@ -1334,7 +1342,7 @@ int main(int argc, char** argv){
                return 1;
           }
 
-          if(demo.mode == DEMO_MODE_PLAY){
+          if(play_demo.mode == DEMO_MODE_PLAY){
                cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
           }
      }else if(suite){
@@ -1344,8 +1352,8 @@ int main(int argc, char** argv){
 
           cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
 
-          demo.mode = DEMO_MODE_PLAY;
-          if(!load_map_number_demo(&demo, map_number, &frame_count)){
+          play_demo.mode = DEMO_MODE_PLAY;
+          if(!load_map_number_demo(&play_demo, map_number, &frame_count)){
                return 1;
           }
      }else if(map_number){
@@ -1353,13 +1361,13 @@ int main(int argc, char** argv){
                return 1;
           }
 
-          if(demo.mode == DEMO_MODE_PLAY){
+          if(play_demo.mode == DEMO_MODE_PLAY){
                cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
           }
 
-          if(first_frame > 0 && first_frame < demo.last_frame){
-               demo.seek_frame = first_frame;
-               demo.paused = true;
+          if(first_frame > 0 && first_frame < play_demo.last_frame){
+               play_demo.seek_frame = first_frame;
+               play_demo.paused = true;
           }
      }else{
           setup_default_room(&world);
@@ -1378,13 +1386,13 @@ int main(int argc, char** argv){
      auto current_time = last_time;
 
      while(!quit){
-          if((!suite || show_suite) && demo.seek_frame < 0){
+          if((!suite || show_suite) && play_demo.seek_frame < 0){
                current_time = std::chrono::system_clock::now();
                std::chrono::duration<double> elapsed_seconds = current_time - last_time;
                auto elapsed_milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(current_time - last_time);
                dt = (F32)(elapsed_seconds.count());
 
-               if(dt < FRAME_TIME / demo.dt_scalar){
+               if(dt < FRAME_TIME / play_demo.dt_scalar){
                     if(elapsed_milliseconds.count() < 16){
                          std::this_thread::sleep_for(std::chrono::milliseconds(1));
                     }
@@ -1395,15 +1403,14 @@ int main(int argc, char** argv){
           last_time = current_time;
 
           // TODO: consider 30fps as minimum for random noobs computers
-          // if(demo.mode) dt = FRAME_TIME; // the game always runs as if a 60th of a frame has occurred.
           dt = FRAME_TIME; // the game always runs as if a 60th of a frame has occurred.
 
           quad_tree_free(world.block_qt);
           world.block_qt = quad_tree_build(&world.blocks);
 
-          if(!demo.paused || demo.seek_frame >= 0){
+          if(!play_demo.paused || play_demo.seek_frame >= 0){
                frame_count++;
-               if(demo.seek_frame == frame_count) demo.seek_frame = -1;
+               if(play_demo.seek_frame == frame_count) play_demo.seek_frame = -1;
           }
 
           player_action.last_activate = player_action.activate;
@@ -1411,16 +1418,16 @@ int main(int argc, char** argv){
                world.players.elements[i].reface = false;
           }
 
-          if(demo.mode == DEMO_MODE_PLAY){
-               if(demo_play_frame(&demo, &player_action, &world.players, frame_count)){
+          if(play_demo.mode == DEMO_MODE_PLAY){
+               if(demo_play_frame(&play_demo, &player_action, &world.players, frame_count, &record_demo)){
                     if(test){
-                         bool passed = test_map_end_state(&world, &demo);
+                         bool passed = test_map_end_state(&world, &play_demo);
                          if(!passed){
                               LOG("test failed\n");
                               fail_count++;
                          }
                          if(!passed && !fail_slow){
-                              demo.mode = DEMO_MODE_NONE;
+                              play_demo.mode = DEMO_MODE_NONE;
                               if(suite && !show_suite) return 1;
                          }else if(suite){
                               map_number++;
@@ -1429,7 +1436,7 @@ int main(int argc, char** argv){
                               if(load_map_number_map(map_number, &world, &undo, &player_start, &player_action)){
                                    cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
 
-                                   if(load_map_number_demo(&demo, map_number, &frame_count)){
+                                   if(load_map_number_demo(&play_demo, map_number, &frame_count)){
                                         continue; // reset to the top of the loop
                                    }else{
                                         return 1;
@@ -1444,7 +1451,7 @@ int main(int argc, char** argv){
                               }
                          }
                     }else{
-                         demo.paused = true;
+                         play_demo.paused = true;
                     }
                }
           }
@@ -1468,29 +1475,29 @@ int main(int argc, char** argv){
                     case SDL_SCANCODE_A:
                          if(editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
                               move_selection(&editor, DIRECTION_LEFT);
-                         }else if(demo.mode == DEMO_MODE_PLAY){
-                              if(frame_count > 0 && demo.seek_frame < 0){
-                                   demo.seek_frame = frame_count - 1;
+                         }else if(play_demo.mode == DEMO_MODE_PLAY){
+                              if(frame_count > 0 && play_demo.seek_frame < 0){
+                                   play_demo.seek_frame = frame_count - 1;
 
                                    restart_demo(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives,
-                                                &demo, &frame_count, &player_start, &player_action, &undo);
+                                                &play_demo, &frame_count, &player_start, &player_action, &undo);
                               }
                          }else if(!resetting){
                               player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_LEFT_START,
-                                                    demo.mode, demo.file, frame_count);
+                                                    record_demo.mode, record_demo.file, frame_count);
                          }
                          break;
                     case SDL_SCANCODE_RIGHT:
                     case SDL_SCANCODE_D:
                          if(editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
                               move_selection(&editor, DIRECTION_RIGHT);
-                         }else if(demo.mode == DEMO_MODE_PLAY){
-                              if(demo.seek_frame < 0){
-                                   demo.seek_frame = frame_count + 1;
+                         }else if(play_demo.mode == DEMO_MODE_PLAY){
+                              if(play_demo.seek_frame < 0){
+                                   play_demo.seek_frame = frame_count + 1;
                               }
                          }else if(!resetting){
                               player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_RIGHT_START,
-                                                    demo.mode, demo.file, frame_count);
+                                                    record_demo.mode, record_demo.file, frame_count);
                          }
                          break;
                     case SDL_SCANCODE_UP:
@@ -1499,7 +1506,7 @@ int main(int argc, char** argv){
                               move_selection(&editor, DIRECTION_UP);
                          }else if(!resetting){
                               player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_UP_START,
-                                                    demo.mode, demo.file, frame_count);
+                                                    record_demo.mode, record_demo.file, frame_count);
                          }
                          break;
                     case SDL_SCANCODE_DOWN:
@@ -1508,28 +1515,28 @@ int main(int argc, char** argv){
                               move_selection(&editor, DIRECTION_DOWN);
                          }else if(!resetting){
                               player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_DOWN_START,
-                                                    demo.mode, demo.file, frame_count);
+                                                    record_demo.mode, record_demo.file, frame_count);
                          }
                          break;
                     case SDL_SCANCODE_E:
                          if(!resetting){
                               player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_ACTIVATE_START,
-                                                    demo.mode, demo.file, frame_count);
+                                                    record_demo.mode, record_demo.file, frame_count);
                          }
                          break;
                     case SDL_SCANCODE_SPACE:
-                         if(demo.mode == DEMO_MODE_PLAY){
-                              demo.paused = !demo.paused;
+                         if(play_demo.mode == DEMO_MODE_PLAY){
+                              play_demo.paused = !play_demo.paused;
                          }else{
                               if(!resetting){
                                    player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_SHOOT_START,
-                                                         demo.mode, demo.file, frame_count);
+                                                         record_demo.mode, record_demo.file, frame_count);
                               }
                          }
                          break;
                     case SDL_SCANCODE_L:
                          if(load_map_number_map(map_number, &world, &undo, &player_start, &player_action)){
-                              if(demo.mode == DEMO_MODE_PLAY){
+                              if(record_demo.mode == DEMO_MODE_PLAY){
                                    cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
                               }
                          }
@@ -1537,10 +1544,10 @@ int main(int argc, char** argv){
                     case SDL_SCANCODE_LEFTBRACKET:
                          map_number--;
                          if(load_map_number_map(map_number, &world, &undo, &player_start, &player_action)){
-                              if(demo.mode == DEMO_MODE_PLAY){
+                              if(record_demo.mode == DEMO_MODE_PLAY){
                                    cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
 
-                                   if(load_map_number_demo(&demo, map_number, &frame_count)){
+                                   if(load_map_number_demo(&play_demo, map_number, &frame_count)){
                                         continue; // reset to the top of the loop
                                    }else{
                                         return 1;
@@ -1553,10 +1560,10 @@ int main(int argc, char** argv){
                     case SDL_SCANCODE_RIGHTBRACKET:
                          map_number++;
                          if(load_map_number_map(map_number, &world, &undo, &player_start, &player_action)){
-                              if(demo.mode == DEMO_MODE_PLAY){
+                              if(play_demo.mode == DEMO_MODE_PLAY){
                                    cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
 
-                                   if(load_map_number_demo(&demo, map_number, &frame_count)){
+                                   if(load_map_number_demo(&play_demo, map_number, &frame_count)){
                                         continue; // reset to the top of the loop
                                    }else{
                                         return 1;
@@ -1567,14 +1574,14 @@ int main(int argc, char** argv){
                          }
                          break;
                     case SDL_SCANCODE_MINUS:
-                         if(demo.dt_scalar > 0.1f){
-                              demo.dt_scalar -= 0.1f;
-                              LOG("game dt scalar: %.1f\n", demo.dt_scalar);
+                         if(play_demo.dt_scalar > 0.1f){
+                              play_demo.dt_scalar -= 0.1f;
+                              LOG("game dt scalar: %.1f\n", play_demo.dt_scalar);
                          }
                          break;
                     case SDL_SCANCODE_EQUALS:
-                         demo.dt_scalar += 0.1f;
-                         LOG("game dt scalar: %.1f\n", demo.dt_scalar);
+                         play_demo.dt_scalar += 0.1f;
+                         LOG("game dt scalar: %.1f\n", play_demo.dt_scalar);
                          break;
                     case SDL_SCANCODE_V:
                          if(editor.mode != EDITOR_MODE_OFF){
@@ -1586,7 +1593,7 @@ int main(int argc, char** argv){
                     case SDL_SCANCODE_U:
                          if(!resetting){
                               player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_UNDO,
-                                                    demo.mode, demo.file, frame_count);
+                                                    record_demo.mode, record_demo.file, frame_count);
                          }
                          break;
                     case SDL_SCANCODE_N:
@@ -1788,49 +1795,49 @@ int main(int argc, char** argv){
                          break;
                     case SDL_SCANCODE_LEFT:
                     case SDL_SCANCODE_A:
-                         if(demo.mode == DEMO_MODE_PLAY) break;
+                         if(play_demo.mode == DEMO_MODE_PLAY) break;
                          if(resetting) break;
 
                          player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_LEFT_STOP,
-                                               demo.mode, demo.file, frame_count);
+                                               record_demo.mode, record_demo.file, frame_count);
                          break;
                     case SDL_SCANCODE_RIGHT:
                     case SDL_SCANCODE_D:
-                         if(demo.mode == DEMO_MODE_PLAY) break;
+                         if(play_demo.mode == DEMO_MODE_PLAY) break;
                          if(resetting) break;
 
                          player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_RIGHT_STOP,
-                                               demo.mode, demo.file, frame_count);
+                                               record_demo.mode, record_demo.file, frame_count);
                          break;
                     case SDL_SCANCODE_UP:
                     case SDL_SCANCODE_W:
-                         if(demo.mode == DEMO_MODE_PLAY) break;
+                         if(play_demo.mode == DEMO_MODE_PLAY) break;
                          if(resetting) break;
 
                          player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_UP_STOP,
-                                               demo.mode, demo.file, frame_count);
+                                               record_demo.mode, record_demo.file, frame_count);
                          break;
                     case SDL_SCANCODE_DOWN:
                     case SDL_SCANCODE_S:
-                         if(demo.mode == DEMO_MODE_PLAY) break;
+                         if(play_demo.mode == DEMO_MODE_PLAY) break;
                          if(resetting) break;
 
                          player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_DOWN_STOP,
-                                               demo.mode, demo.file, frame_count);
+                                               play_demo.mode, play_demo.file, frame_count);
                          break;
                     case SDL_SCANCODE_E:
-                         if(demo.mode == DEMO_MODE_PLAY) break;
+                         if(play_demo.mode == DEMO_MODE_PLAY) break;
                          if(resetting) break;
 
                          player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_ACTIVATE_STOP,
-                                               demo.mode, demo.file, frame_count);
+                                               record_demo.mode, record_demo.file, frame_count);
                          break;
                     case SDL_SCANCODE_SPACE:
-                         if(demo.mode == DEMO_MODE_PLAY) break;
+                         if(play_demo.mode == DEMO_MODE_PLAY) break;
                          if(resetting) break;
 
                          player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_SHOOT_STOP,
-                                               demo.mode, demo.file, frame_count);
+                                               record_demo.mode, record_demo.file, frame_count);
                          break;
                     case SDL_SCANCODE_LCTRL:
                          ctrl_down = false;
@@ -1846,17 +1853,17 @@ int main(int argc, char** argv){
                          default:
                               break;
                          case EDITOR_MODE_OFF:
-                              if(demo.mode == DEMO_MODE_PLAY){
+                              if(play_demo.mode == DEMO_MODE_PLAY){
                                    if(vec_in_quad(&pct_bar_outline_quad, mouse_screen)){
                                         seeked_with_mouse = true;
 
-                                        demo.seek_frame = (S64)((F32)(demo.last_frame) * mouse_screen.x);
+                                        play_demo.seek_frame = (S64)((F32)(play_demo.last_frame) * mouse_screen.x);
 
-                                        if(demo.seek_frame < frame_count){
+                                        if(play_demo.seek_frame < frame_count){
                                             restart_demo(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives,
-                                                         &demo, &frame_count, &player_start, &player_action, &undo);
-                                        }else if(demo.seek_frame == frame_count){
-                                             demo.seek_frame = -1;
+                                                         &play_demo, &frame_count, &player_start, &player_action, &undo);
+                                        }else if(play_demo.seek_frame == frame_count){
+                                             play_demo.seek_frame = -1;
                                         }
                                    }
                               }
@@ -2021,21 +2028,21 @@ int main(int argc, char** argv){
                          break;
                     }
 
-                    if(seeked_with_mouse && demo.mode == DEMO_MODE_PLAY){
-                         demo.seek_frame = (S64)((F32)(demo.last_frame) * mouse_screen.x);
+                    if(seeked_with_mouse && play_demo.mode == DEMO_MODE_PLAY){
+                         play_demo.seek_frame = (S64)((F32)(play_demo.last_frame) * mouse_screen.x);
 
-                         if(demo.seek_frame < frame_count){
+                         if(play_demo.seek_frame < frame_count){
                               restart_demo(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives,
-                                           &demo, &frame_count, &player_start, &player_action, &undo);
-                         }else if(demo.seek_frame == frame_count){
-                              demo.seek_frame = -1;
+                                           &play_demo, &frame_count, &player_start, &player_action, &undo);
+                         }else if(play_demo.seek_frame == frame_count){
+                              play_demo.seek_frame = -1;
                          }
                     }
                     break;
                }
           }
 
-          if(!demo.paused || demo.seek_frame >= 0){
+          if(!play_demo.paused || play_demo.seek_frame >= 0){
                collision_attempts = 1;
 
                reset_tilemap_light(&world);
@@ -4060,6 +4067,10 @@ int main(int argc, char** argv){
                for(S16 i = 0; i < world.interactives.count; i++){
                     Interactive_t* interactive = world.interactives.elements + i;
                     if(interactive->type == INTERACTIVE_TYPE_PRESSURE_PLATE){
+                         // if the tile is iced, the pressure plate shouldn't change state
+                         Tile_t* tile = tilemap_get_tile(&world.tilemap, interactive->coord);
+                         if(tile && tile_is_iced(tile)) continue;
+
                          bool should_be_down = false;
                          for(S16 p = 0; p < world.players.count; p++){
                               if(world.players.elements[p].pos.z != 0) continue;
@@ -4071,49 +4082,34 @@ int main(int argc, char** argv){
                          }
 
                          if(!should_be_down){
-                              Tile_t* tile = tilemap_get_tile(&world.tilemap, interactive->coord);
-                              if(tile){
-                                   if(!tile_is_iced(tile)){
-                                        Rect_t rect = rect_to_check_surrounding_blocks(coord_to_pixel_at_center(interactive->coord));
+                              Position_t plate_pos = coord_to_pos(interactive->coord);
+                              Quad_t plate_quad {0, 0, TILE_SIZE, TILE_SIZE};
+                              Rect_t rect = rect_to_check_surrounding_blocks(coord_to_pixel_at_center(interactive->coord));
+                              S16 mass_on_pressure_plate = 0;
 
-                                        S16 block_count = 0;
-                                        Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
-                                        quad_tree_find_in(world.block_qt, rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
+                              S16 block_count = 0;
+                              Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
+                              quad_tree_find_in(world.block_qt, rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
 
-                                        for(S16 b = 0; b < block_count; b++){
-                                             if(blocks[b]->pos.z != 0) continue;
+                              for(S16 b = 0; b < block_count; b++){
+                                   if(blocks[b]->pos.z != 0) continue;
 
-                                             DirectionMask_t bottom_left_mask = direction_mask_add(DIRECTION_MASK_DOWN, DIRECTION_MASK_LEFT);
-                                             Position_t bottom_left_pos = blocks[b]->pos;
+                                   Position_t block_pos = blocks[b]->teleport ? blocks[b]->teleport_pos : blocks[b]->pos;
+                                   Position_t relative_block_pos = block_pos - plate_pos;
+                                   Vec_t relative_block_pos_vec = pos_to_vec(relative_block_pos);
+                                   S16 block_width = block_get_width_in_pixels(blocks[b]);
+                                   S16 block_height = block_get_height_in_pixels(blocks[b]);
+                                   Quad_t block_quad {relative_block_pos_vec.x, relative_block_pos_vec.y,
+                                                      relative_block_pos_vec.x + ((F32)block_width * PIXEL_SIZE),
+                                                      relative_block_pos_vec.y + ((F32)block_height * PIXEL_SIZE)};
 
-                                             DirectionMask_t bottom_right_mask = direction_mask_add(DIRECTION_MASK_DOWN, DIRECTION_MASK_RIGHT);
-                                             Position_t bottom_right_pos{};
-                                             bottom_right_pos.pixel = block_bottom_right_pixel(blocks[b]->pos.pixel, blocks[b]->cut);
-                                             bottom_right_pos.decimal = blocks[b]->pos.decimal;
-
-                                             DirectionMask_t top_right_mask = direction_mask_add(DIRECTION_MASK_UP, DIRECTION_MASK_RIGHT);
-                                             Position_t top_right_pos{};
-                                             top_right_pos.pixel = block_top_right_pixel(blocks[b]->pos.pixel, blocks[b]->cut);
-                                             top_right_pos.decimal = blocks[b]->pos.decimal;
-
-                                             DirectionMask_t top_left_mask = direction_mask_add(DIRECTION_MASK_UP, DIRECTION_MASK_LEFT);
-                                             Position_t top_left_pos{};
-                                             top_left_pos.pixel = block_top_left_pixel(blocks[b]->pos.pixel, blocks[b]->cut);
-                                             top_left_pos.decimal = blocks[b]->pos.decimal;
-
-                                             Coord_t bottom_left = pixel_to_coord(get_corner_pixel_from_pos(bottom_left_pos, bottom_left_mask));
-                                             Coord_t bottom_right = pixel_to_coord(get_corner_pixel_from_pos(bottom_right_pos, bottom_right_mask));
-                                             Coord_t top_left = pixel_to_coord(get_corner_pixel_from_pos(top_left_pos, top_left_mask));
-                                             Coord_t top_right = pixel_to_coord(get_corner_pixel_from_pos(top_right_pos, top_right_mask));
-                                             if(interactive->coord == bottom_left ||
-                                                interactive->coord == bottom_right ||
-                                                interactive->coord == top_left ||
-                                                interactive->coord == top_right){
-                                                  should_be_down = true;
-                                                  break;
-                                             }
-                                        }
+                                   if(quad_in_quad_high_range_exclusive(&block_quad, &plate_quad)){
+                                        mass_on_pressure_plate += get_block_stack_mass(&world, blocks[b]);
                                    }
+                              }
+
+                              if(mass_on_pressure_plate >= block_get_mass(BLOCK_CUT_TOP_HALF)){
+                                   should_be_down = true;
                               }
                          }
 
@@ -4161,7 +4157,7 @@ int main(int argc, char** argv){
                }
           }
 
-          if((suite && !show_suite) || demo.seek_frame >= 0) continue;
+          if((suite && !show_suite) || play_demo.seek_frame >= 0) continue;
 
           // begin drawing
           Position_t screen_camera = camera - Vec_t{0.5f, 0.5f} + Vec_t{HALF_TILE_SIZE, HALF_TILE_SIZE};
@@ -4304,14 +4300,14 @@ int main(int argc, char** argv){
                glEnd();
           }
 
-          if(demo.mode == DEMO_MODE_PLAY){
-               F32 demo_pct = (F32)(frame_count) / (F32)(demo.last_frame);
+          if(play_demo.mode == DEMO_MODE_PLAY){
+               F32 demo_pct = (F32)(frame_count) / (F32)(play_demo.last_frame);
                Quad_t pct_bar_quad = {pct_bar_outline_quad.left, pct_bar_outline_quad.bottom, demo_pct, pct_bar_outline_quad.top};
                draw_quad_filled(&pct_bar_quad, 255.0f, 255.0f, 255.0f);
                draw_quad_wireframe(&pct_bar_outline_quad, 255.0f, 255.0f, 255.0f);
 
                char buffer[64];
-               snprintf(buffer, 64, "F: %ld/%ld C: %d", frame_count, demo.last_frame, collision_attempts);
+               snprintf(buffer, 64, "F: %ld/%ld C: %d", frame_count, play_demo.last_frame, collision_attempts);
 
                glBindTexture(GL_TEXTURE_2D, text_texture);
                glBegin(GL_QUADS);
@@ -4340,33 +4336,32 @@ int main(int argc, char** argv){
           SDL_GL_SwapWindow(window);
      }
 
-     switch(demo.mode){
-     default:
-          break;
-     case DEMO_MODE_RECORD:
-          player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_END_DEMO, demo.mode, demo.file, frame_count);
+     if(play_demo.mode == DEMO_MODE_PLAY){
+          fclose(play_demo.file);
+     }
+
+     if(record_demo.mode == DEMO_MODE_RECORD){
+          player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_END_DEMO, record_demo.mode, record_demo.file, frame_count);
+
           // save map and player position
-          save_map_to_file(demo.file, player_start, &world.tilemap, &world.blocks, &world.interactives);
-          switch(demo.version){
+          save_map_to_file(record_demo.file, player_start, &world.tilemap, &world.blocks, &world.interactives);
+
+          switch(record_demo.version){
           default:
                break;
           case 1:
-               fwrite(&world.players.elements->pos.pixel, sizeof(world.players.elements->pos.pixel), 1, demo.file);
+               fwrite(&world.players.elements->pos.pixel, sizeof(world.players.elements->pos.pixel), 1, record_demo.file);
                break;
           case 2:
           {
-               fwrite(&world.players.count, sizeof(world.players.count), 1, demo.file);
+               fwrite(&world.players.count, sizeof(world.players.count), 1, record_demo.file);
                for(S16 p = 0; p < world.players.count; p++){
                     Player_t* player = world.players.elements + p;
-                    fwrite(&player->pos.pixel, sizeof(player->pos.pixel), 1, demo.file);
+                    fwrite(&player->pos.pixel, sizeof(player->pos.pixel), 1, record_demo.file);
                }
           } break;
           }
-          fclose(demo.file);
-          break;
-     case DEMO_MODE_PLAY:
-          fclose(demo.file);
-          break;
+          fclose(record_demo.file);
      }
 
      quad_tree_free(world.interactive_qt);

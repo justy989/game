@@ -91,6 +91,7 @@ Coord_t block_get_coord(Block_t* block);
 Coord_t block_get_coord(Position_t pos, BlockCut_t cut);
 bool blocks_at_collidable_height(S8 a_z, S8 b_z);
 Rect_t block_get_inclusive_rect(Block_t* block);
+Rect_t block_get_exclusive_rect(Block_t* block);
 Rect_t block_get_inclusive_rect(Pixel_t pixel, BlockCut_t cut);
 void block_set_pos_from_center(Block_t* block, Position_t pos);
 S16 block_get_width_in_pixels(Block_t* block);
