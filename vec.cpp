@@ -42,3 +42,4 @@ Vec_t vec_project_onto(Vec_t a, Vec_t b){
 }
 
 bool operator !=(const Vec_t& a, const Vec_t& b){return (a.x != b.x || a.y != b.y);}
+bool operator ==(const Vec_t& a, const Vec_t& b){return (a.x == b.x && a.y == b.y);}

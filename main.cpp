@@ -604,17 +604,47 @@ void apply_block_collision(World_t* world, Block_t* block, F32 dt, CheckBlockCol
                     entangled_block_pos.pixel -= block_center_pixel_offset(entangled_block->cut);
 
                     auto final_block_pos = block->pos + block->pos_delta;
-                    auto pos_diff = pos_to_vec(final_block_pos - entangled_block_pos);
 
-                    S8 final_entangle_rotation = entangled_block->rotation - collision_result->collided_portal_rotations;
-                    S8 total_rotations_between = direction_rotations_between((Direction_t)(block->rotation), (Direction_t)(final_entangle_rotation));
+                    Quad_t final_block_quad = {0, 0,
+                                               (F32)block_get_width_in_pixels(block) * PIXEL_SIZE,
+                                               (F32)block_get_height_in_pixels(block) * PIXEL_SIZE};
+
+                    Vec_t final_block_center = {final_block_quad.right * 0.5f, final_block_quad.top * 0.5f};
+
+                    auto entangled_block_offset_vec = pos_to_vec(entangled_block_pos - final_block_pos);
+
+                    Quad_t entangled_block_quad = {entangled_block_offset_vec.x,
+                                                   entangled_block_offset_vec.y,
+                                                   entangled_block_offset_vec.x + (F32)block_get_width_in_pixels(entangled_block) * PIXEL_SIZE,
+                                                   entangled_block_offset_vec.y + (F32)block_get_height_in_pixels(entangled_block) * PIXEL_SIZE};
+
+                    Vec_t entangled_block_center = {entangled_block_quad.left + (entangled_block_quad.right - entangled_block_quad.left) * 0.5f,
+                                                    entangled_block_quad.bottom + (entangled_block_quad.top - entangled_block_quad.bottom) * 0.5f};
+
+                    auto closest_final_vec = closest_vec_in_quad(final_block_center, entangled_block_quad);
+                    auto closest_entangled_vec = closest_vec_in_quad(entangled_block_center, final_block_quad);
+
+                    auto pos_diff = closest_entangled_vec - closest_final_vec;
 
                     // TODO: this 0.0001f is a hack, it used to be an equality check, but the
                     //       numbers were slightly off in the case of rotated portals but not rotated entangled blocks
                     auto pos_dimension_delta = fabs(fabs(pos_diff.x) - fabs(pos_diff.y));
 
+                    S8 final_entangle_rotation = entangled_block->rotation - collision_result->collided_portal_rotations;
+                    S8 total_rotations_between = direction_rotations_between((Direction_t)(block->rotation), (Direction_t)(final_entangle_rotation));
+
+                    bool closest_entangled_is_a_corner = (closest_final_vec == Vec_t{entangled_block_quad.left, entangled_block_quad.bottom} ||
+                                                          closest_final_vec == Vec_t{entangled_block_quad.left, entangled_block_quad.top} ||
+                                                          closest_final_vec == Vec_t{entangled_block_quad.right, entangled_block_quad.bottom} ||
+                                                          closest_final_vec == Vec_t{entangled_block_quad.right, entangled_block_quad.top});
+
+                    bool closest_final_is_a_corner = (closest_entangled_vec == Vec_t{final_block_quad.left, final_block_quad.bottom} ||
+                                                      closest_entangled_vec == Vec_t{final_block_quad.left, final_block_quad.top} ||
+                                                      closest_entangled_vec == Vec_t{final_block_quad.right,final_block_quad.bottom} ||
+                                                      closest_entangled_vec == Vec_t{final_block_quad.right, final_block_quad.top});
+
                     // if positions are diagonal to each other and the rotation between them is odd, check if we are moving into each other
-                    if(pos_dimension_delta <= FLT_EPSILON && (total_rotations_between) % 2 == 1){
+                    if(closest_final_is_a_corner && closest_entangled_is_a_corner && pos_dimension_delta <= FLT_EPSILON && (total_rotations_between) % 2 == 1){
                          auto entangle_inside_result = block_inside_others(entangled_block->pos, entangled_block->pos_delta, entangled_block->cut, get_block_index(world, entangled_block),
                                                                            entangled_block->clone_id > 0, world->block_qt, world->interactive_qt, &world->tilemap, &world->blocks);
                          if(entangle_inside_result.count > 0 && entangle_inside_result.entries[0].block == block){

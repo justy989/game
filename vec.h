@@ -27,3 +27,4 @@ Vec_t vec_zero();
 Vec_t vec_project_onto(Vec_t a, Vec_t b);
 
 bool operator !=(const Vec_t& a, const Vec_t& b);
+bool operator ==(const Vec_t& a, const Vec_t& b);

@@ -270,7 +270,7 @@ Block_t* block_against_another_block(Position_t pos, BlockCut_t cut, Direction_t
      return nullptr;
 }
 
-Pixel_t get_check_pixel_against_centroid(Pixel_t block_pixel, Direction_t direction, S8 rotations_between){
+Pixel_t get_check_pixel_against_centroid(Pixel_t block_pixel, BlockCut_t cut, Direction_t direction, S8 rotations_between){
      Pixel_t check_pixel = {-1, -1};
 
      switch(direction){
@@ -279,7 +279,7 @@ Pixel_t get_check_pixel_against_centroid(Pixel_t block_pixel, Direction_t direct
      case DIRECTION_LEFT:
           if(rotations_between == 1){
                check_pixel.x = block_pixel.x - 1;
-               check_pixel.y = block_pixel.y + TILE_SIZE_IN_PIXELS;
+               check_pixel.y = block_pixel.y + block_get_height_in_pixels(cut);
           }else if(rotations_between == 3){
                check_pixel.x = block_pixel.x - 1;
                check_pixel.y = block_pixel.y - 1;
@@ -287,20 +287,20 @@ Pixel_t get_check_pixel_against_centroid(Pixel_t block_pixel, Direction_t direct
           break;
      case DIRECTION_UP:
           if(rotations_between == 1){
-               check_pixel.x = block_pixel.x + TILE_SIZE_IN_PIXELS;
-               check_pixel.y = block_pixel.y + TILE_SIZE_IN_PIXELS;
+               check_pixel.x = block_pixel.x + block_get_width_in_pixels(cut);
+               check_pixel.y = block_pixel.y + block_get_height_in_pixels(cut);
           }else if(rotations_between == 3){
                check_pixel.x = block_pixel.x - 1;
-               check_pixel.y = block_pixel.y + TILE_SIZE_IN_PIXELS;
+               check_pixel.y = block_pixel.y + block_get_height_in_pixels(cut);
           }
           break;
      case DIRECTION_RIGHT:
           if(rotations_between == 1){
-               check_pixel.x = block_pixel.x + TILE_SIZE_IN_PIXELS;
+               check_pixel.x = block_pixel.x + block_get_width_in_pixels(cut);
                check_pixel.y = block_pixel.y - 1;
           }else if(rotations_between == 3){
-               check_pixel.x = block_pixel.x + TILE_SIZE_IN_PIXELS;
-               check_pixel.y = block_pixel.y + TILE_SIZE_IN_PIXELS;
+               check_pixel.x = block_pixel.x + block_get_width_in_pixels(cut);
+               check_pixel.y = block_pixel.y + block_get_height_in_pixels(cut);
           }
           break;
      case DIRECTION_DOWN:
@@ -308,7 +308,7 @@ Pixel_t get_check_pixel_against_centroid(Pixel_t block_pixel, Direction_t direct
                check_pixel.x = block_pixel.x - 1;
                check_pixel.y = block_pixel.y - 1;
           }else if(rotations_between == 3){
-               check_pixel.x = block_pixel.x + TILE_SIZE_IN_PIXELS;
+               check_pixel.x = block_pixel.x + block_get_width_in_pixels(cut);
                check_pixel.y = block_pixel.y - 1;
           }
           break;
@@ -355,7 +355,7 @@ Block_t* check_portal_for_centroid_with_block(PortalExit_t* portal_exits, Coord_
 
                     auto check_block_pixel = portal_coord_center_pixel + check_block_portal_offset - block_center_pixel_offset(check_block->cut);
                     auto check_block_rect = block_get_inclusive_rect(check_block_pixel, check_block->cut);
-                    auto check_pixel = get_check_pixel_against_centroid(block->pos.pixel, block_move_dir, rotations_between);
+                    auto check_pixel = get_check_pixel_against_centroid(block->pos.pixel, block->cut, block_move_dir, rotations_between);
 
                     if(pixel_in_rect(check_pixel, check_block_rect)) return check_block;
                }
@@ -383,7 +383,7 @@ Block_t* rotated_entangled_blocks_against_centroid(Block_t* block, Direction_t d
           auto check_block_rect = block_get_inclusive_rect(check_block);
           S8 rotations_between = blocks_rotations_between(block, check_block);
 
-          auto check_pixel = get_check_pixel_against_centroid(block->pos.pixel, direction, rotations_between);
+          auto check_pixel = get_check_pixel_against_centroid(block->pos.pixel, block->cut, direction, rotations_between);
 
           if(pixel_in_rect(check_pixel, check_block_rect)) return check_block;
      }

@@ -357,6 +357,28 @@ Pixel_t closest_pixel_in_rect(Pixel_t pixel, Rect_t rect){
      return result;
 }
 
+Vec_t closest_vec_in_quad(Vec_t v, Quad_t quad){
+     Vec_t result;
+
+     if(v.x < quad.left){
+          result.x = quad.left;
+     }else if(v.x > quad.right){
+          result.x = quad.right;
+     }else{
+          result.x = v.x;
+     }
+
+     if(v.y < quad.bottom){
+          result.y = quad.bottom;
+     }else if(v.y > quad.top){
+          result.y = quad.top;
+     }else{
+          result.y = v.y;
+     }
+
+     return result;
+}
+
 bool direction_in_vec(Vec_t vec, Direction_t direction){
      switch(direction){
      default:
