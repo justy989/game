@@ -22,6 +22,8 @@ Current bugs:
 - infinite recursion for entangled against pushes (may or may not be important that the pushes go through portals)
 - when the player collides with anything we are killing their velocity and acceleration because of some floating point
   lameness, this is integrated into a ton of tests
+- an whole block entangled with a corner block where you push the whole block and try to stop the corner block, the
+  corner block is moving crazy fast and the player doesn't stop it as you would expect
 
 - for collision, can shorten things pos_deltas before we cause pushes to happen on ice in the same frame due to collisions ?
 - A block on the tile outside a portal pushed into the portal to clone, the clone has weird behavior and ends up on the portal block
@@ -31,8 +33,6 @@ Current bugs:
 - The -test command line option used on it's own with -play cannot load the map from the demo
 
 Features:
-- Split blocks
-  - detect split block centroids correctly
 - 3D
      - if we put a popup on the other side of a portal and a block 1 interval high goes through the portal, will it work the way we expect?
      - how does a stack of entangled blocks move? really f***ing weird right now tbh

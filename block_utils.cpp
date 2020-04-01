@@ -520,7 +520,8 @@ BlockInsideBlockListResult_t block_inside_block_list(Position_t block_to_check_p
                if(quad == quad_to_check) continue;
           }
 
-          if(quad_in_quad_high_range_exclusive(&quad, &quad_to_check)){
+          if(quad_in_quad_high_range_exclusive(&quad, &quad_to_check) ||
+             quad_in_quad_high_range_exclusive(&quad_to_check, &quad)){
                final_block_pos.pixel += block_center_pixel_offset(block->cut);
                result.add(block, final_block_pos, i);
           }
