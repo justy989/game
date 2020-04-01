@@ -20,6 +20,9 @@ Current bugs:
 - a block travelling diagonally at a wall will stop on both axis' against the wall because of the collision
 - player is able to get into a block sometimes when standing on a popup that is going down and pushing a block that has fallen off of it
 - infinite recursion for entangled against pushes (may or may not be important that the pushes go through portals)
+- when the player collides with anything we are killing their velocity and acceleration because of some floating point
+  lameness, this is integrated into a ton of tests
+
 - for collision, can shorten things pos_deltas before we cause pushes to happen on ice in the same frame due to collisions ?
 - A block on the tile outside a portal pushed into the portal to clone, the clone has weird behavior and ends up on the portal block
 - When pushing a block through a portal that turns off, the block keeps going
@@ -27,10 +30,9 @@ Current bugs:
 - Pushing a block and shooting an arrow causes the player to go invisible
 - The -test command line option used on it's own with -play cannot load the map from the demo
 
-Big Features:
+Features:
 - Split blocks
   - detect split block centroids correctly
-- Bring back da pits
 - 3D
      - if we put a popup on the other side of a portal and a block 1 interval high goes through the portal, will it work the way we expect?
      - how does a stack of entangled blocks move? really f***ing weird right now tbh
@@ -597,6 +599,9 @@ void apply_block_collision(World_t* world, Block_t* block, F32 dt, CheckBlockCol
                     // TODO: I don't love indexing the blocks without checking the index is valid first
                     auto* entangled_block = world->blocks.elements + collision_result->collided_block_index;
 
+                    S8 final_entangle_rotation = entangled_block->rotation - collision_result->collided_portal_rotations;
+                    S8 total_rotations_between = direction_rotations_between((Direction_t)(block->rotation), (Direction_t)(final_entangle_rotation));
+
                     // the entangled block pos might be faked due to portals, so use the resulting collision pos instead of the actual position
                     auto entangled_block_pos = collision_result->collided_pos;
 
@@ -613,10 +618,19 @@ void apply_block_collision(World_t* world, Block_t* block, F32 dt, CheckBlockCol
 
                     auto entangled_block_offset_vec = pos_to_vec(entangled_block_pos - final_block_pos);
 
+                    S16 block_width_in_pixels = block_get_width_in_pixels(entangled_block);
+                    S16 block_height_in_pixels = block_get_height_in_pixels(entangled_block);
+
+                    if(total_rotations_between % 2 == 1){
+                        S16 tmp = block_width_in_pixels;
+                        block_width_in_pixels = block_height_in_pixels;
+                        block_height_in_pixels = tmp;
+                    }
+
                     Quad_t entangled_block_quad = {entangled_block_offset_vec.x,
                                                    entangled_block_offset_vec.y,
-                                                   entangled_block_offset_vec.x + (F32)block_get_width_in_pixels(entangled_block) * PIXEL_SIZE,
-                                                   entangled_block_offset_vec.y + (F32)block_get_height_in_pixels(entangled_block) * PIXEL_SIZE};
+                                                   entangled_block_offset_vec.x + (F32)block_width_in_pixels * PIXEL_SIZE,
+                                                   entangled_block_offset_vec.y + (F32)block_height_in_pixels * PIXEL_SIZE};
 
                     Vec_t entangled_block_center = {entangled_block_quad.left + (entangled_block_quad.right - entangled_block_quad.left) * 0.5f,
                                                     entangled_block_quad.bottom + (entangled_block_quad.top - entangled_block_quad.bottom) * 0.5f};
@@ -629,9 +643,6 @@ void apply_block_collision(World_t* world, Block_t* block, F32 dt, CheckBlockCol
                     // TODO: this 0.0001f is a hack, it used to be an equality check, but the
                     //       numbers were slightly off in the case of rotated portals but not rotated entangled blocks
                     auto pos_dimension_delta = fabs(fabs(pos_diff.x) - fabs(pos_diff.y));
-
-                    S8 final_entangle_rotation = entangled_block->rotation - collision_result->collided_portal_rotations;
-                    S8 total_rotations_between = direction_rotations_between((Direction_t)(block->rotation), (Direction_t)(final_entangle_rotation));
 
                     bool closest_entangled_is_a_corner = (closest_final_vec == Vec_t{entangled_block_quad.left, entangled_block_quad.bottom} ||
                                                           closest_final_vec == Vec_t{entangled_block_quad.left, entangled_block_quad.top} ||
@@ -1854,7 +1865,7 @@ int main(int argc, char** argv){
                          if(resetting) break;
 
                          player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_DOWN_STOP,
-                                               play_demo.mode, play_demo.file, frame_count);
+                                               record_demo.mode, record_demo.file, frame_count);
                          break;
                     case SDL_SCANCODE_E:
                          if(play_demo.mode == DEMO_MODE_PLAY) break;
@@ -3679,7 +3690,7 @@ int main(int argc, char** argv){
                     for(S8 d = 0; d < DIRECTION_COUNT; d++){
                         Direction_t direction = static_cast<Direction_t>(d);
                         if(!direction_in_mask(block_push.direction_mask, direction)) continue;
-                        if(!block_pushable(pushee, direction, &world)) continue;
+                        if(!block_pushable(pushee, direction, &world, block_push.force)) continue;
                         pushable_direction_mask = direction_mask_add(pushable_direction_mask, direction);
                     }
 
@@ -3887,25 +3898,40 @@ int main(int argc, char** argv){
                          auto first_player = world.players.elements + 0;
 
                          // set everyone's rotation relative to the first player
-                         if(i != 0) player->rotation = direction_rotations_between((Direction_t)(player->rotation), (Direction_t)(first_player->rotation));
+                         if(i != 0){
+                             player->rotation = direction_rotations_between((Direction_t)(player->rotation), (Direction_t)(first_player->rotation));
+                         }
 
                          // set rotations for each direction the player wants to move
                          for(S8 d = 0; d < DIRECTION_COUNT; d++){
                               if(player_action.move[d]){
-                                   player->move_rotation[d] = (player->move_rotation[d] + first_player->teleport_rotation) % DIRECTION_COUNT;
+                                   player->move_rotation[d] = (player->move_rotation[d] + first_player->rotation) % DIRECTION_COUNT;
                               }
                          }
                     }else{
                          player->pos += player->pos_delta;
                     }
 
+                    auto pos_delta_save = player->pos_delta_save;
+                    if(player->teleport){
+                         pos_delta_save = vec_rotate_quadrants_clockwise(pos_delta_save, player->teleport_rotation);
+                    }
+
+                    // if we are updating player 0, have this move action ignore player rotation as we always clear player 0s rotation anyways.
+                    // however, we want to bring it back since future iterations will rely on the first player's rotation. this is really bad
+                    // but I can get away with it because of this descriptive comment and being the only programmer on the proj.
+                    S8 save_rotation = player->rotation;
+                    if(i == 0) player->rotation = 0;
+
                     build_move_actions_from_player(&player_action, player, move_actions, DIRECTION_COUNT);
+
+                    if(i == 0) player->rotation = save_rotation;
 
                     auto pure_input_pos_delta = player->pos_delta;
                     pure_input_pos_delta -= player->carried_pos_delta.positive + player->carried_pos_delta.negative;
 
                     // if we have stopped short in either component, kill the movement for that component if we are no longer pressing keys for it
-                    if(fabs(pure_input_pos_delta.x) < fabs(player->pos_delta_save.x)){
+                    if(fabs(pure_input_pos_delta.x) < fabs(pos_delta_save.x)){
                          if((pure_input_pos_delta.x < 0 && !move_actions[DIRECTION_LEFT]) ||
                             (pure_input_pos_delta.x > 0 && !move_actions[DIRECTION_RIGHT])){
                               player->vel.x = 0;
@@ -3913,7 +3939,7 @@ int main(int argc, char** argv){
                          }
                     }
 
-                    if(fabs(pure_input_pos_delta.y) < fabs(player->pos_delta_save.y)){
+                    if(fabs(pure_input_pos_delta.y) < fabs(pos_delta_save.y)){
                          if((pure_input_pos_delta.y < 0 && !move_actions[DIRECTION_DOWN]) ||
                             (pure_input_pos_delta.y > 0 && !move_actions[DIRECTION_UP])){
                               player->vel.y = 0;

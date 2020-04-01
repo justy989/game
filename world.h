@@ -133,7 +133,7 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
                              PushFromEntangler_t* from_entangler = NULL);
 BlockPushResult_t block_push(Block_t* block, Direction_t direction, World_t* world, bool pushed_by_ice, F32 force = 1.0f,
                              TransferMomentum_t* instant_momentum = nullptr, PushFromEntangler_t* from_entangler = NULL);
-bool block_pushable(Block_t* block, Direction_t direction, World_t* world);
+bool block_pushable(Block_t* block, Direction_t direction, World_t* world, F32 force);
 bool reset_players(ObjectArray_t<Player_t>* players);
 
 void describe_player(World_t* world, Player_t* player);

@@ -854,7 +854,7 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
           bool held_down = block_held_down_by_another_block(collision.block, world->block_qt, world->interactive_qt, &world->tilemap).held();
           bool on_ice = block_on_ice(collision.block->pos, collision.block->pos_delta, collision.block->cut,
                                      &world->tilemap, world->interactive_qt, world->block_qt);
-          bool pushable = block_pushable(collision.block, rotated_player_face, world);
+          bool pushable = block_pushable(collision.block, rotated_player_face, world, 1.0f);
 
           if(use_this_collision && collision.dir == player_face && (player_vel.x != 0.0f || player_vel.y != 0.0f) && (!held_down || (on_ice && pushable))){
                // check that we collide with exactly one block and that if we are pushing through a portal, it is not too high up
@@ -1730,7 +1730,12 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
           auto against_block = rotated_entangled_blocks_against_centroid(block, direction, world->block_qt, &world->blocks,
                                                                          world->interactive_qt, &world->tilemap);
           if(against_block){
-               return result;
+               // TODO: compress this logic with the logic in block_pushable()
+               // given the current force, and masses, can this push move the entangled block anyways?
+               S16 block_mass = block_get_mass(block);
+               S16 entangled_block_mass = block_get_mass(against_block);
+               F32 mass_ratio = (F32)(block_mass) / (F32)(entangled_block_mass);
+               if((mass_ratio * force) >= 1.0f) return result;
           }
      }
 
@@ -1848,7 +1853,7 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
      return result;
 }
 
-bool block_pushable(Block_t* block, Direction_t direction, World_t* world){
+bool block_pushable(Block_t* block, Direction_t direction, World_t* world, F32 force){
      Direction_t collided_block_push_dir = DIRECTION_COUNT;
      Block_t* collided_block = block_against_another_block(block->pos + block->pos_delta, block->cut, direction, world->block_qt,
                                                            world->interactive_qt, &world->tilemap, &collided_block_push_dir);
@@ -1856,15 +1861,19 @@ bool block_pushable(Block_t* block, Direction_t direction, World_t* world){
           if(collided_block == block){
                // pass, this happens in a corner portal!
           }else if(blocks_are_entangled(collided_block, block, &world->blocks)){
-               return block_pushable(collided_block, collided_block_push_dir, world);
+               return block_pushable(collided_block, collided_block_push_dir, world, force);
           }else{
                return false;
           }
      }
 
      if(block->entangle_index >= 0){
-          if(rotated_entangled_blocks_against_centroid(block, direction, world->block_qt, &world->blocks, world->interactive_qt, &world->tilemap)){
-               return false;
+          Block_t* entangled_block = rotated_entangled_blocks_against_centroid(block, direction, world->block_qt, &world->blocks, world->interactive_qt, &world->tilemap);
+          if(entangled_block){
+               S16 block_mass = block_get_mass(block);
+               S16 entangled_block_mass = block_get_mass(entangled_block);
+               F32 mass_ratio = (F32)(block_mass) / (F32)(entangled_block_mass);
+               if((mass_ratio * force) >= 1.0f) return false;
           }
      }
 
