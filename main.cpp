@@ -2709,7 +2709,8 @@ int main(int argc, char** argv){
                          if(interactive && interactive->type == INTERACTIVE_TYPE_PIT){
                               auto coord_rect = rect_surrounding_coord(coord);
                               auto block_rect = block_get_inclusive_rect(block);
-                              if(rect_completely_in_rect(block_rect, coord_rect)){
+                              if(rect_completely_in_rect(block_rect, coord_rect) &&
+                                 !block->held_up){
                                    block->vel.x = 0;
                                    block->vel.y = 0;
                                    block->accel.x = 0;
