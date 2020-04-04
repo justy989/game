@@ -730,9 +730,6 @@ void draw_editor(Editor_t* editor, World_t* world, Position_t screen_camera, Vec
      switch(editor->mode){
      default:
           break;
-     case EDITOR_MODE_OFF:
-          // pass
-          break;
      case EDITOR_MODE_CATEGORY_SELECT:
      {
           glBindTexture(GL_TEXTURE_2D, theme_texture);

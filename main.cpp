@@ -140,6 +140,12 @@ struct VecMaskCollisionEntry_t{
      Direction_t move_b_2;
 };
 
+enum GameMode_t{
+     GAME_MODE_PLAYING,
+     GAME_MODE_EDITOR,
+     GAME_MODE_LEVEL_SELECT,
+};
+
 F32 get_collision_dt(CheckBlockCollisionResult_t* collision){
      F32 vel_mag = vec_magnitude(collision->original_vel);
      F32 pos_delta_mag = vec_magnitude(collision->pos_delta);
@@ -1346,6 +1352,8 @@ int main(int argc, char** argv){
      int window_x = SDL_WINDOWPOS_CENTERED;
      int window_y = SDL_WINDOWPOS_CENTERED;
 
+     GameMode_t game_mode = GAME_MODE_PLAYING;
+
      Demo_t play_demo {};
      Demo_t record_demo {};
 
@@ -1761,9 +1769,15 @@ int main(int argc, char** argv){
                     case SDL_SCANCODE_ESCAPE:
                          quit = true;
                          break;
+                    case SDL_SCANCODE_F4:
+                         game_mode = GAME_MODE_PLAYING;
+                         break;
+                    case SDL_SCANCODE_F12:
+                         game_mode = GAME_MODE_LEVEL_SELECT;
+                         break;
                     case SDL_SCANCODE_LEFT:
                     case SDL_SCANCODE_A:
-                         if(editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
+                         if(game_mode == GAME_MODE_EDITOR && editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
                               move_selection(&editor, DIRECTION_LEFT);
                          }else if(play_demo.mode == DEMO_MODE_PLAY){
                               if(frame_count > 0 && play_demo.seek_frame < 0){
@@ -1779,7 +1793,7 @@ int main(int argc, char** argv){
                          break;
                     case SDL_SCANCODE_RIGHT:
                     case SDL_SCANCODE_D:
-                         if(editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
+                         if(game_mode == GAME_MODE_EDITOR && editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
                               move_selection(&editor, DIRECTION_RIGHT);
                          }else if(play_demo.mode == DEMO_MODE_PLAY){
                               if(play_demo.seek_frame < 0){
@@ -1792,7 +1806,7 @@ int main(int argc, char** argv){
                          break;
                     case SDL_SCANCODE_UP:
                     case SDL_SCANCODE_W:
-                         if(editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
+                         if(game_mode == GAME_MODE_EDITOR && editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
                               move_selection(&editor, DIRECTION_UP);
                          }else if(!resetting){
                               player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_UP_START,
@@ -1801,7 +1815,7 @@ int main(int argc, char** argv){
                          break;
                     case SDL_SCANCODE_DOWN:
                     case SDL_SCANCODE_S:
-                         if(editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
+                         if(game_mode == GAME_MODE_EDITOR && editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
                               move_selection(&editor, DIRECTION_DOWN);
                          }else if(!resetting){
                               player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_DOWN_START,
@@ -1886,7 +1900,7 @@ int main(int argc, char** argv){
                          LOG("game dt scalar: %.1f\n", play_demo.dt_scalar);
                          break;
                     case SDL_SCANCODE_V:
-                         if(editor.mode != EDITOR_MODE_OFF){
+                         if(game_mode == GAME_MODE_EDITOR){
                               Raw_t* thumbnail_ptr = NULL;
                               glBindFramebuffer(GL_FRAMEBUFFER, thumbnail_framebuffer);
                               thumbnail = create_thumbnail_bitmap();
@@ -1913,7 +1927,7 @@ int main(int argc, char** argv){
                          if(tile) tile_toggle_wire_activated(tile);
                     } break;
                     case SDL_SCANCODE_8:
-                         if(editor.mode == EDITOR_MODE_CATEGORY_SELECT){
+                         if(game_mode == GAME_MODE_EDITOR && editor.mode == EDITOR_MODE_CATEGORY_SELECT){
                               auto coord = mouse_select_world(mouse_screen, camera);
                               auto rect = rect_surrounding_coord(coord);
 
@@ -1944,7 +1958,7 @@ int main(int argc, char** argv){
                          }
                          break;
                     case SDL_SCANCODE_2:
-                         if(editor.mode == EDITOR_MODE_CATEGORY_SELECT){
+                         if(game_mode == GAME_MODE_EDITOR && editor.mode == EDITOR_MODE_CATEGORY_SELECT){
                               auto pixel = mouse_select_world_pixel(mouse_screen, camera);
 
                               // TODO: make this a function where you can pass in entangle_index
@@ -1957,7 +1971,7 @@ int main(int argc, char** argv){
                          }
                          break;
                     case SDL_SCANCODE_0:
-                         if(editor.mode == EDITOR_MODE_CATEGORY_SELECT){
+                         if(game_mode == GAME_MODE_EDITOR && editor.mode == EDITOR_MODE_CATEGORY_SELECT){
                               auto coord = mouse_select_world(mouse_screen, camera);
                               auto rect = rect_surrounding_coord(coord);
 
@@ -1984,24 +1998,27 @@ int main(int argc, char** argv){
                          break;
                     // TODO: #ifdef DEBUG
                     case SDL_SCANCODE_GRAVE:
-                         if(editor.mode == EDITOR_MODE_OFF){
+                         if(game_mode == GAME_MODE_PLAYING){
+                              game_mode = GAME_MODE_EDITOR;
                               editor.mode = EDITOR_MODE_CATEGORY_SELECT;
                          }else{
-                              editor.mode = EDITOR_MODE_OFF;
+                              game_mode = GAME_MODE_PLAYING;
                               editor.selection_start = {};
                               editor.selection_end = {};
                               destroy(&editor.entangle_indices);
                          }
                          break;
                     case SDL_SCANCODE_TAB:
-                         if(editor.mode == EDITOR_MODE_STAMP_SELECT){
-                              editor.mode = EDITOR_MODE_STAMP_HIDE;
-                         }else{
-                              editor.mode = EDITOR_MODE_STAMP_SELECT;
+                         if(game_mode == GAME_MODE_EDITOR){
+                              if(editor.mode == EDITOR_MODE_STAMP_SELECT){
+                                   editor.mode = EDITOR_MODE_STAMP_HIDE;
+                              }else{
+                                   editor.mode = EDITOR_MODE_STAMP_SELECT;
+                              }
                          }
                          break;
                     case SDL_SCANCODE_RETURN:
-                         if(editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
+                         if(game_mode == GAME_MODE_EDITOR && editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
                               undo_commit(&undo, &world.players, &world.tilemap, &world.blocks, &world.interactives);
 
                               // clear coords below stamp
@@ -2026,7 +2043,7 @@ int main(int argc, char** argv){
                          }
                          break;
                     case SDL_SCANCODE_T:
-                         if(editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
+                         if(game_mode == GAME_MODE_EDITOR && editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
                               sort_selection(&editor);
 
                               S16 height_offset = (S16)((editor.selection_end.y - editor.selection_start.y) - 1);
@@ -2040,28 +2057,30 @@ int main(int argc, char** argv){
                          }
                          break;
                     case SDL_SCANCODE_X:
-                         if(editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
+                         if(game_mode == GAME_MODE_EDITOR && editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
                               destroy(&editor.clipboard);
                               shallow_copy(&editor.selection, &editor.clipboard);
                               editor.mode = EDITOR_MODE_CATEGORY_SELECT;
                          }
                          break;
                     case SDL_SCANCODE_P:
-                         if(editor.mode == EDITOR_MODE_CATEGORY_SELECT && editor.clipboard.count){
+                         if(game_mode == GAME_MODE_EDITOR && editor.mode == EDITOR_MODE_CATEGORY_SELECT && editor.clipboard.count){
                               destroy(&editor.selection);
                               shallow_copy(&editor.clipboard, &editor.selection);
                               editor.mode = EDITOR_MODE_SELECTION_MANIPULATION;
                          }
                          break;
                     case SDL_SCANCODE_M:
-                         if(editor.mode == EDITOR_MODE_CATEGORY_SELECT){
+                         if(game_mode == GAME_MODE_EDITOR &&
+                            editor.mode == EDITOR_MODE_CATEGORY_SELECT){
                               player_start = mouse_select_world(mouse_screen, camera);
-                         }else if(editor.mode == EDITOR_MODE_OFF){
+                         }else if(game_mode == GAME_MODE_PLAYING){
                               resetting = true;
                          }
                          break;
                     case SDL_SCANCODE_R:
-                         if(editor.mode == EDITOR_MODE_CATEGORY_SELECT){
+                         if(game_mode == GAME_MODE_EDITOR &&
+                            editor.mode == EDITOR_MODE_CATEGORY_SELECT){
                               auto coord = mouse_select_world(mouse_screen, camera);
                               auto rect = rect_surrounding_coord(coord);
 
@@ -2072,7 +2091,7 @@ int main(int argc, char** argv){
                                    blocks[i]->rotation += 1;
                                    blocks[i]->rotation %= DIRECTION_COUNT;
                               }
-                         }else if(editor.mode == EDITOR_MODE_OFF){
+                         }else if(game_mode == GAME_MODE_PLAYING){
                               resetting = true;
                          }
                          break;
@@ -2164,13 +2183,14 @@ int main(int argc, char** argv){
                               if(load_map(map_thumbnails.elements[hovered_map_thumbnail_index].map_filepath,
                                           &player_start, &world.tilemap, &world.blocks, &world.interactives)){
                                    reset_map(player_start, &world, &undo);
+                                   game_mode = GAME_MODE_PLAYING;
                               }
                          }
 
-                         switch(editor.mode){
+                         switch(game_mode){
                          default:
                               break;
-                         case EDITOR_MODE_OFF:
+                         case GAME_MODE_PLAYING:
                               if(play_demo.mode == DEMO_MODE_PLAY){
                                    if(vec_in_quad(&pct_bar_outline_quad, mouse_screen)){
                                         seeked_with_mouse = true;
@@ -2186,42 +2206,48 @@ int main(int argc, char** argv){
                                    }
                               }
                               break;
-                         case EDITOR_MODE_CATEGORY_SELECT:
-                         case EDITOR_MODE_SELECTION_MANIPULATION:
-                         {
-                              Coord_t mouse_coord = vec_to_coord(mouse_screen);
-                              S32 select_index = (mouse_coord.y * ROOM_TILE_SIZE) + mouse_coord.x;
-                              if(select_index < EDITOR_CATEGORY_COUNT){
-                                   editor.mode = EDITOR_MODE_STAMP_SELECT;
-                                   editor.category = select_index;
-                                   editor.stamp = 0;
-                              }else{
-                                   editor.mode = EDITOR_MODE_CREATE_SELECTION;
-                                   editor.selection_start = mouse_select_world(mouse_screen, camera);
-                                   editor.selection_end = editor.selection_start;
-                              }
-                         } break;
-                         case EDITOR_MODE_STAMP_SELECT:
-                         case EDITOR_MODE_STAMP_HIDE:
-                         {
-                              S32 select_index = mouse_select_stamp_index(vec_to_coord(mouse_screen),
-                                                                          editor.category_array.elements + editor.category);
-                              if(editor.mode != EDITOR_MODE_STAMP_HIDE && select_index < editor.category_array.elements[editor.category].count && select_index >= 0){
-                                   editor.stamp = select_index;
-                              }else{
-                                   undo_commit(&undo, &world.players, &world.tilemap, &world.blocks, &world.interactives);
-                                   Coord_t select_coord = mouse_select_world(mouse_screen, camera);
-                                   auto* stamp_array = editor.category_array.elements[editor.category].elements + editor.stamp;
-                                   for(S16 s = 0; s < stamp_array->count; s++){
-                                        auto* stamp = stamp_array->elements + s;
-                                        apply_stamp(stamp, select_coord + stamp->offset,
-                                                    &world.tilemap, &world.blocks, &world.interactives, &world.interactive_qt, ctrl_down);
+                         case GAME_MODE_EDITOR:
+                              switch(editor.mode){
+                              default:
+                                   break;
+                              case EDITOR_MODE_CATEGORY_SELECT:
+                              case EDITOR_MODE_SELECTION_MANIPULATION:
+                              {
+                                   Coord_t mouse_coord = vec_to_coord(mouse_screen);
+                                   S32 select_index = (mouse_coord.y * ROOM_TILE_SIZE) + mouse_coord.x;
+                                   if(select_index < EDITOR_CATEGORY_COUNT){
+                                        editor.mode = EDITOR_MODE_STAMP_SELECT;
+                                        editor.category = select_index;
+                                        editor.stamp = 0;
+                                   }else{
+                                        editor.mode = EDITOR_MODE_CREATE_SELECTION;
+                                        editor.selection_start = mouse_select_world(mouse_screen, camera);
+                                        editor.selection_end = editor.selection_start;
                                    }
+                              } break;
+                              case EDITOR_MODE_STAMP_SELECT:
+                              case EDITOR_MODE_STAMP_HIDE:
+                              {
+                                   S32 select_index = mouse_select_stamp_index(vec_to_coord(mouse_screen),
+                                                                               editor.category_array.elements + editor.category);
+                                   if(editor.mode != EDITOR_MODE_STAMP_HIDE && select_index < editor.category_array.elements[editor.category].count && select_index >= 0){
+                                        editor.stamp = select_index;
+                                   }else{
+                                        undo_commit(&undo, &world.players, &world.tilemap, &world.blocks, &world.interactives);
+                                        Coord_t select_coord = mouse_select_world(mouse_screen, camera);
+                                        auto* stamp_array = editor.category_array.elements[editor.category].elements + editor.stamp;
+                                        for(S16 s = 0; s < stamp_array->count; s++){
+                                             auto* stamp = stamp_array->elements + s;
+                                             apply_stamp(stamp, select_coord + stamp->offset,
+                                                         &world.tilemap, &world.blocks, &world.interactives, &world.interactive_qt, ctrl_down);
+                                        }
 
-                                   quad_tree_free(world.block_qt);
-                                   world.block_qt = quad_tree_build(&world.blocks);
+                                        quad_tree_free(world.block_qt);
+                                        world.block_qt = quad_tree_build(&world.blocks);
+                                   }
+                              } break;
                               }
-                         } break;
+                              break;
                          }
                          for(S16 c = 0; c < tag_checkboxes.count; c++){
                               Checkbox_t* checkbox = tag_checkboxes.elements + c;
@@ -2233,38 +2259,40 @@ int main(int argc, char** argv){
                          }
                          break;
                     case SDL_BUTTON_RIGHT:
-                         switch(editor.mode){
-                         default:
-                              break;
-                         case EDITOR_MODE_CATEGORY_SELECT:
-                              undo_commit(&undo, &world.players, &world.tilemap, &world.blocks, &world.interactives);
-                              coord_clear(mouse_select_world(mouse_screen, camera), &world.tilemap, &world.interactives,
-                                          world.interactive_qt, &world.blocks);
-                              break;
-                         case EDITOR_MODE_STAMP_SELECT:
-                         case EDITOR_MODE_STAMP_HIDE:
-                         {
-                              undo_commit(&undo, &world.players, &world.tilemap, &world.blocks, &world.interactives);
-                              Coord_t start = mouse_select_world(mouse_screen, camera);
-                              Coord_t end = start + stamp_array_dimensions(editor.category_array.elements[editor.category].elements + editor.stamp);
-                              for(S16 j = start.y; j < end.y; j++){
-                                   for(S16 i = start.x; i < end.x; i++){
-                                        Coord_t coord {i, j};
-                                        coord_clear(coord, &world.tilemap, &world.interactives, world.interactive_qt, &world.blocks);
+                         if(game_mode == GAME_MODE_EDITOR){
+                              switch(editor.mode){
+                              default:
+                                   break;
+                              case EDITOR_MODE_CATEGORY_SELECT:
+                                   undo_commit(&undo, &world.players, &world.tilemap, &world.blocks, &world.interactives);
+                                   coord_clear(mouse_select_world(mouse_screen, camera), &world.tilemap, &world.interactives,
+                                               world.interactive_qt, &world.blocks);
+                                   break;
+                              case EDITOR_MODE_STAMP_SELECT:
+                              case EDITOR_MODE_STAMP_HIDE:
+                              {
+                                   undo_commit(&undo, &world.players, &world.tilemap, &world.blocks, &world.interactives);
+                                   Coord_t start = mouse_select_world(mouse_screen, camera);
+                                   Coord_t end = start + stamp_array_dimensions(editor.category_array.elements[editor.category].elements + editor.stamp);
+                                   for(S16 j = start.y; j < end.y; j++){
+                                        for(S16 i = start.x; i < end.x; i++){
+                                             Coord_t coord {i, j};
+                                             coord_clear(coord, &world.tilemap, &world.interactives, world.interactive_qt, &world.blocks);
+                                        }
                                    }
-                              }
-                         } break;
-                         case EDITOR_MODE_SELECTION_MANIPULATION:
-                         {
-                              undo_commit(&undo, &world.players, &world.tilemap, &world.blocks, &world.interactives);
-                              Rect_t selection_bounds = editor_selection_bounds(&editor);
-                              for(S16 j = selection_bounds.bottom; j <= selection_bounds.top; j++){
-                                   for(S16 i = selection_bounds.left; i <= selection_bounds.right; i++){
-                                        Coord_t coord {i, j};
-                                        coord_clear(coord, &world.tilemap, &world.interactives, world.interactive_qt, &world.blocks);
+                              } break;
+                              case EDITOR_MODE_SELECTION_MANIPULATION:
+                              {
+                                   undo_commit(&undo, &world.players, &world.tilemap, &world.blocks, &world.interactives);
+                                   Rect_t selection_bounds = editor_selection_bounds(&editor);
+                                   for(S16 j = selection_bounds.bottom; j <= selection_bounds.top; j++){
+                                        for(S16 i = selection_bounds.left; i <= selection_bounds.right; i++){
+                                             Coord_t coord {i, j};
+                                             coord_clear(coord, &world.tilemap, &world.interactives, world.interactive_qt, &world.blocks);
+                                        }
                                    }
+                              } break;
                               }
-                         } break;
                          }
                          break;
                     }
@@ -2294,66 +2322,68 @@ int main(int argc, char** argv){
                     case SDL_BUTTON_LEFT:
                          seeked_with_mouse = false;
 
-                         switch(editor.mode){
-                         default:
-                              break;
-                         case EDITOR_MODE_CREATE_SELECTION:
-                         {
-                              editor.selection_end = mouse_select_world(mouse_screen, camera);
+                         if(game_mode == GAME_MODE_EDITOR){
+                              switch(editor.mode){
+                              default:
+                                   break;
+                              case EDITOR_MODE_CREATE_SELECTION:
+                              {
+                                   editor.selection_end = mouse_select_world(mouse_screen, camera);
 
-                              sort_selection(&editor);
+                                   sort_selection(&editor);
 
-                              destroy(&editor.selection);
+                                   destroy(&editor.selection);
 
-                              S16 stamp_count = (S16)((((editor.selection_end.x - editor.selection_start.x) + 1) *
-                                                       ((editor.selection_end.y - editor.selection_start.y) + 1)) * 2);
-                              init(&editor.selection, stamp_count);
-                              S16 stamp_index = 0;
-                              for(S16 j = editor.selection_start.y; j <= editor.selection_end.y; j++){
-                                   for(S16 i = editor.selection_start.x; i <= editor.selection_end.x; i++){
-                                        Coord_t coord = {i, j};
-                                        Coord_t offset = coord - editor.selection_start;
+                                   S16 stamp_count = (S16)((((editor.selection_end.x - editor.selection_start.x) + 1) *
+                                                            ((editor.selection_end.y - editor.selection_start.y) + 1)) * 2);
+                                   init(&editor.selection, stamp_count);
+                                   S16 stamp_index = 0;
+                                   for(S16 j = editor.selection_start.y; j <= editor.selection_end.y; j++){
+                                        for(S16 i = editor.selection_start.x; i <= editor.selection_end.x; i++){
+                                             Coord_t coord = {i, j};
+                                             Coord_t offset = coord - editor.selection_start;
 
-                                        // tile id
-                                        Tile_t* tile = tilemap_get_tile(&world.tilemap, coord);
-                                        editor.selection.elements[stamp_index].type = STAMP_TYPE_TILE_ID;
-                                        editor.selection.elements[stamp_index].tile_id = tile->id;
-                                        editor.selection.elements[stamp_index].offset = offset;
-                                        stamp_index++;
+                                             // tile id
+                                             Tile_t* tile = tilemap_get_tile(&world.tilemap, coord);
+                                             editor.selection.elements[stamp_index].type = STAMP_TYPE_TILE_ID;
+                                             editor.selection.elements[stamp_index].tile_id = tile->id;
+                                             editor.selection.elements[stamp_index].offset = offset;
+                                             stamp_index++;
 
-                                        // tile flags
-                                        editor.selection.elements[stamp_index].type = STAMP_TYPE_TILE_FLAGS;
-                                        editor.selection.elements[stamp_index].tile_flags = tile->flags;
-                                        editor.selection.elements[stamp_index].offset = offset;
-                                        stamp_index++;
+                                             // tile flags
+                                             editor.selection.elements[stamp_index].type = STAMP_TYPE_TILE_FLAGS;
+                                             editor.selection.elements[stamp_index].tile_flags = tile->flags;
+                                             editor.selection.elements[stamp_index].offset = offset;
+                                             stamp_index++;
 
-                                        // interactive
-                                        auto* interactive = quad_tree_interactive_find_at(world.interactive_qt, coord);
-                                        if(interactive){
-                                             resize(&editor.selection, editor.selection.count + (S16)(1));
-                                             auto* stamp = editor.selection.elements + (editor.selection.count - 1);
-                                             stamp->type = STAMP_TYPE_INTERACTIVE;
-                                             stamp->interactive = *interactive;
-                                             stamp->offset = offset;
-                                        }
-
-                                        for(S16 b = 0; b < world.blocks.count; b++){
-                                             auto* block = world.blocks.elements + b;
-                                             if(pos_to_coord(block->pos) == coord){
+                                             // interactive
+                                             auto* interactive = quad_tree_interactive_find_at(world.interactive_qt, coord);
+                                             if(interactive){
                                                   resize(&editor.selection, editor.selection.count + (S16)(1));
                                                   auto* stamp = editor.selection.elements + (editor.selection.count - 1);
-                                                  stamp->type = STAMP_TYPE_BLOCK;
-                                                  stamp->block.rotation = block->rotation;
-                                                  stamp->block.element = block->element;
+                                                  stamp->type = STAMP_TYPE_INTERACTIVE;
+                                                  stamp->interactive = *interactive;
                                                   stamp->offset = offset;
-                                                  stamp->block.z = block->pos.z;
+                                             }
+
+                                             for(S16 b = 0; b < world.blocks.count; b++){
+                                                  auto* block = world.blocks.elements + b;
+                                                  if(pos_to_coord(block->pos) == coord){
+                                                       resize(&editor.selection, editor.selection.count + (S16)(1));
+                                                       auto* stamp = editor.selection.elements + (editor.selection.count - 1);
+                                                       stamp->type = STAMP_TYPE_BLOCK;
+                                                       stamp->block.rotation = block->rotation;
+                                                       stamp->block.element = block->element;
+                                                       stamp->offset = offset;
+                                                       stamp->block.z = block->pos.z;
+                                                  }
                                              }
                                         }
                                    }
-                              }
 
-                              editor.mode = EDITOR_MODE_SELECTION_MANIPULATION;
-                         } break;
+                                   editor.mode = EDITOR_MODE_SELECTION_MANIPULATION;
+                              } break;
+                              }
                          }
                          break;
                     }
@@ -2380,24 +2410,26 @@ int main(int argc, char** argv){
                          }
                     }
 
-                    switch(editor.mode){
-                    default:
-                         break;
-                    case EDITOR_MODE_CREATE_SELECTION:
-                         if(editor.selection_start.x >= 0 && editor.selection_start.y >= 0){
-                              editor.selection_end = pos_to_coord(mouse_world);
+                    if(game_mode == GAME_MODE_EDITOR){
+                         switch(editor.mode){
+                         default:
+                              break;
+                         case EDITOR_MODE_CREATE_SELECTION:
+                              if(editor.selection_start.x >= 0 && editor.selection_start.y >= 0){
+                                   editor.selection_end = pos_to_coord(mouse_world);
+                              }
+                              break;
                          }
-                         break;
-                    }
+                    }else if(game_mode == GAME_MODE_PLAYING){
+                         if(seeked_with_mouse && play_demo.mode == DEMO_MODE_PLAY){
+                              play_demo.seek_frame = (S64)((F32)(play_demo.last_frame) * mouse_screen.x);
 
-                    if(seeked_with_mouse && play_demo.mode == DEMO_MODE_PLAY){
-                         play_demo.seek_frame = (S64)((F32)(play_demo.last_frame) * mouse_screen.x);
-
-                         if(play_demo.seek_frame < frame_count){
-                              restart_demo(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives,
-                                           &play_demo, &frame_count, &player_start, &player_action, &undo);
-                         }else if(play_demo.seek_frame == frame_count){
-                              play_demo.seek_frame = -1;
+                              if(play_demo.seek_frame < frame_count){
+                                   restart_demo(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives,
+                                                &play_demo, &frame_count, &player_start, &player_action, &undo);
+                              }else if(play_demo.seek_frame == frame_count){
+                                   play_demo.seek_frame = -1;
+                              }
                          }
                     }
                     break;
@@ -4544,261 +4576,268 @@ int main(int argc, char** argv){
 
           glClear(GL_COLOR_BUFFER_BIT);
 
-          // draw flats
-          glBindTexture(GL_TEXTURE_2D, theme_texture);
-          glBegin(GL_QUADS);
-          glColor3f(1.0f, 1.0f, 1.0f);
+          if(game_mode == GAME_MODE_PLAYING || game_mode == GAME_MODE_EDITOR){
+               // draw flats
+               glBindTexture(GL_TEXTURE_2D, theme_texture);
+               glBegin(GL_QUADS);
+               glColor3f(1.0f, 1.0f, 1.0f);
 
-          for(S16 y = max.y; y >= min.y; y--){
-               draw_world_row_flats(y, min.x, max.y, &world.tilemap, world.interactive_qt, camera_offset);
-          }
+               for(S16 y = max.y; y >= min.y; y--){
+                    draw_world_row_flats(y, min.x, max.y, &world.tilemap, world.interactive_qt, camera_offset);
+               }
 
-          for(S16 y = max.y; y >= min.y; y--){
-               for(S16 x = min.x; x <= max.x; x++){
-                    Coord_t coord {x, y};
-                    Interactive_t* interactive = quad_tree_find_at(world.interactive_qt, coord.x, coord.y);
+               for(S16 y = max.y; y >= min.y; y--){
+                    for(S16 x = min.x; x <= max.x; x++){
+                         Coord_t coord {x, y};
+                         Interactive_t* interactive = quad_tree_find_at(world.interactive_qt, coord.x, coord.y);
 
-                    if(is_active_portal(interactive)){
-                         PortalExit_t portal_exits = find_portal_exits(coord, &world.tilemap, world.interactive_qt);
+                         if(is_active_portal(interactive)){
+                              PortalExit_t portal_exits = find_portal_exits(coord, &world.tilemap, world.interactive_qt);
 
-                         for(S8 d = 0; d < DIRECTION_COUNT; d++){
-                              for(S8 i = 0; i < portal_exits.directions[d].count; i++){
-                                   if(portal_exits.directions[d].coords[i] == coord) continue;
-                                   Coord_t portal_coord = portal_exits.directions[d].coords[i] + direction_opposite((Direction_t)(d));
-                                   Rect_t coord_rect = rect_surrounding_coord(portal_coord);
-                                   coord_rect.left -= HALF_TILE_SIZE_IN_PIXELS;
-                                   coord_rect.right += HALF_TILE_SIZE_IN_PIXELS;
-                                   coord_rect.bottom -= TILE_SIZE_IN_PIXELS;
-                                   coord_rect.top += HALF_TILE_SIZE_IN_PIXELS;
+                              for(S8 d = 0; d < DIRECTION_COUNT; d++){
+                                   for(S8 i = 0; i < portal_exits.directions[d].count; i++){
+                                        if(portal_exits.directions[d].coords[i] == coord) continue;
+                                        Coord_t portal_coord = portal_exits.directions[d].coords[i] + direction_opposite((Direction_t)(d));
+                                        Rect_t coord_rect = rect_surrounding_coord(portal_coord);
+                                        coord_rect.left -= HALF_TILE_SIZE_IN_PIXELS;
+                                        coord_rect.right += HALF_TILE_SIZE_IN_PIXELS;
+                                        coord_rect.bottom -= TILE_SIZE_IN_PIXELS;
+                                        coord_rect.top += HALF_TILE_SIZE_IN_PIXELS;
 
-                                   S16 block_count = 0;
-                                   Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
+                                        S16 block_count = 0;
+                                        Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
 
-                                   U8 portal_rotations = portal_rotations_between((Direction_t)(d), interactive->portal.face);
+                                        U8 portal_rotations = portal_rotations_between((Direction_t)(d), interactive->portal.face);
 
-                                   quad_tree_find_in(world.block_qt, coord_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
-                                   if(block_count){
-                                        sort_blocks_by_descending_height(blocks, block_count);
+                                        quad_tree_find_in(world.block_qt, coord_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
+                                        if(block_count){
+                                             sort_blocks_by_descending_height(blocks, block_count);
 
-                                        draw_portal_blocks(blocks, block_count, portal_coord, coord, portal_rotations, camera_offset);
+                                             draw_portal_blocks(blocks, block_count, portal_coord, coord, portal_rotations, camera_offset);
+                                        }
+
+                                        glEnd();
+                                        glBindTexture(GL_TEXTURE_2D, player_texture);
+                                        glBegin(GL_QUADS);
+                                        glColor3f(1.0f, 1.0f, 1.0f);
+
+                                        auto player_region = rect_surrounding_coord(portal_coord);
+                                        player_region.left -= 4;
+                                        player_region.right += 4;
+                                        player_region.bottom -= 10;
+                                        player_region.top += 4;
+                                        draw_portal_players(&world.players, player_region, portal_coord, coord, portal_rotations, camera_offset);
+
+                                        glEnd();
+                                        glBindTexture(GL_TEXTURE_2D, theme_texture);
+                                        glBegin(GL_QUADS);
+                                        glColor3f(1.0f, 1.0f, 1.0f);
                                    }
-
-                                   glEnd();
-                                   glBindTexture(GL_TEXTURE_2D, player_texture);
-                                   glBegin(GL_QUADS);
-                                   glColor3f(1.0f, 1.0f, 1.0f);
-
-                                   auto player_region = rect_surrounding_coord(portal_coord);
-                                   player_region.left -= 4;
-                                   player_region.right += 4;
-                                   player_region.bottom -= 10;
-                                   player_region.top += 4;
-                                   draw_portal_players(&world.players, player_region, portal_coord, coord, portal_rotations, camera_offset);
-
-                                   glEnd();
-                                   glBindTexture(GL_TEXTURE_2D, theme_texture);
-                                   glBegin(GL_QUADS);
-                                   glColor3f(1.0f, 1.0f, 1.0f);
                               }
                          }
                     }
                }
-          }
 
-          for(S16 y = max.y; y >= min.y; y--){
-               for(S16 x = min.x; x <= max.x; x++){
-                    Coord_t coord {x, y};
-                    Tile_t* tile = tilemap_get_tile(&world.tilemap, coord);
-                    if(tile && tile->id >= 16){
+               for(S16 y = max.y; y >= min.y; y--){
+                    for(S16 x = min.x; x <= max.x; x++){
+                         Coord_t coord {x, y};
+                         Tile_t* tile = tilemap_get_tile(&world.tilemap, coord);
+                         if(tile && tile->id >= 16){
+                              Vec_t tile_pos {(F32)(x - min.x) * TILE_SIZE + camera_offset.x,
+                                              (F32)(y - min.y) * TILE_SIZE + camera_offset.y};
+                              draw_tile_id(tile->id, tile_pos);
+                         }
+                    }
+               }
+
+               for(S16 y = max.y; y >= min.y; y--){
+                    draw_world_row_solids(y, min.x, max.y, &world.tilemap, world.interactive_qt, world.block_qt,
+                                          &world.players, camera_offset, player_texture);
+
+                    glEnd();
+                    glBindTexture(GL_TEXTURE_2D, arrow_texture);
+                    glBegin(GL_QUADS);
+                    glColor3f(1.0f, 1.0f, 1.0f);
+
+                    draw_world_row_arrows(y, min.x, max.x, &world.arrows, camera_offset);
+
+                    glEnd();
+
+                    glBindTexture(GL_TEXTURE_2D, theme_texture);
+                    glBegin(GL_QUADS);
+                    glColor3f(1.0f, 1.0f, 1.0f);
+               }
+
+               glEnd();
+
+#if 0
+               // light
+               glBindTexture(GL_TEXTURE_2D, 0);
+               glBegin(GL_QUADS);
+               for(S16 y = min.y; y <= max.y; y++){
+                    for(S16 x = min.x; x <= max.x; x++){
+                         Tile_t* tile = world.tilemap.tiles[y] + x;
+
                          Vec_t tile_pos {(F32)(x - min.x) * TILE_SIZE + camera_offset.x,
                                          (F32)(y - min.y) * TILE_SIZE + camera_offset.y};
-                         draw_tile_id(tile->id, tile_pos);
+                         glColor4f(0.0f, 0.0f, 0.0f, (F32)(255 - tile->light) / 255.0f);
+                         glVertex2f(tile_pos.x, tile_pos.y);
+                         glVertex2f(tile_pos.x, tile_pos.y + TILE_SIZE);
+                         glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y + TILE_SIZE);
+                         glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y);
                     }
                }
+               glEnd();
+#endif
           }
 
-          for(S16 y = max.y; y >= min.y; y--){
-               draw_world_row_solids(y, min.x, max.y, &world.tilemap, world.interactive_qt, world.block_qt,
-                                     &world.players, camera_offset, player_texture);
-
-               glEnd();
-               glBindTexture(GL_TEXTURE_2D, arrow_texture);
-               glBegin(GL_QUADS);
-               glColor3f(1.0f, 1.0f, 1.0f);
-
-               draw_world_row_arrows(y, min.x, max.x, &world.arrows, camera_offset);
-
-               glEnd();
-
+          if(game_mode == GAME_MODE_LEVEL_SELECT){
                glBindTexture(GL_TEXTURE_2D, theme_texture);
                glBegin(GL_QUADS);
-               glColor3f(1.0f, 1.0f, 1.0f);
-          }
-
-          glEnd();
-
-#if 1
-          // light
-          glBindTexture(GL_TEXTURE_2D, 0);
-          glBegin(GL_QUADS);
-          for(S16 y = min.y; y <= max.y; y++){
-               for(S16 x = min.x; x <= max.x; x++){
-                    Tile_t* tile = world.tilemap.tiles[y] + x;
-
-                    Vec_t tile_pos {(F32)(x - min.x) * TILE_SIZE + camera_offset.x,
-                                    (F32)(y - min.y) * TILE_SIZE + camera_offset.y};
-                    glColor4f(0.0f, 0.0f, 0.0f, (F32)(255 - tile->light) / 255.0f);
-                    glVertex2f(tile_pos.x, tile_pos.y);
-                    glVertex2f(tile_pos.x, tile_pos.y + TILE_SIZE);
-                    glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y + TILE_SIZE);
-                    glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y);
-               }
-          }
-          glEnd();
-#endif
-
-          glBindTexture(GL_TEXTURE_2D, theme_texture);
-          glBegin(GL_QUADS);
-          glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
-          for(S16 c = 0; c < tag_checkboxes.count; c++){
-               Checkbox_t* checkbox = tag_checkboxes.elements + c;
-               Vec_t final_pos = checkbox->pos + checkbox_scroll;
-               if(final_pos.y < -CHECKBOX_DIMENSION || final_pos.y > 1.0f) continue;
-               draw_checkbox(checkbox, checkbox_scroll);
-          }
-          glEnd();
-
-          {
-               glBindTexture(GL_TEXTURE_2D, text_texture);
-               glBegin(GL_QUADS);
                glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
-
-               Vec_t text_pos {CHECKBOX_START_OFFSET_X + 10.0f * PIXEL_SIZE, 2.0f * CHECKBOX_START_OFFSET_Y};
-               text_pos += checkbox_scroll;
                for(S16 c = 0; c < tag_checkboxes.count; c++){
-                    if(text_pos.y < 0 || text_pos.y > 1){
-                         // pass
-                    }else{
-                         draw_text(tag_to_string((Tag_t)(c)), text_pos, Vec_t{TEXT_CHAR_WIDTH * 0.5f, TEXT_CHAR_HEIGHT * 0.5f},
-                                   TEXT_CHAR_SPACING * 0.5f);
+                    Checkbox_t* checkbox = tag_checkboxes.elements + c;
+                    Vec_t final_pos = checkbox->pos + checkbox_scroll;
+                    if(final_pos.y < -CHECKBOX_DIMENSION || final_pos.y > 1.0f) continue;
+                    draw_checkbox(checkbox, checkbox_scroll);
+               }
+               glEnd();
+
+               {
+                    glBindTexture(GL_TEXTURE_2D, text_texture);
+                    glBegin(GL_QUADS);
+                    glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+
+                    Vec_t text_pos {CHECKBOX_START_OFFSET_X + 10.0f * PIXEL_SIZE, 2.0f * CHECKBOX_START_OFFSET_Y};
+                    text_pos += checkbox_scroll;
+                    for(S16 c = 0; c < tag_checkboxes.count; c++){
+                         if(text_pos.y < 0 || text_pos.y > 1){
+                              // pass
+                         }else{
+                              draw_text(tag_to_string((Tag_t)(c)), text_pos, Vec_t{TEXT_CHAR_WIDTH * 0.5f, TEXT_CHAR_HEIGHT * 0.5f},
+                                        TEXT_CHAR_SPACING * 0.5f);
+                         }
+                         text_pos.y += CHECKBOX_INTERVAL;
                     }
-                    text_pos.y += CHECKBOX_INTERVAL;
+
+                    if(hovered_map_thumbnail_path){
+                         text_pos = Vec_t{CHECKBOX_THUMBNAIL_SPLIT, 2.0f * PIXEL_SIZE};
+                         draw_text(hovered_map_thumbnail_path, text_pos, Vec_t{TEXT_CHAR_WIDTH * 0.5f, TEXT_CHAR_HEIGHT * 0.5f},
+                                        TEXT_CHAR_SPACING * 0.5f);
+                    }
+
+                    glEnd();
                }
 
-               if(hovered_map_thumbnail_path){
-                    text_pos = Vec_t{CHECKBOX_THUMBNAIL_SPLIT, 2.0f * PIXEL_SIZE};
-                    draw_text(hovered_map_thumbnail_path, text_pos, Vec_t{TEXT_CHAR_WIDTH * 0.5f, TEXT_CHAR_HEIGHT * 0.5f},
-                                   TEXT_CHAR_SPACING * 0.5f);
+               for(S16 m = 0; m < map_thumbnails.count; m++){
+                    auto* map_thumbnail = map_thumbnails.elements + m;
+
+                    if(map_thumbnail->texture == 0) continue;
+
+                    Vec_t pos = map_thumbnail->pos + map_scroll;
+                    Vec_t bounds = pos + Vec_t{THUMBNAIL_UI_DIMENSION, THUMBNAIL_UI_DIMENSION};
+
+                    if(pos.y < 0 || pos.y > 1.0f ) continue;
+
+                    glBindTexture(GL_TEXTURE_2D, map_thumbnail->texture);
+                    glBegin(GL_QUADS);
+                    glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+
+                    glTexCoord2f(0, 0);
+                    glVertex2f(pos.x, pos.y);
+
+                    glTexCoord2f(0, 1.0f);
+                    glVertex2f(pos.x, bounds.y);
+
+                    glTexCoord2f(1.0f, 1.0f);
+                    glVertex2f(bounds.x, bounds.y);
+
+                    glTexCoord2f(1.0f, 0);
+                    glVertex2f(bounds.x, pos.y);
+
+                    glEnd();
+               }
+          }
+
+          if(game_mode == GAME_MODE_EDITOR){
+               // player start
+               draw_selection(player_start, player_start, screen_camera, 0.0f, 1.0f, 0.0f);
+
+               // before we draw the UI, lets write to the thumbnail buffer
+               {
+                    glBindFramebuffer(GL_FRAMEBUFFER, thumbnail_framebuffer);
+
+                    glViewport(0, 0, THUMBNAIL_DIMENSION, THUMBNAIL_DIMENSION);
+
+                    glBindTexture(GL_TEXTURE_2D, render_texture);
+                    glBegin(GL_QUADS);
+                    glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+
+                    glTexCoord2f(0, 0);
+                    glVertex2f(0.0f, 0.0f);
+
+                    glTexCoord2f(0, 1.0f);
+                    glVertex2f(0.0f, 1.0f);
+
+                    glTexCoord2f(1.0f, 1.0f);
+                    glVertex2f(1.0f, 1.0f);
+
+                    glTexCoord2f(1.0f, 0);
+                    glVertex2f(1.0f, 0.0f);
+
+                    glEnd();
+
+                    glViewport(0, 0, window_width, window_height);
+
+                    glBindFramebuffer(GL_FRAMEBUFFER, render_framebuffer);
                }
 
-               glEnd();
+               // editor
+               draw_editor(&editor, &world, screen_camera, mouse_screen, theme_texture, text_texture);
+
+               if(reset_timer >= 0.0f){
+                    glBegin(GL_QUADS);
+                    glColor4f(0.0f, 0.0f, 0.0f, reset_timer / RESET_TIME);
+                    glVertex2f(0, 0);
+                    glVertex2f(0, 1);
+                    glVertex2f(1, 1);
+                    glVertex2f(1, 0);
+                    glEnd();
+               }
           }
 
-          for(S16 m = 0; m < map_thumbnails.count; m++){
-               auto* map_thumbnail = map_thumbnails.elements + m;
+          if(game_mode == GAME_MODE_PLAYING || game_mode == GAME_MODE_EDITOR){
+               if(play_demo.mode == DEMO_MODE_PLAY){
+                    F32 demo_pct = (F32)(frame_count) / (F32)(play_demo.last_frame);
+                    Quad_t pct_bar_quad = {pct_bar_outline_quad.left, pct_bar_outline_quad.bottom, demo_pct, pct_bar_outline_quad.top};
+                    draw_quad_filled(&pct_bar_quad, 255.0f, 255.0f, 255.0f);
+                    draw_quad_wireframe(&pct_bar_outline_quad, 255.0f, 255.0f, 255.0f);
 
-               if(map_thumbnail->texture == 0) continue;
+                    char buffer[64];
+                    snprintf(buffer, 64, "F: %ld/%ld C: %d", frame_count, play_demo.last_frame, collision_attempts);
 
-               Vec_t pos = map_thumbnail->pos + map_scroll;
-               Vec_t bounds = pos + Vec_t{THUMBNAIL_UI_DIMENSION, THUMBNAIL_UI_DIMENSION};
+                    glBindTexture(GL_TEXTURE_2D, text_texture);
+                    glBegin(GL_QUADS);
 
-               if(pos.y < 0 || pos.y > 1.0f ) continue;
+                    Vec_t text_pos {0.005f, 0.965f};
 
-               glBindTexture(GL_TEXTURE_2D, map_thumbnail->texture);
-               glBegin(GL_QUADS);
-               glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+                    if(game_mode == GAME_MODE_EDITOR) text_pos.y -= 0.09f;
 
-               glTexCoord2f(0, 0);
-               glVertex2f(pos.x, pos.y);
+                    glColor3f(0.0f, 0.0f, 0.0f);
+                    draw_text(buffer, text_pos + Vec_t{0.002f, -0.002f});
 
-               glTexCoord2f(0, 1.0f);
-               glVertex2f(pos.x, bounds.y);
+                    glColor3f(1.0f, 1.0f, 1.0f);
+                    draw_text(buffer, text_pos);
 
-               glTexCoord2f(1.0f, 1.0f);
-               glVertex2f(bounds.x, bounds.y);
+                    draw_input_on_hud('L', Vec_t{0.965f - (7.5f * TEXT_CHAR_WIDTH), 0.965f}, player_action.move[DIRECTION_LEFT]);
+                    draw_input_on_hud('U', Vec_t{0.965f - (6.0f * TEXT_CHAR_WIDTH), 0.965f}, player_action.move[DIRECTION_UP]);
+                    draw_input_on_hud('R', Vec_t{0.965f - (4.5f * TEXT_CHAR_WIDTH), 0.965f}, player_action.move[DIRECTION_RIGHT]);
+                    draw_input_on_hud('D', Vec_t{0.965f - (3.0f * TEXT_CHAR_WIDTH), 0.965f}, player_action.move[DIRECTION_DOWN]);
+                    draw_input_on_hud('A', Vec_t{0.965f - (1.5f * TEXT_CHAR_WIDTH), 0.965f}, player_action.activate);
+                    draw_input_on_hud('B', Vec_t{0.965f - (0.0f * TEXT_CHAR_WIDTH), 0.965f}, player_action.activate);
 
-               glTexCoord2f(1.0f, 0);
-               glVertex2f(bounds.x, pos.y);
-
-               glEnd();
-          }
-
-          // player start
-          draw_selection(player_start, player_start, screen_camera, 0.0f, 1.0f, 0.0f);
-
-          // before we draw the UI, lets write to the thumbnail buffer
-          {
-               glBindFramebuffer(GL_FRAMEBUFFER, thumbnail_framebuffer);
-
-               glViewport(0, 0, THUMBNAIL_DIMENSION, THUMBNAIL_DIMENSION);
-
-               glBindTexture(GL_TEXTURE_2D, render_texture);
-               glBegin(GL_QUADS);
-               glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
-
-               glTexCoord2f(0, 0);
-               glVertex2f(0.0f, 0.0f);
-
-               glTexCoord2f(0, 1.0f);
-               glVertex2f(0.0f, 1.0f);
-
-               glTexCoord2f(1.0f, 1.0f);
-               glVertex2f(1.0f, 1.0f);
-
-               glTexCoord2f(1.0f, 0);
-               glVertex2f(1.0f, 0.0f);
-
-               glEnd();
-
-               glViewport(0, 0, window_width, window_height);
-
-               glBindFramebuffer(GL_FRAMEBUFFER, render_framebuffer);
-          }
-
-          // editor
-          draw_editor(&editor, &world, screen_camera, mouse_screen, theme_texture, text_texture);
-
-          if(reset_timer >= 0.0f){
-               glBegin(GL_QUADS);
-               glColor4f(0.0f, 0.0f, 0.0f, reset_timer / RESET_TIME);
-               glVertex2f(0, 0);
-               glVertex2f(0, 1);
-               glVertex2f(1, 1);
-               glVertex2f(1, 0);
-               glEnd();
-          }
-
-          if(play_demo.mode == DEMO_MODE_PLAY){
-               F32 demo_pct = (F32)(frame_count) / (F32)(play_demo.last_frame);
-               Quad_t pct_bar_quad = {pct_bar_outline_quad.left, pct_bar_outline_quad.bottom, demo_pct, pct_bar_outline_quad.top};
-               draw_quad_filled(&pct_bar_quad, 255.0f, 255.0f, 255.0f);
-               draw_quad_wireframe(&pct_bar_outline_quad, 255.0f, 255.0f, 255.0f);
-
-               char buffer[64];
-               snprintf(buffer, 64, "F: %ld/%ld C: %d", frame_count, play_demo.last_frame, collision_attempts);
-
-               glBindTexture(GL_TEXTURE_2D, text_texture);
-               glBegin(GL_QUADS);
-
-               Vec_t text_pos {0.005f, 0.965f};
-
-               if(editor.mode) text_pos.y -= 0.09f;
-
-               glColor3f(0.0f, 0.0f, 0.0f);
-               draw_text(buffer, text_pos + Vec_t{0.002f, -0.002f});
-
-               glColor3f(1.0f, 1.0f, 1.0f);
-               draw_text(buffer, text_pos);
-
-               draw_input_on_hud('L', Vec_t{0.965f - (7.5f * TEXT_CHAR_WIDTH), 0.965f}, player_action.move[DIRECTION_LEFT]);
-               draw_input_on_hud('U', Vec_t{0.965f - (6.0f * TEXT_CHAR_WIDTH), 0.965f}, player_action.move[DIRECTION_UP]);
-               draw_input_on_hud('R', Vec_t{0.965f - (4.5f * TEXT_CHAR_WIDTH), 0.965f}, player_action.move[DIRECTION_RIGHT]);
-               draw_input_on_hud('D', Vec_t{0.965f - (3.0f * TEXT_CHAR_WIDTH), 0.965f}, player_action.move[DIRECTION_DOWN]);
-               draw_input_on_hud('A', Vec_t{0.965f - (1.5f * TEXT_CHAR_WIDTH), 0.965f}, player_action.activate);
-               draw_input_on_hud('B', Vec_t{0.965f - (0.0f * TEXT_CHAR_WIDTH), 0.965f}, player_action.activate);
-
-               glEnd();
-
+                    glEnd();
+               }
           }
 
           glBindFramebuffer(GL_FRAMEBUFFER, 0);

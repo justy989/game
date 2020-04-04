@@ -38,7 +38,6 @@ struct Stamp_t{
 };
 
 enum EditorMode_t : U8{
-     EDITOR_MODE_OFF,
      EDITOR_MODE_CATEGORY_SELECT,
      EDITOR_MODE_STAMP_SELECT,
      EDITOR_MODE_STAMP_HIDE,
