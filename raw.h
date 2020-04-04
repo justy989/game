@@ -8,3 +8,4 @@ struct Raw_t{
 };
 
 Raw_t raw_load_file(const char* filename);
+bool raw_save_file(Raw_t* raw, const char* filename);

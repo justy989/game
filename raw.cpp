@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 
 Raw_t raw_load_file(const char* filename)
 {
@@ -35,4 +36,16 @@ Raw_t raw_load_file(const char* filename)
 
      fclose(file);
      return raw;
+}
+
+bool raw_save_file(Raw_t* raw, const char* filepath){
+    FILE* file = fopen(filepath, "wb");
+    if(!file){
+        LOG("%s() failed to fopen(%s) for writing: %s\n", __FUNCTION__, filepath, strerror(errno));
+        return false;
+    }
+
+    fwrite(raw->bytes, raw->byte_count, 1, file);
+    fclose(file);
+    return true;
 }

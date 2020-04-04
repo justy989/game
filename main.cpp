@@ -1189,16 +1189,18 @@ void set_against_blocks_coasting_from_player(Block_t* block, Direction_t directi
      }
 }
 
-void create_thumbnail_bitmap(const char* filepath){
+Raw_t create_thumbnail_bitmap(){
+    Raw_t raw;
+
     U32 pixel_size = THUMBNAIL_DIMENSION * THUMBNAIL_DIMENSION * 3;
-    U32 data_size = sizeof(BitmapFileHeader_t) + sizeof(BitmapInfoHeader_t) + pixel_size;
+    raw.byte_count = sizeof(BitmapFileHeader_t) + sizeof(BitmapInfoHeader_t) + pixel_size;
     U32 pixel_offset = sizeof(BitmapFileHeader_t) + sizeof(BitmapInfoHeader_t);
 
-    U8* data = (U8*)malloc(data_size);
-    if(!data) return;
+    raw.bytes = (U8*)malloc(raw.byte_count);
+    if(!raw.bytes) return raw;
 
-    BitmapFileHeader_t* file_header = (BitmapFileHeader_t*)(data);
-    BitmapInfoHeader_t* info_header = (BitmapInfoHeader_t*)(data + sizeof(BitmapFileHeader_t));
+    BitmapFileHeader_t* file_header = (BitmapFileHeader_t*)(raw.bytes);
+    BitmapInfoHeader_t* info_header = (BitmapInfoHeader_t*)(raw.bytes + sizeof(BitmapFileHeader_t));
 
     file_header->file_type[0] = 'B';
     file_header->file_type[1] = 'M';
@@ -1217,7 +1219,7 @@ void create_thumbnail_bitmap(const char* filepath){
     info_header->clr_used = 0;
     info_header->clr_important = 0;
 
-    BitmapPixel_t* pixel = (BitmapPixel_t*)(data + pixel_offset);
+    BitmapPixel_t* pixel = (BitmapPixel_t*)(raw.bytes + pixel_offset);
 
     for(U32 y = 0; y < THUMBNAIL_DIMENSION; y++){
         for(U32 x = 0; x < THUMBNAIL_DIMENSION; x++){
@@ -1232,15 +1234,7 @@ void create_thumbnail_bitmap(const char* filepath){
         }
     }
 
-    FILE* file = fopen(filepath, "wb");
-    if(!file){
-        LOG("%s() failed to fopen(%s) for writing: %s\n", __FUNCTION__, filepath, strerror(errno));
-        return;
-    }
-
-    fwrite(data, data_size, 1, file);
-
-    fclose(file);
+    return raw;
 }
 
 int main(int argc, char** argv){
@@ -1791,7 +1785,11 @@ int main(int argc, char** argv){
                     case SDL_SCANCODE_3:
                     {
                          glBindFramebuffer(GL_FRAMEBUFFER, thumbnail_framebuffer);
-                         create_thumbnail_bitmap("frame.bmp");
+                         Raw_t raw_bitmap = create_thumbnail_bitmap();
+                         if(raw_bitmap.bytes){
+                             raw_save_file(&raw_bitmap, "frame.bmp");
+                             free(raw_bitmap.bytes);
+                         }
                          glBindFramebuffer(GL_FRAMEBUFFER, render_framebuffer);
                          break;
                     }
