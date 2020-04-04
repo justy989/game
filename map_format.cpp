@@ -124,394 +124,6 @@ bool save_map(const char* filepath, Coord_t player_start, const TileMap_t* tilem
      return success;
 }
 
-bool load_map_from_file_v1(FILE* file, Coord_t* player_start, TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array,
-                           ObjectArray_t<Interactive_t>* interactive_array){
-     // read counts from file
-     S16 map_width;
-     S16 map_height;
-     S16 interactive_count;
-     S16 block_count;
-
-     fread(player_start, sizeof(*player_start), 1, file);
-     fread(&map_width, sizeof(map_width), 1, file);
-     fread(&map_height, sizeof(map_height), 1, file);
-     fread(&block_count, sizeof(block_count), 1, file);
-     fread(&interactive_count, sizeof(interactive_count), 1, file);
-
-     // alloc and convert map elements to map format
-     S32 map_tile_count = (S32)(map_width) * (S32)(map_height);
-     MapTileV1_t* map_tiles = (MapTileV1_t*)(calloc((size_t)(map_tile_count), sizeof(*map_tiles)));
-     if(!map_tiles){
-          LOG("%s(): failed to allocate %d tiles\n", __FUNCTION__, map_tile_count);
-          return false;
-     }
-
-     MapBlockV1_t* map_blocks = (MapBlockV1_t*)(calloc((size_t)(block_count), sizeof(*map_blocks)));
-     if(!map_blocks){
-          LOG("%s(): failed to allocate %d blocks\n", __FUNCTION__, block_count);
-          return false;
-     }
-
-     MapInteractiveV1_t* map_interactives = (MapInteractiveV1_t*)(calloc((size_t)(interactive_count), sizeof(*map_interactives)));
-     if(!map_interactives){
-          LOG("%s(): failed to allocate %d interactives\n", __FUNCTION__, interactive_count);
-          return false;
-     }
-
-     // read data from file
-     fread(map_tiles, sizeof(*map_tiles), (size_t)(map_tile_count), file);
-     fread(map_blocks, sizeof(*map_blocks), (size_t)(block_count), file);
-     fread(map_interactives, sizeof(*map_interactives), (size_t)(interactive_count), file);
-
-     destroy(tilemap);
-     init(tilemap, map_width, map_height);
-
-     destroy(block_array);
-     init(block_array, block_count);
-
-     destroy(interactive_array);
-     init(interactive_array, interactive_count);
-
-     // convert to map formats
-     S32 index = 0;
-     for(S32 y = 0; y < tilemap->height; y++){
-          for(S32 x = 0; x < tilemap->width; x++){
-               tilemap->tiles[y][x].id = map_tiles[index].id;
-               tilemap->tiles[y][x].flags = map_tiles[index].flags;
-               tilemap->tiles[y][x].light = BASE_LIGHT;
-               index++;
-          }
-     }
-
-     // TODO: a lot of maps have -16, -16 as the first block
-     for(S16 i = 0; i < block_count; i++){
-          Block_t* block = block_array->elements + i;
-          *block = Block_t{};
-          block->pos.pixel = map_blocks[i].pixel;
-          block->pos.z = map_blocks[i].z;
-          block->rotation = map_blocks[i].rotation;
-          block->element = map_blocks[i].element;
-          block->entangle_index = -1;
-          block->clone_start = Coord_t{};
-          block->clone_id = 0;
-     }
-
-     for(S16 i = 0; i < interactive_array->count; i++){
-          Interactive_t* interactive = interactive_array->elements + i;
-          interactive->coord = map_interactives[i].coord;
-          interactive->type = map_interactives[i].type;
-
-          switch(map_interactives[i].type){
-          default:
-          case INTERACTIVE_TYPE_LEVER:
-          case INTERACTIVE_TYPE_BOW:
-               break;
-          case INTERACTIVE_TYPE_PRESSURE_PLATE:
-               interactive->pressure_plate = map_interactives[i].pressure_plate;
-               break;
-          case INTERACTIVE_TYPE_LIGHT_DETECTOR:
-          case INTERACTIVE_TYPE_ICE_DETECTOR:
-               interactive->detector = map_interactives[i].detector;
-               break;
-          case INTERACTIVE_TYPE_POPUP:
-               interactive->popup.lift.up = map_interactives[i].popup.up;
-               interactive->popup.lift.timer = 0.0f;
-               interactive->popup.iced = map_interactives[i].popup.iced;
-               if(interactive->popup.lift.up){
-                    interactive->popup.lift.ticks = HEIGHT_INTERVAL + 1;
-               }else{
-                    interactive->popup.lift.ticks = 1;
-               }
-               break;
-          case INTERACTIVE_TYPE_DOOR:
-               interactive->door.lift.up = map_interactives[i].door.up;
-               interactive->door.lift.timer = 0.0f;
-               interactive->door.lift.ticks = DOOR_MAX_HEIGHT;
-               interactive->door.face = map_interactives[i].door.face;
-               break;
-          case INTERACTIVE_TYPE_PORTAL:
-               interactive->portal.face = map_interactives[i].portal.face;
-               interactive->portal.on = map_interactives[i].portal.on;
-               break;
-          case INTERACTIVE_TYPE_STAIRS:
-               interactive->stairs.up = map_interactives[i].stairs.up;
-               interactive->stairs.face = map_interactives[i].stairs.face;
-               break;
-          case INTERACTIVE_TYPE_PROMPT:
-               break;
-          case INTERACTIVE_TYPE_WIRE_CROSS:
-               interactive->wire_cross.on = map_interactives[i].wire_cross.on;
-               interactive->wire_cross.mask = map_interactives[i].wire_cross.mask;
-               break;
-          }
-     }
-
-     free(map_tiles);
-     free(map_blocks);
-     free(map_interactives);
-
-     return true;
-}
-
-bool load_map_from_file_v2(FILE* file, Coord_t* player_start, TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array,
-                           ObjectArray_t<Interactive_t>* interactive_array){
-     // read counts from file
-     S16 map_width;
-     S16 map_height;
-     S16 interactive_count;
-     S16 block_count;
-
-     fread(player_start, sizeof(*player_start), 1, file);
-     fread(&map_width, sizeof(map_width), 1, file);
-     fread(&map_height, sizeof(map_height), 1, file);
-     fread(&block_count, sizeof(block_count), 1, file);
-     fread(&interactive_count, sizeof(interactive_count), 1, file);
-
-     // alloc and convert map elements to map format
-     S32 map_tile_count = (S32)(map_width) * (S32)(map_height);
-     MapTileV1_t* map_tiles = (MapTileV1_t*)(calloc((size_t)(map_tile_count), sizeof(*map_tiles)));
-     if(!map_tiles){
-          LOG("%s(): failed to allocate %d tiles\n", __FUNCTION__, map_tile_count);
-          return false;
-     }
-
-     MapBlockV2_t* map_blocks = (MapBlockV2_t*)(calloc((size_t)(block_count), sizeof(*map_blocks)));
-     if(!map_blocks){
-          LOG("%s(): failed to allocate %d blocks\n", __FUNCTION__, block_count);
-          return false;
-     }
-
-     MapInteractiveV1_t* map_interactives = (MapInteractiveV1_t*)(calloc((size_t)(interactive_count), sizeof(*map_interactives)));
-     if(!map_interactives){
-          LOG("%s(): failed to allocate %d interactives\n", __FUNCTION__, interactive_count);
-          return false;
-     }
-
-     // read data from file
-     fread(map_tiles, sizeof(*map_tiles), (size_t)(map_tile_count), file);
-     fread(map_blocks, sizeof(*map_blocks), (size_t)(block_count), file);
-     fread(map_interactives, sizeof(*map_interactives), (size_t)(interactive_count), file);
-
-     destroy(tilemap);
-     init(tilemap, map_width, map_height);
-
-     destroy(block_array);
-     init(block_array, block_count);
-
-     destroy(interactive_array);
-     init(interactive_array, interactive_count);
-
-     // convert to map formats
-     S32 index = 0;
-     for(S32 y = 0; y < tilemap->height; y++){
-          for(S32 x = 0; x < tilemap->width; x++){
-               tilemap->tiles[y][x].id = map_tiles[index].id;
-               tilemap->tiles[y][x].flags = map_tiles[index].flags;
-               tilemap->tiles[y][x].light = BASE_LIGHT;
-               index++;
-          }
-     }
-
-     // TODO: a lot of maps have -16, -16 as the first block
-     for(S16 i = 0; i < block_count; i++){
-          Block_t* block = block_array->elements + i;
-          *block = Block_t{};
-          block->pos.pixel = map_blocks[i].pixel;
-          block->pos.z = map_blocks[i].z;
-          block->rotation = map_blocks[i].rotation;
-          block->element = map_blocks[i].element;
-          block->entangle_index = map_blocks[i].entangle_index;
-          block->clone_start = Coord_t{};
-          block->clone_id = 0;
-     }
-
-     for(S16 i = 0; i < interactive_array->count; i++){
-          Interactive_t* interactive = interactive_array->elements + i;
-          interactive->coord = map_interactives[i].coord;
-          interactive->type = map_interactives[i].type;
-
-          switch(map_interactives[i].type){
-          default:
-          case INTERACTIVE_TYPE_LEVER:
-          case INTERACTIVE_TYPE_BOW:
-               break;
-          case INTERACTIVE_TYPE_PRESSURE_PLATE:
-               interactive->pressure_plate = map_interactives[i].pressure_plate;
-               break;
-          case INTERACTIVE_TYPE_LIGHT_DETECTOR:
-          case INTERACTIVE_TYPE_ICE_DETECTOR:
-               interactive->detector = map_interactives[i].detector;
-               break;
-          case INTERACTIVE_TYPE_POPUP:
-               interactive->popup.lift.up = map_interactives[i].popup.up;
-               interactive->popup.lift.timer = 0.0f;
-               interactive->popup.iced = map_interactives[i].popup.iced;
-               if(interactive->popup.lift.up){
-                    interactive->popup.lift.ticks = HEIGHT_INTERVAL + 1;
-               }else{
-                    interactive->popup.lift.ticks = 1;
-               }
-               break;
-          case INTERACTIVE_TYPE_DOOR:
-               interactive->door.lift.up = map_interactives[i].door.up;
-               interactive->door.lift.timer = 0.0f;
-               interactive->door.lift.ticks = DOOR_MAX_HEIGHT;
-               interactive->door.face = map_interactives[i].door.face;
-               break;
-          case INTERACTIVE_TYPE_PORTAL:
-               interactive->portal.face = map_interactives[i].portal.face;
-               interactive->portal.on = map_interactives[i].portal.on;
-               break;
-          case INTERACTIVE_TYPE_STAIRS:
-               interactive->stairs.up = map_interactives[i].stairs.up;
-               interactive->stairs.face = map_interactives[i].stairs.face;
-               break;
-          case INTERACTIVE_TYPE_PROMPT:
-               break;
-          case INTERACTIVE_TYPE_WIRE_CROSS:
-               interactive->wire_cross.on = map_interactives[i].wire_cross.on;
-               interactive->wire_cross.mask = map_interactives[i].wire_cross.mask;
-               break;
-          }
-     }
-
-     free(map_tiles);
-     free(map_blocks);
-     free(map_interactives);
-
-     return true;
-}
-
-bool load_map_from_file_v3(FILE* file, Coord_t* player_start, TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array,
-                           ObjectArray_t<Interactive_t>* interactive_array){
-     // read counts from file
-     S16 map_width;
-     S16 map_height;
-     S16 interactive_count;
-     S16 block_count;
-
-     fread(player_start, sizeof(*player_start), 1, file);
-     fread(&map_width, sizeof(map_width), 1, file);
-     fread(&map_height, sizeof(map_height), 1, file);
-     fread(&block_count, sizeof(block_count), 1, file);
-     fread(&interactive_count, sizeof(interactive_count), 1, file);
-
-     // alloc and convert map elements to map format
-     S32 map_tile_count = (S32)(map_width) * (S32)(map_height);
-     MapTileV1_t* map_tiles = (MapTileV1_t*)(calloc((size_t)(map_tile_count), sizeof(*map_tiles)));
-     if(!map_tiles){
-          LOG("%s(): failed to allocate %d tiles\n", __FUNCTION__, map_tile_count);
-          return false;
-     }
-
-     MapBlockV3_t* map_blocks = (MapBlockV3_t*)(calloc((size_t)(block_count), sizeof(*map_blocks)));
-     if(!map_blocks){
-          LOG("%s(): failed to allocate %d blocks\n", __FUNCTION__, block_count);
-          return false;
-     }
-
-     MapInteractiveV1_t* map_interactives = (MapInteractiveV1_t*)(calloc((size_t)(interactive_count), sizeof(*map_interactives)));
-     if(!map_interactives){
-          LOG("%s(): failed to allocate %d interactives\n", __FUNCTION__, interactive_count);
-          return false;
-     }
-
-     // read data from file
-     fread(map_tiles, sizeof(*map_tiles), (size_t)(map_tile_count), file);
-     fread(map_blocks, sizeof(*map_blocks), (size_t)(block_count), file);
-     fread(map_interactives, sizeof(*map_interactives), (size_t)(interactive_count), file);
-
-     destroy(tilemap);
-     init(tilemap, map_width, map_height);
-
-     destroy(block_array);
-     init(block_array, block_count);
-
-     destroy(interactive_array);
-     init(interactive_array, interactive_count);
-
-     // convert to map formats
-     S32 index = 0;
-     for(S32 y = 0; y < tilemap->height; y++){
-          for(S32 x = 0; x < tilemap->width; x++){
-               tilemap->tiles[y][x].id = map_tiles[index].id;
-               tilemap->tiles[y][x].flags = map_tiles[index].flags;
-               tilemap->tiles[y][x].light = BASE_LIGHT;
-               index++;
-          }
-     }
-
-     // TODO: a lot of maps have -16, -16 as the first block
-     for(S16 i = 0; i < block_count; i++){
-          Block_t* block = block_array->elements + i;
-          *block = Block_t{};
-          block->pos.pixel = map_blocks[i].pixel;
-          block->pos.z = map_blocks[i].z;
-          block->rotation = map_blocks[i].rotation;
-          block->element = map_blocks[i].element;
-          block->entangle_index = map_blocks[i].entangle_index;
-          block->cut = map_blocks[i].cut;
-          block->clone_start = Coord_t{};
-          block->clone_id = 0;
-     }
-
-     for(S16 i = 0; i < interactive_array->count; i++){
-          Interactive_t* interactive = interactive_array->elements + i;
-          interactive->coord = map_interactives[i].coord;
-          interactive->type = map_interactives[i].type;
-
-          switch(map_interactives[i].type){
-          default:
-          case INTERACTIVE_TYPE_LEVER:
-          case INTERACTIVE_TYPE_BOW:
-               break;
-          case INTERACTIVE_TYPE_PRESSURE_PLATE:
-               interactive->pressure_plate = map_interactives[i].pressure_plate;
-               break;
-          case INTERACTIVE_TYPE_LIGHT_DETECTOR:
-          case INTERACTIVE_TYPE_ICE_DETECTOR:
-               interactive->detector = map_interactives[i].detector;
-               break;
-          case INTERACTIVE_TYPE_POPUP:
-               interactive->popup.lift.up = map_interactives[i].popup.up;
-               interactive->popup.lift.timer = 0.0f;
-               interactive->popup.iced = map_interactives[i].popup.iced;
-               if(interactive->popup.lift.up){
-                    interactive->popup.lift.ticks = HEIGHT_INTERVAL + 1;
-               }else{
-                    interactive->popup.lift.ticks = 1;
-               }
-               break;
-          case INTERACTIVE_TYPE_DOOR:
-               interactive->door.lift.up = map_interactives[i].door.up;
-               interactive->door.lift.timer = 0.0f;
-               interactive->door.lift.ticks = DOOR_MAX_HEIGHT;
-               interactive->door.face = map_interactives[i].door.face;
-               break;
-          case INTERACTIVE_TYPE_PORTAL:
-               interactive->portal.face = map_interactives[i].portal.face;
-               interactive->portal.on = map_interactives[i].portal.on;
-               break;
-          case INTERACTIVE_TYPE_STAIRS:
-               interactive->stairs.up = map_interactives[i].stairs.up;
-               interactive->stairs.face = map_interactives[i].stairs.face;
-               break;
-          case INTERACTIVE_TYPE_PROMPT:
-               break;
-          case INTERACTIVE_TYPE_WIRE_CROSS:
-               interactive->wire_cross.on = map_interactives[i].wire_cross.on;
-               interactive->wire_cross.mask = map_interactives[i].wire_cross.mask;
-               break;
-          }
-     }
-
-     free(map_tiles);
-     free(map_blocks);
-     free(map_interactives);
-
-     return true;
-}
-
 bool load_map_from_file_v4(FILE* file, Coord_t* player_start, TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array,
                            ObjectArray_t<Interactive_t>* interactive_array, Raw_t* thumbnail){
      // read counts from file
@@ -556,7 +168,10 @@ bool load_map_from_file_v4(FILE* file, Coord_t* player_start, TileMap_t* tilemap
      if(thumbnail && thumbnail_size > 0){
          thumbnail->byte_count = thumbnail_size;
          thumbnail->bytes = (U8*)(malloc(thumbnail_size));
-         if(!thumbnail->bytes) return false;
+         if(!thumbnail->bytes){
+             LOG("Failed to allocate memory for thumbnail\n");
+             return false;
+         }
          fread(thumbnail->bytes, thumbnail_size, 1, file);
      }
 
@@ -660,11 +275,10 @@ bool load_map_from_file(FILE* file, Coord_t* player_start, TileMap_t* tilemap, O
           LOG("%s(): mismatched version loading '%s', actual %d, expected %d\n", __FUNCTION__, filepath, map_version, MAP_VERSION);
           break;
      case 1:
-          return load_map_from_file_v1(file, player_start, tilemap, block_array, interactive_array);
      case 2:
-          return load_map_from_file_v2(file, player_start, tilemap, block_array, interactive_array);
      case 3:
-          return load_map_from_file_v3(file, player_start, tilemap, block_array, interactive_array);
+          LOG("%s(): unsupported old version %d\n", __FUNCTION__, map_version);
+          break;
      case 4:
           return load_map_from_file_v4(file, player_start, tilemap, block_array, interactive_array, thumbnail);
      }
@@ -684,3 +298,53 @@ bool load_map(const char* filepath, Coord_t* player_start, TileMap_t* tilemap, O
      return success;
 }
 
+bool load_map_thumbnail(const char* filepath, Raw_t* thumbnail){
+     FILE* file = fopen(filepath, "rb");
+     if(!file){
+          LOG("%s(): fopen() failed\n", __FUNCTION__);
+          return false;
+     }
+
+     U8 map_version = 0;
+     fread(&map_version, sizeof(map_version), 1, file);
+
+     if(map_version < 4){
+         LOG("map version %u does not support thumbnail\n", map_version);
+         return false;
+     }
+
+     S16 map_width;
+     S16 map_height;
+     S16 interactive_count;
+     S16 block_count;
+     U64 thumbnail_size;
+     Coord_t player_start;
+
+     fread(&player_start, sizeof(player_start), 1, file);
+     fread(&map_width, sizeof(map_width), 1, file);
+     fread(&map_height, sizeof(map_height), 1, file);
+     fread(&block_count, sizeof(block_count), 1, file);
+     fread(&interactive_count, sizeof(interactive_count), 1, file);
+
+     fseek(file, sizeof(MapTileV1_t) * map_width * map_height, SEEK_CUR);
+     fseek(file, sizeof(MapBlockV3_t) * block_count, SEEK_CUR);
+     fseek(file, sizeof(MapInteractiveV1_t) * interactive_count, SEEK_CUR);
+
+     fread(&thumbnail_size, sizeof(thumbnail_size), 1, file);
+
+     if(thumbnail_size > 0){
+         thumbnail->byte_count = thumbnail_size;
+         thumbnail->bytes = (U8*)(malloc(thumbnail_size));
+         if(!thumbnail->bytes){
+             LOG("Failed to allocate memory for thumbnail\n");
+             return false;
+         }
+         fread(thumbnail->bytes, thumbnail_size, 1, file);
+     }else{
+         LOG("map does not contain a thumbnail\n");
+         return false;
+     }
+
+     fclose(file);
+     return true;
+}

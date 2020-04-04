@@ -119,7 +119,7 @@ build the entangled pushes before the loop and then when invalidating, we need t
 
 #define CHECKBOX_START_OFFSET_X (4.0f * PIXEL_SIZE)
 #define CHECKBOX_START_OFFSET_Y (2.0f * PIXEL_SIZE)
-#define CHECKBOX_INTERVAL (CHECKBOX_WORLD_DIMENSION + 2.0f * PIXEL_SIZE)
+#define CHECKBOX_INTERVAL (CHECKBOX_DIMENSION + 2.0f * PIXEL_SIZE)
 
 struct VecMaskCollisionEntry_t{
      S8 mask;
@@ -1533,8 +1533,8 @@ int main(int argc, char** argv){
 
      for(S16 c = 0; c < tag_checkboxes.count; c++){
           Checkbox_t* checkbox = tag_checkboxes.elements + c;
-          checkbox->vec.x = CHECKBOX_START_OFFSET_X;
-          checkbox->vec.y = CHECKBOX_START_OFFSET_Y + CHECKBOX_INTERVAL * (F32)(c);
+          checkbox->pos.x = CHECKBOX_START_OFFSET_X;
+          checkbox->pos.y = CHECKBOX_START_OFFSET_Y + CHECKBOX_INTERVAL * (F32)(c);
      }
 
      F32 dt = 0.0f;
@@ -4490,7 +4490,7 @@ int main(int argc, char** argv){
               glBegin(GL_QUADS);
               glColor3f(1.0f, 1.0f, 1.0f);
 
-              Vec_t text_pos {CHECKBOX_START_OFFSET_X + 10.0f * PIXEL_SIZE, CHECKBOX_START_OFFSET_Y};
+              Vec_t text_pos {CHECKBOX_START_OFFSET_X + 10.0f * PIXEL_SIZE, 2.0f * CHECKBOX_START_OFFSET_Y};
               text_pos += checkbox_scroll;
               for(S16 c = 0; c < tag_checkboxes.count; c++){
                   draw_text(tag_to_string((Tag_t)(c)), text_pos, Vec_t{TEXT_CHAR_WIDTH * 0.5f, TEXT_CHAR_HEIGHT * 0.5f},
