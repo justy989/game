@@ -21,6 +21,7 @@ struct Checkbox_t{
 
 struct MapThumbnail_t{
     char* map_filepath = NULL;
+    int map_number = 0;
     bool tags[TAG_COUNT];
     Vec_t pos;
     GLuint texture = 0;
