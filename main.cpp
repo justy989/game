@@ -113,9 +113,13 @@ build the entangled pushes before the loop and then when invalidating, we need t
 #include "world.h"
 #include "editor.h"
 #include "utils.h"
+#include "tags.h"
 
-#define DEBUG_FILE 0
 #define THUMBNAIL_DIMENSION 128
+
+#define CHECKBOX_START_OFFSET_X (4.0f * PIXEL_SIZE)
+#define CHECKBOX_START_OFFSET_Y (2.0f * PIXEL_SIZE)
+#define CHECKBOX_INTERVAL (10.0f * PIXEL_SIZE)
 
 struct VecMaskCollisionEntry_t{
      S8 mask;
@@ -1523,9 +1527,15 @@ int main(int argc, char** argv){
      reset_map(player_start, &world, &undo);
      init(&editor);
 
-#if DEBUG_FILE
-     FILE* debug_file = fopen("debug.txt", "w");
-#endif
+     Vec_t checkbox_scroll {};
+     ObjectArray_t<Checkbox_t> tag_checkboxes;
+     init(&tag_checkboxes, TAG_COUNT);
+
+     for(S16 c = 0; c < tag_checkboxes.count; c++){
+          Checkbox_t* checkbox = tag_checkboxes.elements + c;
+          checkbox->vec.x = CHECKBOX_START_OFFSET_X;
+          checkbox->vec.y = CHECKBOX_START_OFFSET_Y + CHECKBOX_INTERVAL * (F32)(c);
+     }
 
      F32 dt = 0.0f;
 
@@ -2065,6 +2075,14 @@ int main(int argc, char** argv){
                               }
                          } break;
                          }
+                         for(S16 c = 0; c < tag_checkboxes.count; c++){
+                              Checkbox_t* checkbox = tag_checkboxes.elements + c;
+
+                              Quad_t checkbox_quad = checkbox->get_area(checkbox_scroll);
+                              if(vec_in_quad(&checkbox_quad, mouse_screen)){
+                                   checkbox->checked = !checkbox->checked;
+                              }
+                         }
                          break;
                     case SDL_BUTTON_RIGHT:
                          switch(editor.mode){
@@ -2103,6 +2121,15 @@ int main(int argc, char** argv){
                          break;
                     }
                     break;
+               case SDL_MOUSEWHEEL:
+                    {
+                        const F32 max_scroll = -(CHECKBOX_INTERVAL * TAG_COUNT) + 1.0f;
+                        F32 y_scroll = (F32)(sdl_event.wheel.y) * CHECKBOX_INTERVAL;
+                        F32 final_scroll = checkbox_scroll.y + y_scroll;
+                        if(final_scroll > 0) final_scroll = 0;
+                        if(final_scroll < max_scroll) final_scroll = max_scroll;
+                        checkbox_scroll.y = final_scroll;
+                    } break;
                case SDL_MOUSEBUTTONUP:
                     switch(sdl_event.button.button){
                     default:
@@ -4146,15 +4173,6 @@ int main(int argc, char** argv){
                          block->pos.decimal.y = final_pos.decimal.y;
                     }
 
-#if DEBUG_FILE
-                    if(i == 2){
-                         fprintf(debug_file, "%ld %d %d %f %f hm %s %s %f vm %s %s %f\n", frame_count,
-                                 block->pos.pixel.x, block->pos.pixel.y, block->pos.decimal.x, block->pos.decimal.y,
-                                 move_state_to_string(block->horizontal_move.state), move_sign_to_string(block->horizontal_move.sign), block->horizontal_move.distance,
-                                 move_state_to_string(block->vertical_move.state), move_sign_to_string(block->vertical_move.sign), block->vertical_move.distance);
-                         fflush(debug_file);
-                    }
-#endif
                }
 
                // have player push block
@@ -4460,6 +4478,31 @@ int main(int argc, char** argv){
           glEnd();
 #endif
 
+          glBegin(GL_QUADS);
+          for(S16 c = 0; c < tag_checkboxes.count; c++){
+               Checkbox_t* checkbox = tag_checkboxes.elements + c;
+               draw_checkbox(checkbox, checkbox_scroll);
+          }
+          glEnd();
+
+          {
+              glBindTexture(GL_TEXTURE_2D, text_texture);
+              glBegin(GL_QUADS);
+              glColor3f(1.0f, 1.0f, 1.0f);
+
+              Vec_t text_pos {CHECKBOX_START_OFFSET_X + 10.0f * PIXEL_SIZE, CHECKBOX_START_OFFSET_Y};
+              text_pos += checkbox_scroll;
+              for(S16 c = 0; c < tag_checkboxes.count; c++){
+                  draw_text(tag_to_string((Tag_t)(c)), text_pos);
+                  text_pos.y += CHECKBOX_INTERVAL;
+              }
+
+              glEnd();
+          }
+
+          // player start
+          draw_selection(player_start, player_start, screen_camera, 0.0f, 1.0f, 0.0f);
+
           // before we draw the UI, lets write to the thumbnail buffer
           {
                glBindFramebuffer(GL_FRAMEBUFFER, thumbnail_framebuffer);
@@ -4488,9 +4531,6 @@ int main(int argc, char** argv){
 
                glBindFramebuffer(GL_FRAMEBUFFER, render_framebuffer);
           }
-
-          // player start
-          draw_selection(player_start, player_start, screen_camera, 0.0f, 1.0f, 0.0f);
 
           // editor
           draw_editor(&editor, &world, screen_camera, mouse_screen, theme_texture, text_texture);
@@ -4636,10 +4676,6 @@ int main(int argc, char** argv){
           SDL_DestroyWindow(window);
           SDL_Quit();
      }
-
-#if DEBUG_FILE
-     fclose(debug_file);
-#endif
 
      Log_t::destroy();
      return 0;

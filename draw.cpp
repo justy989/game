@@ -942,3 +942,12 @@ void draw_editor(Editor_t* editor, World_t* world, Position_t screen_camera, Vec
           glEnd();
      }
 }
+
+void draw_checkbox(Checkbox_t* checkbox, Vec_t scroll){
+    Vec_t pos = checkbox->vec + scroll;
+    Vec_t dim {CHECKBOX_DIMENSION, CHECKBOX_DIMENSION};
+    Vec_t tex = theme_frame(15, 15);
+    if(!checkbox->checked) tex.y += THEME_FRAME_HEIGHT * 0.5f;
+    Vec_t tex_dim {THEME_FRAME_WIDTH * 0.5f, THEME_FRAME_HEIGHT * 0.5f};
+    draw_screen_texture(pos, tex, dim, tex_dim);
+}

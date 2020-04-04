@@ -9,6 +9,7 @@
 #include "player.h"
 #include "arrow.h"
 #include "quad.h"
+#include "ui.h"
 
 #include <SDL2/SDL_opengl.h>
 
@@ -74,3 +75,4 @@ void draw_selection(Coord_t selection_start, Coord_t selection_end, Position_t c
 void draw_text(const char* message, Vec_t pos);
 void draw_editor(Editor_t* editor, World_t* world, Position_t screen_camera, Vec_t mouse_screen,
                  GLuint theme_texture, GLuint text_texture);
+void draw_checkbox(Checkbox_t* checkbox, Vec_t scroll);
