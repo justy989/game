@@ -125,13 +125,12 @@ bool save_map(const char* filepath, Coord_t player_start, const TileMap_t* tilem
 }
 
 bool load_map_from_file_v4(FILE* file, Coord_t* player_start, TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array,
-                           ObjectArray_t<Interactive_t>* interactive_array, Raw_t* thumbnail){
+                           ObjectArray_t<Interactive_t>* interactive_array){
      // read counts from file
      S16 map_width;
      S16 map_height;
      S16 interactive_count;
      S16 block_count;
-     U64 thumbnail_size;
 
      fread(player_start, sizeof(*player_start), 1, file);
      fread(&map_width, sizeof(map_width), 1, file);
@@ -163,17 +162,6 @@ bool load_map_from_file_v4(FILE* file, Coord_t* player_start, TileMap_t* tilemap
      fread(map_tiles, sizeof(*map_tiles), (size_t)(map_tile_count), file);
      fread(map_blocks, sizeof(*map_blocks), (size_t)(block_count), file);
      fread(map_interactives, sizeof(*map_interactives), (size_t)(interactive_count), file);
-
-     fread(&thumbnail_size, sizeof(thumbnail_size), 1, file);
-     if(thumbnail && thumbnail_size > 0){
-         thumbnail->byte_count = thumbnail_size;
-         thumbnail->bytes = (U8*)(malloc(thumbnail_size));
-         if(!thumbnail->bytes){
-             LOG("Failed to allocate memory for thumbnail\n");
-             return false;
-         }
-         fread(thumbnail->bytes, thumbnail_size, 1, file);
-     }
 
      destroy(tilemap);
      init(tilemap, map_width, map_height);
@@ -267,7 +255,7 @@ bool load_map_from_file_v4(FILE* file, Coord_t* player_start, TileMap_t* tilemap
 }
 
 bool load_map_from_file(FILE* file, Coord_t* player_start, TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array,
-                        ObjectArray_t<Interactive_t>* interactive_array, const char* filepath, Raw_t* thumbnail){
+                        ObjectArray_t<Interactive_t>* interactive_array, const char* filepath){
      U8 map_version = 0;
      fread(&map_version, sizeof(map_version), 1, file);
      switch(map_version){
@@ -280,20 +268,20 @@ bool load_map_from_file(FILE* file, Coord_t* player_start, TileMap_t* tilemap, O
           LOG("%s(): unsupported old version %d\n", __FUNCTION__, map_version);
           break;
      case 4:
-          return load_map_from_file_v4(file, player_start, tilemap, block_array, interactive_array, thumbnail);
+          return load_map_from_file_v4(file, player_start, tilemap, block_array, interactive_array);
      }
 
      return false;
 }
 
 bool load_map(const char* filepath, Coord_t* player_start, TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array,
-              ObjectArray_t<Interactive_t>* interactive_array, Raw_t* thumbnail){
+              ObjectArray_t<Interactive_t>* interactive_array){
      FILE* f = fopen(filepath, "rb");
      if(!f){
           LOG("%s(): fopen() failed\n", __FUNCTION__);
           return false;
      }
-     bool success = load_map_from_file(f, player_start, tilemap, block_array, interactive_array, filepath, thumbnail);
+     bool success = load_map_from_file(f, player_start, tilemap, block_array, interactive_array, filepath);
      fclose(f);
      return success;
 }

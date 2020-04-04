@@ -36,10 +36,12 @@ void sort_blocks_by_descending_height(Block_t** blocks, S16 block_count){
     qsort(blocks, block_count, sizeof(*blocks), descending_block_height_comparer);
 }
 
-bool load_map_number(S32 map_number, Coord_t* player_start, World_t* world, Raw_t* thumbnail){
+LogMapNumberResult_t load_map_number(S32 map_number, Coord_t* player_start, World_t* world){
+     LogMapNumberResult_t result;
+
      // search through directory to find file starting with 3 digit map number
      DIR* d = opendir("content");
-     if(!d) return false;
+     if(!d) return result;
      struct dirent* dir;
      char filepath[512] = {};
      char match[4] = {};
@@ -54,10 +56,12 @@ bool load_map_number(S32 map_number, Coord_t* player_start, World_t* world, Raw_
 
      closedir(d);
 
-     if(!filepath[0]) return false;
+     if(!filepath[0]) return result;
 
      LOG("load map %s\n", filepath);
-     return load_map(filepath, player_start, &world->tilemap, &world->blocks, &world->interactives, thumbnail);
+     result.success = load_map(filepath, player_start, &world->tilemap, &world->blocks, &world->interactives);
+     if(result.success) result.filepath = strdup(filepath);
+     return result;
 }
 
 void reset_map(Coord_t player_start, World_t* world, Undo_t* undo){
@@ -2058,7 +2062,7 @@ bool test_map_end_state(World_t* world, Demo_t* demo){
 #define NAME_LEN 64
      char name[NAME_LEN];
 
-     if(!load_map_from_file(demo->file, &check_player_start, &check_tilemap, &check_block_array, &check_interactives, demo->filepath, NULL)){
+     if(!load_map_from_file(demo->file, &check_player_start, &check_tilemap, &check_block_array, &check_interactives, demo->filepath)){
           LOG("failed to load map state from end of file\n");
           return false;
      }

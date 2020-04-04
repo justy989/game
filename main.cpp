@@ -136,56 +136,56 @@ struct VecMaskCollisionEntry_t{
 };
 
 F32 get_collision_dt(CheckBlockCollisionResult_t* collision){
-    F32 vel_mag = vec_magnitude(collision->original_vel);
-    F32 pos_delta_mag = vec_magnitude(collision->pos_delta);
+     F32 vel_mag = vec_magnitude(collision->original_vel);
+     F32 pos_delta_mag = vec_magnitude(collision->pos_delta);
 
-    F32 dt = pos_delta_mag / vel_mag;
-    if(dt < 0) return 0;
-    if(dt > FRAME_TIME) return FRAME_TIME;
+     F32 dt = pos_delta_mag / vel_mag;
+     if(dt < 0) return 0;
+     if(dt > FRAME_TIME) return FRAME_TIME;
 
-    return dt;
+     return dt;
 }
 
 int sort_collision_by_time_comparer(const void* a, const void* b){
-    CheckBlockCollisionResult_t* collision_a = (CheckBlockCollisionResult_t*)a;
-    CheckBlockCollisionResult_t* collision_b = (CheckBlockCollisionResult_t*)b;
+     CheckBlockCollisionResult_t* collision_a = (CheckBlockCollisionResult_t*)a;
+     CheckBlockCollisionResult_t* collision_b = (CheckBlockCollisionResult_t*)b;
 
-    return get_collision_dt(collision_a) < get_collision_dt(collision_b);
+     return get_collision_dt(collision_a) < get_collision_dt(collision_b);
 }
 
 struct CheckBlockCollisions_t{
-    CheckBlockCollisionResult_t* collisions = NULL;
-    S32 count = 0;
-    S32 allocated = 0;
+     CheckBlockCollisionResult_t* collisions = NULL;
+     S32 count = 0;
+     S32 allocated = 0;
 
-    bool init(S32 block_count){
-        collisions = (CheckBlockCollisionResult_t*)malloc(block_count * block_count * sizeof(*collisions));
-        if(collisions == NULL) return false;
-        allocated = block_count;
-        return true;
-    }
+     bool init(S32 block_count){
+         collisions = (CheckBlockCollisionResult_t*)malloc(block_count * block_count * sizeof(*collisions));
+         if(collisions == NULL) return false;
+         allocated = block_count;
+         return true;
+     }
 
-    bool add_collision(CheckBlockCollisionResult_t* collision){
-        if(count >= allocated) return false;
-        collisions[count] = *collision;
-        count++;
-        return true;
-    }
+     bool add_collision(CheckBlockCollisionResult_t* collision){
+         if(count >= allocated) return false;
+         collisions[count] = *collision;
+         count++;
+         return true;
+     }
 
-    void reset(){
-        count = 0;
-    }
+     void reset(){
+         count = 0;
+     }
 
-    void clear(){
-        free(collisions);
-        collisions = NULL;
-        count = 0;
-        allocated = 0;
-    }
+     void clear(){
+         free(collisions);
+         collisions = NULL;
+         count = 0;
+         allocated = 0;
+     }
 
-    void sort_by_time(){
-        qsort(collisions, count, sizeof(*collisions), sort_collision_by_time_comparer);
-    }
+     void sort_by_time(){
+         qsort(collisions, count, sizeof(*collisions), sort_collision_by_time_comparer);
+     }
 };
 
 FILE* load_demo_number(S32 map_number, const char** demo_filepath){
@@ -228,15 +228,16 @@ bool load_map_number_demo(Demo_t* demo, S16 map_number, S64* frame_count){
      return true;
 }
 
-bool load_map_number_map(S16 map_number, World_t* world, Undo_t* undo,
-                         Coord_t* player_start, PlayerAction_t* player_action, Raw_t* thumbnail){
-     if(load_map_number(map_number, player_start, world, thumbnail)){
+LogMapNumberResult_t load_map_number_map(S16 map_number, World_t* world, Undo_t* undo,
+                                         Coord_t* player_start, PlayerAction_t* player_action){
+     auto result = load_map_number(map_number, player_start, world);
+     if(result.success){
           reset_map(*player_start, world, undo);
           *player_action = {};
-          return true;
+          return result;
      }
 
-     return false;
+     return result;
 }
 
 void reset_texture(GLuint* texture, Raw_t* raw){
@@ -1488,7 +1489,7 @@ int main(int argc, char** argv){
      Quad_t pct_bar_outline_quad = {0, 2.0f * PIXEL_SIZE, 1.0f, 0.02f};
 
      if(load_map_filepath){
-          if(!load_map(load_map_filepath, &player_start, &world.tilemap, &world.blocks, &world.interactives, &thumbnail)){
+          if(!load_map(load_map_filepath, &player_start, &world.tilemap, &world.blocks, &world.interactives)){
                return 1;
           }
 
@@ -1496,9 +1497,12 @@ int main(int argc, char** argv){
                cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
           }
      }else if(suite){
-          if(!load_map_number(map_number, &player_start, &world, &thumbnail)){
+          auto load_result = load_map_number(map_number, &player_start, &world);
+          if(!load_result.success){
                return 1;
           }
+
+          load_map_filepath = load_result.filepath;
 
           cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
 
@@ -1507,9 +1511,12 @@ int main(int argc, char** argv){
                return 1;
           }
      }else if(map_number){
-          if(!load_map_number(map_number, &player_start, &world, &thumbnail)){
+          auto load_result = load_map_number(map_number, &player_start, &world);
+          if(!load_result.success){
                return 1;
           }
+
+          load_map_filepath = load_result.filepath;
 
           if(play_demo.mode == DEMO_MODE_PLAY){
                cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
@@ -1522,7 +1529,11 @@ int main(int argc, char** argv){
      }else{
           setup_default_room(&world);
      }
-     reset_texture(&cached_thumbnail_texture, &thumbnail);
+     if(load_map_filepath != NULL){
+          if(load_map_thumbnail(load_map_filepath, &thumbnail)){
+               reset_texture(&cached_thumbnail_texture, &thumbnail);
+          }
+     }
 
      reset_map(player_start, &world, &undo);
      init(&editor);
@@ -1590,9 +1601,13 @@ int main(int argc, char** argv){
                               map_number++;
                               S16 maps_tested = map_number - first_map_number;
 
-                              if(load_map_number_map(map_number, &world, &undo, &player_start, &player_action, &thumbnail)){
-                                   reset_texture(&cached_thumbnail_texture, &thumbnail);
+                              auto load_result = load_map_number_map(map_number, &world, &undo, &player_start, &player_action);
+                              if(load_result.success){
+                                   if(load_map_thumbnail(load_result.filepath, &thumbnail)){
+                                        reset_texture(&cached_thumbnail_texture, &thumbnail);
+                                   }
                                    cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
+                                   free(load_result.filepath);
 
                                    if(load_map_number_demo(&play_demo, map_number, &frame_count)){
                                         continue; // reset to the top of the loop
@@ -1693,17 +1708,28 @@ int main(int argc, char** argv){
                          }
                          break;
                     case SDL_SCANCODE_L:
-                         if(load_map_number_map(map_number, &world, &undo, &player_start, &player_action, &thumbnail)){
-                              reset_texture(&cached_thumbnail_texture, &thumbnail);
+                    {
+                         auto load_result = load_map_number_map(map_number, &world, &undo, &player_start, &player_action);
+                         if(load_result.success){
+                              if(load_map_thumbnail(load_result.filepath, &thumbnail)){
+                                   reset_texture(&cached_thumbnail_texture, &thumbnail);
+                              }
                               if(record_demo.mode == DEMO_MODE_PLAY){
                                    cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
                               }
+                              free(load_result.filepath);
                          }
                          break;
+                    }
                     case SDL_SCANCODE_LEFTBRACKET:
+                    {
                          map_number--;
-                         if(load_map_number_map(map_number, &world, &undo, &player_start, &player_action, &thumbnail)){
-                              reset_texture(&cached_thumbnail_texture, &thumbnail);
+                         auto load_result = load_map_number_map(map_number, &world, &undo, &player_start, &player_action);
+                         if(load_result.success){
+                              if(load_map_thumbnail(load_result.filepath, &thumbnail)){
+                                   reset_texture(&cached_thumbnail_texture, &thumbnail);
+                              }
+                              free(load_result.filepath);
                               if(record_demo.mode == DEMO_MODE_PLAY){
                                    cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
 
@@ -1717,10 +1743,16 @@ int main(int argc, char** argv){
                               map_number++;
                          }
                          break;
+                    }
                     case SDL_SCANCODE_RIGHTBRACKET:
+                    {
                          map_number++;
-                         if(load_map_number_map(map_number, &world, &undo, &player_start, &player_action, &thumbnail)){
-                              reset_texture(&cached_thumbnail_texture, &thumbnail);
+                         auto load_result = load_map_number_map(map_number, &world, &undo, &player_start, &player_action);
+                         if(load_result.success){
+                              if(load_map_thumbnail(load_result.filepath, &thumbnail)){
+                                   reset_texture(&cached_thumbnail_texture, &thumbnail);
+                              }
+                              free(load_result.filepath);
                               if(play_demo.mode == DEMO_MODE_PLAY){
                                    cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
 
@@ -1734,6 +1766,7 @@ int main(int argc, char** argv){
                               map_number--;
                          }
                          break;
+                    }
                     case SDL_SCANCODE_MINUS:
                          if(play_demo.dt_scalar > 0.1f){
                               play_demo.dt_scalar -= 0.1f;
@@ -4343,7 +4376,11 @@ int main(int argc, char** argv){
                     reset_timer += dt;
                     if(reset_timer >= RESET_TIME){
                          resetting = false;
-                         load_map_number_map(map_number, &world, &undo, &player_start, &player_action, &thumbnail);
+                         // TODO: maybe rather than relying on the file system, we can store the starting state in memory ?
+                         auto load_result = load_map_number_map(map_number, &world, &undo, &player_start, &player_action);
+                         if(load_result.success){
+                              free(load_result.filepath);
+                         }
                     }
                }else{
                     reset_timer -= dt;

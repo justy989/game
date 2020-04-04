@@ -80,9 +80,9 @@ bool save_map(const char* filepath, Coord_t player_start, const TileMap_t* tilem
               ObjectArray_t<Interactive_t>* interactive_array, Raw_t* thumbnail);
 
 bool load_map_from_file(FILE* file, Coord_t* player_start, TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array,
-                        ObjectArray_t<Interactive_t>* interactive_array, const char* filepath, Raw_t* thumbnail);
+                        ObjectArray_t<Interactive_t>* interactive_array, const char* filepath);
 
 bool load_map(const char* filepath, Coord_t* player_start, TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array,
-              ObjectArray_t<Interactive_t>* interactive_array, Raw_t* thumbnail);
+              ObjectArray_t<Interactive_t>* interactive_array);
 
 bool load_map_thumbnail(const char* filepath, Raw_t* thumbnail);

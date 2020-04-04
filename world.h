@@ -106,10 +106,15 @@ struct PushFromEntangler_t{
     BlockCut_t cut = BLOCK_CUT_WHOLE;
 };
 
+struct LogMapNumberResult_t{
+    bool success = false;
+    char* filepath = NULL;
+};
+
 void sort_blocks_by_ascending_height(Block_t** blocks, S16 block_count);
 void sort_blocks_by_descending_height(Block_t** blocks, S16 block_count);
 
-bool load_map_number(S32 map_number, Coord_t* player_start, World_t* world, Raw_t* thumbnail);
+LogMapNumberResult_t load_map_number(S32 map_number, Coord_t* player_start, World_t* world);
 void reset_map(Coord_t player_start, World_t* world, Undo_t* undo);
 
 void activate(World_t* world, Coord_t coord);
