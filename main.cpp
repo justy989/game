@@ -119,7 +119,7 @@ build the entangled pushes before the loop and then when invalidating, we need t
 
 #define CHECKBOX_START_OFFSET_X (4.0f * PIXEL_SIZE)
 #define CHECKBOX_START_OFFSET_Y (2.0f * PIXEL_SIZE)
-#define CHECKBOX_INTERVAL (10.0f * PIXEL_SIZE)
+#define CHECKBOX_INTERVAL (CHECKBOX_WORLD_DIMENSION + 2.0f * PIXEL_SIZE)
 
 struct VecMaskCollisionEntry_t{
      S8 mask;
@@ -2124,7 +2124,7 @@ int main(int argc, char** argv){
                case SDL_MOUSEWHEEL:
                     {
                         const F32 max_scroll = -(CHECKBOX_INTERVAL * TAG_COUNT) + 1.0f;
-                        F32 y_scroll = (F32)(sdl_event.wheel.y) * CHECKBOX_INTERVAL;
+                        F32 y_scroll = (F32)(-sdl_event.wheel.y) * CHECKBOX_INTERVAL;
                         F32 final_scroll = checkbox_scroll.y + y_scroll;
                         if(final_scroll > 0) final_scroll = 0;
                         if(final_scroll < max_scroll) final_scroll = max_scroll;
@@ -4493,7 +4493,8 @@ int main(int argc, char** argv){
               Vec_t text_pos {CHECKBOX_START_OFFSET_X + 10.0f * PIXEL_SIZE, CHECKBOX_START_OFFSET_Y};
               text_pos += checkbox_scroll;
               for(S16 c = 0; c < tag_checkboxes.count; c++){
-                  draw_text(tag_to_string((Tag_t)(c)), text_pos);
+                  draw_text(tag_to_string((Tag_t)(c)), text_pos, Vec_t{TEXT_CHAR_WIDTH * 0.5f, TEXT_CHAR_HEIGHT * 0.5f},
+                            TEXT_CHAR_SPACING * 0.5f);
                   text_pos.y += CHECKBOX_INTERVAL;
               }
 

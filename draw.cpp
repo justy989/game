@@ -671,10 +671,9 @@ void draw_world_row_arrows(S16 y, S16 x_start, S16 x_end, const ArrowArray_t* ar
      }
 }
 
-void draw_text(const char* message, Vec_t pos)
+void draw_text(const char* message, Vec_t pos, Vec_t dim, F32 spacing)
 {
      char c;
-     Vec_t dimensions {TEXT_CHAR_WIDTH, TEXT_CHAR_HEIGHT};
      Vec_t tex {};
      Vec_t tex_dimensions {TEXT_CHAR_TEX_WIDTH, TEXT_CHAR_TEX_HEIGHT};
 
@@ -707,9 +706,9 @@ void draw_text(const char* message, Vec_t pos)
                tex.x = 1.0f - TEXT_CHAR_TEX_WIDTH;
           }
 
-          draw_screen_texture(pos, tex, dimensions, tex_dimensions);
+          draw_screen_texture(pos, tex, dim, tex_dimensions);
 
-          pos.x += TEXT_CHAR_WIDTH + TEXT_CHAR_SPACING;
+          pos.x += dim.x + spacing;
           message++;
      }
 }
@@ -945,7 +944,7 @@ void draw_editor(Editor_t* editor, World_t* world, Position_t screen_camera, Vec
 
 void draw_checkbox(Checkbox_t* checkbox, Vec_t scroll){
     Vec_t pos = checkbox->vec + scroll;
-    Vec_t dim {CHECKBOX_DIMENSION, CHECKBOX_DIMENSION};
+    Vec_t dim {CHECKBOX_WORLD_DIMENSION, CHECKBOX_WORLD_DIMENSION};
     Vec_t tex = theme_frame(15, 15);
     if(!checkbox->checked) tex.y += THEME_FRAME_HEIGHT * 0.5f;
     Vec_t tex_dim {THEME_FRAME_WIDTH * 0.5f, THEME_FRAME_HEIGHT * 0.5f};
