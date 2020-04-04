@@ -56,7 +56,7 @@ GLuint transparent_texture_from_file(const char* filepath){
      return result;
 }
 
-GLuint transparent_texture_from_raw(Raw_t* raw){
+GLuint transparent_texture_from_raw_bitmap(Raw_t* raw){
      Bitmap_t bitmap = bitmap_load_raw(raw->bytes, raw->byte_count);
      if(bitmap.raw.byte_count == 0) return 0;
      GLuint result = transparent_texture_from_bitmap(&bitmap);

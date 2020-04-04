@@ -4,8 +4,10 @@
 #include "vec.h"
 #include "tags.h"
 
+#include <GL/gl.h>
+
 #define CHECKBOX_DIMENSION (8.0 * PIXEL_SIZE)
-#define THUMBNAIL_UI_DIMENSION (0.05f)
+#define THUMBNAIL_UI_DIMENSION (0.1375f)
 
 struct Checkbox_t{
     Vec_t pos;
@@ -21,7 +23,7 @@ struct MapThumbnail_t{
     char* map_filepath = NULL;
     bool tags[TAG_COUNT];
     Vec_t pos;
-    // thumbnail
+    GLuint texture = 0;
 
     Quad_t get_area(Vec_t scroll){
         Vec_t final = pos + scroll;

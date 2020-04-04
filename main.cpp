@@ -96,6 +96,9 @@ build the entangled pushes before the loop and then when invalidating, we need t
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_opengl.h>
 
+// linux specific
+#include <dirent.h>
+
 #include "log.h"
 #include "defines.h"
 #include "direction.h"
@@ -243,7 +246,7 @@ LogMapNumberResult_t load_map_number_map(S16 map_number, World_t* world, Undo_t*
 void reset_texture(GLuint* texture, Raw_t* raw){
     if(raw->bytes && raw->byte_count > 0){
         if(*texture > 0) glDeleteTextures(1, texture);
-        *texture = transparent_texture_from_raw(raw);
+        *texture = transparent_texture_from_raw_bitmap(raw);
     }
 }
 
@@ -1249,6 +1252,65 @@ Raw_t create_thumbnail_bitmap(){
     return raw;
 }
 
+struct FindAllMapsResult_t{
+     char** paths = NULL;
+     U32 count = 0;
+};
+
+bool is_numbered_map(const char* path){
+    U32 digits_left = 3;
+    while(*path){
+         if(digits_left > 0){
+              if(!isdigit(*path)) return false;
+              digits_left--;
+         }else{
+              if(*path == '_') break;
+              return false;
+         }
+         path++;
+    }
+
+    return true;
+}
+
+FindAllMapsResult_t find_all_maps(){
+     FindAllMapsResult_t result;
+     U32 map_count = 0;
+
+     {
+          DIR* d = opendir("content");
+          if(!d) return result;
+          struct dirent* dir;
+          while((dir = readdir(d)) != nullptr){
+               if(strstr(dir->d_name, ".bm") && is_numbered_map(dir->d_name)){
+                    map_count++;
+               }
+          }
+          closedir(d);
+     }
+
+     result.count = map_count;
+     result.paths = (char**)(malloc(map_count * sizeof(*result.paths)));
+
+     map_count = 0;
+     {
+          DIR* d = opendir("content");
+          if(!d) return result;
+          struct dirent* dir;
+          char full_path[256];
+          while((dir = readdir(d)) != nullptr){
+               if(strstr(dir->d_name, ".bm") && is_numbered_map(dir->d_name)){
+                    snprintf(full_path, 256, "content/%s", dir->d_name);
+                    result.paths[map_count] = strdup(full_path);
+                    map_count++;
+               }
+          }
+          closedir(d);
+     }
+
+     return result;
+}
+
 int main(int argc, char** argv){
      const char* load_map_filepath = nullptr;
      bool test = false;
@@ -1363,7 +1425,6 @@ int main(int argc, char** argv){
      GLuint render_texture = 0;
      GLuint thumbnail_framebuffer = 0;
      GLuint thumbnail_texture = 0;
-     GLuint cached_thumbnail_texture = 0;
 
      if(!suite || show_suite){
           if(SDL_Init(SDL_INIT_EVERYTHING) != 0){
@@ -1529,15 +1590,11 @@ int main(int argc, char** argv){
      }else{
           setup_default_room(&world);
      }
-     if(load_map_filepath != NULL){
-          if(load_map_thumbnail(load_map_filepath, &thumbnail)){
-               reset_texture(&cached_thumbnail_texture, &thumbnail);
-          }
-     }
 
      reset_map(player_start, &world, &undo);
      init(&editor);
 
+     // init ui
      Vec_t checkbox_scroll {};
      ObjectArray_t<Checkbox_t> tag_checkboxes;
      init(&tag_checkboxes, TAG_COUNT);
@@ -1546,6 +1603,40 @@ int main(int argc, char** argv){
           Checkbox_t* checkbox = tag_checkboxes.elements + c;
           checkbox->pos.x = CHECKBOX_START_OFFSET_X;
           checkbox->pos.y = CHECKBOX_START_OFFSET_Y + CHECKBOX_INTERVAL * (F32)(c);
+     }
+
+     auto all_maps = find_all_maps();
+
+     Vec_t map_scroll {};
+     char* hovered_map_thumbnail = NULL;
+     ObjectArray_t<MapThumbnail_t> map_thumbnails;
+     init(&map_thumbnails, all_maps.count);
+
+     {
+          const F32 thumbnail_row_start_x = 0.45f;
+          F32 current_thumbnail_x = thumbnail_row_start_x;
+          F32 current_thumbnail_y = TEXT_CHAR_HEIGHT + PIXEL_SIZE;
+
+          for(U32 m = 0; m < all_maps.count; m++){
+               auto* map_thumbnail = map_thumbnails.elements + m;
+               map_thumbnail->map_filepath = strdup(all_maps.paths[m]);
+               map_thumbnail->pos.x = current_thumbnail_x;
+               map_thumbnail->pos.y = current_thumbnail_y;
+               Raw_t loaded_thumbnail;
+               if(load_map_thumbnail(map_thumbnail->map_filepath, &loaded_thumbnail)){
+                    map_thumbnail->texture = transparent_texture_from_raw_bitmap(&loaded_thumbnail);
+                    free(loaded_thumbnail.bytes);
+               }else{
+                    map_thumbnail->texture = 0;
+               }
+               free(all_maps.paths[m]);
+               current_thumbnail_x += THUMBNAIL_UI_DIMENSION;
+               if(current_thumbnail_x > 1.0f){
+                    current_thumbnail_x = thumbnail_row_start_x;
+                    current_thumbnail_y += THUMBNAIL_UI_DIMENSION;
+               }
+          }
+          free(all_maps.paths);
      }
 
      F32 dt = 0.0f;
@@ -1603,9 +1694,6 @@ int main(int argc, char** argv){
 
                               auto load_result = load_map_number_map(map_number, &world, &undo, &player_start, &player_action);
                               if(load_result.success){
-                                   if(load_map_thumbnail(load_result.filepath, &thumbnail)){
-                                        reset_texture(&cached_thumbnail_texture, &thumbnail);
-                                   }
                                    cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
                                    free(load_result.filepath);
 
@@ -1711,9 +1799,6 @@ int main(int argc, char** argv){
                     {
                          auto load_result = load_map_number_map(map_number, &world, &undo, &player_start, &player_action);
                          if(load_result.success){
-                              if(load_map_thumbnail(load_result.filepath, &thumbnail)){
-                                   reset_texture(&cached_thumbnail_texture, &thumbnail);
-                              }
                               if(record_demo.mode == DEMO_MODE_PLAY){
                                    cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
                               }
@@ -1726,9 +1811,6 @@ int main(int argc, char** argv){
                          map_number--;
                          auto load_result = load_map_number_map(map_number, &world, &undo, &player_start, &player_action);
                          if(load_result.success){
-                              if(load_map_thumbnail(load_result.filepath, &thumbnail)){
-                                   reset_texture(&cached_thumbnail_texture, &thumbnail);
-                              }
                               free(load_result.filepath);
                               if(record_demo.mode == DEMO_MODE_PLAY){
                                    cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
@@ -1749,9 +1831,6 @@ int main(int argc, char** argv){
                          map_number++;
                          auto load_result = load_map_number_map(map_number, &world, &undo, &player_start, &player_action);
                          if(load_result.success){
-                              if(load_map_thumbnail(load_result.filepath, &thumbnail)){
-                                   reset_texture(&cached_thumbnail_texture, &thumbnail);
-                              }
                               free(load_result.filepath);
                               if(play_demo.mode == DEMO_MODE_PLAY){
                                    cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
@@ -2156,12 +2235,21 @@ int main(int argc, char** argv){
                     break;
                case SDL_MOUSEWHEEL:
                     {
-                        const F32 max_scroll = -(CHECKBOX_INTERVAL * TAG_COUNT) + 1.0f;
-                        F32 y_scroll = (F32)(-sdl_event.wheel.y) * CHECKBOX_INTERVAL;
-                        F32 final_scroll = checkbox_scroll.y + y_scroll;
-                        if(final_scroll > 0) final_scroll = 0;
-                        if(final_scroll < max_scroll) final_scroll = max_scroll;
-                        checkbox_scroll.y = final_scroll;
+                        if(mouse_screen.x <= 0.3f){
+                             const F32 max_scroll = -(CHECKBOX_INTERVAL * TAG_COUNT) + 1.0f;
+                             F32 y_scroll = (F32)(-sdl_event.wheel.y) * CHECKBOX_INTERVAL;
+                             F32 final_scroll = checkbox_scroll.y + y_scroll;
+                             if(final_scroll > 0) final_scroll = 0;
+                             if(final_scroll < max_scroll) final_scroll = max_scroll;
+                             checkbox_scroll.y = final_scroll;
+                        }else{
+                             F32 max_scroll = -(THUMBNAIL_UI_DIMENSION * (map_thumbnails.count / 4)) + 1.0f;
+                             F32 y_scroll = (F32)(-sdl_event.wheel.y) * THUMBNAIL_UI_DIMENSION;
+                             F32 final_scroll = map_scroll.y + y_scroll;
+                             if(final_scroll > 0) final_scroll = 0;
+                             if(final_scroll < max_scroll) final_scroll = max_scroll;
+                             map_scroll.y = final_scroll;
+                        }
                     } break;
                case SDL_MOUSEBUTTONUP:
                     switch(sdl_event.button.button){
@@ -2238,6 +2326,22 @@ int main(int argc, char** argv){
                     mouse_screen = Vec_t{((F32)(sdl_event.button.x) / (F32)(window_width)),
                                          1.0f - ((F32)(sdl_event.button.y) / (F32)(window_height))};
                     mouse_world = vec_to_pos(mouse_screen);
+
+                    hovered_map_thumbnail = NULL;
+                    for(S16 m = 0; m < map_thumbnails.count; m++){
+                         auto* map_thumbnail = map_thumbnails.elements + m;
+                         auto quad = map_thumbnail->get_area(map_scroll);
+                         if(vec_in_quad(&quad, mouse_screen)){
+                              hovered_map_thumbnail = strdup(map_thumbnail->map_filepath);
+                              char* itr = hovered_map_thumbnail;
+                              while(*itr){
+                                   *itr = toupper(*itr);
+                                   itr++;
+                              }
+                              break;
+                         }
+                    }
+
                     switch(editor.mode){
                     default:
                          break;
@@ -4495,7 +4599,7 @@ int main(int argc, char** argv){
 
           glEnd();
 
-#if 0
+#if 1
           // light
           glBindTexture(GL_TEXTURE_2D, 0);
           glBegin(GL_QUADS);
@@ -4515,27 +4619,70 @@ int main(int argc, char** argv){
           glEnd();
 #endif
 
+          glBindTexture(GL_TEXTURE_2D, theme_texture);
           glBegin(GL_QUADS);
+          glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
           for(S16 c = 0; c < tag_checkboxes.count; c++){
                Checkbox_t* checkbox = tag_checkboxes.elements + c;
+               Vec_t final_pos = checkbox->pos + checkbox_scroll;
+               if(final_pos.y < 0 || final_pos.y > 1) continue;
                draw_checkbox(checkbox, checkbox_scroll);
           }
           glEnd();
 
           {
-              glBindTexture(GL_TEXTURE_2D, text_texture);
-              glBegin(GL_QUADS);
-              glColor3f(1.0f, 1.0f, 1.0f);
+               glBindTexture(GL_TEXTURE_2D, text_texture);
+               glBegin(GL_QUADS);
+               glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
 
-              Vec_t text_pos {CHECKBOX_START_OFFSET_X + 10.0f * PIXEL_SIZE, 2.0f * CHECKBOX_START_OFFSET_Y};
-              text_pos += checkbox_scroll;
-              for(S16 c = 0; c < tag_checkboxes.count; c++){
-                  draw_text(tag_to_string((Tag_t)(c)), text_pos, Vec_t{TEXT_CHAR_WIDTH * 0.5f, TEXT_CHAR_HEIGHT * 0.5f},
-                            TEXT_CHAR_SPACING * 0.5f);
-                  text_pos.y += CHECKBOX_INTERVAL;
-              }
+               Vec_t text_pos {CHECKBOX_START_OFFSET_X + 10.0f * PIXEL_SIZE, 2.0f * CHECKBOX_START_OFFSET_Y};
+               text_pos += checkbox_scroll;
+               for(S16 c = 0; c < tag_checkboxes.count; c++){
+                    if(text_pos.y < 0 || text_pos.y > 1){
+                         // pass
+                    }else{
+                         draw_text(tag_to_string((Tag_t)(c)), text_pos, Vec_t{TEXT_CHAR_WIDTH * 0.5f, TEXT_CHAR_HEIGHT * 0.5f},
+                                   TEXT_CHAR_SPACING * 0.5f);
+                    }
+                    text_pos.y += CHECKBOX_INTERVAL;
+               }
 
-              glEnd();
+               if(hovered_map_thumbnail){
+                    text_pos = Vec_t{0.45f, 2.0f * PIXEL_SIZE};
+                    draw_text(hovered_map_thumbnail, text_pos, Vec_t{TEXT_CHAR_WIDTH * 0.5f, TEXT_CHAR_HEIGHT * 0.5f},
+                                   TEXT_CHAR_SPACING * 0.5f);
+               }
+
+               glEnd();
+          }
+
+          for(S16 m = 0; m < map_thumbnails.count; m++){
+               auto* map_thumbnail = map_thumbnails.elements + m;
+
+               if(map_thumbnail->texture == 0) continue;
+
+               Vec_t pos = map_thumbnail->pos + map_scroll;
+               Vec_t bounds = pos + Vec_t{THUMBNAIL_UI_DIMENSION, THUMBNAIL_UI_DIMENSION};
+
+               if(pos.y < 0 || pos.y > 1) continue;
+
+               glBindTexture(GL_TEXTURE_2D, map_thumbnail->texture);
+               glBegin(GL_QUADS);
+               glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+
+               glTexCoord2f(0, 0);
+               glVertex2f(pos.x, pos.y);
+
+               glTexCoord2f(0, 1.0f);
+               glVertex2f(pos.x, bounds.y);
+
+               glTexCoord2f(1.0f, 1.0f);
+               glVertex2f(bounds.x, bounds.y);
+
+               glTexCoord2f(1.0f, 0);
+               glVertex2f(bounds.x, pos.y);
+
+               glEnd();
           }
 
           // player start
@@ -4616,26 +4763,6 @@ int main(int argc, char** argv){
 
           }
 
-          if(cached_thumbnail_texture > 0){
-              glBindTexture(GL_TEXTURE_2D, cached_thumbnail_texture);
-              glBegin(GL_QUADS);
-              glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
-
-              glTexCoord2f(0, 0);
-              glVertex2f(0.0f, 0.0f);
-
-              glTexCoord2f(0, 1.0f);
-              glVertex2f(0.0f, 0.25f);
-
-              glTexCoord2f(1.0f, 1.0f);
-              glVertex2f(0.25f, 0.25f);
-
-              glTexCoord2f(1.0f, 0);
-              glVertex2f(0.25f, 0.0f);
-
-              glEnd();
-          }
-
           glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
           glBindTexture(GL_TEXTURE_2D, render_texture);
@@ -4705,7 +4832,6 @@ int main(int argc, char** argv){
           glDeleteTextures(1, &text_texture);
           glDeleteTextures(1, &render_texture);
           glDeleteTextures(1, &thumbnail_texture);
-          glDeleteTextures(1, &cached_thumbnail_texture);
 
           glDeleteFramebuffers(1, &render_framebuffer);
           glDeleteFramebuffers(1, &thumbnail_framebuffer);
