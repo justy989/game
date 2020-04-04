@@ -90,6 +90,9 @@ build the entangled pushes before the loop and then when invalidating, we need t
 #include <cassert>
 #include <thread>
 
+// enable GLEXT
+#define GL_GLEXT_PROTOTYPES
+
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_opengl.h>
 
@@ -112,6 +115,7 @@ build the entangled pushes before the loop and then when invalidating, we need t
 #include "utils.h"
 
 #define DEBUG_FILE 0
+#define THUMBNAIL_DIMENSION 128
 
 struct VecMaskCollisionEntry_t{
      S8 mask;
@@ -1185,6 +1189,60 @@ void set_against_blocks_coasting_from_player(Block_t* block, Direction_t directi
      }
 }
 
+void create_thumbnail_bitmap(const char* filepath){
+    U32 pixel_size = THUMBNAIL_DIMENSION * THUMBNAIL_DIMENSION * 3;
+    U32 data_size = sizeof(BitmapFileHeader_t) + sizeof(BitmapInfoHeader_t) + pixel_size;
+    U32 pixel_offset = sizeof(BitmapFileHeader_t) + sizeof(BitmapInfoHeader_t);
+
+    U8* data = (U8*)malloc(data_size);
+    if(!data) return;
+
+    BitmapFileHeader_t* file_header = (BitmapFileHeader_t*)(data);
+    BitmapInfoHeader_t* info_header = (BitmapInfoHeader_t*)(data + sizeof(BitmapFileHeader_t));
+
+    file_header->file_type[0] = 'B';
+    file_header->file_type[1] = 'M';
+    file_header->file_size = pixel_size + pixel_offset;
+    file_header->bitmap_offset = pixel_offset;
+
+    info_header->size = BITMAP_SUPPORTED_SIZE;
+    info_header->width = THUMBNAIL_DIMENSION;
+    info_header->height = THUMBNAIL_DIMENSION;
+    info_header->planes = 1;
+    info_header->bit_count = 24;
+    info_header->compression = 0;
+    info_header->size_image = pixel_size;
+    info_header->x_pels_per_meter = 2835;
+    info_header->y_pels_per_meter = 2835;
+    info_header->clr_used = 0;
+    info_header->clr_important = 0;
+
+    BitmapPixel_t* pixel = (BitmapPixel_t*)(data + pixel_offset);
+
+    for(U32 y = 0; y < THUMBNAIL_DIMENSION; y++){
+        for(U32 x = 0; x < THUMBNAIL_DIMENSION; x++){
+            glReadPixels(x, y, 1, 1, GL_RGB, GL_UNSIGNED_BYTE, pixel);
+
+            // swap red and blue
+            U8 tmp = pixel->red;
+            pixel->red = pixel->blue;
+            pixel->blue = tmp;
+
+            pixel++;
+        }
+    }
+
+    FILE* file = fopen(filepath, "wb");
+    if(!file){
+        LOG("%s() failed to fopen(%s) for writing: %s\n", __FUNCTION__, filepath, strerror(errno));
+        return;
+    }
+
+    fwrite(data, data_size, 1, file);
+
+    fclose(file);
+}
+
 int main(int argc, char** argv){
      const char* load_map_filepath = nullptr;
      bool test = false;
@@ -1295,6 +1353,10 @@ int main(int argc, char** argv){
      GLuint player_texture = 0;
      GLuint arrow_texture = 0;
      GLuint text_texture = 0;
+     GLuint render_framebuffer = 0;
+     GLuint render_texture = 0;
+     GLuint thumbnail_framebuffer = 0;
+     GLuint thumbnail_texture = 0;
 
      if(!suite || show_suite){
           if(SDL_Init(SDL_INIT_EVERYTHING) != 0){
@@ -1317,7 +1379,6 @@ int main(int argc, char** argv){
           glViewport(0, 0, window_width, window_height);
           glClearColor(0.0, 0.0, 0.0, 1.0);
           glEnable(GL_TEXTURE_2D);
-          glViewport(0, 0, window_width, window_height);
           glMatrixMode(GL_PROJECTION);
           glLoadIdentity();
           glOrtho(0.0, 1.0, 0.0, 1.0, 0.0, 1.0);
@@ -1335,6 +1396,46 @@ int main(int argc, char** argv){
           if(arrow_texture == 0) return 1;
           text_texture = transparent_texture_from_file("content/text.bmp");
           if(text_texture == 0) return 1;
+
+          glGenFramebuffers(1, &thumbnail_framebuffer);
+          glBindFramebuffer(GL_FRAMEBUFFER, thumbnail_framebuffer);
+
+          glGenTextures(1, &thumbnail_texture);
+          glBindTexture(GL_TEXTURE_2D, thumbnail_texture);
+          glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, THUMBNAIL_DIMENSION, THUMBNAIL_DIMENSION, 0, GL_RGB, GL_UNSIGNED_BYTE, 0);
+          glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+          glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+
+          glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, thumbnail_texture, 0);
+
+          GLenum DrawBuffers[1] = {GL_COLOR_ATTACHMENT0};
+          glDrawBuffers(1, DrawBuffers); // "1" is the size of DrawBuffers
+
+          auto rc = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+          if(rc != GL_FRAMEBUFFER_COMPLETE){
+              LOG("glCheckFramebufferStatus() rc: %x\n", rc);
+              return 1;
+          }
+
+          glGenFramebuffers(1, &render_framebuffer);
+          glBindFramebuffer(GL_FRAMEBUFFER, render_framebuffer);
+
+          // TODO: need to resize if the window resizes
+          glGenTextures(1, &render_texture);
+          glBindTexture(GL_TEXTURE_2D, render_texture);
+          glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, window_width, window_height, 0, GL_RGB, GL_UNSIGNED_BYTE, 0);
+          glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+          glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+
+          glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, render_texture, 0);
+
+          glDrawBuffers(1, DrawBuffers); // "1" is the size of DrawBuffers
+
+          rc = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+          if(rc != GL_FRAMEBUFFER_COMPLETE){
+              LOG("glCheckFramebufferStatus() rc: %x\n", rc);
+              return 1;
+          }
      }
 
      if(play_demo.mode != DEMO_MODE_NONE){
@@ -1687,6 +1788,13 @@ int main(int argc, char** argv){
                               }
                          }
                          break;
+                    case SDL_SCANCODE_3:
+                    {
+                         glBindFramebuffer(GL_FRAMEBUFFER, thumbnail_framebuffer);
+                         create_thumbnail_bitmap("frame.bmp");
+                         glBindFramebuffer(GL_FRAMEBUFFER, render_framebuffer);
+                         break;
+                    }
                     case SDL_SCANCODE_0:
                          if(editor.mode == EDITOR_MODE_CATEGORY_SELECT){
                               auto coord = mouse_select_world(mouse_screen, camera);
@@ -4342,6 +4450,35 @@ int main(int argc, char** argv){
           glEnd();
 #endif
 
+          // before we draw the UI, lets write to the thumbnail buffer
+          {
+               glBindFramebuffer(GL_FRAMEBUFFER, thumbnail_framebuffer);
+
+               glViewport(0, 0, THUMBNAIL_DIMENSION, THUMBNAIL_DIMENSION);
+
+               glBindTexture(GL_TEXTURE_2D, render_texture);
+               glBegin(GL_QUADS);
+               glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+
+               glTexCoord2f(0, 0);
+               glVertex2f(0.0f, 0.0f);
+
+               glTexCoord2f(0, 1.0f);
+               glVertex2f(0.0f, 1.0f);
+
+               glTexCoord2f(1.0f, 1.0f);
+               glVertex2f(1.0f, 1.0f);
+
+               glTexCoord2f(1.0f, 0);
+               glVertex2f(1.0f, 0.0f);
+
+               glEnd();
+
+               glViewport(0, 0, window_width, window_height);
+
+               glBindFramebuffer(GL_FRAMEBUFFER, render_framebuffer);
+          }
+
           // player start
           draw_selection(player_start, player_start, screen_camera, 0.0f, 1.0f, 0.0f);
 
@@ -4391,7 +4528,29 @@ int main(int argc, char** argv){
 
           }
 
+          glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+          glBindTexture(GL_TEXTURE_2D, render_texture);
+          glBegin(GL_QUADS);
+          glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+
+          glTexCoord2f(0, 0);
+          glVertex2f(0.0f, 0.0f);
+
+          glTexCoord2f(0, 1.0f);
+          glVertex2f(0.0f, 1.0f);
+
+          glTexCoord2f(1.0f, 1.0f);
+          glVertex2f(1.0f, 1.0f);
+
+          glTexCoord2f(1.0f, 0);
+          glVertex2f(1.0f, 0.0f);
+
+          glEnd();
+
           SDL_GL_SwapWindow(window);
+
+          glBindFramebuffer(GL_FRAMEBUFFER, render_framebuffer);
      }
 
      if(play_demo.mode == DEMO_MODE_PLAY){
@@ -4436,6 +4595,11 @@ int main(int argc, char** argv){
           glDeleteTextures(1, &player_texture);
           glDeleteTextures(1, &arrow_texture);
           glDeleteTextures(1, &text_texture);
+          glDeleteTextures(1, &render_texture);
+          glDeleteTextures(1, &thumbnail_texture);
+
+          glDeleteFramebuffers(1, &render_framebuffer);
+          glDeleteFramebuffers(1, &thumbnail_framebuffer);
 
           SDL_GL_DeleteContext(opengl_context);
           SDL_DestroyWindow(window);
