@@ -41,14 +41,27 @@ GLuint create_texture_from_bitmap(AlphaBitmap_t* bitmap){
      return texture;
 }
 
-GLuint transparent_texture_from_file(const char* filepath){
-     Bitmap_t bitmap = bitmap_load_from_file(filepath);
-     if(bitmap.raw.byte_count == 0) return 0;
-     AlphaBitmap_t alpha_bitmap = bitmap_to_alpha_bitmap(&bitmap, BitmapPixel_t{255, 0, 255});
-     free(bitmap.raw.bytes);
+GLuint transparent_texture_from_bitmap(Bitmap_t* bitmap){
+     AlphaBitmap_t alpha_bitmap = bitmap_to_alpha_bitmap(bitmap, BitmapPixel_t{255, 0, 255});
      GLuint texture_id = create_texture_from_bitmap(&alpha_bitmap);
      free(alpha_bitmap.pixels);
      return texture_id;
+}
+
+GLuint transparent_texture_from_file(const char* filepath){
+     Bitmap_t bitmap = bitmap_load_from_file(filepath);
+     if(bitmap.raw.byte_count == 0) return 0;
+     GLuint result = transparent_texture_from_bitmap(&bitmap);
+     free(bitmap.raw.bytes);
+     return result;
+}
+
+GLuint transparent_texture_from_raw(Raw_t* raw){
+     Bitmap_t bitmap = bitmap_load_raw(raw->bytes, raw->byte_count);
+     if(bitmap.raw.byte_count == 0) return 0;
+     GLuint result = transparent_texture_from_bitmap(&bitmap);
+     free(bitmap.raw.bytes);
+     return result;
 }
 
 void draw_screen_texture(Vec_t pos, Vec_t tex, Vec_t dim, Vec_t tex_dim){

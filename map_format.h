@@ -5,10 +5,12 @@
 #include "object_array.h"
 #include "block.h"
 #include "interactive.h"
+#include "raw.h"
 
 #include <stdio.h>
 
-#define MAP_VERSION 3
+// version 4 is just the addition of the thumbnail
+#define MAP_VERSION 4
 
 #pragma pack(push, 1)
 struct MapTileV1_t{
@@ -72,13 +74,13 @@ struct MapInteractiveV1_t{
 #pragma pack(pop)
 
 bool save_map_to_file(FILE* file, Coord_t player_start, const TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array,
-                      ObjectArray_t<Interactive_t>* interactive_array);
+                      ObjectArray_t<Interactive_t>* interactive_array, Raw_t* thumbnail);
 
 bool save_map(const char* filepath, Coord_t player_start, const TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array,
-              ObjectArray_t<Interactive_t>* interactive_array);
+              ObjectArray_t<Interactive_t>* interactive_array, Raw_t* thumbnail);
 
 bool load_map_from_file(FILE* file, Coord_t* player_start, TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array,
-                        ObjectArray_t<Interactive_t>* interactive_array, const char* filepath);
+                        ObjectArray_t<Interactive_t>* interactive_array, const char* filepath, Raw_t* thumbnail);
 
 bool load_map(const char* filepath, Coord_t* player_start, TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array,
-              ObjectArray_t<Interactive_t>* interactive_array);
+              ObjectArray_t<Interactive_t>* interactive_array, Raw_t* thumbnail);

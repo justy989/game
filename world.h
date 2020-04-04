@@ -8,6 +8,7 @@
 #include "quad_tree.h"
 #include "undo.h"
 #include "demo.h"
+#include "raw.h"
 
 struct World_t{
      TileMap_t tilemap = {};
@@ -108,7 +109,7 @@ struct PushFromEntangler_t{
 void sort_blocks_by_ascending_height(Block_t** blocks, S16 block_count);
 void sort_blocks_by_descending_height(Block_t** blocks, S16 block_count);
 
-bool load_map_number(S32 map_number, Coord_t* player_start, World_t* world);
+bool load_map_number(S32 map_number, Coord_t* player_start, World_t* world, Raw_t* thumbnail);
 void reset_map(Coord_t player_start, World_t* world, Undo_t* undo);
 
 void activate(World_t* world, Coord_t coord);

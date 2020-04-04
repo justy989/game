@@ -43,6 +43,7 @@ Vec_t player_frame(S16 x, S16 y);
 
 GLuint create_texture_from_bitmap(AlphaBitmap_t* bitmap);
 GLuint transparent_texture_from_file(const char* filepath);
+GLuint transparent_texture_from_raw(Raw_t* raw);
 
 void draw_screen_texture(Vec_t pos, Vec_t tex, Vec_t dim, Vec_t tex_dim);
 void draw_theme_frame(Vec_t tex_vec, Vec_t pos_vec);

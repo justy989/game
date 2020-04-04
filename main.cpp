@@ -225,14 +225,21 @@ bool load_map_number_demo(Demo_t* demo, S16 map_number, S64* frame_count){
 }
 
 bool load_map_number_map(S16 map_number, World_t* world, Undo_t* undo,
-                         Coord_t* player_start, PlayerAction_t* player_action){
-     if(load_map_number(map_number, player_start, world)){
+                         Coord_t* player_start, PlayerAction_t* player_action, Raw_t* thumbnail){
+     if(load_map_number(map_number, player_start, world, thumbnail)){
           reset_map(*player_start, world, undo);
           *player_action = {};
           return true;
      }
 
      return false;
+}
+
+void reset_texture(GLuint* texture, Raw_t* raw){
+    if(raw->bytes && raw->byte_count > 0){
+        if(*texture > 0) glDeleteTextures(1, texture);
+        *texture = transparent_texture_from_raw(raw);
+    }
 }
 
 void update_light_and_ice_detectors(Interactive_t* interactive, World_t* world){
@@ -1351,6 +1358,7 @@ int main(int argc, char** argv){
      GLuint render_texture = 0;
      GLuint thumbnail_framebuffer = 0;
      GLuint thumbnail_texture = 0;
+     GLuint cached_thumbnail_texture = 0;
 
      if(!suite || show_suite){
           if(SDL_Init(SDL_INIT_EVERYTHING) != 0){
@@ -1471,11 +1479,12 @@ int main(int argc, char** argv){
      TileMap_t demo_starting_tilemap {};
      ObjectArray_t<Block_t> demo_starting_blocks {};
      ObjectArray_t<Interactive_t> demo_starting_interactives {};
+     Raw_t thumbnail {};
 
      Quad_t pct_bar_outline_quad = {0, 2.0f * PIXEL_SIZE, 1.0f, 0.02f};
 
      if(load_map_filepath){
-          if(!load_map(load_map_filepath, &player_start, &world.tilemap, &world.blocks, &world.interactives)){
+          if(!load_map(load_map_filepath, &player_start, &world.tilemap, &world.blocks, &world.interactives, &thumbnail)){
                return 1;
           }
 
@@ -1483,7 +1492,7 @@ int main(int argc, char** argv){
                cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
           }
      }else if(suite){
-          if(!load_map_number(map_number, &player_start, &world)){
+          if(!load_map_number(map_number, &player_start, &world, &thumbnail)){
                return 1;
           }
 
@@ -1494,7 +1503,7 @@ int main(int argc, char** argv){
                return 1;
           }
      }else if(map_number){
-          if(!load_map_number(map_number, &player_start, &world)){
+          if(!load_map_number(map_number, &player_start, &world, &thumbnail)){
                return 1;
           }
 
@@ -1509,6 +1518,7 @@ int main(int argc, char** argv){
      }else{
           setup_default_room(&world);
      }
+     reset_texture(&cached_thumbnail_texture, &thumbnail);
 
      reset_map(player_start, &world, &undo);
      init(&editor);
@@ -1570,7 +1580,8 @@ int main(int argc, char** argv){
                               map_number++;
                               S16 maps_tested = map_number - first_map_number;
 
-                              if(load_map_number_map(map_number, &world, &undo, &player_start, &player_action)){
+                              if(load_map_number_map(map_number, &world, &undo, &player_start, &player_action, &thumbnail)){
+                                   reset_texture(&cached_thumbnail_texture, &thumbnail);
                                    cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
 
                                    if(load_map_number_demo(&play_demo, map_number, &frame_count)){
@@ -1672,7 +1683,8 @@ int main(int argc, char** argv){
                          }
                          break;
                     case SDL_SCANCODE_L:
-                         if(load_map_number_map(map_number, &world, &undo, &player_start, &player_action)){
+                         if(load_map_number_map(map_number, &world, &undo, &player_start, &player_action, &thumbnail)){
+                              reset_texture(&cached_thumbnail_texture, &thumbnail);
                               if(record_demo.mode == DEMO_MODE_PLAY){
                                    cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
                               }
@@ -1680,7 +1692,8 @@ int main(int argc, char** argv){
                          break;
                     case SDL_SCANCODE_LEFTBRACKET:
                          map_number--;
-                         if(load_map_number_map(map_number, &world, &undo, &player_start, &player_action)){
+                         if(load_map_number_map(map_number, &world, &undo, &player_start, &player_action, &thumbnail)){
+                              reset_texture(&cached_thumbnail_texture, &thumbnail);
                               if(record_demo.mode == DEMO_MODE_PLAY){
                                    cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
 
@@ -1696,7 +1709,8 @@ int main(int argc, char** argv){
                          break;
                     case SDL_SCANCODE_RIGHTBRACKET:
                          map_number++;
-                         if(load_map_number_map(map_number, &world, &undo, &player_start, &player_action)){
+                         if(load_map_number_map(map_number, &world, &undo, &player_start, &player_action, &thumbnail)){
+                              reset_texture(&cached_thumbnail_texture, &thumbnail);
                               if(play_demo.mode == DEMO_MODE_PLAY){
                                    cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
 
@@ -1722,9 +1736,18 @@ int main(int argc, char** argv){
                          break;
                     case SDL_SCANCODE_V:
                          if(editor.mode != EDITOR_MODE_OFF){
+                              Raw_t* thumbnail_ptr = NULL;
+                              glBindFramebuffer(GL_FRAMEBUFFER, thumbnail_framebuffer);
+                              thumbnail = create_thumbnail_bitmap();
+                              if(thumbnail.bytes) thumbnail_ptr = &thumbnail;
+                              glBindFramebuffer(GL_FRAMEBUFFER, render_framebuffer);
                               char filepath[64];
                               snprintf(filepath, 64, "content/%03d.bm", map_number);
-                              save_map(filepath, player_start, &world.tilemap, &world.blocks, &world.interactives);
+                              save_map(filepath, player_start, &world.tilemap, &world.blocks, &world.interactives, thumbnail_ptr);
+                              if(thumbnail.bytes){
+                                  free(thumbnail.bytes);
+                                  thumbnail.bytes = 0;
+                              }
                          }
                          break;
                     case SDL_SCANCODE_U:
@@ -1782,17 +1805,6 @@ int main(int argc, char** argv){
                               }
                          }
                          break;
-                    case SDL_SCANCODE_3:
-                    {
-                         glBindFramebuffer(GL_FRAMEBUFFER, thumbnail_framebuffer);
-                         Raw_t raw_bitmap = create_thumbnail_bitmap();
-                         if(raw_bitmap.bytes){
-                             raw_save_file(&raw_bitmap, "frame.bmp");
-                             free(raw_bitmap.bytes);
-                         }
-                         glBindFramebuffer(GL_FRAMEBUFFER, render_framebuffer);
-                         break;
-                    }
                     case SDL_SCANCODE_0:
                          if(editor.mode == EDITOR_MODE_CATEGORY_SELECT){
                               auto coord = mouse_select_world(mouse_screen, camera);
@@ -4313,7 +4325,7 @@ int main(int argc, char** argv){
                     reset_timer += dt;
                     if(reset_timer >= RESET_TIME){
                          resetting = false;
-                         load_map_number_map(map_number, &world, &undo, &player_start, &player_action);
+                         load_map_number_map(map_number, &world, &undo, &player_start, &player_action, &thumbnail);
                     }
                }else{
                     reset_timer -= dt;
@@ -4526,6 +4538,26 @@ int main(int argc, char** argv){
 
           }
 
+          if(cached_thumbnail_texture > 0){
+              glBindTexture(GL_TEXTURE_2D, cached_thumbnail_texture);
+              glBegin(GL_QUADS);
+              glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+
+              glTexCoord2f(0, 0);
+              glVertex2f(0.0f, 0.0f);
+
+              glTexCoord2f(0, 1.0f);
+              glVertex2f(0.0f, 0.25f);
+
+              glTexCoord2f(1.0f, 1.0f);
+              glVertex2f(0.25f, 0.25f);
+
+              glTexCoord2f(1.0f, 0);
+              glVertex2f(0.25f, 0.0f);
+
+              glEnd();
+          }
+
           glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
           glBindTexture(GL_TEXTURE_2D, render_texture);
@@ -4559,7 +4591,7 @@ int main(int argc, char** argv){
           player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_END_DEMO, record_demo.mode, record_demo.file, frame_count);
 
           // save map and player position
-          save_map_to_file(record_demo.file, player_start, &world.tilemap, &world.blocks, &world.interactives);
+          save_map_to_file(record_demo.file, player_start, &world.tilemap, &world.blocks, &world.interactives, NULL);
 
           switch(record_demo.version){
           default:
@@ -4595,6 +4627,7 @@ int main(int argc, char** argv){
           glDeleteTextures(1, &text_texture);
           glDeleteTextures(1, &render_texture);
           glDeleteTextures(1, &thumbnail_texture);
+          glDeleteTextures(1, &cached_thumbnail_texture);
 
           glDeleteFramebuffers(1, &render_framebuffer);
           glDeleteFramebuffers(1, &thumbnail_framebuffer);
