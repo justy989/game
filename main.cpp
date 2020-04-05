@@ -1880,6 +1880,88 @@ int main(int argc, char** argv){
                     case SDL_SCANCODE_F4:
                          game_mode = GAME_MODE_PLAYING;
                          break;
+                    case SDL_SCANCODE_F5:
+                    {
+                         if(world.tilemap.width <= 1) break;
+
+                         TileMap_t map_copy = {};
+                         deep_copy(&world.tilemap, &map_copy);
+
+                         for(S16 i = 0; i < map_copy.height; i++){
+                              Coord_t coord{(S16)(map_copy.width - 1), i};
+                              coord_clear(coord, &world.tilemap, &world.interactives, world.interactive_qt, &world.blocks);
+                         }
+
+                         destroy(&world.tilemap);
+                         init(&world.tilemap, map_copy.width - 1, map_copy.height);
+
+                         for(S16 i = 0; i < world.tilemap.height; i++){
+                              for(S16 j = 0; j < world.tilemap.width; j++){
+                                   world.tilemap.tiles[i][j] = map_copy.tiles[i][j];
+                              }
+                         }
+
+                         destroy(&map_copy);
+                         break;
+                    }
+                    case SDL_SCANCODE_F6:
+                    {
+                         TileMap_t map_copy = {};
+                         deep_copy(&world.tilemap, &map_copy);
+
+                         destroy(&world.tilemap);
+                         init(&world.tilemap, map_copy.width + 1, map_copy.height);
+
+                         for(S16 i = 0; i < map_copy.height; i++){
+                              for(S16 j = 0; j < map_copy.width; j++){
+                                   world.tilemap.tiles[i][j] = map_copy.tiles[i][j];
+                              }
+                         }
+
+                         destroy(&map_copy);
+                         break;
+                    }
+                    case SDL_SCANCODE_F7:
+                    {
+                         if(world.tilemap.height <= 1) break;
+
+                         TileMap_t map_copy = {};
+                         deep_copy(&world.tilemap, &map_copy);
+
+                         for(S16 i = 0; i < map_copy.width; i++){
+                              Coord_t coord{i, (S16)(map_copy.height - 1)};
+                              coord_clear(coord, &world.tilemap, &world.interactives, world.interactive_qt, &world.blocks);
+                         }
+
+                         destroy(&world.tilemap);
+                         init(&world.tilemap, map_copy.width, map_copy.height - 1);
+
+                         for(S16 i = 0; i < world.tilemap.height; i++){
+                              for(S16 j = 0; j < world.tilemap.width; j++){
+                                   world.tilemap.tiles[i][j] = map_copy.tiles[i][j];
+                              }
+                         }
+
+                         destroy(&map_copy);
+                         break;
+                    }
+                    case SDL_SCANCODE_F8:
+                    {
+                         TileMap_t map_copy = {};
+                         deep_copy(&world.tilemap, &map_copy);
+
+                         destroy(&world.tilemap);
+                         init(&world.tilemap, map_copy.width, map_copy.height + 1);
+
+                         for(S16 i = 0; i < map_copy.height; i++){
+                              for(S16 j = 0; j < map_copy.width; j++){
+                                   world.tilemap.tiles[i][j] = map_copy.tiles[i][j];
+                              }
+                         }
+
+                         destroy(&map_copy);
+                         break;
+                    }
                     case SDL_SCANCODE_F12:
                          game_mode = GAME_MODE_LEVEL_SELECT;
                          break;
@@ -2358,16 +2440,18 @@ int main(int argc, char** argv){
                               } break;
                               }
                               break;
-                         }
-                         for(S16 c = 0; c < tag_checkboxes.count; c++){
-                              Checkbox_t* checkbox = tag_checkboxes.elements + c;
+                         case GAME_MODE_LEVEL_SELECT:
+                              for(S16 c = 0; c < tag_checkboxes.count; c++){
+                                   Checkbox_t* checkbox = tag_checkboxes.elements + c;
 
-                              Quad_t checkbox_quad = checkbox->get_area(checkbox_scroll);
-                              if(vec_in_quad(&checkbox_quad, mouse_screen)){
-                                   checkbox->checked = !checkbox->checked;
-                                   visible_map_thumbnail_count = filter_thumbnails(&tag_checkboxes, &map_thumbnails);
-                                   map_scroll.y = 0;
+                                   Quad_t checkbox_quad = checkbox->get_area(checkbox_scroll);
+                                   if(vec_in_quad(&checkbox_quad, mouse_screen)){
+                                        checkbox->checked = !checkbox->checked;
+                                        visible_map_thumbnail_count = filter_thumbnails(&tag_checkboxes, &map_thumbnails);
+                                        map_scroll.y = 0;
+                                   }
                               }
+                              break;
                          }
                          break;
                     case SDL_BUTTON_RIGHT:
@@ -2505,22 +2589,6 @@ int main(int argc, char** argv){
                                          1.0f - ((F32)(sdl_event.button.y) / (F32)(window_height))};
                     mouse_world = vec_to_pos(mouse_screen);
 
-                    if(hovered_map_thumbnail_path) free(hovered_map_thumbnail_path);
-                    hovered_map_thumbnail_path = NULL;
-                    for(S16 m = 0; m < map_thumbnails.count; m++){
-                         auto* map_thumbnail = map_thumbnails.elements + m;
-                         auto quad = map_thumbnail->get_area(map_scroll);
-                         if(vec_in_quad(&quad, mouse_screen)){
-                              hovered_map_thumbnail_path = strdup(map_thumbnail->map_filepath);
-                              hovered_map_thumbnail_index = m;
-                              char* itr = hovered_map_thumbnail_path;
-                              while(*itr){
-                                   *itr = toupper(*itr);
-                                   itr++;
-                              }
-                              break;
-                         }
-                    }
 
                     if(game_mode == GAME_MODE_EDITOR){
                          switch(editor.mode){
@@ -2541,6 +2609,23 @@ int main(int argc, char** argv){
                                                 &play_demo, &frame_count, &player_start, &player_action, &undo);
                               }else if(play_demo.seek_frame == frame_count){
                                    play_demo.seek_frame = -1;
+                              }
+                         }
+                    }else if(game_mode == GAME_MODE_LEVEL_SELECT){
+                         if(hovered_map_thumbnail_path) free(hovered_map_thumbnail_path);
+                         hovered_map_thumbnail_path = NULL;
+                         for(S16 m = 0; m < map_thumbnails.count; m++){
+                              auto* map_thumbnail = map_thumbnails.elements + m;
+                              auto quad = map_thumbnail->get_area(map_scroll);
+                              if(vec_in_quad(&quad, mouse_screen)){
+                                   hovered_map_thumbnail_path = strdup(map_thumbnail->map_filepath);
+                                   hovered_map_thumbnail_index = m;
+                                   char* itr = hovered_map_thumbnail_path;
+                                   while(*itr){
+                                        *itr = toupper(*itr);
+                                        itr++;
+                                   }
+                                   break;
                               }
                          }
                     }
@@ -4728,7 +4813,7 @@ int main(int argc, char** argv){
                glColor3f(1.0f, 1.0f, 1.0f);
 
                for(S16 y = max.y; y >= min.y; y--){
-                    draw_world_row_flats(y, min.x, max.y, &world.tilemap, world.interactive_qt, camera_offset);
+                    draw_world_row_flats(y, min.x, max.x, &world.tilemap, world.interactive_qt, camera_offset);
                }
 
                for(S16 y = max.y; y >= min.y; y--){
