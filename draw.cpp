@@ -327,7 +327,7 @@ void draw_quad_wireframe(const Quad_t* quad, F32 red, F32 green, F32 blue){
      glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
      glBegin(GL_QUADS);
-     glColor3f(red, green, blue);
+     glColor4f(red, green, blue, 1.0f);
      glVertex2f(quad->left,  quad->top);
      glVertex2f(quad->left,  quad->bottom);
      glVertex2f(quad->right, quad->bottom);
@@ -339,7 +339,7 @@ void draw_quad_wireframe(const Quad_t* quad, F32 red, F32 green, F32 blue){
 
 void draw_quad_filled(const Quad_t* quad, F32 red, F32 green, F32 blue){
      glBegin(GL_QUADS);
-     glColor3f(red, green, blue);
+     glColor4f(red, green, blue, 1.0f);
      glVertex2f(quad->left,  quad->top);
      glVertex2f(quad->left,  quad->bottom);
      glVertex2f(quad->right, quad->bottom);

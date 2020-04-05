@@ -9,6 +9,7 @@
 #include "undo.h"
 #include "demo.h"
 #include "raw.h"
+#include "camera.h"
 
 struct World_t{
      TileMap_t tilemap = {};
@@ -115,7 +116,7 @@ void sort_blocks_by_ascending_height(Block_t** blocks, S16 block_count);
 void sort_blocks_by_descending_height(Block_t** blocks, S16 block_count);
 
 LogMapNumberResult_t load_map_number(S32 map_number, Coord_t* player_start, World_t* world);
-void reset_map(Coord_t player_start, World_t* world, Undo_t* undo);
+void reset_map(Coord_t player_start, World_t* world, Undo_t* undo, Camera_t* camera);
 
 void activate(World_t* world, Coord_t coord);
 

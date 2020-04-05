@@ -27,6 +27,15 @@ Vec_t pos_to_vec(Position_t p){
      return v;
 }
 
+Vec_t pixel_to_vec(Pixel_t p){
+     Vec_t v {};
+
+     v.x = (F32)(p.x) * PIXEL_SIZE;
+     v.y = (F32)(p.y) * PIXEL_SIZE;
+
+     return v;
+}
+
 Coord_t pixel_to_coord(Pixel_t p){
      Coord_t c {};
      c.x = p.x / TILE_SIZE_IN_PIXELS;

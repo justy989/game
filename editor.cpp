@@ -511,17 +511,24 @@ void coord_clear(Coord_t coord, TileMap_t* tilemap, ObjectArray_t<Interactive_t>
           }
      }
 
-     S16 block_index = -1;
-     for(S16 i = 0; i < block_array->count; i++){
-          if(pos_to_coord(block_array->elements[i].pos) == coord){
-               block_index = i;
-               break;
-          }
-     }
+     bool found_block = false;
+     do
+     {
+          found_block = false;
 
-     if(block_index >= 0){
-          remove(block_array, block_index);
-     }
+          S16 block_index = -1;
+          for(S16 i = 0; i < block_array->count; i++){
+               if(pos_to_coord(block_array->elements[i].pos) == coord){
+                    block_index = i;
+                    found_block = true;
+                    break;
+               }
+          }
+
+          if(block_index >= 0){
+               remove(block_array, block_index);
+          }
+     }while(found_block);
 }
 
 Rect_t editor_selection_bounds(Editor_t* editor){

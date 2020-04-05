@@ -65,7 +65,11 @@ LogMapNumberResult_t load_map_number(S32 map_number, Coord_t* player_start, Worl
      return result;
 }
 
-void reset_map(Coord_t player_start, World_t* world, Undo_t* undo){
+Position_t center_camera(TileMap_t* tilemap){
+     return coord_to_pos(Coord_t{(S16)(tilemap->width / 2), (S16)(tilemap->height / 2)});
+}
+
+void reset_map(Coord_t player_start, World_t* world, Undo_t* undo, Camera_t* camera){
      destroy(&world->players);
      init(&world->players, 1);
      Player_t* player = world->players.elements;
@@ -85,6 +89,8 @@ void reset_map(Coord_t player_start, World_t* world, Undo_t* undo){
      destroy(undo);
      init(undo, UNDO_MEMORY, world->tilemap.width, world->tilemap.height, world->blocks.count, world->interactives.count);
      undo_snapshot(undo, &world->players, &world->tilemap, &world->blocks, &world->interactives);
+
+     camera->center_on_tilemap(&world->tilemap);
 }
 
 static void toggle_electricity(TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree, Coord_t coord,

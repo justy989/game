@@ -542,6 +542,8 @@ bool load_map_from_file_v4(FILE* file, Coord_t* player_start, TileMap_t* tilemap
      S16 map_height;
      S16 interactive_count;
      S16 block_count;
+     U64 thumbnail_size;
+     U16 tag_count;
 
      fread(player_start, sizeof(*player_start), 1, file);
      fread(&map_width, sizeof(map_width), 1, file);
@@ -573,6 +575,12 @@ bool load_map_from_file_v4(FILE* file, Coord_t* player_start, TileMap_t* tilemap
      fread(map_tiles, sizeof(*map_tiles), (size_t)(map_tile_count), file);
      fread(map_blocks, sizeof(*map_blocks), (size_t)(block_count), file);
      fread(map_interactives, sizeof(*map_interactives), (size_t)(interactive_count), file);
+
+     // mostly skip over the extra thumbnail and tags
+     fread(&thumbnail_size, sizeof(thumbnail_size), 1, file);
+     fseek(file, thumbnail_size, SEEK_CUR);
+     fread(&tag_count, sizeof(tag_count), 1, file);
+     fseek(file, tag_count * sizeof(Tag_t), SEEK_CUR);
 
      destroy(tilemap);
      init(tilemap, map_width, map_height);

@@ -256,7 +256,7 @@ Pixel_t mouse_select_pixel(Vec_t mouse_screen){
 }
 
 Pixel_t mouse_select_world_pixel(Vec_t mouse_screen, Position_t camera){
-     return mouse_select_pixel(mouse_screen) + (camera.pixel - Pixel_t{ROOM_PIXEL_SIZE / 2, ROOM_PIXEL_SIZE / 2});
+     return mouse_select_pixel(mouse_screen) + camera.pixel;
 }
 
 Coord_t mouse_select_coord(Vec_t mouse_screen){
@@ -264,7 +264,7 @@ Coord_t mouse_select_coord(Vec_t mouse_screen){
 }
 
 Coord_t mouse_select_world(Vec_t mouse_screen, Position_t camera){
-     return mouse_select_coord(mouse_screen) + (pos_to_coord(camera) - Coord_t{ROOM_TILE_SIZE / 2, ROOM_TILE_SIZE / 2});
+     return mouse_select_coord(mouse_screen) + pos_to_coord(camera);
 }
 
 Vec_t coord_to_screen_position(Coord_t coord){

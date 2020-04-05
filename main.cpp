@@ -117,6 +117,7 @@ build the entangled pushes before the loop and then when invalidating, we need t
 #include "editor.h"
 #include "utils.h"
 #include "tags.h"
+#include "camera.h"
 
 #define THUMBNAIL_DIMENSION 128
 
@@ -242,10 +243,10 @@ bool load_map_number_demo(Demo_t* demo, S16 map_number, S64* frame_count){
 
 LogMapNumberResult_t load_map_number_map(S16 map_number, World_t* world, Undo_t* undo,
                                          Coord_t* player_start, PlayerAction_t* player_action,
-                                         bool* tags){
+                                         Camera_t* camera, bool* tags){
      auto result = load_map_number(map_number, player_start, world);
      if(result.success){
-          reset_map(*player_start, world, undo);
+          reset_map(*player_start, world, undo, camera);
           *player_action = {};
           load_map_tags(result.filepath, tags);
           return result;
@@ -1187,10 +1188,10 @@ bool block_pushes_are_the_same_collision(BlockPushes_t<128>& block_pushes, S16 s
 
 void restart_demo(World_t* world, TileMap_t* demo_starting_tilemap, ObjectArray_t<Block_t>* demo_starting_blocks,
                   ObjectArray_t<Interactive_t>* demo_starting_interactives, Demo_t* demo, S64* frame_count,
-                  Coord_t* player_start, PlayerAction_t* player_action, Undo_t* undo){
+                  Coord_t* player_start, PlayerAction_t* player_action, Undo_t* undo, Camera_t* camera){
      fetch_cache_for_demo_seek(world, demo_starting_tilemap, demo_starting_blocks, demo_starting_interactives);
 
-     reset_map(*player_start, world, undo);
+     reset_map(*player_start, world, undo, camera);
 
      // reset some vars
      *player_action = {};
@@ -1658,7 +1659,6 @@ int main(int argc, char** argv){
      F32 reset_timer = 1.0f;
 
      PlayerAction_t player_action {};
-     Position_t camera = coord_to_pos(Coord_t{8, 8});
 
      Vec_t mouse_screen = {}; // 0.0f to 1.0f
      Position_t mouse_world = {};
@@ -1720,7 +1720,9 @@ int main(int argc, char** argv){
           setup_default_room(&world);
      }
 
-     reset_map(player_start, &world, &undo);
+     Camera_t camera {};
+
+     reset_map(player_start, &world, &undo, &camera);
      init(&editor);
 
      // init ui
@@ -1836,7 +1838,7 @@ int main(int argc, char** argv){
                               map_number++;
                               S16 maps_tested = map_number - first_map_number;
 
-                              auto load_result = load_map_number_map(map_number, &world, &undo, &player_start, &player_action, current_map_tags);
+                              auto load_result = load_map_number_map(map_number, &world, &undo, &player_start, &player_action, &camera, current_map_tags);
                               if(load_result.success){
                                    cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
                                    free(map_number_filepath);
@@ -1858,6 +1860,10 @@ int main(int argc, char** argv){
                          }
                     }else{
                          play_demo.paused = true;
+                    }
+                    if(record_demo.mode == DEMO_MODE_RECORD){
+                         frame_count--;
+                         break;
                     }
                }
           }
@@ -1902,6 +1908,7 @@ int main(int argc, char** argv){
                          }
 
                          destroy(&map_copy);
+                         camera.center_on_tilemap(&world.tilemap);
                          break;
                     }
                     case SDL_SCANCODE_F6:
@@ -1919,6 +1926,7 @@ int main(int argc, char** argv){
                          }
 
                          destroy(&map_copy);
+                         camera.center_on_tilemap(&world.tilemap);
                          break;
                     }
                     case SDL_SCANCODE_F7:
@@ -1943,6 +1951,7 @@ int main(int argc, char** argv){
                          }
 
                          destroy(&map_copy);
+                         camera.center_on_tilemap(&world.tilemap);
                          break;
                     }
                     case SDL_SCANCODE_F8:
@@ -1960,6 +1969,7 @@ int main(int argc, char** argv){
                          }
 
                          destroy(&map_copy);
+                         camera.center_on_tilemap(&world.tilemap);
                          break;
                     }
                     case SDL_SCANCODE_F12:
@@ -1974,7 +1984,7 @@ int main(int argc, char** argv){
                                    play_demo.seek_frame = frame_count - 1;
 
                                    restart_demo(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives,
-                                                &play_demo, &frame_count, &player_start, &player_action, &undo);
+                                                &play_demo, &frame_count, &player_start, &player_action, &undo, &camera);
                               }
                          }else if(!resetting){
                               player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_LEFT_START,
@@ -2030,7 +2040,7 @@ int main(int argc, char** argv){
                          break;
                     case SDL_SCANCODE_L:
                     {
-                         auto load_result = load_map_number_map(map_number, &world, &undo, &player_start, &player_action, current_map_tags);
+                         auto load_result = load_map_number_map(map_number, &world, &undo, &player_start, &player_action, &camera, current_map_tags);
                          if(load_result.success){
                               if(record_demo.mode == DEMO_MODE_PLAY){
                                    cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
@@ -2043,7 +2053,7 @@ int main(int argc, char** argv){
                     case SDL_SCANCODE_LEFTBRACKET:
                     {
                          map_number--;
-                         auto load_result = load_map_number_map(map_number, &world, &undo, &player_start, &player_action, current_map_tags);
+                         auto load_result = load_map_number_map(map_number, &world, &undo, &player_start, &player_action, &camera, current_map_tags);
                          if(load_result.success){
                               free(map_number_filepath);
                               map_number_filepath = load_result.filepath;
@@ -2064,7 +2074,7 @@ int main(int argc, char** argv){
                     case SDL_SCANCODE_RIGHTBRACKET:
                     {
                          map_number++;
-                         auto load_result = load_map_number_map(map_number, &world, &undo, &player_start, &player_action, current_map_tags);
+                         auto load_result = load_map_number_map(map_number, &world, &undo, &player_start, &player_action, &camera, current_map_tags);
                          if(load_result.success){
                               free(map_number_filepath);
                               map_number_filepath = load_result.filepath;
@@ -2113,12 +2123,12 @@ int main(int argc, char** argv){
                          break;
                     case SDL_SCANCODE_N:
                     {
-                         Tile_t* tile = tilemap_get_tile(&world.tilemap, mouse_select_world(mouse_screen, camera));
+                         Tile_t* tile = tilemap_get_tile(&world.tilemap, mouse_select_world(mouse_screen, camera.bottom_left()));
                          if(tile) tile_toggle_wire_activated(tile);
                     } break;
                     case SDL_SCANCODE_8:
                          if(game_mode == GAME_MODE_EDITOR && editor.mode == EDITOR_MODE_CATEGORY_SELECT){
-                              auto coord = mouse_select_world(mouse_screen, camera);
+                              auto coord = mouse_select_world(mouse_screen, camera.bottom_left());
                               auto rect = rect_surrounding_coord(coord);
 
                               S16 block_count = 0;
@@ -2149,7 +2159,7 @@ int main(int argc, char** argv){
                          break;
                     case SDL_SCANCODE_2:
                          if(game_mode == GAME_MODE_EDITOR && editor.mode == EDITOR_MODE_CATEGORY_SELECT){
-                              auto pixel = mouse_select_world_pixel(mouse_screen, camera);
+                              auto pixel = mouse_select_world_pixel(mouse_screen, camera.bottom_left());
 
                               // TODO: make this a function where you can pass in entangle_index
                               S16 new_index = world.players.count;
@@ -2162,7 +2172,7 @@ int main(int argc, char** argv){
                          break;
                     case SDL_SCANCODE_0:
                          if(game_mode == GAME_MODE_EDITOR && editor.mode == EDITOR_MODE_CATEGORY_SELECT){
-                              auto coord = mouse_select_world(mouse_screen, camera);
+                              auto coord = mouse_select_world(mouse_screen, camera.bottom_left());
                               auto rect = rect_surrounding_coord(coord);
 
                               S16 block_count = 0;
@@ -2263,7 +2273,7 @@ int main(int argc, char** argv){
                     case SDL_SCANCODE_M:
                          if(game_mode == GAME_MODE_EDITOR &&
                             editor.mode == EDITOR_MODE_CATEGORY_SELECT){
-                              player_start = mouse_select_world(mouse_screen, camera);
+                              player_start = mouse_select_world(mouse_screen, camera.bottom_left());
                          }else if(game_mode == GAME_MODE_PLAYING){
                               resetting = true;
                          }
@@ -2271,7 +2281,7 @@ int main(int argc, char** argv){
                     case SDL_SCANCODE_R:
                          if(game_mode == GAME_MODE_EDITOR &&
                             editor.mode == EDITOR_MODE_CATEGORY_SELECT){
-                              auto coord = mouse_select_world(mouse_screen, camera);
+                              auto coord = mouse_select_world(mouse_screen, camera.bottom_left());
                               auto rect = rect_surrounding_coord(coord);
 
                               S16 block_count = 0;
@@ -2292,15 +2302,15 @@ int main(int argc, char** argv){
                     {
                          reset_players(&world.players);
                          Player_t* player = world.players.elements;
-                         player->pos.pixel = mouse_select_world_pixel(mouse_screen, camera) + HALF_TILE_SIZE_PIXEL;
+                         player->pos.pixel = mouse_select_world_pixel(mouse_screen, camera.bottom_left()) + HALF_TILE_SIZE_PIXEL;
                          player->pos.decimal.x = 0;
                          player->pos.decimal.y = 0;
                          break;
                     }
                     case SDL_SCANCODE_H:
                     {
-                         Pixel_t pixel = mouse_select_world_pixel(mouse_screen, camera) + HALF_TILE_SIZE_PIXEL;
-                         Coord_t coord = mouse_select_world(mouse_screen, camera);
+                         Pixel_t pixel = mouse_select_world_pixel(mouse_screen, camera.bottom_left()) + HALF_TILE_SIZE_PIXEL;
+                         Coord_t coord = mouse_select_world(mouse_screen, camera.bottom_left());
                          LOG("mouse pixel: %d, %d, Coord: %d, %d\n", pixel.x, pixel.y, coord.x, coord.y);
                          describe_coord(coord, &world);
                     } break;
@@ -2369,16 +2379,6 @@ int main(int argc, char** argv){
                     default:
                          break;
                     case SDL_BUTTON_LEFT:
-                         if(hovered_map_thumbnail_path){
-                              clear_global_tags();
-                              if(load_map(map_thumbnails.elements[hovered_map_thumbnail_index].map_filepath,
-                                          &player_start, &world.tilemap, &world.blocks, &world.interactives)){
-                                   load_map_tags(map_thumbnails.elements[hovered_map_thumbnail_index].map_filepath, current_map_tags);
-                                   reset_map(player_start, &world, &undo);
-                                   game_mode = GAME_MODE_PLAYING;
-                              }
-                         }
-
                          switch(game_mode){
                          default:
                               break;
@@ -2391,7 +2391,7 @@ int main(int argc, char** argv){
 
                                         if(play_demo.seek_frame < frame_count){
                                             restart_demo(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives,
-                                                         &play_demo, &frame_count, &player_start, &player_action, &undo);
+                                                         &play_demo, &frame_count, &player_start, &player_action, &undo, &camera);
                                         }else if(play_demo.seek_frame == frame_count){
                                              play_demo.seek_frame = -1;
                                         }
@@ -2413,7 +2413,7 @@ int main(int argc, char** argv){
                                         editor.stamp = 0;
                                    }else{
                                         editor.mode = EDITOR_MODE_CREATE_SELECTION;
-                                        editor.selection_start = mouse_select_world(mouse_screen, camera);
+                                        editor.selection_start = mouse_select_world(mouse_screen, camera.bottom_left());
                                         editor.selection_end = editor.selection_start;
                                    }
                               } break;
@@ -2426,7 +2426,7 @@ int main(int argc, char** argv){
                                         editor.stamp = select_index;
                                    }else{
                                         undo_commit(&undo, &world.players, &world.tilemap, &world.blocks, &world.interactives);
-                                        Coord_t select_coord = mouse_select_world(mouse_screen, camera);
+                                        Coord_t select_coord = mouse_select_world(mouse_screen, camera.bottom_left());
                                         auto* stamp_array = editor.category_array.elements[editor.category].elements + editor.stamp;
                                         for(S16 s = 0; s < stamp_array->count; s++){
                                              auto* stamp = stamp_array->elements + s;
@@ -2441,6 +2441,16 @@ int main(int argc, char** argv){
                               }
                               break;
                          case GAME_MODE_LEVEL_SELECT:
+                              if(hovered_map_thumbnail_path){
+                                   clear_global_tags();
+                                   if(load_map(map_thumbnails.elements[hovered_map_thumbnail_index].map_filepath,
+                                               &player_start, &world.tilemap, &world.blocks, &world.interactives)){
+                                        load_map_tags(map_thumbnails.elements[hovered_map_thumbnail_index].map_filepath, current_map_tags);
+                                        reset_map(player_start, &world, &undo, &camera);
+                                        game_mode = GAME_MODE_PLAYING;
+                                   }
+                              }
+
                               for(S16 c = 0; c < tag_checkboxes.count; c++){
                                    Checkbox_t* checkbox = tag_checkboxes.elements + c;
 
@@ -2461,14 +2471,14 @@ int main(int argc, char** argv){
                                    break;
                               case EDITOR_MODE_CATEGORY_SELECT:
                                    undo_commit(&undo, &world.players, &world.tilemap, &world.blocks, &world.interactives);
-                                   coord_clear(mouse_select_world(mouse_screen, camera), &world.tilemap, &world.interactives,
+                                   coord_clear(mouse_select_world(mouse_screen, camera.bottom_left()), &world.tilemap, &world.interactives,
                                                world.interactive_qt, &world.blocks);
                                    break;
                               case EDITOR_MODE_STAMP_SELECT:
                               case EDITOR_MODE_STAMP_HIDE:
                               {
                                    undo_commit(&undo, &world.players, &world.tilemap, &world.blocks, &world.interactives);
-                                   Coord_t start = mouse_select_world(mouse_screen, camera);
+                                   Coord_t start = mouse_select_world(mouse_screen, camera.bottom_left());
                                    Coord_t end = start + stamp_array_dimensions(editor.category_array.elements[editor.category].elements + editor.stamp);
                                    for(S16 j = start.y; j < end.y; j++){
                                         for(S16 i = start.x; i < end.x; i++){
@@ -2524,7 +2534,7 @@ int main(int argc, char** argv){
                                    break;
                               case EDITOR_MODE_CREATE_SELECTION:
                               {
-                                   editor.selection_end = mouse_select_world(mouse_screen, camera);
+                                   editor.selection_end = mouse_select_world(mouse_screen, camera.bottom_left());
 
                                    sort_selection(&editor);
 
@@ -2572,6 +2582,7 @@ int main(int argc, char** argv){
                                                        stamp->block.element = block->element;
                                                        stamp->offset = offset;
                                                        stamp->block.z = block->pos.z;
+                                                       stamp->block.cut = block->cut;
                                                   }
                                              }
                                         }
@@ -2606,7 +2617,7 @@ int main(int argc, char** argv){
 
                               if(play_demo.seek_frame < frame_count){
                                    restart_demo(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives,
-                                                &play_demo, &frame_count, &player_start, &player_action, &undo);
+                                                &play_demo, &frame_count, &player_start, &player_action, &undo, &camera);
                               }else if(play_demo.seek_frame == frame_count){
                                    play_demo.seek_frame = -1;
                               }
@@ -2952,10 +2963,6 @@ int main(int argc, char** argv){
                          }
                     }
                }
-
-               Position_t room_center = coord_to_pos(Coord_t{8, 8});
-               Position_t camera_movement = room_center - camera;
-               camera += camera_movement * 0.05f;
 
                for(S16 i = 0; i < world.players.count; i++){
                     Player_t* player = world.players.elements + i;
@@ -4780,7 +4787,7 @@ int main(int argc, char** argv){
                     if(reset_timer >= RESET_TIME){
                          resetting = false;
                          // TODO: maybe rather than relying on the file system, we can store the starting state in memory ?
-                         auto load_result = load_map_number_map(map_number, &world, &undo, &player_start, &player_action, current_map_tags);
+                         auto load_result = load_map_number_map(map_number, &world, &undo, &player_start, &player_action, &camera, current_map_tags);
                          if(load_result.success){
                               free(map_number_filepath);
                               map_number_filepath = load_result.filepath;
@@ -4795,10 +4802,11 @@ int main(int argc, char** argv){
           if((suite && !show_suite) || play_demo.seek_frame >= 0) continue;
 
           // begin drawing
-          Position_t screen_camera = camera - Vec_t{0.5f, 0.5f} + Vec_t{HALF_TILE_SIZE, HALF_TILE_SIZE};
+          Position_t screen_camera = camera.pos - Vec_t{0.5f, 0.5f}; // (camera.view_dimensions * 0.5f);
 
-          Coord_t min = pos_to_coord(screen_camera);
-          Coord_t max = min + Coord_t{ROOM_TILE_SIZE, ROOM_TILE_SIZE};
+          // Coord_t min = pos_to_coord(screen_camera);
+          Coord_t min = Coord_t{};
+          Coord_t max = min + Coord_t{world.tilemap.width, world.tilemap.height};
           min = coord_clamp_zero_to_dim(min, world.tilemap.width - (S16)(1), world.tilemap.height - (S16)(1));
           max = coord_clamp_zero_to_dim(max, world.tilemap.width - (S16)(1), world.tilemap.height - (S16)(1));
           Position_t tile_bottom_left = coord_to_pos(min);
@@ -5046,6 +5054,7 @@ int main(int argc, char** argv){
                if(play_demo.mode == DEMO_MODE_PLAY){
                     F32 demo_pct = (F32)(frame_count) / (F32)(play_demo.last_frame);
                     Quad_t pct_bar_quad = {pct_bar_outline_quad.left, pct_bar_outline_quad.bottom, demo_pct, pct_bar_outline_quad.top};
+                    glBindTexture(GL_TEXTURE_2D, 0);
                     draw_quad_filled(&pct_bar_quad, 255.0f, 255.0f, 255.0f);
                     draw_quad_wireframe(&pct_bar_outline_quad, 255.0f, 255.0f, 255.0f);
 
