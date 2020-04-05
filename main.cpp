@@ -1347,7 +1347,7 @@ S16 filter_thumbnails(ObjectArray_t<Checkbox_t>* tag_checkboxes, ObjectArray_t<M
 
      bool none_checked = true;
      for(S16 c = 0; c < tag_checkboxes->count; c++){
-          auto* checkbox = tag_checkboxes->elements + c;
+          auto* checkbox = tag_checkboxes->elements + c + 1;
           if(checkbox->checked){
                none_checked = false;
                break;
@@ -1367,19 +1367,36 @@ S16 filter_thumbnails(ObjectArray_t<Checkbox_t>* tag_checkboxes, ObjectArray_t<M
                }
           }
 
+          // account for integer division truncation
           return map_thumbnails->count + THUMBNAILS_PER_ROW;
      }
+
+     bool exclusive = tag_checkboxes->elements[0].checked;
 
      S16 match_index = 1;
      for(S16 m = 0; m < map_thumbnails->count; m++){
           auto* map_thumbnail = map_thumbnails->elements + m;
 
           bool matches = false;
-          for(S16 c = 0; c < tag_checkboxes->count; c++){
-               auto* checkbox = tag_checkboxes->elements + c;
-               if(checkbox->checked && map_thumbnail->tags[c]){
-                    matches = true;
-                    break;
+
+          if(exclusive){
+               matches = true;
+               for(S16 c = 0; c < TAG_COUNT; c++){
+                    auto* checkbox = tag_checkboxes->elements + c + 1;
+                    if(checkbox->checked){
+                         if(!map_thumbnail->tags[c]){
+                              matches = false;
+                              break;
+                         }
+                    }
+               }
+          }else{
+               for(S16 c = 0; c < TAG_COUNT; c++){
+                    auto* checkbox = tag_checkboxes->elements + c + 1;
+                    if(checkbox->checked && map_thumbnail->tags[c]){
+                         matches = true;
+                         break;
+                    }
                }
           }
 
@@ -1704,7 +1721,7 @@ int main(int argc, char** argv){
      // init ui
      Vec_t checkbox_scroll {};
      ObjectArray_t<Checkbox_t> tag_checkboxes;
-     init(&tag_checkboxes, TAG_COUNT);
+     init(&tag_checkboxes, TAG_COUNT + 1);
 
      for(S16 c = 0; c < tag_checkboxes.count; c++){
           Checkbox_t* checkbox = tag_checkboxes.elements + c;
@@ -2269,6 +2286,7 @@ int main(int argc, char** argv){
                               clear_global_tags();
                               if(load_map(map_thumbnails.elements[hovered_map_thumbnail_index].map_filepath,
                                           &player_start, &world.tilemap, &world.blocks, &world.interactives)){
+                                   load_map_tags(map_thumbnails.elements[hovered_map_thumbnail_index].map_filepath, current_map_tags);
                                    reset_map(player_start, &world, &undo);
                                    game_mode = GAME_MODE_PLAYING;
                               }
@@ -4833,7 +4851,13 @@ int main(int argc, char** argv){
                          if(text_pos.y < 0 || text_pos.y > 1){
                               // pass
                          }else{
-                              draw_text(tag_to_string((Tag_t)(c)), text_pos, Vec_t{TEXT_CHAR_WIDTH * 0.5f, TEXT_CHAR_HEIGHT * 0.5f},
+                              const char* text = NULL;
+                              if(c == 0){
+                                   text = "EXCLUSIVE";
+                              }else{
+                                   text = tag_to_string((Tag_t)(c - 1));
+                              }
+                              draw_text(text, text_pos, Vec_t{TEXT_CHAR_WIDTH * 0.5f, TEXT_CHAR_HEIGHT * 0.5f},
                                         TEXT_CHAR_SPACING * 0.5f);
                          }
                          text_pos.y += CHECKBOX_INTERVAL;

@@ -1,6 +1,12 @@
 #include "map_format.h"
 #include "defines.h"
+
+// only here for tag generation
+#include "block_utils.h"
+#include "portal_exit.h"
+#include "quad_tree.h"
 #include "tags.h"
+#include "utils.h"
 
 #include <string.h>
 
@@ -683,6 +689,16 @@ bool load_map_from_file(FILE* file, Coord_t* player_start, TileMap_t* tilemap, O
           break;
      }
 
+     for(S16 y = 0; y < tilemap->height; y++){
+          for(S16 x = 0; x < tilemap->width; x++){
+               Tile_t* tile = tilemap->tiles[y] + x;
+               if(tile->flags & TILE_FLAG_ICED) add_global_tag(TAG_ICE);
+          }
+     }
+
+     auto* block_qt = quad_tree_build(block_array);
+     auto* interactive_qt = quad_tree_build(interactive_array);
+
      // TODO: We use 1 because there is always a mystery first block, we should fix that, then fix this
      if(block_array->count > 1) add_global_tag(TAG_BLOCK);
      for(S16 i = 1; i < block_array->count; i++){
@@ -711,6 +727,10 @@ bool load_map_from_file(FILE* file, Coord_t* player_start, TileMap_t* tilemap, O
                     add_global_tag(TAG_ENTANGLED_BLOCK_ROT_270);
                }
           }
+          auto held_up_result = block_held_up_by_another_block(block, block_qt, interactive_qt, tilemap);
+          if(held_up_result.held()){
+               add_global_tag(TAG_BLOCKS_STACKED);
+          }
      }
 
      for(S16 i = 0; i < interactive_array->count; i++){
@@ -720,6 +740,9 @@ bool load_map_from_file(FILE* file, Coord_t* player_start, TileMap_t* tilemap, O
                break;
           case INTERACTIVE_TYPE_PRESSURE_PLATE:
                add_global_tag(TAG_PRESSURE_PLATE);
+               if(tilemap_is_iced(tilemap, interactive->coord)){
+                    add_global_tag(TAG_ICED_PRESSURE_PLATE);
+               }
                break;
           case INTERACTIVE_TYPE_LIGHT_DETECTOR:
                add_global_tag(TAG_LIGHT_DETECTOR);
@@ -729,6 +752,9 @@ bool load_map_from_file(FILE* file, Coord_t* player_start, TileMap_t* tilemap, O
                break;
           case INTERACTIVE_TYPE_POPUP:
                add_global_tag(TAG_POPUP);
+               if(interactive->popup.iced){
+                    add_global_tag(TAG_ICED_POPUP);
+               }
                break;
           case INTERACTIVE_TYPE_LEVER:
                add_global_tag(TAG_LEVER);
@@ -736,9 +762,34 @@ bool load_map_from_file(FILE* file, Coord_t* player_start, TileMap_t* tilemap, O
           case INTERACTIVE_TYPE_DOOR:
                break;
           case INTERACTIVE_TYPE_PORTAL:
+          {
                add_global_tag(TAG_PORTAL);
                // TODO: detect different portal rotations
+
+               PortalExit_t portal_exits = find_portal_exits(interactive->coord, tilemap, interactive_qt);
+
+               for(S8 d = 0; d < DIRECTION_COUNT; d++){
+                    Direction_t current_portal_dir = (Direction_t)(d);
+                    auto portal_exit = portal_exits.directions + d;
+
+                    for(S8 p = 0; p < portal_exit->count; p++){
+                         auto portal_dst_coord = portal_exit->coords[p];
+                         if(portal_dst_coord == interactive->coord) continue;
+
+                         auto rotations_between_portals = portal_rotations_between(interactive->portal.face, current_portal_dir);
+
+                         if(rotations_between_portals == 1){
+                              add_global_tag(TAG_PORTAL_ROT_90);
+                         }else if(rotations_between_portals == 2){
+                              add_global_tag(TAG_PORTAL_ROT_180);
+                         }else if(rotations_between_portals == 3){
+                              add_global_tag(TAG_PORTAL_ROT_270);
+                         }
+                    }
+               }
+
                break;
+          }
           case INTERACTIVE_TYPE_BOMB:
                break;
           case INTERACTIVE_TYPE_PIT:
@@ -746,6 +797,9 @@ bool load_map_from_file(FILE* file, Coord_t* player_start, TileMap_t* tilemap, O
                break;
           }
      }
+
+     quad_tree_free(block_qt);
+     quad_tree_free(interactive_qt);
 
      return result;
 }
