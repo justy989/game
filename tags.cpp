@@ -1,4 +1,5 @@
 #include "tags.h"
+#include "log.h"
 
 const char* tag_to_string(Tag_t tag){
     switch(tag){
@@ -46,12 +47,14 @@ const char* tag_to_string(Tag_t tag){
         return "LEVER";
     case TAG_PIT:
         return "PIT";
-    case TAG_LIGHT_SENSOR:
-        return "LIGHT_SENSOR";
+    case TAG_PRESSURE_PLATE:
+        return "PRESSURE_PLATE";
+    case TAG_LIGHT_DETECTOR:
+        return "LIGHT_DETECTOR";
     case TAG_ICE:
         return "ICE";
-    case TAG_ICE_SENSOR:
-        return "ICE_SENSOR";
+    case TAG_ICE_DETECTOR:
+        return "ICE_DETECTOR";
     case TAG_ICE_BLOCK:
         return "ICE_BLOCK";
     case TAG_FIRE_BLOCK:
@@ -131,4 +134,26 @@ const char* tag_to_string(Tag_t tag){
     }
 
     return "TAG_UNKNOWN";
+}
+
+bool global_tags[TAG_COUNT];
+
+void add_global_tag(Tag_t tag){
+     global_tags[tag] = true;
+}
+
+bool* get_global_tags(){ return global_tags; }
+
+void clear_global_tags(){
+     for(S32 c = 0; c < TAG_COUNT; c++){
+          global_tags[c] = false;
+     }
+}
+
+void log_global_tags(){
+     for(S32 c = 0; c < TAG_COUNT; c++){
+          if(global_tags[c]){
+               LOG("%s\n", tag_to_string((Tag_t)(c)));
+          }
+     }
 }

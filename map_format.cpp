@@ -1,8 +1,11 @@
 #include "map_format.h"
 #include "defines.h"
+#include "tags.h"
+
+#include <string.h>
 
 bool save_map_to_file(FILE* file, Coord_t player_start, const TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array,
-                      ObjectArray_t<Interactive_t>* interactive_array, Raw_t* thumbnail){
+                      ObjectArray_t<Interactive_t>* interactive_array, bool* tags, Raw_t* thumbnail){
      // alloc and convert map elements to map format
      S32 map_tile_count = (S32)(tilemap->width) * (S32)(tilemap->height);
      MapTileV1_t* map_tiles = (MapTileV1_t*)(calloc((size_t)(map_tile_count), sizeof(*map_tiles)));
@@ -96,11 +99,25 @@ bool save_map_to_file(FILE* file, Coord_t player_start, const TileMap_t* tilemap
      fwrite(map_interactives, sizeof(*map_interactives), (size_t)(interactive_array->count), file);
 
      if(thumbnail){
-         fwrite(&thumbnail->byte_count, sizeof(thumbnail->byte_count), 1, file);
-         fwrite(thumbnail->bytes, thumbnail->byte_count, 1, file);
+          fwrite(&thumbnail->byte_count, sizeof(thumbnail->byte_count), 1, file);
+          fwrite(thumbnail->bytes, thumbnail->byte_count, 1, file);
      }else{
-         U64 thumbnail_size = 0;
-         fwrite(&thumbnail_size, sizeof(thumbnail_size), 1, file);
+          U64 thumbnail_size = 0;
+          fwrite(&thumbnail_size, sizeof(thumbnail_size), 1, file);
+     }
+
+     U16 tags_count = 0;
+
+     if(tags){
+          for(U16 t = 0; t < TAG_COUNT; t++){
+               if(tags[t]) tags_count++;
+          }
+          fwrite(&tags_count, sizeof(tags_count), 1, file);
+          for(U16 t = 0; t < TAG_COUNT; t++){
+               if(tags[t]) fwrite(&t, sizeof(t), 1, file);
+          }
+     }else{
+          fwrite(&tags_count, sizeof(tags_count), 1, file);
      }
 
      free(map_tiles);
@@ -111,14 +128,14 @@ bool save_map_to_file(FILE* file, Coord_t player_start, const TileMap_t* tilemap
 }
 
 bool save_map(const char* filepath, Coord_t player_start, const TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array,
-              ObjectArray_t<Interactive_t>* interactive_array, Raw_t* thumbnail){
+              ObjectArray_t<Interactive_t>* interactive_array, bool* tags, Raw_t* thumbnail){
      // write to file
      FILE* f = fopen(filepath, "wb");
      if(!f){
           LOG("%s: fopen() failed\n", __FUNCTION__);
           return false;
      }
-     bool success = save_map_to_file(f, player_start, tilemap, block_array, interactive_array, thumbnail);
+     bool success = save_map_to_file(f, player_start, tilemap, block_array, interactive_array, tags, thumbnail);
      LOG("saved map %s\n", filepath);
      fclose(f);
      return success;
@@ -646,21 +663,91 @@ bool load_map_from_file(FILE* file, Coord_t* player_start, TileMap_t* tilemap, O
                         ObjectArray_t<Interactive_t>* interactive_array, const char* filepath){
      U8 map_version = 0;
      fread(&map_version, sizeof(map_version), 1, file);
+     bool result = false;
      switch(map_version){
      default:
           LOG("%s(): mismatched version loading '%s', actual %d, expected %d\n", __FUNCTION__, filepath, map_version, MAP_VERSION);
           break;
      case 1:
-          return load_map_from_file_v1(file, player_start, tilemap, block_array, interactive_array);
+          result = load_map_from_file_v1(file, player_start, tilemap, block_array, interactive_array);
+          break;
      case 2:
-          return load_map_from_file_v2(file, player_start, tilemap, block_array, interactive_array);
+          result = load_map_from_file_v2(file, player_start, tilemap, block_array, interactive_array);
+          break;
      case 3:
-          return load_map_from_file_v3(file, player_start, tilemap, block_array, interactive_array);
+          result = load_map_from_file_v3(file, player_start, tilemap, block_array, interactive_array);
+          break;
      case 4:
-          return load_map_from_file_v4(file, player_start, tilemap, block_array, interactive_array);
+     case 5:
+          result = load_map_from_file_v4(file, player_start, tilemap, block_array, interactive_array);
+          break;
      }
 
-     return false;
+     // TODO: We use 1 because there is always a mystery first block, we should fix that, then fix this
+     if(block_array->count > 1) add_global_tag(TAG_BLOCK);
+     for(S16 i = 1; i < block_array->count; i++){
+          Block_t* block = block_array->elements + i;
+          if(block->element == ELEMENT_FIRE) add_global_tag(TAG_FIRE_BLOCK);
+          if(block->element == ELEMENT_ICE) add_global_tag(TAG_ICE_BLOCK);
+          if(block->element == ELEMENT_ONLY_ICED) add_global_tag(TAG_ICED_BLOCK);
+          if(block->cut != BLOCK_CUT_WHOLE) add_global_tag(TAG_SPLIT_BLOCK);
+          if(block->entangle_index >= 0){
+               add_global_tag(TAG_ENTANGLED_BLOCK);
+               Block_t* entangled_block = block_array->elements + block->entangle_index;
+               S8 rot_diff = 0;
+               if(entangled_block->rotation > block->rotation){
+                    rot_diff = entangled_block->rotation - block->rotation;
+               }else{
+                    rot_diff = block->rotation - entangled_block->rotation;
+               }
+
+               rot_diff %= DIRECTION_COUNT;
+
+               if(rot_diff == 1){
+                    add_global_tag(TAG_ENTANGLED_BLOCK_ROT_90);
+               }else if(rot_diff == 2){
+                    add_global_tag(TAG_ENTANGLED_BLOCK_ROT_180);
+               }else if(rot_diff == 3){
+                    add_global_tag(TAG_ENTANGLED_BLOCK_ROT_270);
+               }
+          }
+     }
+
+     for(S16 i = 0; i < interactive_array->count; i++){
+          Interactive_t* interactive = interactive_array->elements + i;
+          switch(interactive->type){
+          default:
+               break;
+          case INTERACTIVE_TYPE_PRESSURE_PLATE:
+               add_global_tag(TAG_PRESSURE_PLATE);
+               break;
+          case INTERACTIVE_TYPE_LIGHT_DETECTOR:
+               add_global_tag(TAG_LIGHT_DETECTOR);
+               break;
+          case INTERACTIVE_TYPE_ICE_DETECTOR:
+               add_global_tag(TAG_ICE_DETECTOR);
+               break;
+          case INTERACTIVE_TYPE_POPUP:
+               add_global_tag(TAG_POPUP);
+               break;
+          case INTERACTIVE_TYPE_LEVER:
+               add_global_tag(TAG_LEVER);
+               break;
+          case INTERACTIVE_TYPE_DOOR:
+               break;
+          case INTERACTIVE_TYPE_PORTAL:
+               add_global_tag(TAG_PORTAL);
+               // TODO: detect different portal rotations
+               break;
+          case INTERACTIVE_TYPE_BOMB:
+               break;
+          case INTERACTIVE_TYPE_PIT:
+               add_global_tag(TAG_PIT);
+               break;
+          }
+     }
+
+     return result;
 }
 
 bool load_map(const char* filepath, Coord_t* player_start, TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array,
@@ -720,6 +807,59 @@ bool load_map_thumbnail(const char* filepath, Raw_t* thumbnail){
      }else{
          LOG("map does not contain a thumbnail\n");
          return false;
+     }
+
+     fclose(file);
+     return true;
+}
+
+bool load_map_tags(const char* filepath, bool* tags){
+     FILE* file = fopen(filepath, "rb");
+     if(!file){
+          LOG("%s(): fopen() failed\n", __FUNCTION__);
+          return false;
+     }
+
+     U8 map_version = 0;
+     fread(&map_version, sizeof(map_version), 1, file);
+
+     if(map_version < 5){
+         LOG("map version %u does not support tags\n", map_version);
+         return false;
+     }
+
+     S16 map_width;
+     S16 map_height;
+     S16 interactive_count;
+     S16 block_count;
+     U64 thumbnail_size;
+     U16 tag_count;
+     Coord_t player_start;
+
+     fread(&player_start, sizeof(player_start), 1, file);
+     fread(&map_width, sizeof(map_width), 1, file);
+     fread(&map_height, sizeof(map_height), 1, file);
+     fread(&block_count, sizeof(block_count), 1, file);
+     fread(&interactive_count, sizeof(interactive_count), 1, file);
+
+     fseek(file, sizeof(MapTileV1_t) * map_width * map_height, SEEK_CUR);
+     fseek(file, sizeof(MapBlockV3_t) * block_count, SEEK_CUR);
+     fseek(file, sizeof(MapInteractiveV1_t) * interactive_count, SEEK_CUR);
+
+     fread(&thumbnail_size, sizeof(thumbnail_size), 1, file);
+     fseek(file, thumbnail_size, SEEK_CUR);
+
+     fread(&tag_count, sizeof(tag_count), 1, file);
+
+     if(tag_count > 0){
+          memset(tags, 0, TAG_COUNT * sizeof(*tags));
+          U16 value;
+          for(U16 t = 0; t < tag_count; t++){
+               fread(&value, sizeof(value), 1, file);
+               if(value >= 0 && value < TAG_COUNT){
+                    tags[value] = true;
+               }
+          }
      }
 
      fclose(file);

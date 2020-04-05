@@ -453,5 +453,3 @@ void apply_block_change(ObjectArray_t<Block_t>* blocks_array, BlockChange_t* cha
 BlockCollisionPushResult_t block_collision_push(BlockPush_t* push, World_t* world);
 
 FindBlocksThroughPortalResult_t find_blocks_through_portals(Coord_t coord, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt, QuadTreeNode_t<Block_t>* block_qt);
-
-extern Pixel_t g_collided_with_pixel;
