@@ -1887,91 +1887,91 @@ int main(int argc, char** argv){
                          game_mode = GAME_MODE_PLAYING;
                          break;
                     case SDL_SCANCODE_F5:
-                    {
-                         if(world.tilemap.width <= 1) break;
+                         if(game_mode == GAME_MODE_EDITOR){
+                              if(world.tilemap.width <= 1) break;
 
-                         TileMap_t map_copy = {};
-                         deep_copy(&world.tilemap, &map_copy);
+                              TileMap_t map_copy = {};
+                              deep_copy(&world.tilemap, &map_copy);
 
-                         for(S16 i = 0; i < map_copy.height; i++){
-                              Coord_t coord{(S16)(map_copy.width - 1), i};
-                              coord_clear(coord, &world.tilemap, &world.interactives, world.interactive_qt, &world.blocks);
-                         }
-
-                         destroy(&world.tilemap);
-                         init(&world.tilemap, map_copy.width - 1, map_copy.height);
-
-                         for(S16 i = 0; i < world.tilemap.height; i++){
-                              for(S16 j = 0; j < world.tilemap.width; j++){
-                                   world.tilemap.tiles[i][j] = map_copy.tiles[i][j];
+                              for(S16 i = 0; i < map_copy.height; i++){
+                                   Coord_t coord{(S16)(map_copy.width - 1), i};
+                                   coord_clear(coord, &world.tilemap, &world.interactives, world.interactive_qt, &world.blocks);
                               }
-                         }
 
-                         destroy(&map_copy);
-                         camera.center_on_tilemap(&world.tilemap);
+                              destroy(&world.tilemap);
+                              init(&world.tilemap, map_copy.width - 1, map_copy.height);
+
+                              for(S16 i = 0; i < world.tilemap.height; i++){
+                                   for(S16 j = 0; j < world.tilemap.width; j++){
+                                        world.tilemap.tiles[i][j] = map_copy.tiles[i][j];
+                                   }
+                              }
+
+                              destroy(&map_copy);
+                              camera.center_on_tilemap(&world.tilemap);
+                         }
                          break;
-                    }
                     case SDL_SCANCODE_F6:
-                    {
-                         TileMap_t map_copy = {};
-                         deep_copy(&world.tilemap, &map_copy);
+                         if(game_mode == GAME_MODE_EDITOR){
+                              TileMap_t map_copy = {};
+                              deep_copy(&world.tilemap, &map_copy);
 
-                         destroy(&world.tilemap);
-                         init(&world.tilemap, map_copy.width + 1, map_copy.height);
+                              destroy(&world.tilemap);
+                              init(&world.tilemap, map_copy.width + 1, map_copy.height);
 
-                         for(S16 i = 0; i < map_copy.height; i++){
-                              for(S16 j = 0; j < map_copy.width; j++){
-                                   world.tilemap.tiles[i][j] = map_copy.tiles[i][j];
+                              for(S16 i = 0; i < map_copy.height; i++){
+                                   for(S16 j = 0; j < map_copy.width; j++){
+                                        world.tilemap.tiles[i][j] = map_copy.tiles[i][j];
+                                   }
                               }
-                         }
 
-                         destroy(&map_copy);
-                         camera.center_on_tilemap(&world.tilemap);
+                              destroy(&map_copy);
+                              camera.center_on_tilemap(&world.tilemap);
+                         }
                          break;
-                    }
                     case SDL_SCANCODE_F7:
-                    {
-                         if(world.tilemap.height <= 1) break;
+                         if(game_mode == GAME_MODE_EDITOR){
+                              if(world.tilemap.height <= 1) break;
 
-                         TileMap_t map_copy = {};
-                         deep_copy(&world.tilemap, &map_copy);
+                              TileMap_t map_copy = {};
+                              deep_copy(&world.tilemap, &map_copy);
 
-                         for(S16 i = 0; i < map_copy.width; i++){
-                              Coord_t coord{i, (S16)(map_copy.height - 1)};
-                              coord_clear(coord, &world.tilemap, &world.interactives, world.interactive_qt, &world.blocks);
-                         }
-
-                         destroy(&world.tilemap);
-                         init(&world.tilemap, map_copy.width, map_copy.height - 1);
-
-                         for(S16 i = 0; i < world.tilemap.height; i++){
-                              for(S16 j = 0; j < world.tilemap.width; j++){
-                                   world.tilemap.tiles[i][j] = map_copy.tiles[i][j];
+                              for(S16 i = 0; i < map_copy.width; i++){
+                                   Coord_t coord{i, (S16)(map_copy.height - 1)};
+                                   coord_clear(coord, &world.tilemap, &world.interactives, world.interactive_qt, &world.blocks);
                               }
-                         }
 
-                         destroy(&map_copy);
-                         camera.center_on_tilemap(&world.tilemap);
+                              destroy(&world.tilemap);
+                              init(&world.tilemap, map_copy.width, map_copy.height - 1);
+
+                              for(S16 i = 0; i < world.tilemap.height; i++){
+                                   for(S16 j = 0; j < world.tilemap.width; j++){
+                                        world.tilemap.tiles[i][j] = map_copy.tiles[i][j];
+                                   }
+                              }
+
+                              destroy(&map_copy);
+                              camera.center_on_tilemap(&world.tilemap);
+                         }
                          break;
-                    }
                     case SDL_SCANCODE_F8:
-                    {
-                         TileMap_t map_copy = {};
-                         deep_copy(&world.tilemap, &map_copy);
+                         if(game_mode == GAME_MODE_EDITOR){
+                              TileMap_t map_copy = {};
+                              deep_copy(&world.tilemap, &map_copy);
 
-                         destroy(&world.tilemap);
-                         init(&world.tilemap, map_copy.width, map_copy.height + 1);
+                              destroy(&world.tilemap);
+                              init(&world.tilemap, map_copy.width, map_copy.height + 1);
 
-                         for(S16 i = 0; i < map_copy.height; i++){
-                              for(S16 j = 0; j < map_copy.width; j++){
-                                   world.tilemap.tiles[i][j] = map_copy.tiles[i][j];
+                              for(S16 i = 0; i < map_copy.height; i++){
+                                   for(S16 j = 0; j < map_copy.width; j++){
+                                        world.tilemap.tiles[i][j] = map_copy.tiles[i][j];
+                                   }
                               }
-                         }
 
-                         destroy(&map_copy);
-                         camera.center_on_tilemap(&world.tilemap);
+                              destroy(&map_copy);
+                              camera.center_on_tilemap(&world.tilemap);
+                         }
                          break;
-                    }
                     case SDL_SCANCODE_F12:
                          game_mode = GAME_MODE_LEVEL_SELECT;
                          break;
@@ -2415,6 +2415,7 @@ int main(int argc, char** argv){
                                         editor.mode = EDITOR_MODE_CREATE_SELECTION;
                                         editor.selection_start = mouse_select_world(mouse_screen, camera.bottom_left());
                                         editor.selection_end = editor.selection_start;
+                                        LOG("editor selection start: %d, %d\n", editor.selection_start.x, editor.selection_start.y);
                                    }
                               } break;
                               case EDITOR_MODE_STAMP_SELECT:
@@ -2538,6 +2539,10 @@ int main(int argc, char** argv){
 
                                    sort_selection(&editor);
 
+                                   LOG("finished editor selection start: %d, %d, end: %d, %d\n",
+                                       editor.selection_start.x, editor.selection_start.y,
+                                       editor.selection_end.x, editor.selection_end.y);
+
                                    destroy(&editor.selection);
 
                                    S16 stamp_count = (S16)((((editor.selection_end.x - editor.selection_start.x) + 1) *
@@ -2607,7 +2612,7 @@ int main(int argc, char** argv){
                               break;
                          case EDITOR_MODE_CREATE_SELECTION:
                               if(editor.selection_start.x >= 0 && editor.selection_start.y >= 0){
-                                   editor.selection_end = pos_to_coord(mouse_world);
+                                   editor.selection_end = pos_to_coord(mouse_world + camera.bottom_left());
                               }
                               break;
                          }
@@ -4889,7 +4894,7 @@ int main(int argc, char** argv){
                }
 
                for(S16 y = max.y; y >= min.y; y--){
-                    draw_world_row_solids(y, min.x, max.y, &world.tilemap, world.interactive_qt, world.block_qt,
+                    draw_world_row_solids(y, min.x, max.x, &world.tilemap, world.interactive_qt, world.block_qt,
                                           &world.players, camera_offset, player_texture);
 
                     glEnd();

@@ -347,12 +347,12 @@ void draw_quad_filled(const Quad_t* quad, F32 red, F32 green, F32 blue){
      glEnd();
 }
 
-void draw_selection(Coord_t selection_start, Coord_t selection_end, Position_t camera, F32 red, F32 green, F32 blue){
+void draw_selection(Coord_t selection_start, Coord_t selection_end, Position_t screen_camera, F32 red, F32 green, F32 blue){
      if(selection_start.x > selection_end.x) SWAP(selection_start.x, selection_end.x);
      if(selection_start.y > selection_end.y) SWAP(selection_start.y, selection_end.y);
 
-     Position_t start_location = coord_to_pos(selection_start) - camera;
-     Position_t end_location = coord_to_pos(selection_end) - camera;
+     Position_t start_location = coord_to_pos(selection_start) - screen_camera;
+     Position_t end_location = coord_to_pos(selection_end) - screen_camera;
      Vec_t start_vec = pos_to_vec(start_location);
      Vec_t end_vec = pos_to_vec(end_location);
 
@@ -650,7 +650,7 @@ void draw_world_row_arrows(S16 y, S16 x_start, S16 x_end, const ArrowArray_t* ar
           if(coord.y != y) continue;
           if(coord.x < x_start || coord.x > x_end) continue;
 
-          Vec_t arrow_vec = pos_to_vec(arrow->pos - camera);
+          Vec_t arrow_vec = pos_to_vec(arrow->pos) + camera;
           arrow_vec.x -= arrow_tip_offset[arrow->face].x;
           arrow_vec.y -= arrow_tip_offset[arrow->face].y;
 
@@ -871,7 +871,7 @@ void draw_editor(Editor_t* editor, World_t* world, Position_t screen_camera, Vec
 
           for(S32 g = 0; g < editor->selection.count; ++g){
                auto* stamp = editor->selection.elements + g;
-               Position_t stamp_pos = coord_to_pos(editor->selection_start + stamp->offset);
+               Position_t stamp_pos = coord_to_pos(editor->selection_start + stamp->offset) - screen_camera;
                Vec_t stamp_vec = pos_to_vec(stamp_pos);
 
                switch(stamp->type){

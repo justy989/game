@@ -70,7 +70,7 @@ void draw_portal_players(ObjectArray_t<Player_t>* players, Rect_t region, Coord_
 void draw_quad_wireframe(const Quad_t* quad, F32 red, F32 green, F32 blue);
 void draw_quad_filled(const Quad_t* quad, F32 red, F32 green, F32 blue);
 
-void draw_selection(Coord_t selection_start, Coord_t selection_end, Position_t camera, F32 red, F32 green, F32 blue);
+void draw_selection(Coord_t selection_start, Coord_t selection_end, Position_t screen_camera, F32 red, F32 green, F32 blue);
 
 void draw_text(const char* message, Vec_t pos, Vec_t dim = Vec_t{TEXT_CHAR_WIDTH, TEXT_CHAR_HEIGHT}, F32 spacing = TEXT_CHAR_SPACING);
 void draw_editor(Editor_t* editor, World_t* world, Position_t screen_camera, Vec_t mouse_screen,
