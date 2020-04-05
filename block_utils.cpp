@@ -3,6 +3,7 @@
 #include "defines.h"
 #include "conversion.h"
 #include "portal_exit.h"
+#include "tags.h"
 
 #include <float.h>
 #include <math.h>
@@ -385,7 +386,10 @@ Block_t* rotated_entangled_blocks_against_centroid(Block_t* block, Direction_t d
 
           auto check_pixel = get_check_pixel_against_centroid(block->pos.pixel, block->cut, direction, rotations_between);
 
-          if(pixel_in_rect(check_pixel, check_block_rect)) return check_block;
+          if(pixel_in_rect(check_pixel, check_block_rect)){
+               add_global_tag(TAG_ENTANGLED_CENTROID_COLLISION);
+               return check_block;
+          }
      }
 
      // check through portals
@@ -403,7 +407,10 @@ Block_t* rotated_entangled_blocks_against_centroid(Block_t* block, Direction_t d
 
           portal_exits = find_portal_exits(adj_portal_coord, tilemap, interactive_qt);
           check_block = check_portal_for_centroid_with_block(&portal_exits, adj_portal_coord, (Direction_t)(d), direction, block, block_qt, blocks_array);
-          if(check_block) return check_block;
+          if(check_block){
+               add_global_tag(TAG_ENTANGLED_CENTROID_COLLISION);
+               return check_block;
+          }
      }
 
      return nullptr;

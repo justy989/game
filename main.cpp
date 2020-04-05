@@ -793,6 +793,8 @@ void apply_block_collision(World_t* world, Block_t* block, F32 dt, CheckBlockCol
                                         stop_block_colliding_with_entangled(block, move_dir_to_stop);
                                         stop_block_colliding_with_entangled(entangled_block, stop_entangled_dir);
 
+                                        add_global_tag(TAG_ENTANGLED_CENTROID_COLLISION);
+
                                         // TODO: compress this code, it's definitely used elsewhere
                                         for(S16 p = 0; p < world->players.count; p++){
                                              auto* player = world->players.elements + p;
@@ -971,6 +973,8 @@ DoBlockCollisionResults_t do_block_collision(World_t* world, Block_t* block, S16
                          S16 old_block_index = (S16)(block - world->blocks.elements);
 
                          if(resize(&world->blocks, world->blocks.count + (S16)(1))){
+                              add_global_tag(TAG_BLOCK_GETS_ENTANGLED);
+
                               // a resize will kill our block ptr, so we gotta update it
                               block = world->blocks.elements + old_block_index;
                               block->clone_start = portal->coord;
@@ -984,6 +988,7 @@ DoBlockCollisionResults_t do_block_collision(World_t* world, Block_t* block, S16
                               if(block->entangle_index == -1){
                                    entangled_block->entangle_index = old_block_index;
                               }else{
+                                   add_global_tag(TAG_THREE_PLUS_BLOCKS_ENTANGLED);
                                    entangled_block->entangle_index = block->entangle_index;
                               }
 
@@ -2635,6 +2640,7 @@ int main(int argc, char** argv){
                          S8 block_top = block_bottom + HEIGHT_INTERVAL;
                          if(pixel_in_rect(arrow->pos.pixel, block_rect) && arrow->element_from_block != block_index){
                               if(arrow->pos.z >= block_bottom && arrow->pos.z <= block_top){
+                                   add_global_tag(TAG_ARROW_STICKS_INTO_BLOCK);
                                    arrow->stuck_time = dt;
                                    arrow->stuck_offset = arrow->pos - blocks[b]->pos;
                                    arrow->stuck_type = STUCK_BLOCK;
@@ -2646,6 +2652,7 @@ int main(int argc, char** argv){
                                         arrow->element = transition_element(arrow->element, blocks[b]->element);
                                         if(arrow_element){
                                              blocks[b]->element = transition_element(blocks[b]->element, arrow_element);
+                                             add_global_tag(TAG_ARROW_CHANGES_BLOCK_ELEMENT);
                                              if(blocks[b]->entangle_index >= 0 && blocks[b]->entangle_index < world.blocks.count){
                                                   S16 original_index = blocks[b] - world.blocks.elements;
                                                   S16 entangle_index = blocks[b]->entangle_index;
@@ -2694,6 +2701,7 @@ int main(int argc, char** argv){
                               case INTERACTIVE_TYPE_LEVER:
                                    if(arrow->pos.z >= HEIGHT_INTERVAL){
                                         activate(&world, post_move_coord);
+                                        add_global_tag(TAB_ARROW_ACTIVATES_LEVER);
                                    }else{
                                         arrow->stuck_time = dt;
                                    }
@@ -2725,6 +2733,7 @@ int main(int argc, char** argv){
                          auto teleport_result = teleport_position_across_portal(arrow->pos, Vec_t{}, &world,
                                                                                 pre_move_coord, post_move_coord);
                          if(teleport_result.count > 0){
+                              add_global_tag(TAG_TELEPORT_ARROW);
                               arrow->pos = teleport_result.results[0].pos;
                               arrow->face = direction_rotate_clockwise(arrow->face, teleport_result.results[0].rotations);
 
@@ -2831,6 +2840,7 @@ int main(int argc, char** argv){
                               }
                               arrow_pos.z += ARROW_SHOOT_HEIGHT;
                               arrow_spawn(&world.arrows, arrow_pos, player->face);
+                              add_global_tag(TAG_ARROW);
                          }
                          player->bow_draw_time = 0.0f;
                     }
@@ -2974,6 +2984,7 @@ int main(int argc, char** argv){
                                     hold_players(&world.players);
                               }else if(interactive->coord == player_previous_coord && interactive->popup.lift.ticks == player->pos.z + 2){
                                     raise_players(&world.players);
+                                    add_global_tag(TAB_POPUP_RAISES_PLAYER);
                               }
                          }
                     }
@@ -3118,6 +3129,7 @@ int main(int argc, char** argv){
                                         raise_above_blocks(&world, block);
 
                                         block->pos.z++;
+                                        add_global_tag(TAB_POPUP_RAISES_BLOCK);
                                         block->held_up |= BLOCK_HELD_BY_SOLID;
 
                                         raise_entangled_blocks(&world, block);
@@ -3180,6 +3192,7 @@ int main(int argc, char** argv){
                                    block->pos_delta.y = 0;
                                    reset_move(&block->horizontal_move);
                                    reset_move(&block->vertical_move);
+                                   add_global_tag(TAG_BLOCK_FALLS_IN_PIT);
                                    over_pit = true;
                               }
                          }
@@ -3206,6 +3219,8 @@ int main(int argc, char** argv){
                               block->pos.z--;
                               block->fall_time = 0;
                          }
+                    }else if(block->held_up == BLOCK_HELD_BY_ENTANGLE){
+                         add_global_tag(TAG_ENTANGLED_BLOCK_FLOATS);
                     }
                }
 
@@ -3311,19 +3326,24 @@ int main(int argc, char** argv){
                                                   check_idle_move_state = block->vertical_move.state;
                                              }
 
-                                             if(check_idle_move_state == MOVE_STATE_IDLING && player->push_time > BLOCK_PUSH_TIME &&
-                                                !block_held_down_by_another_block(block, world.block_qt, world.interactive_qt, &world.tilemap).held()){
-                                                  Vec_t block_horizontal_vel = {entangled_block->vel.x, 0};
-                                                  auto block_move_dir = vec_direction(block_horizontal_vel);
-                                                  if(block_move_dir != DIRECTION_COUNT){
-                                                       S16 block_mass = block_get_mass(player_prev_pushing_block);
-                                                       S16 entangled_block_mass = block_get_mass(block);
-                                                       F32 mass_ratio = (F32)(block_mass) / (F32)(entangled_block_mass);
-                                                       auto direction_to_push = direction_rotate_clockwise(block_move_dir, rotations_between);
-                                                       auto allowed_result = allowed_to_push(&world, block, direction_to_push, mass_ratio);
-                                                       if(allowed_result.push){
-                                                            block_push(block, direction_to_push, &world, false, mass_ratio * allowed_result.mass_ratio);
+                                             bool held_down = block_held_down_by_another_block(block, world.block_qt, world.interactive_qt, &world.tilemap).held();
+
+                                             if(check_idle_move_state == MOVE_STATE_IDLING && player->push_time > BLOCK_PUSH_TIME){
+                                                  if(!held_down){
+                                                       Vec_t block_horizontal_vel = {entangled_block->vel.x, 0};
+                                                       auto block_move_dir = vec_direction(block_horizontal_vel);
+                                                       if(block_move_dir != DIRECTION_COUNT){
+                                                            S16 block_mass = block_get_mass(player_prev_pushing_block);
+                                                            S16 entangled_block_mass = block_get_mass(block);
+                                                            F32 mass_ratio = (F32)(block_mass) / (F32)(entangled_block_mass);
+                                                            auto direction_to_push = direction_rotate_clockwise(block_move_dir, rotations_between);
+                                                            auto allowed_result = allowed_to_push(&world, block, direction_to_push, mass_ratio);
+                                                            if(allowed_result.push){
+                                                                 block_push(block, direction_to_push, &world, false, mass_ratio * allowed_result.mass_ratio);
+                                                            }
                                                        }
+                                                  }else{
+                                                       add_global_tag(TAG_ENTANGLED_BLOCK_HELD_DOWN_UNMOVABLE);
                                                   }
                                              }
                                         }
@@ -3339,19 +3359,24 @@ int main(int argc, char** argv){
                                                   check_idle_move_state = block->horizontal_move.state;
                                              }
 
-                                             if(check_idle_move_state == MOVE_STATE_IDLING && player->push_time > BLOCK_PUSH_TIME &&
-                                                !block_held_down_by_another_block(block, world.block_qt, world.interactive_qt, &world.tilemap).held()){
-                                                  Vec_t block_vertical_vel = {0, entangled_block->vel.y};
-                                                  auto block_move_dir = vec_direction(block_vertical_vel);
-                                                  if(block_move_dir != DIRECTION_COUNT){
-                                                       S16 block_mass = block_get_mass(player_prev_pushing_block);
-                                                       S16 entangled_block_mass = block_get_mass(block);
-                                                       F32 mass_ratio = (F32)(block_mass) / (F32)(entangled_block_mass);
-                                                       auto direction_to_push = direction_rotate_clockwise(block_move_dir, rotations_between);
-                                                       auto allowed_result = allowed_to_push(&world, block, direction_to_push, mass_ratio);
-                                                       if(allowed_result.push){
-                                                            block_push(block, direction_to_push, &world, false, mass_ratio * allowed_result.mass_ratio);
+                                             bool held_down = block_held_down_by_another_block(block, world.block_qt, world.interactive_qt, &world.tilemap).held();
+
+                                             if(check_idle_move_state == MOVE_STATE_IDLING && player->push_time > BLOCK_PUSH_TIME){
+                                                  if(!held_down){
+                                                       Vec_t block_vertical_vel = {0, entangled_block->vel.y};
+                                                       auto block_move_dir = vec_direction(block_vertical_vel);
+                                                       if(block_move_dir != DIRECTION_COUNT){
+                                                            S16 block_mass = block_get_mass(player_prev_pushing_block);
+                                                            S16 entangled_block_mass = block_get_mass(block);
+                                                            F32 mass_ratio = (F32)(block_mass) / (F32)(entangled_block_mass);
+                                                            auto direction_to_push = direction_rotate_clockwise(block_move_dir, rotations_between);
+                                                            auto allowed_result = allowed_to_push(&world, block, direction_to_push, mass_ratio);
+                                                            if(allowed_result.push){
+                                                                 block_push(block, direction_to_push, &world, false, mass_ratio * allowed_result.mass_ratio);
+                                                            }
                                                        }
+                                                  }else{
+                                                       add_global_tag(TAG_ENTANGLED_BLOCK_HELD_DOWN_UNMOVABLE);
                                                   }
                                              }
                                         }
@@ -3487,8 +3512,10 @@ int main(int argc, char** argv){
                               if(pixel_in_rect(block_center_pixel(check_block), block_rect)){
                                    if(check_block->element == ELEMENT_FIRE){
                                         check_block->element = ELEMENT_NONE;
+                                        add_global_tag(TAG_BLOCK_EXTINGUISHED_BY_STOMP);
                                    }else if(check_block->element == ELEMENT_ICE){
                                         check_block->element = ELEMENT_ONLY_ICED;
+                                        add_global_tag(TAG_BLOCK_EXTINGUISHED_BY_STOMP);
                                    }
                               }
                          }
@@ -3562,6 +3589,7 @@ int main(int argc, char** argv){
                          auto coord = block_get_coord(block->pos + block->pos_delta, block->cut);
                          auto teleport_result = teleport_position_across_portal(block_center, block->pos_delta, &world, premove_coord, coord, false);
                          if(teleport_result.count > block->clone_id){
+                              add_global_tag(TAG_TELEPORT_BLOCK);
                               block->teleport = true;
                               block->teleport_pos = teleport_result.results[block->clone_id].pos;
                               block->teleport_cut = block_cut_rotate_clockwise(block->cut, teleport_result.results[block->clone_id].rotations);
@@ -3754,6 +3782,7 @@ int main(int argc, char** argv){
                                           // we kill the block
                                           // TODO: I'm hesitant to actually kill it because things use block index as references, so we move it to the origin
                                           block->teleport_pos.pixel = Pixel_t{-TILE_SIZE_IN_PIXELS, -TILE_SIZE_IN_PIXELS};
+                                          add_global_tag(TAG_BLOCK_GETS_DESTROYED);
                                       }else{
                                           if(original_src_cut == BLOCK_CUT_WHOLE){
                                               switch(src_portal_dir){
@@ -3877,6 +3906,8 @@ int main(int argc, char** argv){
                                           block->teleport_pos.pixel += final_dst_offset;
                                           block->teleport_cut = final_dst_cut;
                                           block->teleport_split = true;
+
+                                          add_global_tag(TAG_BLOCK_GETS_SPLIT);
                                       }
 
                                       src_portal->portal.on = false;
@@ -3949,6 +3980,7 @@ int main(int argc, char** argv){
                                                   player->clone_instance = world.clone_instance;
                                              }else{
                                                   S16 new_player_index = world.players.count;
+                                                  add_global_tag(TAG_PLAYER_GETS_ENTANGLED);
 
                                                   if(resize(&world.players, world.players.count + (S16)(1))){
                                                        // a resize will kill our player ptr, so we gotta update it
@@ -3958,6 +3990,10 @@ int main(int argc, char** argv){
                                                        Player_t* new_player = world.players.elements + new_player_index;
                                                        *new_player = *player;
                                                        new_player->clone_id = clone_id;
+                                                  }
+
+                                                  if(world.players.count > 2){
+                                                       add_global_tag(TAG_THREE_PLUS_PLAYERS_ENTANGLED);
                                                   }
                                              }
 
@@ -4115,6 +4151,7 @@ int main(int argc, char** argv){
                          // if a teleport happened, update the position
                          if(teleport_result.count){
                               assert(teleport_result.count > teleport_clone_id);
+                              add_global_tag(TAG_TELEPORT_PLAYER);
 
                               player->teleport = true;
                               player->teleport_pos = teleport_result.results[teleport_clone_id].pos;

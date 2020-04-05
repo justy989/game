@@ -6,6 +6,7 @@
 #include "utils.h"
 #include "collision.h"
 #include "block_utils.h"
+#include "tags.h"
 
 // linux
 #include <dirent.h>
@@ -344,6 +345,8 @@ void slow_block_toward_gridlock(World_t* world, Block_t* block, Direction_t dire
      auto block_mass = get_block_stack_mass(world, block);
      F32 block_vel = 0;
 
+     add_global_tag(TAB_PLAYER_STOPS_COASTING_BLOCK);
+
      if(direction_is_horizontal(direction)){
           block->stopped_by_player_horizontal = true;
           auto motion = motion_x_component(block);
@@ -668,6 +671,7 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                     if(would_squish){
                          if(momentum >= PLAYER_SQUISH_MOMENTUM){
                               result.resetting = true;
+                              add_global_tag(TAG_BLOCK_SQUISHES_PLAYER);
                          }else{
                               auto collided_pos_offset = collision.pos - collision.block->pos;
                               auto block_new_pos = collision.pos;
@@ -720,6 +724,7 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                     if(would_squish){
                          if(momentum >= PLAYER_SQUISH_MOMENTUM){
                               result.resetting = true;
+                              add_global_tag(TAG_BLOCK_SQUISHES_PLAYER);
                          }else{
                               auto collided_pos_offset = collision.pos - collision.block->pos;
                               auto block_new_pos = collision.pos;
@@ -770,6 +775,7 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                     if(would_squish){
                          if(momentum >= PLAYER_SQUISH_MOMENTUM){
                               result.resetting = true;
+                              add_global_tag(TAG_BLOCK_SQUISHES_PLAYER);
                          }else{
                               auto collided_pos_offset = collision.pos - collision.block->pos;
                               auto block_new_pos = collision.pos;
@@ -822,6 +828,7 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                     if(would_squish){
                          if(momentum >= PLAYER_SQUISH_MOMENTUM){
                               result.resetting = true;
+                              add_global_tag(TAG_BLOCK_SQUISHES_PLAYER);
                          }else{
                               auto collided_pos_offset = collision.pos - collision.block->pos;
                               auto block_new_pos = collision.pos;
@@ -1190,9 +1197,11 @@ static void impact_ice(Coord_t center, S8 height, S16 radius, World_t* world, bo
                               if(spread_the_ice){
                                    if(block->element == ELEMENT_NONE) block->element = ELEMENT_ONLY_ICED;
                                    spread_on_block = true;
+                                   add_global_tag(TAG_BLOCK_BLOCKS_ICE_FROM_BEING_SPREAD);
                               }else{
                                    if(block->element == ELEMENT_ONLY_ICED) block->element = ELEMENT_NONE;
                                    spread_on_block = true;
+                                   add_global_tag(TAG_BLOCK_BLOCKS_ICE_FROM_BEING_MELTED);
                               }
                          }
                     }
@@ -1206,12 +1215,19 @@ static void impact_ice(Coord_t center, S8 height, S16 radius, World_t* world, bo
                                    if(interactive->popup.lift.ticks == 1 && height <= MELT_SPREAD_HEIGHT){
                                         if(spread_the_ice){
                                              interactive->popup.iced = false;
+                                             add_global_tag(TAG_SPREAD_ICE);
                                              tile->flags |= TILE_FLAG_ICED;
                                         }else{
+                                             add_global_tag(TAG_MELT_ICE);
                                              tile->flags &= ~TILE_FLAG_ICED;
                                         }
                                    }else if(height < interactive->popup.lift.ticks + MELT_SPREAD_HEIGHT){
                                         interactive->popup.iced = spread_the_ice;
+                                        if(spread_the_ice){
+                                             add_global_tag(TAG_ICED_POPUP);
+                                        }else{
+                                             add_global_tag(TAG_MELTED_POPUP);
+                                        }
                                    }
                                    break;
                               case INTERACTIVE_TYPE_PRESSURE_PLATE:
@@ -1219,8 +1235,12 @@ static void impact_ice(Coord_t center, S8 height, S16 radius, World_t* world, bo
                               case INTERACTIVE_TYPE_LIGHT_DETECTOR:
                                    if(height <= MELT_SPREAD_HEIGHT){
                                         if(spread_the_ice){
+                                             add_global_tag(TAG_SPREAD_ICE);
+                                             add_global_tag(TAG_ICED_PRESSURE_PLATE);
                                              tile->flags |= TILE_FLAG_ICED;
                                         }else{
+                                             add_global_tag(TAG_MELT_ICE);
+                                             add_global_tag(TAG_MELTED_PRESSURE_PLATE);
                                              tile->flags &= ~TILE_FLAG_ICED;
                                              if(interactive->type == INTERACTIVE_TYPE_PRESSURE_PLATE){
                                                   interactive->pressure_plate.iced_under = false;
@@ -1235,6 +1255,7 @@ static void impact_ice(Coord_t center, S8 height, S16 radius, World_t* world, bo
                               if(spread_the_ice){
                                    tile->flags |= TILE_FLAG_ICED;
                               }else{
+                                   add_global_tag(TAG_MELT_ICE);
                                    tile->flags &= ~TILE_FLAG_ICED;
                               }
                          }
@@ -1348,6 +1369,7 @@ void apply_push_horizontal(Block_t* block, Position_t pos, World_t* world, Direc
       if(pushed_by_ice){
            auto elastic_result = elastic_transfer_momentum_to_block(instant_momentum, world, block, direction);
            if(collision_result_overcomes_friction(block->vel.x, elastic_result.second_final_velocity, get_block_stack_mass(world, block))){
+                add_global_tag(TAB_BLOCK_MOMENTUM_COLLISION);
                 auto instant_vel = elastic_result.second_final_velocity;
                 auto pushee_momentum = get_block_momentum(world, block, direction);
                 result->add_collision(instant_momentum->mass, elastic_result.first_final_velocity, pushee_momentum.mass, pushee_momentum.vel, elastic_result.second_final_velocity);
@@ -1425,6 +1447,7 @@ void apply_push_vertical(Block_t* block, Position_t pos, World_t* world, Directi
       if(pushed_by_ice){
            auto elastic_result = elastic_transfer_momentum_to_block(instant_momentum, world, block, direction);
            if(collision_result_overcomes_friction(block->vel.y, elastic_result.second_final_velocity, get_block_stack_mass(world, block))){
+                add_global_tag(TAB_BLOCK_MOMENTUM_COLLISION);
                 auto instant_vel = elastic_result.second_final_velocity;
                 auto pushee_momentum = get_block_momentum(world, block, direction);
                 result->add_collision(instant_momentum->mass, elastic_result.first_final_velocity, pushee_momentum.mass, pushee_momentum.vel, elastic_result.second_final_velocity);
@@ -1710,6 +1733,7 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
                F32 total_block_mass = get_block_mass_in_direction(world, block, direction, false);
 
                if(total_block_mass <= PLAYER_MAX_PUSH_MASS_ON_FRICTION){
+                   add_global_tag(TAG_PLAYER_PUSHES_MORE_THAN_ONE_MASS);
                    bool are_entangled = blocks_are_entangled(block, against_block, &world->blocks);
                    auto push_result = block_push(against_block, against_block_push_dir, world, pushed_by_ice, force, instant_momentum);
 

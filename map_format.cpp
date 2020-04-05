@@ -706,7 +706,7 @@ bool load_map_from_file(FILE* file, Coord_t* player_start, TileMap_t* tilemap, O
           if(block->element == ELEMENT_FIRE) add_global_tag(TAG_FIRE_BLOCK);
           if(block->element == ELEMENT_ICE) add_global_tag(TAG_ICE_BLOCK);
           if(block->element == ELEMENT_ONLY_ICED) add_global_tag(TAG_ICED_BLOCK);
-          if(block->cut != BLOCK_CUT_WHOLE) add_global_tag(TAG_SPLIT_BLOCK);
+          if(block->cut != BLOCK_CUT_WHOLE){ add_global_tag(TAG_SPLIT_BLOCK); }
           if(block->entangle_index >= 0){
                add_global_tag(TAG_ENTANGLED_BLOCK);
                Block_t* entangled_block = block_array->elements + block->entangle_index;
@@ -725,6 +725,14 @@ bool load_map_from_file(FILE* file, Coord_t* player_start, TileMap_t* tilemap, O
                     add_global_tag(TAG_ENTANGLED_BLOCK_ROT_180);
                }else if(rot_diff == 3){
                     add_global_tag(TAG_ENTANGLED_BLOCK_ROT_270);
+               }
+
+               if(block->cut == BLOCK_CUT_WHOLE && entangled_block->cut != BLOCK_CUT_WHOLE){
+                    add_global_tag(TAG_ENTANGLED_BLOCKS_OF_DIFFERENT_SPLITS);
+               }
+
+               if(entangled_block->entangle_index != i){
+                    add_global_tag(TAG_THREE_PLUS_BLOCKS_ENTANGLED);
                }
           }
           auto held_up_result = block_held_up_by_another_block(block, block_qt, interactive_qt, tilemap);

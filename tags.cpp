@@ -5,16 +5,14 @@ const char* tag_to_string(Tag_t tag){
     switch(tag){
     default:
         break;
-    case TAB_PLAYER_STOPS_BLOCK_ON_ICE:
-        return "PLAYER_STOPS_BLOCK_ON_ICE";
+    case TAB_PLAYER_STOPS_COASTING_BLOCK:
+        return "PLAYER_STOPS_COASTING_BLOCK";
     case TAG_PLAYER_PUSHES_MORE_THAN_ONE_MASS:
         return "PLAYER_PUSHES_MORE_THAN_ONE_MASS";
     case TAG_BLOCK:
         return "BLOCK";
     case TAG_BLOCK_FALLS_IN_PIT:
         return "BLOCK_FALLS_IN_PIT";
-    case TAG_BLOCK_CHANGES_ELEMENT:
-        return "BLOCK_CHANGES_ELEMENT";
     case TAG_BLOCK_BLOCKS_ICE_FROM_BEING_MELTED:
         return "BLOCK_BLOCKS_ICE_FROM_BEING_MELTED";
     case TAG_BLOCK_BLOCKS_ICE_FROM_BEING_SPREAD:
@@ -59,6 +57,8 @@ const char* tag_to_string(Tag_t tag){
         return "ICE_BLOCK";
     case TAG_FIRE_BLOCK:
         return "FIRE_BLOCK";
+    case TAG_FIRE_BLOCK_SLIDES_ON_ICE:
+        return "FIRE_BLOCK_SLIDES_ON_ICE";
     case TAG_ICED_BLOCK:
         return "ICED_BLOCK";
     case TAG_MELT_ICE:
@@ -115,14 +115,10 @@ const char* tag_to_string(Tag_t tag){
         return "ENTANGLED_BLOCK_HELD_DOWN_UNMOVABLE";
     case TAG_ENTANGLED_BLOCK_FLOATS:
         return "ENTANGLED_BLOCK_FLOATS";
-    case TAG_ENTANGLED_PLAYER_FLOATS:
-        return "ENTANGLED_PLAYER_FLOATS";
     case TAG_ENTANGLED_BLOCKS_OF_DIFFERENT_SPLITS:
         return "ENTANGLED_BLOCKS_OF_DIFFERENT_SPLITS";
     case TAG_ENTANGLED_CENTROID_COLLISION:
         return "ENTANGLED_CENTROID_COLLISION";
-    case TAG_FIRE_BLOCK_SLIDES_ON_ICE:
-        return "FIRE_BLOCK_SLIDES_ON_ICE";
     case TAG_THREE_PLUS_BLOCKS_ENTANGLED:
         return "THREE_PLUS_BLOCKS_ENTANGLED";
     case TAG_THREE_PLUS_PLAYERS_ENTANGLED:

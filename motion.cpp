@@ -3,6 +3,7 @@
 #include "defines.h"
 #include "utils.h"
 #include "conversion.h"
+#include "tags.h"
 
 #include <float.h>
 #include <math.h>
@@ -263,6 +264,7 @@ F32 begin_stopping_grid_aligned_motion(BlockCut_t cut, MotionComponent_t* motion
          // we travel more grid cells when slowing down if there is a lot of momentum
          S16 grid_cells_to_travel = round(motion->ref->vel / normal_velocity) - 1;
          if(grid_cells_to_travel < 0) grid_cells_to_travel = 0;
+         if(grid_cells_to_travel > 1) add_global_tag(TAG_BLOCK_MULTIPLE_INTERVALS_TO_STOP);
 
          if(positive){
               goal += (lowest_dim * PIXEL_SIZE) * (F32)(grid_cells_to_travel);
