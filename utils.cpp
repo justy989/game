@@ -251,24 +251,16 @@ S16 range_passes_boundary(S16 a, S16 b, S16 boundary_size, S16 ignore){
      return 0;
 }
 
-Pixel_t mouse_select_pixel(Vec_t mouse_screen){
-     return {(S16)(mouse_screen.x * (F32)(ROOM_PIXEL_SIZE)), (S16)(mouse_screen.y * (F32)(ROOM_PIXEL_SIZE))};
+Pixel_t mouse_select_world_pixel(Vec_t mouse_screen, Camera_t* camera){
+     return vec_to_pixel(camera->normalized_to_world(mouse_screen) - camera->world_offset);
 }
 
-Pixel_t mouse_select_world_pixel(Vec_t mouse_screen, Position_t camera){
-     return mouse_select_pixel(mouse_screen) + camera.pixel;
-}
-
-Coord_t mouse_select_coord(Vec_t mouse_screen){
-     return {(S16)(mouse_screen.x * (F32)(ROOM_TILE_SIZE)), (S16)(mouse_screen.y * (F32)(ROOM_TILE_SIZE))};
-}
-
-Coord_t mouse_select_world(Vec_t mouse_screen, Position_t camera){
-     return mouse_select_coord(mouse_screen) + pos_to_coord(camera);
+Coord_t mouse_select_world_coord(Vec_t mouse_screen, Camera_t* camera){
+     return vec_to_coord(camera->normalized_to_world(mouse_screen) - camera->world_offset);
 }
 
 Vec_t coord_to_screen_position(Coord_t coord){
-     Pixel_t pixel = coord_to_pixel(coord);
+     Pixel_t pixel = coord_to_pixel_at_center(coord);
      Position_t relative_loc {pixel, {0.0f, 0.0f}, 0};
      return pos_to_vec(relative_loc);
 }

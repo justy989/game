@@ -1,5 +1,6 @@
 #pragma once
 
+#include "camera.h"
 #include "direction.h"
 #include "coord.h"
 #include "vec.h"
@@ -41,10 +42,8 @@ Interactive_t* player_is_teleporting(const Player_t* player, QuadTreeNode_t<Inte
 
 S16 range_passes_boundary(S16 a, S16 b, S16 boundary_size, S16 ignore);
 
-Pixel_t mouse_select_pixel(Vec_t mouse_screen);
-Pixel_t mouse_select_world_pixel(Vec_t mouse_screen, Position_t camera);
-Coord_t mouse_select_coord(Vec_t mouse_screen);
-Coord_t mouse_select_world(Vec_t mouse_screen, Position_t camera);
+Pixel_t mouse_select_world_pixel(Vec_t mouse_screen, Camera_t* camera);
+Coord_t mouse_select_world_coord(Vec_t mouse_screen, Camera_t* camera);
 Vec_t coord_to_screen_position(Coord_t coord);
 
 bool vec_in_quad(const Quad_t* q, Vec_t v);

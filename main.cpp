@@ -2123,12 +2123,12 @@ int main(int argc, char** argv){
                          break;
                     case SDL_SCANCODE_N:
                     {
-                         Tile_t* tile = tilemap_get_tile(&world.tilemap, mouse_select_world(mouse_screen, camera.bottom_left()));
+                         Tile_t* tile = tilemap_get_tile(&world.tilemap, mouse_select_world_coord(mouse_screen, &camera));
                          if(tile) tile_toggle_wire_activated(tile);
                     } break;
                     case SDL_SCANCODE_8:
                          if(game_mode == GAME_MODE_EDITOR && editor.mode == EDITOR_MODE_CATEGORY_SELECT){
-                              auto coord = mouse_select_world(mouse_screen, camera.bottom_left());
+                              auto coord = mouse_select_world_coord(mouse_screen, &camera);
                               auto rect = rect_surrounding_coord(coord);
 
                               S16 block_count = 0;
@@ -2159,7 +2159,7 @@ int main(int argc, char** argv){
                          break;
                     case SDL_SCANCODE_2:
                          if(game_mode == GAME_MODE_EDITOR && editor.mode == EDITOR_MODE_CATEGORY_SELECT){
-                              auto pixel = mouse_select_world_pixel(mouse_screen, camera.bottom_left());
+                              auto pixel = mouse_select_world_pixel(mouse_screen, &camera);
 
                               // TODO: make this a function where you can pass in entangle_index
                               S16 new_index = world.players.count;
@@ -2172,7 +2172,7 @@ int main(int argc, char** argv){
                          break;
                     case SDL_SCANCODE_0:
                          if(game_mode == GAME_MODE_EDITOR && editor.mode == EDITOR_MODE_CATEGORY_SELECT){
-                              auto coord = mouse_select_world(mouse_screen, camera.bottom_left());
+                              auto coord = mouse_select_world_coord(mouse_screen, &camera);
                               auto rect = rect_surrounding_coord(coord);
 
                               S16 block_count = 0;
@@ -2273,7 +2273,7 @@ int main(int argc, char** argv){
                     case SDL_SCANCODE_M:
                          if(game_mode == GAME_MODE_EDITOR &&
                             editor.mode == EDITOR_MODE_CATEGORY_SELECT){
-                              player_start = mouse_select_world(mouse_screen, camera.bottom_left());
+                              player_start = mouse_select_world_coord(mouse_screen, &camera);
                          }else if(game_mode == GAME_MODE_PLAYING){
                               resetting = true;
                          }
@@ -2281,7 +2281,7 @@ int main(int argc, char** argv){
                     case SDL_SCANCODE_R:
                          if(game_mode == GAME_MODE_EDITOR &&
                             editor.mode == EDITOR_MODE_CATEGORY_SELECT){
-                              auto coord = mouse_select_world(mouse_screen, camera.bottom_left());
+                              auto coord = mouse_select_world_coord(mouse_screen, &camera);
                               auto rect = rect_surrounding_coord(coord);
 
                               S16 block_count = 0;
@@ -2302,15 +2302,15 @@ int main(int argc, char** argv){
                     {
                          reset_players(&world.players);
                          Player_t* player = world.players.elements;
-                         player->pos.pixel = mouse_select_world_pixel(mouse_screen, camera.bottom_left()) + HALF_TILE_SIZE_PIXEL;
+                         player->pos.pixel = mouse_select_world_pixel(mouse_screen, &camera) + HALF_TILE_SIZE_PIXEL;
                          player->pos.decimal.x = 0;
                          player->pos.decimal.y = 0;
                          break;
                     }
                     case SDL_SCANCODE_H:
                     {
-                         Pixel_t pixel = mouse_select_world_pixel(mouse_screen, camera.bottom_left()) + HALF_TILE_SIZE_PIXEL;
-                         Coord_t coord = mouse_select_world(mouse_screen, camera.bottom_left());
+                         Pixel_t pixel = mouse_select_world_pixel(mouse_screen, &camera) + HALF_TILE_SIZE_PIXEL;
+                         Coord_t coord = mouse_select_world_coord(mouse_screen, &camera);
                          LOG("mouse pixel: %d, %d, Coord: %d, %d\n", pixel.x, pixel.y, coord.x, coord.y);
                          describe_coord(coord, &world);
                     } break;
@@ -2413,9 +2413,8 @@ int main(int argc, char** argv){
                                         editor.stamp = 0;
                                    }else{
                                         editor.mode = EDITOR_MODE_CREATE_SELECTION;
-                                        editor.selection_start = mouse_select_world(mouse_screen, camera.bottom_left());
+                                        editor.selection_start = mouse_select_world_coord(mouse_screen, &camera);
                                         editor.selection_end = editor.selection_start;
-                                        LOG("editor selection start: %d, %d\n", editor.selection_start.x, editor.selection_start.y);
                                    }
                               } break;
                               case EDITOR_MODE_STAMP_SELECT:
@@ -2427,7 +2426,7 @@ int main(int argc, char** argv){
                                         editor.stamp = select_index;
                                    }else{
                                         undo_commit(&undo, &world.players, &world.tilemap, &world.blocks, &world.interactives);
-                                        Coord_t select_coord = mouse_select_world(mouse_screen, camera.bottom_left());
+                                        Coord_t select_coord = mouse_select_world_coord(mouse_screen, &camera);
                                         auto* stamp_array = editor.category_array.elements[editor.category].elements + editor.stamp;
                                         for(S16 s = 0; s < stamp_array->count; s++){
                                              auto* stamp = stamp_array->elements + s;
@@ -2472,14 +2471,14 @@ int main(int argc, char** argv){
                                    break;
                               case EDITOR_MODE_CATEGORY_SELECT:
                                    undo_commit(&undo, &world.players, &world.tilemap, &world.blocks, &world.interactives);
-                                   coord_clear(mouse_select_world(mouse_screen, camera.bottom_left()), &world.tilemap, &world.interactives,
+                                   coord_clear(mouse_select_world_coord(mouse_screen, &camera), &world.tilemap, &world.interactives,
                                                world.interactive_qt, &world.blocks);
                                    break;
                               case EDITOR_MODE_STAMP_SELECT:
                               case EDITOR_MODE_STAMP_HIDE:
                               {
                                    undo_commit(&undo, &world.players, &world.tilemap, &world.blocks, &world.interactives);
-                                   Coord_t start = mouse_select_world(mouse_screen, camera.bottom_left());
+                                   Coord_t start = mouse_select_world_coord(mouse_screen, &camera);
                                    Coord_t end = start + stamp_array_dimensions(editor.category_array.elements[editor.category].elements + editor.stamp);
                                    for(S16 j = start.y; j < end.y; j++){
                                         for(S16 i = start.x; i < end.x; i++){
@@ -2535,13 +2534,9 @@ int main(int argc, char** argv){
                                    break;
                               case EDITOR_MODE_CREATE_SELECTION:
                               {
-                                   editor.selection_end = mouse_select_world(mouse_screen, camera.bottom_left());
+                                   editor.selection_end = mouse_select_world_coord(mouse_screen, &camera);
 
                                    sort_selection(&editor);
-
-                                   LOG("finished editor selection start: %d, %d, end: %d, %d\n",
-                                       editor.selection_start.x, editor.selection_start.y,
-                                       editor.selection_end.x, editor.selection_end.y);
 
                                    destroy(&editor.selection);
 
@@ -2603,8 +2598,7 @@ int main(int argc, char** argv){
                case SDL_MOUSEMOTION:
                     mouse_screen = Vec_t{((F32)(sdl_event.button.x) / (F32)(window_width)),
                                          1.0f - ((F32)(sdl_event.button.y) / (F32)(window_height))};
-                    mouse_world = vec_to_pos(mouse_screen);
-
+                    mouse_world = vec_to_pos(camera.normalized_to_world(mouse_screen));
 
                     if(game_mode == GAME_MODE_EDITOR){
                          switch(editor.mode){
@@ -4807,26 +4801,25 @@ int main(int argc, char** argv){
           if((suite && !show_suite) || play_demo.seek_frame >= 0) continue;
 
           // begin drawing
-          Position_t screen_camera = camera.pos - Vec_t{0.5f, 0.5f}; // (camera.view_dimensions * 0.5f);
-
-          // Coord_t min = pos_to_coord(screen_camera);
           Coord_t min = Coord_t{};
           Coord_t max = min + Coord_t{world.tilemap.width, world.tilemap.height};
           min = coord_clamp_zero_to_dim(min, world.tilemap.width - (S16)(1), world.tilemap.height - (S16)(1));
           max = coord_clamp_zero_to_dim(max, world.tilemap.width - (S16)(1), world.tilemap.height - (S16)(1));
-          Position_t tile_bottom_left = coord_to_pos(min);
-          Vec_t camera_offset = pos_to_vec(tile_bottom_left - screen_camera);
 
           glClear(GL_COLOR_BUFFER_BIT);
 
           if(game_mode == GAME_MODE_PLAYING || game_mode == GAME_MODE_EDITOR){
+               glMatrixMode(GL_PROJECTION);
+               glLoadIdentity();
+               glOrtho(camera.view.left, camera.view.right, camera.view.bottom, camera.view.top, 0.0, 1.0);
+
                // draw flats
                glBindTexture(GL_TEXTURE_2D, theme_texture);
                glBegin(GL_QUADS);
                glColor3f(1.0f, 1.0f, 1.0f);
 
                for(S16 y = max.y; y >= min.y; y--){
-                    draw_world_row_flats(y, min.x, max.x, &world.tilemap, world.interactive_qt, camera_offset);
+                    draw_world_row_flats(y, min.x, max.x, &world.tilemap, world.interactive_qt, camera.world_offset);
                }
 
                for(S16 y = max.y; y >= min.y; y--){
@@ -4855,8 +4848,7 @@ int main(int argc, char** argv){
                                         quad_tree_find_in(world.block_qt, coord_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
                                         if(block_count){
                                              sort_blocks_by_descending_height(blocks, block_count);
-
-                                             draw_portal_blocks(blocks, block_count, portal_coord, coord, portal_rotations, camera_offset);
+                                             draw_portal_blocks(blocks, block_count, portal_coord, coord, portal_rotations, camera.world_offset);
                                         }
 
                                         glEnd();
@@ -4869,7 +4861,7 @@ int main(int argc, char** argv){
                                         player_region.right += 4;
                                         player_region.bottom -= 10;
                                         player_region.top += 4;
-                                        draw_portal_players(&world.players, player_region, portal_coord, coord, portal_rotations, camera_offset);
+                                        draw_portal_players(&world.players, player_region, portal_coord, coord, portal_rotations, camera.world_offset);
 
                                         glEnd();
                                         glBindTexture(GL_TEXTURE_2D, theme_texture);
@@ -4886,8 +4878,8 @@ int main(int argc, char** argv){
                          Coord_t coord {x, y};
                          Tile_t* tile = tilemap_get_tile(&world.tilemap, coord);
                          if(tile && tile->id >= 16){
-                              Vec_t tile_pos {(F32)(x - min.x) * TILE_SIZE + camera_offset.x,
-                                              (F32)(y - min.y) * TILE_SIZE + camera_offset.y};
+                              Vec_t tile_pos {(F32)(x - min.x) * TILE_SIZE + camera.world_offset.x,
+                                              (F32)(y - min.y) * TILE_SIZE + camera.world_offset.y};
                               draw_tile_id(tile->id, tile_pos);
                          }
                     }
@@ -4895,14 +4887,14 @@ int main(int argc, char** argv){
 
                for(S16 y = max.y; y >= min.y; y--){
                     draw_world_row_solids(y, min.x, max.x, &world.tilemap, world.interactive_qt, world.block_qt,
-                                          &world.players, camera_offset, player_texture);
+                                          &world.players, camera.world_offset, player_texture);
 
                     glEnd();
                     glBindTexture(GL_TEXTURE_2D, arrow_texture);
                     glBegin(GL_QUADS);
                     glColor3f(1.0f, 1.0f, 1.0f);
 
-                    draw_world_row_arrows(y, min.x, max.x, &world.arrows, camera_offset);
+                    draw_world_row_arrows(y, min.x, max.x, &world.arrows, camera.world_offset);
 
                     glEnd();
 
@@ -4921,8 +4913,8 @@ int main(int argc, char** argv){
                     for(S16 x = min.x; x <= max.x; x++){
                          Tile_t* tile = world.tilemap.tiles[y] + x;
 
-                         Vec_t tile_pos {(F32)(x - min.x) * TILE_SIZE + camera_offset.x,
-                                         (F32)(y - min.y) * TILE_SIZE + camera_offset.y};
+                         Vec_t tile_pos {(F32)(x - min.x) * TILE_SIZE + camera.world_offset.x,
+                                         (F32)(y - min.y) * TILE_SIZE + camera.world_offset.y};
                          glColor4f(0.0f, 0.0f, 0.0f, (F32)(255 - tile->light) / 255.0f);
                          glVertex2f(tile_pos.x, tile_pos.y);
                          glVertex2f(tile_pos.x, tile_pos.y + TILE_SIZE);
@@ -4962,6 +4954,10 @@ int main(int argc, char** argv){
                     glBindFramebuffer(GL_FRAMEBUFFER, render_framebuffer);
                }
           }
+
+          glMatrixMode(GL_PROJECTION);
+          glLoadIdentity();
+          glOrtho(0.0f, 1.0f, 0.0f, 1.0f, 0.0, 1.0);
 
           if(game_mode == GAME_MODE_LEVEL_SELECT){
                glBindTexture(GL_TEXTURE_2D, theme_texture);
@@ -5039,10 +5035,10 @@ int main(int argc, char** argv){
 
           if(game_mode == GAME_MODE_EDITOR){
                // player start
-               draw_selection(player_start, player_start, screen_camera, 0.0f, 1.0f, 0.0f);
+               draw_selection(player_start, player_start, &camera, 0.0f, 1.0f, 0.0f);
 
                // editor
-               draw_editor(&editor, &world, screen_camera, mouse_screen, theme_texture, text_texture);
+               draw_editor(&editor, &world, &camera, mouse_screen, theme_texture, text_texture);
 
                if(reset_timer >= 0.0f){
                     glBegin(GL_QUADS);

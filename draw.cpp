@@ -347,18 +347,27 @@ void draw_quad_filled(const Quad_t* quad, F32 red, F32 green, F32 blue){
      glEnd();
 }
 
-void draw_selection(Coord_t selection_start, Coord_t selection_end, Position_t screen_camera, F32 red, F32 green, F32 blue){
+void draw_selection(Coord_t selection_start, Coord_t selection_end, Camera_t* camera, F32 red, F32 green, F32 blue){
      if(selection_start.x > selection_end.x) SWAP(selection_start.x, selection_end.x);
      if(selection_start.y > selection_end.y) SWAP(selection_start.y, selection_end.y);
 
-     Position_t start_location = coord_to_pos(selection_start) - screen_camera;
-     Position_t end_location = coord_to_pos(selection_end) - screen_camera;
+     Position_t start_location = coord_to_pos(selection_start) + camera->world_offset;
+     Position_t end_location = coord_to_pos(selection_end) + camera->world_offset;
      Vec_t start_vec = pos_to_vec(start_location);
      Vec_t end_vec = pos_to_vec(end_location);
 
      Quad_t selection_quad {start_vec.x, start_vec.y, end_vec.x + TILE_SIZE, end_vec.y + TILE_SIZE};
+
+     glMatrixMode(GL_PROJECTION);
+     glLoadIdentity();
+     glOrtho(camera->view.left, camera->view.right, camera->view.bottom, camera->view.top, 0.0, 1.0);
+
      glBindTexture(GL_TEXTURE_2D, 0);
      draw_quad_wireframe(&selection_quad, red, green, blue);
+
+     glMatrixMode(GL_PROJECTION);
+     glLoadIdentity();
+     glOrtho(0.0f, 1.0f, 0.0f, 1.0f, 0.0, 1.0);
 }
 
 static void draw_ice(Vec_t pos){
@@ -725,7 +734,7 @@ static Block_t block_from_stamp(Stamp_t* stamp){
      return block;
 }
 
-void draw_editor(Editor_t* editor, World_t* world, Position_t screen_camera, Vec_t mouse_screen,
+void draw_editor(Editor_t* editor, World_t* world, Camera_t* camera, Vec_t mouse_screen,
                  GLuint theme_texture, GLuint text_texture){
      switch(editor->mode){
      default:
@@ -779,17 +788,21 @@ void draw_editor(Editor_t* editor, World_t* world, Position_t screen_camera, Vec
      case EDITOR_MODE_STAMP_SELECT:
      case EDITOR_MODE_STAMP_HIDE:
      {
+          glMatrixMode(GL_PROJECTION);
+          glLoadIdentity();
+          glOrtho(camera->view.left, camera->view.right, camera->view.bottom, camera->view.top, 0.0, 1.0);
+
           glBindTexture(GL_TEXTURE_2D, theme_texture);
           glBegin(GL_QUADS);
           glColor3f(1.0f, 1.0f, 1.0f);
 
           // draw stamp at mouse
           auto* stamp_array = editor->category_array.elements[editor->category].elements + editor->stamp;
-          Coord_t mouse_coord = mouse_select_coord(mouse_screen);
+          Coord_t mouse_coord = mouse_select_world_coord(mouse_screen, camera);
 
           for(S16 s = 0; s < stamp_array->count; s++){
                auto* stamp = stamp_array->elements + s;
-               Vec_t stamp_pos = coord_to_screen_position(mouse_coord + stamp->offset);
+               Vec_t stamp_pos = coord_to_vec(mouse_coord + stamp->offset) + camera->world_offset;
                switch(stamp->type){
                default:
                     break;
@@ -811,6 +824,12 @@ void draw_editor(Editor_t* editor, World_t* world, Position_t screen_camera, Vec
                } break;
                }
           }
+          glEnd();
+
+          glLoadIdentity();
+          glOrtho(0.0f, 1.0f, 0.0f, 1.0f, 0.0, 1.0);
+
+          glBegin(GL_QUADS);
 
           if(editor->mode == EDITOR_MODE_STAMP_SELECT){
                // draw stamps to select from at the bottom
@@ -861,17 +880,21 @@ void draw_editor(Editor_t* editor, World_t* world, Position_t screen_camera, Vec
           glEnd();
      } break;
      case EDITOR_MODE_CREATE_SELECTION:
-          draw_selection(editor->selection_start, editor->selection_end, screen_camera, 1.0f, 0.0f, 0.0f);
+          draw_selection(editor->selection_start, editor->selection_end, camera, 1.0f, 0.0f, 0.0f);
           break;
      case EDITOR_MODE_SELECTION_MANIPULATION:
      {
+          glMatrixMode(GL_PROJECTION);
+          glLoadIdentity();
+          glOrtho(camera->view.left, camera->view.right, camera->view.bottom, camera->view.top, 0.0, 1.0);
+
           glBindTexture(GL_TEXTURE_2D, theme_texture);
           glBegin(GL_QUADS);
           glColor3f(1.0f, 1.0f, 1.0f);
 
           for(S32 g = 0; g < editor->selection.count; ++g){
                auto* stamp = editor->selection.elements + g;
-               Position_t stamp_pos = coord_to_pos(editor->selection_start + stamp->offset) - screen_camera;
+               Position_t stamp_pos = coord_to_pos(editor->selection_start + stamp->offset) + camera->world_offset;
                Vec_t stamp_vec = pos_to_vec(stamp_pos);
 
                switch(stamp->type){
@@ -900,10 +923,13 @@ void draw_editor(Editor_t* editor, World_t* world, Position_t screen_camera, Vec
           }
           glEnd();
 
+          glLoadIdentity();
+          glOrtho(0.0f, 1.0f, 0.0f, 1.0f, 0.0, 1.0);
+
           Rect_t selection_bounds = editor_selection_bounds(editor);
           Coord_t min_coord {selection_bounds.left, selection_bounds.bottom};
           Coord_t max_coord {selection_bounds.right, selection_bounds.top};
-          draw_selection(min_coord, max_coord, screen_camera, 1.0f, 0.0f, 0.0f);
+          draw_selection(min_coord, max_coord, camera, 1.0f, 0.0f, 0.0f);
      } break;
      }
 

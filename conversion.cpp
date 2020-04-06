@@ -4,13 +4,6 @@
 #include <cstdlib>
 #include <cassert>
 
-Coord_t vec_to_coord(Vec_t v){
-     Coord_t c {};
-     c.x = (S16)(v.x / PIXEL_SIZE) / TILE_SIZE_IN_PIXELS;
-     c.y = (S16)(v.y / PIXEL_SIZE) / TILE_SIZE_IN_PIXELS;
-     return c;
-}
-
 Vec_t coord_to_vec(Coord_t c){
      Vec_t v {};
      v.x = (F32)(c.x * TILE_SIZE_IN_PIXELS) * PIXEL_SIZE;
@@ -36,6 +29,13 @@ Vec_t pixel_to_vec(Pixel_t p){
      return v;
 }
 
+Coord_t vec_to_coord(Vec_t v){
+     Coord_t c {};
+     c.x = (S16)(v.x / PIXEL_SIZE) / TILE_SIZE_IN_PIXELS;
+     c.y = (S16)(v.y / PIXEL_SIZE) / TILE_SIZE_IN_PIXELS;
+     return c;
+}
+
 Coord_t pixel_to_coord(Pixel_t p){
      Coord_t c {};
      c.x = p.x / TILE_SIZE_IN_PIXELS;
@@ -46,6 +46,13 @@ Coord_t pixel_to_coord(Pixel_t p){
 Coord_t pos_to_coord(Position_t p){
      assert(p.decimal.x >= 0.0f && p.decimal.y >= 0.0f);
      return pixel_to_coord(p.pixel);
+}
+
+Pixel_t vec_to_pixel(Vec_t v){
+     Pixel_t p {};
+     p.x = (S16)(v.x / PIXEL_SIZE);
+     p.y = (S16)(v.y / PIXEL_SIZE);
+     return p;
 }
 
 Pixel_t coord_to_pixel(Coord_t c){
