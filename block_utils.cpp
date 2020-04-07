@@ -1435,7 +1435,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                    case DIRECTION_UP:
                    {
                         if(block_vel.y > 0 &&
-                           block_inside_result.entries[i].block->vel.y >= 0 &&
+                           block_inside_result.entries[i].block->vel.y > 0 &&
                            block_vel.y > block_inside_result.entries[i].block->vel.y){
                              result.vel.y = block_inside_result.entries[i].block->vel.y;
                              handle_blocks_colliding_moving_in_the_same_direction_vertical(&result, last_block_in_chain, rotations_between_last_in_chain);
