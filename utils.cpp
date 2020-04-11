@@ -256,6 +256,54 @@ S16 range_passes_boundary(S16 a, S16 b, S16 boundary_size, S16 ignore){
      return 0;
 }
 
+static bool block_against_grid_locked_solid(Position_t pos, BlockCut_t cut, Direction_t direction, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt){
+     Pixel_t pixel_a {};
+     Pixel_t pixel_b {};
+     block_adjacent_pixels_to_check(pos, vec_zero(), cut, direction, &pixel_a, &pixel_b);
+     Coord_t coord_a = pixel_to_coord(pixel_a);
+     Coord_t coord_b = pixel_to_coord(pixel_b);
+     Coord_t adj_coord_a = coord_a - direction;
+     Coord_t adj_coord_b = coord_b - direction;
+
+     Interactive_t* interactive_a = quad_tree_interactive_solid_at(interactive_qt, tilemap, coord_a, pos.z);
+     Interactive_t* interactive_b = quad_tree_interactive_solid_at(interactive_qt, tilemap, coord_b, pos.z);
+
+     if(interactive_a){
+          if(is_active_portal(interactive_a) && interactive_a->portal.has_block_inside && interactive_a->portal.wants_to_turn_off){
+               // pass
+          }else{
+               if(!quad_tree_interactive_solid_at(interactive_qt, tilemap, adj_coord_a, pos.z)){
+                    return true;
+               }
+          }
+     }
+
+     if(interactive_b){
+          if(is_active_portal(interactive_b) && interactive_b->portal.has_block_inside && interactive_b->portal.wants_to_turn_off){
+               // pass
+          }else{
+               if(!quad_tree_interactive_solid_at(interactive_qt, tilemap, adj_coord_b, pos.z)){
+                    return true;
+               }
+          }
+     }
+
+     if(tilemap_is_solid(tilemap, coord_a)){
+          if(!tilemap_is_solid(tilemap, adj_coord_a)){
+               return true;
+          }
+     }
+
+     if(tilemap_is_solid(tilemap, coord_b)){
+          if(!tilemap_is_solid(tilemap, adj_coord_b)){
+               return true;
+          }
+          return true;
+     }
+
+     return false;
+}
+
 S16 range_passes_solid_boundary(S16 a, S16 b, BlockCut_t cut, bool x, S16 alternate_pixel, S16 z, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt){
      if(a == b) return 0;
 
@@ -272,48 +320,8 @@ S16 range_passes_solid_boundary(S16 a, S16 b, BlockCut_t cut, bool x, S16 altern
                     }else{
                          pos = pixel_to_pos(Pixel_t{alternate_pixel, (S16)(i - 1)});
                     }
-
-                    Pixel_t pixel_a {};
-                    Pixel_t pixel_b {};
-                    block_adjacent_pixels_to_check(pos, vec_zero(), cut, direction, &pixel_a, &pixel_b);
-                    Coord_t coord_a = pixel_to_coord(pixel_a);
-                    Coord_t coord_b = pixel_to_coord(pixel_b);
-                    Coord_t adj_coord_a = coord_a - direction;
-                    Coord_t adj_coord_b = coord_b - direction;
-
-                    Interactive_t* interactive_a = quad_tree_interactive_solid_at(interactive_qt, tilemap, coord_a, z);
-                    Interactive_t* interactive_b = quad_tree_interactive_solid_at(interactive_qt, tilemap, coord_b, z);
-
-                    if(interactive_a){
-                         if(is_active_portal(interactive_a) && interactive_a->portal.has_block_inside && interactive_a->portal.wants_to_turn_off){
-                              // pass
-                         }else{
-                              if(!quad_tree_interactive_solid_at(interactive_qt, tilemap, adj_coord_a, z)){
-                                   return i;
-                              }
-                         }
-                    }
-
-                    if(interactive_b){
-                         if(is_active_portal(interactive_b) && interactive_b->portal.has_block_inside && interactive_b->portal.wants_to_turn_off){
-                              // pass
-                         }else{
-                              if(!quad_tree_interactive_solid_at(interactive_qt, tilemap, adj_coord_b, z)){
-                                   return i;
-                              }
-                         }
-                    }
-
-                    if(tilemap_is_solid(tilemap, coord_a)){
-                         if(!tilemap_is_solid(tilemap, adj_coord_a)){
-                              return i;
-                         }
-                    }
-
-                    if(tilemap_is_solid(tilemap, coord_b)){
-                         if(!tilemap_is_solid(tilemap, adj_coord_b)){
-                              return i;
-                         }
+                    pos.z = z;
+                    if(block_against_grid_locked_solid(pos, cut, direction, tilemap, interactive_qt)){
                          return i;
                     }
                }
@@ -329,48 +337,9 @@ S16 range_passes_solid_boundary(S16 a, S16 b, BlockCut_t cut, bool x, S16 altern
                     }else{
                          pos = pixel_to_pos(Pixel_t{alternate_pixel, i});
                     }
-
-                    Pixel_t pixel_a {};
-                    Pixel_t pixel_b {};
-                    block_adjacent_pixels_to_check(pos, vec_zero(), cut, direction, &pixel_a, &pixel_b);
-                    Coord_t coord_a = pixel_to_coord(pixel_a);
-                    Coord_t coord_b = pixel_to_coord(pixel_b);
-                    Coord_t adj_coord_a = coord_a - direction;
-                    Coord_t adj_coord_b = coord_b - direction;
-
-                    Interactive_t* interactive_a = quad_tree_interactive_solid_at(interactive_qt, tilemap, coord_a, z);
-                    Interactive_t* interactive_b = quad_tree_interactive_solid_at(interactive_qt, tilemap, coord_b, z);
-
-                    if(interactive_a){
-                         if(is_active_portal(interactive_a) && interactive_a->portal.has_block_inside && interactive_a->portal.wants_to_turn_off){
-                              // pass
-                         }else{
-                              if(!quad_tree_interactive_solid_at(interactive_qt, tilemap, adj_coord_a, z)){
-                                   return i;
-                              }
-                         }
-                    }
-
-                    if(interactive_b){
-                         if(is_active_portal(interactive_b) && interactive_b->portal.has_block_inside && interactive_b->portal.wants_to_turn_off){
-                              // pass
-                         }else{
-                              if(!quad_tree_interactive_solid_at(interactive_qt, tilemap, adj_coord_b, z)){
-                                   return i;
-                              }
-                         }
-                    }
-
-                    if(tilemap_is_solid(tilemap, coord_a)){
-                         if(!tilemap_is_solid(tilemap, adj_coord_a)){
-                              return i;
-                         }
-                    }
-
-                    if(tilemap_is_solid(tilemap, coord_b)){
-                         if(!tilemap_is_solid(tilemap, adj_coord_b)){
-                              return i;
-                         }
+                    pos.z = z;
+                    if(block_against_grid_locked_solid(pos, cut, direction, tilemap, interactive_qt)){
+                         return i;
                     }
                }
           }
