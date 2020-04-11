@@ -391,6 +391,7 @@ void update_motion_grid_aligned(BlockCut_t cut, Move_t* move, MotionComponent_t*
                motion->ref->accel = 0.0;
                motion->ref->vel = motion->ref->target_vel;
                motion->ref->target_vel = 0;
+               move->time_left = 0;
           }else if(coast){
                move->state = MOVE_STATE_COASTING;
                motion->ref->accel = 0.0;

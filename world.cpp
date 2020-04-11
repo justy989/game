@@ -1313,34 +1313,18 @@ BlockPushResult_t block_push(Block_t* block, Direction_t direction, World_t* wor
      return block_push(block, block->pos, block->pos_delta, direction, world, pushed_by_ice, force, instant_momentum, from_entangler);
 }
 
-static float calc_half_distance_to_next_grid_center(S16 pixel, F32 decimal, S16 block_len, bool positive, bool is_x){
+static float calc_half_distance_to_next_grid_center(S16 pixel, F32 decimal, S16 block_len, bool positive){
      // if the position is not grid aligned
      if(pixel % block_len != 0 || decimal != 0){
+
           // find the next grid center
           S16 next_grid_center_pixel = (pixel - (pixel % block_len));
           if(positive) next_grid_center_pixel += block_len;
 
-          // convert it to world space
-          F32 goal = ((F32)(next_grid_center_pixel) * PIXEL_SIZE);
+          S16 pixel_diff = (positive) ? (next_grid_center_pixel - pixel) : (pixel - next_grid_center_pixel);
+          F32 decimal_diff = (positive) ? (PIXEL_SIZE - decimal) : (decimal);
 
-          // find the current position in world space
-          Position_t pos;
-
-          if(is_x){
-               pos.pixel.x = pixel;
-               pos.decimal.x = decimal;
-          }else{
-               pos.pixel.y = pixel;
-               pos.decimal.y = decimal;
-          }
-
-          Vec_t vec = pos_to_vec(pos);
-          F32 current = is_x ? vec.x : vec.y;
-
-          // find half the distance
-          if(positive) return (goal - current) * 0.5f;
-
-          return (current - goal) * 0.5f;
+          return ((F32)(pixel_diff) * PIXEL_SIZE + decimal_diff) * 0.5f;
      }
 
      return (block_len / 2) * PIXEL_SIZE;
@@ -1422,9 +1406,10 @@ void apply_push_horizontal(Block_t* block, Position_t pos, World_t* world, Direc
 
                if(lower_dim == HALF_TILE_SIZE_IN_PIXELS) accel_time *= SMALL_BLOCK_ACCEL_MULTIPLIER;
 
-               F32 half_distance_to_next_grid_center = calc_half_distance_to_next_grid_center(block->pos.pixel.x, block->pos.decimal.x,
+               F32 half_distance_to_next_grid_center = calc_half_distance_to_next_grid_center(block->pos.pixel.x,
+                                                                                              block->pos.decimal.x,
                                                                                               lower_dim,
-                                                                                              direction == DIRECTION_RIGHT, true);
+                                                                                              direction == DIRECTION_RIGHT);
                F32 velocity_ratio = get_block_velocity_ratio(world, block, block->vel.x, force);
 
                block->accel.x = calc_accel_from_stop(half_distance_to_next_grid_center, accel_time) * force;
@@ -1500,9 +1485,10 @@ void apply_push_vertical(Block_t* block, Position_t pos, World_t* world, Directi
 
                if(lower_dim == HALF_TILE_SIZE_IN_PIXELS) accel_time *= SMALL_BLOCK_ACCEL_MULTIPLIER;
 
-               F32 half_distance_to_next_grid_center = calc_half_distance_to_next_grid_center(block->pos.pixel.y, block->pos.decimal.y,
+               F32 half_distance_to_next_grid_center = calc_half_distance_to_next_grid_center(block->pos.pixel.y,
+                                                                                              block->pos.decimal.y,
                                                                                               lower_dim,
-                                                                                              direction == DIRECTION_UP, false);
+                                                                                              direction == DIRECTION_UP);
                F32 velocity_ratio = get_block_velocity_ratio(world, block, block->vel.y, force);
 
                block->accel.y = calc_accel_from_stop(half_distance_to_next_grid_center, accel_time) * force;
@@ -1928,15 +1914,15 @@ void describe_block(World_t* world, Block_t* block){
      auto mass = get_block_stack_mass(world, block);
      auto horizontal_momentum = fabs(mass * block->vel.x);
      auto vertical_momentum = fabs(mass * block->vel.y);
-     LOG("block %ld: pixel %d, %d, %d, -> (%d, %d) decimal: %f, %f, rot: %d, element: %s, entangle: %d, clone id: %d\n",
+     LOG("block %ld: pixel %d, %d, %d, -> (%d, %d) decimal: %.10f, %.10f, rot: %d, element: %s, entangle: %d, clone id: %d\n",
          block - world->blocks.elements, block->pos.pixel.x, block->pos.pixel.y, block->pos.z,
          block->pos.pixel.x + BLOCK_SOLID_SIZE_IN_PIXELS, block->pos.pixel.y + BLOCK_SOLID_SIZE_IN_PIXELS,
          block->pos.decimal.x, block->pos.decimal.y,
          block->rotation, element_to_string(block->element),
          block->entangle_index, block->clone_id);
      LOG("     cut : %s\n", block_cut_to_string(block->cut));
-     LOG("  accel  : %f, %f\n", block->accel.x, block->accel.y);
-     LOG("    vel  : %f, %f prev_vel: %f, %f\n", block->vel.x, block->vel.y, block->prev_vel.x, block->prev_vel.y);
+     LOG("  accel  : %.10f, %.10f\n", block->accel.x, block->accel.y);
+     LOG("    vel  : %.10f, %.10f prev_vel: %f, %f\n", block->vel.x, block->vel.y, block->prev_vel.x, block->prev_vel.y);
      LOG(" pos dt  : %f, %f\n", block->pos_delta.x, block->pos_delta.y);
      LOG(" start px: %d, %d\n", block->started_on_pixel_x, block->started_on_pixel_y);
      LOG(" stop px : %d, %d\n", block->stop_on_pixel_x, block->stop_on_pixel_y);
