@@ -43,7 +43,7 @@ Features:
 - update get mass and block push to handle infinite mass cases
 - A visual way to tell which blocks are entangled
 - arrow kills player
-- arrow entanglement
+- entangling a block that has an arrow stuck in it
 - Multiple players pushing blocks at once
 
 Cleanup:
@@ -2630,6 +2630,10 @@ int main(int argc, char** argv){
                for(S16 i = 0; i < ARROW_ARRAY_MAX; i++){
                     Arrow_t* arrow = world.arrows.arrows + i;
                     if(!arrow->alive) continue;
+                    if(arrow->spawned_this_frame){
+                         arrow->spawned_this_frame = false;
+                         continue;
+                    }
 
                     Coord_t pre_move_coord = pixel_to_coord(arrow->pos.pixel);
 
@@ -2713,6 +2717,10 @@ int main(int argc, char** argv){
                                    if(arrow->element != blocks[b]->element){
                                         Element_t arrow_element = arrow->element;
                                         arrow->element = transition_element(arrow->element, blocks[b]->element);
+                                        if(arrow->entangle_index >= 0){
+                                             Arrow_t* entangled_arrow = world.arrows.arrows + arrow->entangle_index;
+                                             entangled_arrow->element = transition_element(entangled_arrow->element, blocks[b]->element);
+                                        }
                                         if(arrow_element){
                                              blocks[b]->element = transition_element(blocks[b]->element, arrow_element);
                                              add_global_tag(TAG_ARROW_CHANGES_BLOCK_ELEMENT);
@@ -2797,10 +2805,28 @@ int main(int argc, char** argv){
                                                                                 pre_move_coord, post_move_coord);
                          if(teleport_result.count > 0){
                               add_global_tag(TAG_TELEPORT_ARROW);
+
+                              S16 last_entangle_index = i;
+
+                              for(S16 t = 1; t < teleport_result.count; t++){
+                                   Arrow_t* spawned_arrow = arrow_spawn(&world.arrows, teleport_result.results[t].pos,
+                                                                        direction_rotate_clockwise(arrow->face, teleport_result.results[t].rotations));
+                                   spawned_arrow->element = arrow->element;
+                                   spawned_arrow->vel = rotate_vec_to_see_if_negates(arrow->vel, direction_is_horizontal(arrow->face), teleport_result.results[t].rotations);
+                                   spawned_arrow->fall_time = arrow->fall_time;
+                                   spawned_arrow->spawned_this_frame = true;
+
+                                   spawned_arrow->entangle_index = last_entangle_index;
+                                   last_entangle_index = spawned_arrow - world.arrows.arrows;
+                              }
+
                               arrow->pos = teleport_result.results[0].pos;
                               arrow->face = direction_rotate_clockwise(arrow->face, teleport_result.results[0].rotations);
 
-                              // TODO: entangle
+                              if(teleport_result.count > 1){
+                                   arrow->entangle_index = last_entangle_index;
+                                   activate(&world, teleport_result.results[0].src_portal);
+                              }
                          }
                     }
                }

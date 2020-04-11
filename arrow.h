@@ -36,6 +36,9 @@ struct Arrow_t{
           Block_t* stuck_block;
           Interactive_t* stuck_interactive;
      };
+
+     bool spawned_this_frame = false;
+     S16 entangle_index = -1;
 };
 
 #define ARROW_ARRAY_MAX 32
