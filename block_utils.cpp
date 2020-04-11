@@ -48,7 +48,7 @@ bool block_adjacent_pixels_to_check(Position_t pos, Vec_t pos_delta, BlockCut_t 
      {
           // check bottom corner
           Pixel_t pixel = block_to_check_pos.pixel;
-          pixel.x += block_get_width_in_pixels(cut);
+          pixel.x += block_get_width_in_pixels(cut) + 1;
           *a = pixel;
 
           // check top corner
@@ -72,7 +72,7 @@ bool block_adjacent_pixels_to_check(Position_t pos, Vec_t pos_delta, BlockCut_t 
      {
           // check left corner
           Pixel_t pixel = block_to_check_pos.pixel;
-          pixel.y += block_get_height_in_pixels(cut);
+          pixel.y += block_get_height_in_pixels(cut) + 1;
           *a = pixel;
 
           // check right corner

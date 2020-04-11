@@ -349,47 +349,6 @@ void stop_block_colliding_with_entangled(Block_t* block, Direction_t move_dir_to
      }
 }
 
-bool check_direction_from_block_for_adjacent_walls(Block_t* block, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt,
-                                                   Direction_t direction){
-     Pixel_t pixel_a {};
-     Pixel_t pixel_b {};
-     auto block_pos = block->teleport ? block->teleport_pos : block->pos;
-     auto block_pos_delta = block->teleport ? block->teleport_pos_delta : block->pos_delta;
-     block_adjacent_pixels_to_check(block_pos, block_pos_delta, block->cut, direction, &pixel_a, &pixel_b);
-     Coord_t coord_a = pixel_to_coord(pixel_a);
-     Coord_t coord_b = pixel_to_coord(pixel_b);
-
-     if(tilemap_is_solid(tilemap, coord_a)){
-          if(!tilemap_is_solid(tilemap, coord_a - direction)){
-              return true;
-          }
-     }else if(tilemap_is_solid(tilemap, coord_b)){
-          if(!tilemap_is_solid(tilemap, coord_b - direction)){
-              return true;
-          }
-     }
-
-     Interactive_t* a = quad_tree_interactive_solid_at(interactive_qt, tilemap, coord_a, block->pos.z);
-     Interactive_t* b = quad_tree_interactive_solid_at(interactive_qt, tilemap, coord_b, block->pos.z);
-
-     if(a){
-         if(is_active_portal(a) && a->portal.has_block_inside && a->portal.wants_to_turn_off){
-             // pass
-         }else{
-             return true;
-         }
-     }
-     if(b){
-         if(is_active_portal(a) && a->portal.has_block_inside && a->portal.wants_to_turn_off){
-             // pass
-         }else{
-             return true;
-         }
-     }
-
-     return false;
-}
-
 void copy_block_collision_results(Block_t* block, CheckBlockCollisionResult_t* result){
      block->pos_delta = result->pos_delta;
      block->vel = result->vel;
@@ -840,27 +799,6 @@ DoBlockCollisionResults_t do_block_collision(World_t* world, Block_t* block, S16
           stop_on_boundary_y = STOP_ON_BOUNDARY_TRACKING_START;
      }
 
-     // check for adjacent walls
-     if(block->pos_delta.x > 0.0f){
-          if(check_direction_from_block_for_adjacent_walls(block, &world->tilemap, world->interactive_qt, DIRECTION_RIGHT)){
-               stop_on_boundary_x = STOP_ON_BOUNDARY_IGNORING_START;
-          }
-     }else if(block->pos_delta.x < 0.0f){
-          if(check_direction_from_block_for_adjacent_walls(block, &world->tilemap, world->interactive_qt, DIRECTION_LEFT)){
-               stop_on_boundary_x = STOP_ON_BOUNDARY_IGNORING_START;
-          }
-     }
-
-     if(block->pos_delta.y > 0.0f){
-          if(check_direction_from_block_for_adjacent_walls(block, &world->tilemap, world->interactive_qt, DIRECTION_UP)){
-               stop_on_boundary_y = STOP_ON_BOUNDARY_IGNORING_START;
-          }
-     }else if(block->pos_delta.y < 0.0f){
-          if(check_direction_from_block_for_adjacent_walls(block, &world->tilemap, world->interactive_qt, DIRECTION_DOWN)){
-               stop_on_boundary_y = STOP_ON_BOUNDARY_IGNORING_START;
-          }
-     }
-
      // TODO: we need to maintain a list of these blocks pushed i guess in the future
      Block_t* block_pushed = nullptr;
      for(S16 p = 0; p < world->players.count; p++){
@@ -925,10 +863,24 @@ DoBlockCollisionResults_t do_block_collision(World_t* world, Block_t* block, S16
           if(boundary_x){
                result.repeat_collision_pass = true;
 
+               block_stop_horizontally(block);
                block->stop_on_pixel_x = boundary_x;
-               block->accel.x = 0;
-               block->vel.x = 0;
-               block->horizontal_move.state = MOVE_STATE_IDLING;
+               block->coast_horizontal = BLOCK_COAST_NONE;
+
+               // figure out new pos_delta which will be used for collision in the next iteration
+               auto delta_pos = pixel_to_pos(Pixel_t{boundary_x, 0}) - block->pos;
+               block->pos_delta.x = pos_to_vec(delta_pos).x;
+          }
+     }
+
+     if(block->pos_delta.x > 0.0f || block->pos_delta.x < 0.0f){
+          S16 boundary_x = range_passes_solid_boundary(block->pos.pixel.x, final_pos.pixel.x, block->cut,
+                                                       true, block->pos.pixel.y, block->pos.z, &world->tilemap, world->interactive_qt);
+          if(boundary_x){
+               result.repeat_collision_pass = true;
+
+               block_stop_horizontally(block);
+               block->stop_on_pixel_x = boundary_x;
                block->coast_horizontal = BLOCK_COAST_NONE;
 
                // figure out new pos_delta which will be used for collision in the next iteration
@@ -938,15 +890,31 @@ DoBlockCollisionResults_t do_block_collision(World_t* world, Block_t* block, S16
      }
 
      if(stop_on_boundary_y){
+          // LOG("stop on boundary y: start: %d, end: %d, ignore: %d, ignore pixel: %d\n",
+          //     block->pos.pixel.y, final_pos.pixel.y, stop_on_boundary_y, block->started_on_pixel_y);
           S16 boundary_y = range_passes_boundary(block->pos.pixel.y, final_pos.pixel.y, block_get_lowest_dimension(block),
                                                  stop_on_boundary_y == STOP_ON_BOUNDARY_TRACKING_START ? block->started_on_pixel_y : 0);
           if(boundary_y){
                result.repeat_collision_pass = true;
 
+               block_stop_vertically(block);
                block->stop_on_pixel_y = boundary_y;
-               block->accel.y = 0;
-               block->vel.y = 0;
-               block->vertical_move.state = MOVE_STATE_IDLING;
+               block->coast_vertical = BLOCK_COAST_NONE;
+
+               // figure out new pos_delta which will be used for collision in the next iteration
+               auto delta_pos = pixel_to_pos(Pixel_t{0, boundary_y}) - block->pos;
+               block->pos_delta.y = pos_to_vec(delta_pos).y;
+          }
+     }
+
+     if(block->pos_delta.y > 0.0f || block->pos_delta.y < 0.0f){
+          S16 boundary_y = range_passes_solid_boundary(block->pos.pixel.y, final_pos.pixel.y, block->cut,
+                                                       false, block->pos.pixel.x, block->pos.z, &world->tilemap, world->interactive_qt);
+          if(boundary_y){
+               result.repeat_collision_pass = true;
+
+               block_stop_vertically(block);
+               block->stop_on_pixel_y = boundary_y;
                block->coast_vertical = BLOCK_COAST_NONE;
 
                // figure out new pos_delta which will be used for collision in the next iteration
