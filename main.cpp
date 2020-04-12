@@ -43,8 +43,8 @@ Features:
 - update get mass and block push to handle infinite mass cases
 - A visual way to tell which blocks are entangled
 - arrow kills player
-- entangling a block that has an arrow stuck in it
 - Multiple players pushing blocks at once
+- Entangling a stack of blocks, does that work ?
 
 Cleanup:
 - Probably make a get_x_component(), get_y_component() for position as well ? That could help reduce code
@@ -780,6 +780,21 @@ struct DoBlockCollisionResults_t{
      S16 update_blocks_count;
 };
 
+template < typename T, S32 N >
+struct StaticObjectArray_t{
+     T objects[N];
+     int32_t count = 0;
+
+     bool insert(const T* obj){
+          if(count >= N){
+               return false;
+          }
+          objects[count] = *obj;
+          count++;
+          return true;
+     }
+};
+
 DoBlockCollisionResults_t do_block_collision(World_t* world, Block_t* block, S16 update_blocks_count){
      DoBlockCollisionResults_t result;
      result.update_blocks_count = update_blocks_count;
@@ -923,6 +938,8 @@ DoBlockCollisionResults_t do_block_collision(World_t* world, Block_t* block, S16
           }
      }
 
+     StaticObjectArray_t<S16, ARROW_ARRAY_MAX> stuck_arrows;
+
      auto* portal = block_is_teleporting(block, world->interactive_qt);
 
      // is the block teleporting and it hasn't been cloning ?
@@ -937,6 +954,14 @@ DoBlockCollisionResults_t do_block_collision(World_t* world, Block_t* block, S16
 
                     if(clone_id == 0){
                          block->clone_id = clone_id;
+
+                         for(S16 a = 0; a < ARROW_ARRAY_MAX; a++){
+                              Arrow_t* arrow = world->arrows.arrows + a;
+                              if(!arrow->alive) continue;
+                              if(arrow->stuck_type == STUCK_BLOCK && arrow->stuck_index == block_index){
+                                   stuck_arrows.insert(&a);
+                              }
+                         }
                     }else{
                          S16 new_block_index = world->blocks.count;
                          S16 old_block_index = (S16)(block - world->blocks.elements);
@@ -959,6 +984,23 @@ DoBlockCollisionResults_t do_block_collision(World_t* world, Block_t* block, S16
                               }else{
                                    add_global_tag(TAG_THREE_PLUS_BLOCKS_ENTANGLED);
                                    entangled_block->entangle_index = block->entangle_index;
+                              }
+
+                              // entangle any arrows stuck in the original block
+                              for(S16 a = 0; a < stuck_arrows.count; a++){
+                                   Arrow_t* arrow = world->arrows.arrows + stuck_arrows.objects[a];
+
+                                   Arrow_t* spawned_arrow = arrow_spawn(&world->arrows, arrow->pos, arrow->face);
+
+                                   // TODO: compress this code with other entangled code
+                                   spawned_arrow->element = arrow->element;
+                                   spawned_arrow->vel = arrow->vel;
+                                   spawned_arrow->fall_time = arrow->fall_time;
+                                   // TODO: I'm not sure anything bad can happen, but we may need to make a full chain of entangles,
+                                   //       rather than all entangling back to the original
+                                   spawned_arrow->entangle_index = stuck_arrows.objects[a];
+                                   arrow->entangle_index = spawned_arrow - world->arrows.arrows;
+                                   // spawned_arrow->spawned_this_frame = true;
                               }
 
                               block->entangle_index = new_block_index;
@@ -2649,7 +2691,25 @@ int main(int argc, char** argv){
                          default:
                               break;
                          case STUCK_BLOCK:
-                              arrow->pos = arrow->stuck_block->pos + arrow->stuck_offset;
+                              if(arrow->stuck_index >= 0){
+                                   Block_t* stuck_block = world.blocks.elements + arrow->stuck_index;
+                                   arrow->pos = block_get_center(stuck_block) + arrow->stuck_offset;
+                              }
+                         case STUCK_POPUP:
+                              if(arrow->stuck_index >= 0){
+                                   Interactive_t* stuck_popup = world.interactives.elements + arrow->stuck_index;
+                                   if(stuck_popup->type == INTERACTIVE_TYPE_POPUP){
+                                        arrow->pos.z = stuck_popup->popup.lift.ticks + arrow->stuck_offset.z;
+                                   }
+                              }
+                              break;
+                         case STUCK_DOOR:
+                              if(arrow->stuck_index >= 0){
+                                   Interactive_t* stuck_popup = world.interactives.elements + arrow->stuck_index;
+                                   if(stuck_popup->type == INTERACTIVE_TYPE_DOOR){
+                                        arrow->pos.z = stuck_popup->door.lift.ticks + arrow->stuck_offset.z;
+                                   }
+                              }
                               break;
                          }
 
@@ -2709,9 +2769,9 @@ int main(int argc, char** argv){
                               if(arrow->pos.z >= block_bottom && arrow->pos.z <= block_top){
                                    add_global_tag(TAG_ARROW_STICKS_INTO_BLOCK);
                                    arrow->stuck_time = dt;
-                                   arrow->stuck_offset = arrow->pos - blocks[b]->pos;
+                                   arrow->stuck_offset = arrow->pos - block_get_center(blocks[b]);
                                    arrow->stuck_type = STUCK_BLOCK;
-                                   arrow->stuck_block = blocks[b];
+                                   arrow->stuck_index = get_block_index(&world, blocks[b]);
                               }else if(arrow->pos.z > block_top && arrow->pos.z < (block_top + HEIGHT_INTERVAL)){
                                    arrow->element_from_block = block_index;
                                    if(arrow->element != blocks[b]->element){
@@ -2780,13 +2840,17 @@ int main(int argc, char** argv){
                               case INTERACTIVE_TYPE_DOOR:
                                    if(interactive->door.lift.ticks < arrow->pos.z){
                                         arrow->stuck_time = dt;
-                                        // TODO: stuck in door
+                                        arrow->stuck_type = STUCK_DOOR;
+                                        arrow->stuck_index = interactive - world.interactives.elements;
+                                        arrow->stuck_offset.z = arrow->pos.z - interactive->door.lift.ticks;
                                    }
                                    break;
                               case INTERACTIVE_TYPE_POPUP:
                                    if(interactive->popup.lift.ticks > arrow->pos.z){
                                         arrow->stuck_time = dt;
-                                        // TODO: stuck in popup
+                                        arrow->stuck_type = STUCK_POPUP;
+                                        arrow->stuck_index = interactive - world.interactives.elements;
+                                        arrow->stuck_offset.z = arrow->pos.z - interactive->popup.lift.ticks;
                                    }
                                    break;
                               case INTERACTIVE_TYPE_PORTAL:
@@ -3726,6 +3790,16 @@ int main(int argc, char** argv){
 
                                    if(direction_is_positive(prev_horizontal_dir) != direction_is_positive(cur_horizontal_dir)){
                                         move_flip_sign(&block->teleport_horizontal_move);
+                                   }
+                              }
+
+                              // update any stuck offsets
+                              for(S16 a = 0; a < ARROW_ARRAY_MAX; a++){
+                                   Arrow_t* arrow = world.arrows.arrows + a;
+                                   if(!arrow->alive) continue;
+                                   if(arrow->stuck_type == STUCK_BLOCK && arrow->stuck_index == i){
+                                        arrow->face = direction_rotate_clockwise(arrow->face, teleport_result.results[block->clone_id].rotations);
+                                        arrow->stuck_offset = position_rotate_quadrants_clockwise(arrow->stuck_offset, teleport_result.results[block->clone_id].rotations);
                                    }
                               }
 

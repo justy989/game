@@ -31,11 +31,7 @@ struct Arrow_t{
      StuckType_t stuck_type;
      F32 stuck_time; // TODO: track objects we are stuck in
      Position_t stuck_offset;
-
-     union{
-          Block_t* stuck_block;
-          Interactive_t* stuck_interactive;
-     };
+     S16 stuck_index = 0;
 
      bool spawned_this_frame = false;
      S16 entangle_index = -1;
