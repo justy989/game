@@ -10,6 +10,8 @@
 struct BlockInsideBlockResult_t{
      Block_t* block = nullptr;
      Position_t collision_pos;
+     Vec_t collision_pos_delta;
+     Vec_t collision_overlap;
      U8 portal_rotations = 0;
      Coord_t src_portal_coord;
      Coord_t dst_portal_coord;
@@ -22,7 +24,8 @@ struct BlockInsideOthersResult_t{
      BlockInsideBlockResult_t entries[MAX_BLOCK_INSIDE_OTHERS_COUNT];
      S8 count = 0;
 
-     bool add(Block_t* block, Position_t collision_pos, U8 portal_rotations, Coord_t src_portal_coord, Coord_t dst_portal_coord){
+     bool add(Block_t* block, Position_t collision_pos, Vec_t collision_pos_delta, Vec_t collision_overlap,
+              U8 portal_rotations, Coord_t src_portal_coord, Coord_t dst_portal_coord){
           if(count >= MAX_BLOCK_INSIDE_OTHERS_COUNT) return false;
           // refuse duplicates
           for(S8 i = 0; i < count; i++){
@@ -30,6 +33,8 @@ struct BlockInsideOthersResult_t{
           }
           entries[count].block = block;
           entries[count].collision_pos = collision_pos;
+          entries[count].collision_pos_delta = collision_pos_delta;
+          entries[count].collision_overlap = collision_overlap;
           entries[count].portal_rotations = portal_rotations;
           entries[count].src_portal_coord = src_portal_coord;
           entries[count].dst_portal_coord = dst_portal_coord;
@@ -224,6 +229,7 @@ struct BlockPushes_t{
 struct CheckBlockCollisionResult_t{
      bool collided;
      S16 block_index;
+     bool same_as_next;
 
      Vec_t pos_delta;
      Vec_t original_vel;
@@ -242,6 +248,7 @@ struct CheckBlockCollisionResult_t{
      Position_t collided_pos;
      S16 collided_block_index;
      U8 collided_portal_rotations;
+     Direction_t collided_dir;
 
      F32 horizontal_momentum;
      F32 vertical_momentum;

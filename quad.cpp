@@ -20,28 +20,42 @@ bool quad_in_quad(const Quad_t* a, const Quad_t* b){
      return false;
 }
 
-bool quad_in_quad_high_range_exclusive(const Quad_t* a, const Quad_t* b){
+QuadInQuadHighRangeResult_t quad_in_quad_high_range_exclusive(const Quad_t* a, const Quad_t* b){
+     QuadInQuadHighRangeResult_t result {};
+
      if(a->left >= b->left && a->left < b->right &&
         a->bottom >= b->bottom && a->bottom < b->top){
-          return true;
+          result.horizontal_overlap = b->right - a->left;
+          result.vertical_overlap = b->top - a->bottom;
+          result.inside = true;
+          return result;
      }
 
      if(a->right > b->left && a->right < b->right &&
         a->bottom >= b->bottom && a->bottom < b->top){
-          return true;
+          result.horizontal_overlap = a->right - b->left;
+          result.vertical_overlap = b->top - a->bottom;
+          result.inside = true;
+          return result;
      }
 
      if(a->left >= b->left && a->left < b->right &&
         a->top > b->bottom && a->top < b->top){
-          return true;
+          result.horizontal_overlap = b->right - a->left;
+          result.vertical_overlap = a->top - b->bottom;
+          result.inside = true;
+          return result;
      }
 
      if(a->right > b->left && a->right < b->right &&
         a->top > b->bottom && a->top < b->top){
-          return true;
+          result.horizontal_overlap = a->right - b->left;
+          result.vertical_overlap = a->top - b->bottom;
+          result.inside = true;
+          return result;
      }
 
-     return false;
+     return result;
 }
 
 bool operator==(const Quad_t& a, const Quad_t& b){

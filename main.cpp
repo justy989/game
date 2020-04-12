@@ -20,9 +20,7 @@ Current bugs:
 - a block travelling diagonally at a wall will stop on both axis' against the wall because of the collision
 - player is able to get into a block sometimes when standing on a popup that is going down and pushing a block that has fallen off of it
 - infinite recursion for entangled against pushes (may or may not be important that the pushes go through portals)
-- when the player collides with anything we are killing their velocity and acceleration because of some floating point
-  lameness, this is integrated into a ton of tests
-- an whole block entangled with a corner block where you push the whole block and try to stop the corner block, the
+- a whole block entangled with a corner block where you push the whole block and try to stop the corner block, the
   corner block is moving crazy fast and the player doesn't stop it as you would expect
 
 - for collision, can shorten things pos_deltas before we cause pushes to happen on ice in the same frame due to collisions ?
@@ -127,6 +125,8 @@ build the entangled pushes before the loop and then when invalidating, we need t
 #define CHECKBOX_THUMBNAIL_SPLIT 0.45f
 #define THUMBNAILS_PER_ROW 4
 
+#define SAME_TIME_ESPILON 0.00000001
+
 struct VecMaskCollisionEntry_t{
      S8 mask;
 
@@ -197,6 +197,73 @@ struct CheckBlockCollisions_t{
 
      void sort_by_time(){
          qsort(collisions, count, sizeof(*collisions), sort_collision_by_time_comparer);
+
+         // put pairs together of collisions together that occur at the same time
+         // eg. 3 hits 4 and 4 hits 3 because they move into each other
+         for(S32 i = 0; i < count; i++){
+              auto* collision = collisions + i;
+              F32 collision_dt = get_collision_dt(collision);
+
+              S32 swap_index = i + 1;
+              for(S32 j = swap_index; j < count; j++){
+                   auto* later_collision = collisions + j;
+                   F32 later_collision_dt = get_collision_dt(later_collision);
+                   if(fabs(collision_dt - later_collision_dt) > SAME_TIME_ESPILON) break;
+
+                   if(collision->collided_block_index == later_collision->block_index &&
+                      collision->block_index == later_collision->collided_block_index &&
+                      collision->collided_dir == direction_opposite(later_collision->collided_dir)){
+                        CheckBlockCollisionResult_t tmp = collisions[swap_index];
+                        collisions[swap_index] = *later_collision;
+                        *later_collision = tmp;
+                        collision->same_as_next = true;
+                        break;
+                   }
+              }
+         }
+
+         // find pairs that share blocks, and put them together
+         for(S32 i = 0; i < count; i++){
+              auto* collision = collisions + i;
+              if(collision->same_as_next == false) continue;
+              F32 collision_dt = get_collision_dt(collision);
+
+              auto* pair_collision = collisions + i + 1;
+
+              // move any collisions at the same time with the block that we collided with up adjacent to us
+              S32 swap_index = i + 2;
+              for(S32 j = swap_index; j < count; j++){
+                   auto* later_collision = collisions + j;
+                   F32 later_collision_dt = get_collision_dt(later_collision);
+                   if(fabs(collision_dt - later_collision_dt) <= SAME_TIME_ESPILON) break;
+
+                   if(later_collision->same_as_next &&
+                      ((collision->collided_block_index == later_collision->collided_block_index &&
+                        collision->collided_dir == later_collision->collided_dir) ||
+                       (collision->block_index == later_collision->block_index &&
+                        collision->collided_dir == later_collision->collided_dir) ||
+                       (pair_collision->collided_block_index == later_collision->collided_block_index &&
+                        pair_collision->collided_dir == later_collision->collided_dir) ||
+                       (pair_collision->block_index == later_collision->block_index &&
+                        pair_collision->collided_dir == later_collision->collided_dir))){
+                        CheckBlockCollisionResult_t tmp = collisions[swap_index];
+                        collisions[swap_index] = *later_collision;
+                        *later_collision = tmp;
+                        swap_index++;
+
+                        auto* later_pair_collision = collisions + j + 1;
+                        tmp = collisions[swap_index];
+                        collisions[swap_index] = *later_pair_collision;
+                        *later_pair_collision = tmp;
+                        swap_index++;
+
+                        pair_collision->same_as_next = true;
+                        break;
+                   }
+              }
+
+              i++;
+         }
      }
 };
 
@@ -782,7 +849,7 @@ struct DoBlockCollisionResults_t{
 template < typename T, S32 N >
 struct StaticObjectArray_t{
      T objects[N];
-     int32_t count = 0;
+     S32 count = 0;
 
      bool insert(const T* obj){
           if(count >= N){
@@ -3619,11 +3686,15 @@ int main(int argc, char** argv){
                         auto* collision = collision_results.collisions + i;
                         if(!collision->collided) continue;
                         apply_block_collision(&world, world.blocks.elements + collision->block_index, dt, collision);
-                        // update collision for all blocks afterwards
-                        for(S32 j = i + 1; j < collision_results.count; j++){
-                            auto* block = world.blocks.elements + collision_results.collisions[j].block_index;
-                            collision_results.collisions[j] = check_block_collision(&world, block);
+
+                        if(!collision->same_as_next){
+                            // update collision for all blocks afterwards unless the next collision happens at the exact same time, then continue to 
+                            for(S32 j = i + 1; j < collision_results.count; j++){
+                                auto* block = world.blocks.elements + collision_results.collisions[j].block_index;
+                                collision_results.collisions[j] = check_block_collision(&world, block);
+                            }
                         }
+
                         all_block_pushes.merge(&collision->block_pushes);
                     }
 
@@ -4813,7 +4884,8 @@ int main(int argc, char** argv){
                                                       relative_block_pos_vec.x + ((F32)block_width * PIXEL_SIZE),
                                                       relative_block_pos_vec.y + ((F32)block_height * PIXEL_SIZE)};
 
-                                   if(quad_in_quad_high_range_exclusive(&block_quad, &plate_quad)){
+                                   auto collision_result = quad_in_quad_high_range_exclusive(&block_quad, &plate_quad);
+                                   if(collision_result.inside){
                                         mass_on_pressure_plate += get_block_stack_mass(&world, blocks[b]);
                                    }
                               }
