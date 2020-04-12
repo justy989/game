@@ -44,7 +44,6 @@ Features:
 - A visual way to tell which blocks are entangled
 - arrow kills player
 - Multiple players pushing blocks at once
-- Entangling a stack of blocks, does that work ?
 
 Cleanup:
 - Probably make a get_x_component(), get_y_component() for position as well ? That could help reduce code
@@ -1067,9 +1066,9 @@ DoBlockCollisionResults_t do_block_collision(World_t* world, Block_t* block, S16
                block->clone_id = 0;
 
                // turn off the circuit
-               activate(world, block->clone_start);
                auto* src_portal = quad_tree_find_at(world->interactive_qt, block->clone_start.x, block->clone_start.y);
                if(is_active_portal(src_portal)){
+                    activate(world, block->clone_start);
                     src_portal->portal.on = false;
                }
           }
@@ -2889,7 +2888,12 @@ int main(int argc, char** argv){
 
                               if(teleport_result.count > 1){
                                    arrow->entangle_index = last_entangle_index;
-                                   activate(&world, teleport_result.results[0].src_portal);
+                                   // TODO: compress this code with block/player entanglement
+                                   auto* src_portal = quad_tree_find_at(world.interactive_qt, teleport_result.results[0].src_portal.x, teleport_result.results[0].src_portal.y);
+                                   if(is_active_portal(src_portal)){
+                                        src_portal->portal.on = false;
+                                        activate(&world, teleport_result.results[0].src_portal);
+                                   }
                               }
                          }
                     }
@@ -4193,9 +4197,11 @@ int main(int argc, char** argv){
                                    }
 
                                    // turn off the circuit
-                                   activate(&world, player->clone_start);
                                    auto* src_portal = quad_tree_find_at(world.interactive_qt, player->clone_start.x, player->clone_start.y);
-                                   if(is_active_portal(src_portal)) src_portal->portal.on = false;
+                                   if(is_active_portal(src_portal)){
+                                        activate(&world, player->clone_start);
+                                        src_portal->portal.on = false;
+                                   }
                               }
 
                               player->clone_id = 0;

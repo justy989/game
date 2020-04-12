@@ -2339,8 +2339,20 @@ S16 get_block_stack_mass(World_t* world, Block_t* block){
      if(block->element != ELEMENT_ICE && block->element != ELEMENT_ONLY_ICED){
           auto result = block_held_down_by_another_block(block->pos.pixel, block->pos.z, block->cut, world->block_qt, world->interactive_qt, &world->tilemap, 0, false);
           for(S16 i = 0; i < result.count; i++){
-               mass += get_block_stack_mass(world, result.blocks_held[i].block);
-               mass += get_player_mass_on_block(world, result.blocks_held[i].block);
+               // check earlier blocks we've processed to see if they are currently entangled and cloning of one of them
+               bool cloning = false;
+               for(S16 j = 0; j < i; j++){
+                    if(blocks_are_entangled(result.blocks_held[i].block, result.blocks_held[j].block, &world->blocks) &&
+                       result.blocks_held[i].block->clone_start.x != 0){
+                         cloning = true;
+                         break;
+                    }
+               }
+
+               if(!cloning){
+                    mass += get_block_stack_mass(world, result.blocks_held[i].block);
+                    mass += get_player_mass_on_block(world, result.blocks_held[i].block);
+               }
           }
      }
 
