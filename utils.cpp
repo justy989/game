@@ -518,16 +518,29 @@ F32 get_block_normal_pushed_velocity(BlockCut_t cut, S16 mass, F32 force){
      return result;
 }
 
-F32 rotate_vec_to_see_if_negates(F32 value, bool x, S8 rotations){
+static Vec_t single_elem_vector(F32 value, bool x){
      Vec_t v = vec_zero();
      if(x){
           v.x = value;
      }else{
           v.y = value;
      }
+     return v;
+}
 
+static F32 get_single_element(Vec_t v){
+     if(v.x != 0) return v.x;
+     return v.y;
+}
+
+F32 rotate_vec_counter_clockwise_to_see_if_negates(F32 value, bool x, S8 rotations){
+     Vec_t v = single_elem_vector(value, x);
      Vec_t rotated = vec_rotate_quadrants_counter_clockwise(v, rotations);
+     return get_single_element(rotated);
+}
 
-     if(rotated.x != 0) return rotated.x;
-     return rotated.y;
+F32 rotate_vec_clockwise_to_see_if_negates(F32 value, bool x, S8 rotations){
+     Vec_t v = single_elem_vector(value, x);
+     Vec_t rotated = vec_rotate_quadrants_clockwise(v, rotations);
+     return get_single_element(rotated);
 }

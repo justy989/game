@@ -138,6 +138,7 @@ struct BlockPusher_t{
      bool hit_entangler = false;
      S8 entangle_rotations = 0;
      S8 portal_rotations = 0;
+     bool opposite_entangle_reversed = false;
 };
 
 struct BlockPush_t{
@@ -150,15 +151,17 @@ struct BlockPush_t{
      bool invalidated = false;
      S8 entangled_with_push_index = -1;
      F32 force = 1.0f;
+     bool opposite_entangle_reversed = false;
 
      bool add_pusher(S16 index, S16 collided_with_block_count = 1, bool hit_entangler = false,
-                     S8 pusher_entangle_rotations = 0, S8 pusher_portal_rotations = 0){
+                     S8 pusher_entangle_rotations = 0, S8 pusher_portal_rotations = 0, bool opposite_entangle_reversed_flag = false){
           if(pusher_count >= MAX_BLOCK_PUSHERS) return false;
           pushers[pusher_count].index = index;
           pushers[pusher_count].collided_with_block_count = collided_with_block_count;
           pushers[pusher_count].hit_entangler = hit_entangler;
           pushers[pusher_count].entangle_rotations = pusher_entangle_rotations;
           pushers[pusher_count].portal_rotations = pusher_portal_rotations;
+          pushers[pusher_count].opposite_entangle_reversed = opposite_entangle_reversed_flag;
           pusher_count++;
           return true;
      }
@@ -351,6 +354,10 @@ struct BlockMomentumChanges_t{
                add(change->block_index, change->mass, change->vel, change->x);
           }
      }
+
+     void clear(){
+          count = 0;
+     }
 };
 
 #define MAX_BLOCK_PUSHES 128
@@ -457,6 +464,7 @@ bool blocks_are_entangled(Block_t* a, Block_t* b, ObjectArray_t<Block_t>* blocks
 bool blocks_are_entangled(S16 a_index, S16 b_index, ObjectArray_t<Block_t>* blocks_array);
 
 void apply_block_change(ObjectArray_t<Block_t>* blocks_array, BlockChange_t* change);
+TransferMomentum_t get_block_push_pusher_momentum(BlockPush_t* push, World_t* world, Direction_t push_direction);
 BlockCollisionPushResult_t block_collision_push(BlockPush_t* push, World_t* world);
 
 FindBlocksThroughPortalResult_t find_blocks_through_portals(Coord_t coord, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt, QuadTreeNode_t<Block_t>* block_qt);

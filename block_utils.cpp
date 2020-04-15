@@ -938,22 +938,31 @@ void handle_block_on_block_action_horizontal(Position_t block_pos, Vec_t block_p
      }
 }
 
-void handle_block_on_block_action_vertical(Position_t block_pos, Direction_t direction, Position_t collided_block_center, DirectionMask_t collided_block_move_mask,
+void handle_block_on_block_action_vertical(Position_t block_pos, Vec_t block_pos_delta, Direction_t direction, Position_t collided_block_center, DirectionMask_t collided_block_move_mask,
                                            bool inside_block_on_frictionless, bool both_frictionless, Pixel_t collision_offset,
                                            BlockInsideBlockResult_t* inside_block_entry, CheckBlockCollisionResult_t* result){
      if(direction_in_mask(collided_block_move_mask, direction) ||
         direction_in_mask(collided_block_move_mask, direction_opposite(direction))){
-          Position_t final_stop_pos = collided_block_center + collision_offset;
-          auto new_pos_delta = pos_to_vec(final_stop_pos - block_pos);
-          result->pos_delta.y = new_pos_delta.y;
 
           if(direction_in_mask(collided_block_move_mask, direction)){
+              Position_t final_stop_pos = collided_block_center + collision_offset;
+              auto new_pos_delta = pos_to_vec(final_stop_pos - block_pos);
+              result->pos_delta.y = new_pos_delta.y;
+
               if(!inside_block_on_frictionless){
                   Vec_t collided_block_vel = vec_rotate_quadrants_counter_clockwise(inside_block_entry->block->vel, inside_block_entry->portal_rotations);
                   result->vel.y = collided_block_vel.y;
                   if(result->vel.y == 0) result->stop_vertically();
               }
           }else if(!inside_block_on_frictionless){
+             F32 total_pos_delta = fabs(block_pos_delta.y) + fabs(inside_block_entry->collision_pos_delta.y);
+             F32 inside_block_overlap_ratio = inside_block_entry->collision_pos_delta.y / total_pos_delta;
+
+             Position_t final_stop_pos = block_pos + block_pos_delta + Vec_t{0, inside_block_overlap_ratio * inside_block_entry->collision_overlap.y};
+             auto new_pos_delta = pos_to_vec(final_stop_pos - block_pos);
+
+             result->pos_delta.y = new_pos_delta.y;
+             result->stop_on_pixel_y = closest_pixel(final_stop_pos.pixel.y, final_stop_pos.decimal.y);
              result->stop_vertically();
           }
      }else{
@@ -1274,7 +1283,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                               break;
                          case DIRECTION_DOWN:
                               if(block_pos_delta.y < 0){
-                                   handle_block_on_block_action_vertical(block_pos, first_direction, collided_block_center, collided_block_move_mask,
+                                   handle_block_on_block_action_vertical(block_pos, block_pos_delta, first_direction, collided_block_center, collided_block_move_mask,
                                                                          inside_block_on_frictionless, both_frictionless,
                                                                          Pixel_t{0, block_center_pixel_offset(collided_block->cut).y},
                                                                          block_inside_result.entries + i, &result);
@@ -1283,7 +1292,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                          case DIRECTION_UP:
                               if(block_pos_delta.y > 0){
                                    S16 offset = -(block_center_pixel_offset(collided_block->cut).y + block_get_height_in_pixels(cut));
-                                   handle_block_on_block_action_vertical(block_pos, first_direction, collided_block_center, collided_block_move_mask,
+                                   handle_block_on_block_action_vertical(block_pos, block_pos_delta, first_direction, collided_block_center, collided_block_move_mask,
                                                                          inside_block_on_frictionless, both_frictionless,
                                                                          Pixel_t{0, offset}, block_inside_result.entries + i, &result);
                               }
@@ -1308,7 +1317,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                          break;
                     case MOVE_DIRECTION_DOWN:
                          if(block_pos_delta.y < 0){
-                              handle_block_on_block_action_vertical(block_pos, first_direction, collided_block_center, collided_block_move_mask,
+                              handle_block_on_block_action_vertical(block_pos, block_pos_delta, first_direction, collided_block_center, collided_block_move_mask,
                                                                     inside_block_on_frictionless, both_frictionless,
                                                                     Pixel_t{0, block_center_pixel_offset(collided_block->cut).y},
                                                                     block_inside_result.entries + i, &result);
@@ -1317,7 +1326,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                     case MOVE_DIRECTION_UP:
                          if(block_pos_delta.y > 0){
                               S16 offset = -(block_center_pixel_offset(collided_block->cut).y + block_get_height_in_pixels(cut));
-                              handle_block_on_block_action_vertical(block_pos, first_direction, collided_block_center, collided_block_move_mask,
+                              handle_block_on_block_action_vertical(block_pos, block_pos_delta, first_direction, collided_block_center, collided_block_move_mask,
                                                                     inside_block_on_frictionless, both_frictionless,
                                                                     Pixel_t{0, offset}, block_inside_result.entries + i, &result);
                          }
@@ -1530,7 +1539,7 @@ struct DealWithPushResult_t{
 
 DealWithPushResult_t deal_with_push_result(Block_t* pusher, Direction_t direction_to_check, S8 portal_rotations,
                                            World_t* world, BlockPushResult_t* push_result, S16 collided_with_block_count,
-                                           bool entangled){
+                                           bool entangled, bool opposite_entangle_reversed){
      DealWithPushResult_t result;
 
      // This rotation is undoing portal rotations specifically
@@ -1609,11 +1618,15 @@ DealWithPushResult_t deal_with_push_result(Block_t* pusher, Direction_t directio
                  result.momentum_changes.add(block_receiving_force_index, collision.pusher_mass, collision.pusher_velocity, direction_is_horizontal(direction_to_check));
                  result.new_vel = collision.pusher_velocity;
              }else{
+                 if(opposite_entangle_reversed){
+                     collision.pushee_mass *= 2;
+                 }
                  // determine if we need to negate the pushee's velocity to get it into our block receiving force's rotational space
-                 auto rotated_pushee_vel = rotate_vec_to_see_if_negates(collision.pushee_initial_velocity, direction_is_horizontal(pusher_direction), total_against_rotations);
+                 auto rotated_pushee_vel = rotate_vec_counter_clockwise_to_see_if_negates(collision.pushee_initial_velocity, direction_is_horizontal(pusher_direction), total_against_rotations);
+                 // LOG("  m: %d, v: %f - m: %d, v: %f\n", pusher_momentum.mass, pusher_momentum.vel, collision.pushee_mass, rotated_pushee_vel);
                  auto elastic_result = elastic_transfer_momentum(pusher_momentum.mass, pusher_momentum.vel, collision.pushee_mass, rotated_pushee_vel);
-                 // LOG("deal_with_push_result(): initial forceback direction %s, final forceback direction %s on using momentum %d %f on block %d with momentum %d %f\n",
-                 //     direction_to_string(initial_direction_to_check), direction_to_string(direction_to_check), collision.pushee_mass, rotated_pushee_vel, block_receiving_force_index, pusher_momentum.mass, pusher_momentum.vel);
+                 // LOG("deal_with_push_result(): final forceback direction %s on using momentum %d %f on block %d with momentum %d %f\n",
+                 //     direction_to_string(direction_to_check), collision.pushee_mass, rotated_pushee_vel, block_receiving_force_index, pusher_momentum.mass, pusher_momentum.vel);
                  // LOG("  result vel: %f\n", elastic_result.first_final_velocity);
                  result.momentum_changes.add(block_receiving_force_index, pusher_momentum.mass, elastic_result.first_final_velocity, direction_is_horizontal(direction_to_check));
                  result.new_vel = elastic_result.first_final_velocity;
@@ -1803,6 +1816,43 @@ void apply_block_change(ObjectArray_t<Block_t>* blocks_array, BlockChange_t* cha
      }
 }
 
+TransferMomentum_t get_block_push_pusher_momentum(BlockPush_t* push, World_t* world, Direction_t push_direction){
+     TransferMomentum_t result {0, 0};
+     F32 total_momentum = 0;
+
+     for(S16 p = 0; p < push->pusher_count; p++){
+          auto* pusher = world->blocks.elements + push->pushers[p].index;
+
+          // TODO: have a collided_with_block_counts for each pusher_index
+          S16 pusher_mass = get_block_stack_mass(world, pusher);
+          pusher_mass = (S16)((F32)(pusher_mass) * (1.0f / (F32)(push->pushers[p].collided_with_block_count)));
+
+          S8 total_rotations = (push->portal_rotations + push->entangle_rotations) % DIRECTION_COUNT;
+          Vec_t rotated_pusher_vel = vec_rotate_quadrants_clockwise(pusher->vel, total_rotations);
+          Direction_t rotated_dir = direction_rotate_clockwise(push_direction, total_rotations);
+          F32 vel = 0;
+
+          if(direction_is_horizontal(rotated_dir)){
+               vel = rotated_pusher_vel.x;
+          }else{
+               vel = rotated_pusher_vel.y;
+          }
+
+          if(direction_is_positive(push_direction)){
+               if(vel < 0) vel = -vel;
+          }else{
+               if(vel > 0) vel = -vel;
+          }
+
+          // TODO: normalize momentum to a specific mass, maybe just use the first one ?
+          total_momentum += (F32)(pusher_mass) * vel;
+          result.mass += pusher_mass;
+     }
+
+     result.vel = total_momentum / result.mass;
+     return result;
+}
+
 BlockCollisionPushResult_t block_collision_push(BlockPush_t* push, World_t* world){
      BlockCollisionPushResult_t result;
 
@@ -1842,11 +1892,6 @@ BlockCollisionPushResult_t block_collision_push(BlockPush_t* push, World_t* worl
                push_pos_delta = pushee->teleport_pos_delta;
           }
 
-          TransferMomentum_t instant_momentum;
-          instant_momentum.mass = 0;
-
-          F32 total_momentum = 0;
-
 #if 0
           LOG("pushers: %d\n", push->pusher_count);
           for(S16 p = 0; p < push->pusher_count; p++){
@@ -1859,36 +1904,12 @@ BlockCollisionPushResult_t block_collision_push(BlockPush_t* push, World_t* worl
           }
 #endif
 
-          for(S16 p = 0; p < push->pusher_count; p++){
-               auto* pusher = world->blocks.elements + push->pushers[p].index;
+          TransferMomentum_t instant_momentum = get_block_push_pusher_momentum(push, world, direction);
+          instant_momentum.vel = rotate_vec_clockwise_to_see_if_negates(instant_momentum.vel, direction_is_horizontal(direction), total_push_rotations);
 
-               // TODO: have a collided_with_block_counts for each pusher_index
-               S16 pusher_mass = get_block_stack_mass(world, pusher);
-               pusher_mass = (S16)((F32)(pusher_mass) * (1.0f / (F32)(push->pushers[p].collided_with_block_count)));
-
-               S8 total_rotations = push->portal_rotations + push->entangle_rotations;
-               Vec_t rotated_pusher_vel = vec_rotate_quadrants_clockwise(pusher->vel, total_rotations);
-               F32 vel = 0;
-
-               switch(push_direction){
-               default:
-                    break;
-               case DIRECTION_LEFT:
-               case DIRECTION_RIGHT:
-                    vel = rotated_pusher_vel.x;
-                    break;
-               case DIRECTION_UP:
-               case DIRECTION_DOWN:
-                    vel = rotated_pusher_vel.y;
-                    break;
-               }
-
-               // TODO: normalize momentum to a specific mass, maybe just use the first one ?
-               total_momentum += (F32)(pusher_mass) * vel;
-               instant_momentum.mass += pusher_mass;
+          if(push->opposite_entangle_reversed){
+               instant_momentum.mass *= 2;
           }
-
-          instant_momentum.vel = total_momentum / instant_momentum.mass;
 
           auto push_result = block_push(pushee, push_pos, push_pos_delta, push_direction, world, true, push->force, &instant_momentum);
 
@@ -1916,20 +1937,18 @@ BlockCollisionPushResult_t block_collision_push(BlockPush_t* push, World_t* worl
                    local_rotations = 0;
                }
 
-               // LOG("pusher %d checking %s with rotations %d\n", get_block_index(world, pusher), direction_to_string(direction_to_check), local_rotations);
-
                S16 pusher_mass = get_block_stack_mass(world, pusher);
                pusher_mass = (S16)((F32)(pusher_mass) * (1.0f / (F32)(push->pushers[p].collided_with_block_count)));
 
                auto deal_with_push_result_result = deal_with_push_result(pusher, direction_to_check, local_rotations,
                                                                          world, &push_result, push->pushers[p].collided_with_block_count,
-                                                                         push->is_entangled());
+                                                                         push->is_entangled(), push->pushers[p].opposite_entangle_reversed);
 
-                result.reapply_push = deal_with_push_result_result.reapply_push;
+               result.reapply_push = deal_with_push_result_result.reapply_push;
 
-                // TODO: if the block has force thrown back at it through an elastic collision, we should impact the other entangler blocks that are on ice
+               // TODO: if the block has force thrown back at it through an elastic collision, we should impact the other entangler blocks that are on ice
 
-                result.momentum_changes.merge(&deal_with_push_result_result.momentum_changes);
+               result.momentum_changes.merge(&deal_with_push_result_result.momentum_changes);
           }
      }
 

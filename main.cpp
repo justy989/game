@@ -829,6 +829,11 @@ void apply_block_collision(World_t* world, Block_t* block, F32 dt, CheckBlockCol
                                              }
                                         }
                                    }
+
+                                   // we know this will be set because the entangled blocks are colliding with each other,
+                                   // since we detected the centroid and resolved it here, don't do any special logic as
+                                   // if the next collision is the same as this one
+                                   collision_result->same_as_next = false;
                               }
                          }
                     }else{
@@ -1171,11 +1176,47 @@ Pixel_t get_corner_pixel_from_pos(Position_t pos, DirectionMask_t from_center){
      return result;
 }
 
+bool block_pushes_are_the_same_collision(BlockPushes_t<128>* block_pushes, S16 start_index, S16 end_index, S16 block_index){
+     if(start_index < 0 || start_index > block_pushes->count) return false;
+     if(end_index < 0 || end_index > block_pushes->count) return false;
+     if(start_index > end_index) return false;
+
+     auto& start_push = block_pushes->pushes[start_index];
+     auto& end_push = block_pushes->pushes[end_index];
+
+     S16 start_push_count = 0;
+     S16 end_push_count = 0;
+
+     bool found_index = false;
+     for(S16 i = 0; i < start_push.pusher_count; i++){
+         auto& pusher = start_push.pushers[i];
+         if(pusher.index != block_index) continue;
+         found_index = true;
+         start_push_count = pusher.collided_with_block_count;
+     }
+     if(!found_index) return false;
+
+     found_index = false;
+     for(S16 i = 0; i < end_push.pusher_count; i++){
+         auto& pusher = end_push.pushers[i];
+         if(pusher.index != block_index) continue;
+         found_index = true;
+         end_push_count = pusher.collided_with_block_count;
+     }
+     if(!found_index) return false;
+
+     return (start_push_count > 1 && end_push_count > 1 && start_push_count == end_push_count &&
+             start_push.direction_mask == end_push.direction_mask);
+}
+
 void consolidate_block_pushes(BlockPushes_t<128>* block_pushes, BlockPushes_t<128>* consolidated_block_pushes){
      for(S16 i = 0; i < block_pushes->count; i++){
           auto* push = block_pushes->pushes + i;
 
           assert(push->pusher_count == 1);
+
+          S8 rotations = (push->entangle_rotations + push->portal_rotations) % DIRECTION_COUNT;
+          auto rot_direction_mask = direction_mask_rotate_clockwise(push->direction_mask, rotations);
 
           // consolidate pushes if we can
           bool consolidated_current_push = false;
@@ -1183,16 +1224,156 @@ void consolidate_block_pushes(BlockPushes_t<128>* block_pushes, BlockPushes_t<12
                auto* consolidated_push = consolidated_block_pushes->pushes + j;
 
                if(push->pushee_index == consolidated_push->pushee_index &&
-                  push->direction_mask == consolidated_push->direction_mask &&
-                  push->portal_rotations == consolidated_push->portal_rotations){
-                    consolidated_push->add_pusher(push->pushers[0].index, push->pushers[0].collided_with_block_count, push->is_entangled(),
-                                                  push->entangle_rotations, push->portal_rotations);
+                  rot_direction_mask == consolidated_push->direction_mask){
+                    for(S16 p = 0; p < push->pusher_count; p++){
+                         consolidated_push->add_pusher(push->pushers[p].index, push->pushers[p].collided_with_block_count,
+                                                       push->is_entangled(), push->pushers[p].entangle_rotations, push->pushers[p].portal_rotations,
+                                                       push->pushers[p].opposite_entangle_reversed);
+                    }
                     consolidated_current_push = true;
                }
           }
 
           // otherwise just add it
           if(!consolidated_current_push) consolidated_block_pushes->add(push);
+     }
+}
+
+void execute_block_pushes(BlockPushes_t<128>* block_pushes, World_t* world, BlockMomentumChanges_t* momentum_changes){
+     S16 simultaneous_block_pushes = 0;
+
+     for(S16 i = 0; i < block_pushes->count; i++){
+          auto& block_push = block_pushes->pushes[i];
+          if(block_push.invalidated) continue;
+
+          auto result = block_collision_push(&block_push, world);
+
+          // any momentum changes that stops or changes a blocks momentum, means that block could not have pushed anything, so invalidate it's pushes
+          for(S16 j = i + 1; j < block_pushes->count; j++){
+              auto& check_block_push = block_pushes->pushes[j];
+
+              // if the entangled push has already been executed, then we can't invalidate it
+              if(check_block_push.is_entangled()){
+                  if(i >= check_block_push.entangled_with_push_index) continue;
+              }
+
+              for(S16 m = 0; m < result.momentum_changes.count; m++){
+                  auto& block_change = result.momentum_changes.changes[m];
+
+                  for(S16 p = 0; p < check_block_push.pusher_count; p++){
+                      auto& check_pusher = check_block_push.pushers[p];
+
+                      if(check_pusher.index != block_change.block_index) continue;
+                      if(check_pusher.hit_entangler) continue;
+                      if(block_pushes_are_the_same_collision(block_pushes, i, j, check_pusher.index)) continue;
+
+                      if(block_change.x){
+                          if(direction_in_mask(check_block_push.direction_mask, DIRECTION_LEFT) && block_change.vel >= 0){
+                              check_block_push.remove_pusher(p);
+                              p--;
+                          }else if(direction_in_mask(check_block_push.direction_mask, DIRECTION_RIGHT) && block_change.vel <= 0){
+                              check_block_push.remove_pusher(p);
+                              p--;
+                          }
+                      }else{
+                          if(direction_in_mask(check_block_push.direction_mask, DIRECTION_DOWN) && block_change.vel >= 0){
+                              check_block_push.remove_pusher(p);
+                              p--;
+                          }else if(direction_in_mask(check_block_push.direction_mask, DIRECTION_UP) && block_change.vel <= 0){
+                              check_block_push.remove_pusher(p);
+                              p--;
+                          }
+                      }
+                  }
+              }
+          }
+
+          momentum_changes->merge(&result.momentum_changes);
+
+          if(result.additional_block_pushes.count){
+              block_pushes->merge(&result.additional_block_pushes);
+              // TODO: reconsolidate?
+          }
+
+          // TODO: I don't think getting the max collided with block count is right fore determining
+          // the cancellable block pushes
+          S16 max_collided_with_block_count = 0;
+          for(S16 p = 0; p < block_push.pusher_count; p++){
+               if(block_push.pushers[p].collided_with_block_count > max_collided_with_block_count){
+                    max_collided_with_block_count = block_push.pushers[p].collided_with_block_count;
+               }
+          }
+
+          // for simultaneous pushes, skip ahead because they should not be cancelled
+          S16 cancellable_block_pushes = i + 1;
+          if(simultaneous_block_pushes > 0){
+               simultaneous_block_pushes--;
+               cancellable_block_pushes += simultaneous_block_pushes;
+          }else if(max_collided_with_block_count > 1){
+               simultaneous_block_pushes = max_collided_with_block_count - 1;
+               cancellable_block_pushes += simultaneous_block_pushes;
+          }
+
+          if(result.reapply_push){
+              i--;
+          }
+     }
+}
+
+void apply_momentum_changes(BlockMomentumChanges_t* momentum_changes, World_t* world){
+     for(S16 i = 0; i < world->blocks.count; i++){
+          auto* block = world->blocks.elements + i;
+          auto block_mass = get_block_stack_mass(world, block);
+
+          S16 x_changes = 0;
+          S16 y_changes = 0;
+          Vec_t new_vel = vec_zero();
+
+          // clear momentum for each impacted block
+          for(S16 c = 0; c < momentum_changes->count; c++){
+               auto& block_change = momentum_changes->changes[c];
+               if(block_change.block_index != i) continue;
+
+               F32 ratio = (F32)(block_change.mass) / (F32)(block_mass);
+
+               if(block_change.x){
+                    new_vel.x += block_change.vel * ratio;
+                    x_changes++;
+               }else{
+                    new_vel.y += block_change.vel * ratio;
+                    y_changes++;
+               }
+          }
+
+          if(x_changes) block->vel.x = new_vel.x;
+          if(y_changes) block->vel.y = new_vel.y;
+     }
+
+     // set coasting or idling based on velocity
+     for(S16 c = 0; c < momentum_changes->count; c++){
+          auto& block_change = momentum_changes->changes[c];
+          auto* block = world->blocks.elements + block_change.block_index;
+          if(block_change.x){
+               if(block->vel.x == 0){
+                    block->horizontal_move.state = MOVE_STATE_IDLING;
+                    block->horizontal_move.sign = MOVE_SIGN_ZERO;
+               }else{
+                    block->horizontal_move.state = MOVE_STATE_COASTING;
+                    block->horizontal_move.sign = move_sign_from_vel(block->vel.x);
+                    block->accel.x = 0;
+               }
+               block->horizontal_move.time_left = 0;
+          }else{
+               if(block->vel.y == 0){
+                    block->vertical_move.state = MOVE_STATE_IDLING;
+                    block->vertical_move.sign = MOVE_SIGN_ZERO;
+               }else{
+                    block->vertical_move.state = MOVE_STATE_COASTING;
+                    block->vertical_move.sign = move_sign_from_vel(block->vel.y);
+                    block->accel.y = 0;
+               }
+               block->vertical_move.time_left = 0;
+          }
      }
 }
 
@@ -1229,37 +1410,14 @@ void log_block_pushes(BlockPushes_t<128>& block_pushes)
     }
 }
 
-bool block_pushes_are_the_same_collision(BlockPushes_t<128>& block_pushes, S16 start_index, S16 end_index, S16 block_index){
-     if(start_index < 0 || start_index > block_pushes.count) return false;
-     if(end_index < 0 || end_index > block_pushes.count) return false;
-     if(start_index > end_index) return false;
-
-     auto& start_push = block_pushes.pushes[start_index];
-     auto& end_push = block_pushes.pushes[end_index];
-
-     S16 start_push_count = 0;
-     S16 end_push_count = 0;
-
-     bool found_index = false;
-     for(S16 i = 0; i < start_push.pusher_count; i++){
-         auto& pusher = start_push.pushers[i];
-         if(pusher.index != block_index) continue;
-         found_index = true;
-         start_push_count = pusher.collided_with_block_count;
+void log_momentum_changes(BlockMomentumChanges_t* momentum_changes){
+     if(momentum_changes->count > 0){
+          LOG("momentum changes: %d\n", momentum_changes->count);
      }
-     if(!found_index) return false;
-
-     found_index = false;
-     for(S16 i = 0; i < end_push.pusher_count; i++){
-         auto& pusher = end_push.pushers[i];
-         if(pusher.index != block_index) continue;
-         found_index = true;
-         end_push_count = pusher.collided_with_block_count;
+     for(S16 c = 0; c < momentum_changes->count; c++){
+          auto& block_change = momentum_changes->changes[c];
+          LOG("  block %d m: %d, v: %f in %s\n", block_change.block_index, block_change.mass, block_change.vel, block_change.x ? "x" : "y");
      }
-     if(!found_index) return false;
-
-     return (start_push_count > 1 && end_push_count > 1 && start_push_count == end_push_count &&
-             start_push.direction_mask == end_push.direction_mask);
 }
 
 void restart_demo(World_t* world, TileMap_t* demo_starting_tilemap, ObjectArray_t<Block_t>* demo_starting_blocks,
@@ -2942,7 +3100,7 @@ int main(int argc, char** argv){
                                    Arrow_t* spawned_arrow = arrow_spawn(&world.arrows, teleport_result.results[t].pos,
                                                                         direction_rotate_clockwise(arrow->face, teleport_result.results[t].rotations));
                                    spawned_arrow->element = arrow->element;
-                                   spawned_arrow->vel = rotate_vec_to_see_if_negates(arrow->vel, direction_is_horizontal(arrow->face), teleport_result.results[t].rotations);
+                                   spawned_arrow->vel = rotate_vec_counter_clockwise_to_see_if_negates(arrow->vel, direction_is_horizontal(arrow->face), teleport_result.results[t].rotations);
                                    spawned_arrow->fall_time = arrow->fall_time;
                                    spawned_arrow->spawned_this_frame = true;
 
@@ -4418,198 +4576,93 @@ int main(int argc, char** argv){
                     Block_t* pushee = world.blocks.elements + block_push.pushee_index;
 
                     if(pushee->entangle_index < 0) continue;
+                    if(block_push.is_entangled()) continue;
 
-                    DirectionMask_t pushable_direction_mask = DIRECTION_MASK_NONE;
+                    // TODO: the logic around the use of this bool could apply when only one of the pushers is entangled, not sure what the logic would be there
+                    bool entangled_with_all_pushers = true;
+                    for(S16 p = 0; p < block_push.pusher_count; p++){
+                        Block_t* pusher = world.blocks.elements + block_push.pushers[p].index;
+                        entangled_with_all_pushers &= blocks_are_entangled(pushee, pusher, &world.blocks);
+                    }
+
                     for(S8 d = 0; d < DIRECTION_COUNT; d++){
                         Direction_t direction = static_cast<Direction_t>(d);
                         if(!direction_in_mask(block_push.direction_mask, direction)) continue;
-                        if(!block_pushable(pushee, direction, &world, block_push.force)) continue;
-                        pushable_direction_mask = direction_mask_add(pushable_direction_mask, direction);
-                    }
 
-                    if(pushable_direction_mask == DIRECTION_MASK_NONE) continue;
+                        S8 block_push_rotations = (block_push.portal_rotations + block_push.entangle_rotations) % DIRECTION_COUNT;
+                        Direction_t push_rotated_direction = direction_rotate_clockwise(direction, block_push_rotations);
 
-                    if(!block_push.is_entangled()){
-                         S16 current_entangle_index = pushee->entangle_index;
-                         while(current_entangle_index != block_push.pushee_index && current_entangle_index >= 0){
-                             Block_t* entangler = world.blocks.elements + current_entangle_index;
-                             BlockPush_t new_block_push = block_push;
-                             S8 rotations_between_blocks = blocks_rotations_between(entangler, pushee);
-                             new_block_push.direction_mask = pushable_direction_mask;
-                             new_block_push.pushee_index = current_entangle_index;
-                             new_block_push.portal_rotations = block_push.portal_rotations;
-                             new_block_push.entangle_rotations = rotations_between_blocks;
-                             new_block_push.entangled_with_push_index = i;
-                             all_block_pushes.add(&new_block_push);
-                             current_entangle_index = entangler->entangle_index;
-                         }
+                        if(!block_pushable(pushee, push_rotated_direction, &world, block_push.force)) continue;
+
+                        if(entangled_with_all_pushers &&
+                           (block_on_ice(pushee->pos, pushee->pos_delta, pushee->cut, &world.tilemap, world.interactive_qt, world.block_qt) ||
+                            block_on_air(pushee, &world.tilemap, world.interactive_qt, world.block_qt))){
+                             auto total_pusher_momentum = get_block_push_pusher_momentum(&block_push, &world, direction);
+                             auto pushee_momentum = get_block_momentum(&world, pushee, push_rotated_direction);
+                             auto rotated_pushee_vel = rotate_vec_counter_clockwise_to_see_if_negates(pushee_momentum.vel, direction_is_horizontal(push_rotated_direction), block_push_rotations);
+
+                             char m[256];
+                             direction_mask_to_string(block_push.direction_mask, m, 256);
+
+                              // if the push isn't going to cause it to start moving in that direction, don't add the entangle pushes
+                             auto elastic_result = elastic_transfer_momentum(total_pusher_momentum.mass, total_pusher_momentum.vel, pushee_momentum.mass, rotated_pushee_vel);
+                             if(elastic_result.second_final_velocity == 0) continue;
+
+                             block_push.opposite_entangle_reversed = ((rotated_pushee_vel < 0 && elastic_result.second_final_velocity > 0) ||
+                                                                      (rotated_pushee_vel > 0 && elastic_result.second_final_velocity < 0));
+
+                             S16 pushee_momentum_mass_split = pushee_momentum.mass / block_push.pusher_count;
+                             for(S16 p = 0; p < block_push.pusher_count; p++){
+                                  auto* push = block_push.pushers + p;
+                                  Block_t* pusher = world.blocks.elements + push->index;
+                                  S8 push_rotations = (push->portal_rotations + push->entangle_rotations) % DIRECTION_COUNT;
+                                  auto rotated_direction = direction_rotate_clockwise(direction, push_rotations);
+                                  rotated_pushee_vel = rotate_vec_counter_clockwise_to_see_if_negates(pushee_momentum.vel, direction_is_horizontal(rotated_direction), DIRECTION_COUNT - (block_push_rotations));
+                                  auto pusher_momentum = get_block_momentum(&world, pusher, rotated_direction);
+
+                                  elastic_result = elastic_transfer_momentum(pusher_momentum.mass, pusher_momentum.vel, pushee_momentum_mass_split, rotated_pushee_vel);
+
+                                  push->opposite_entangle_reversed = ((pusher_momentum.vel < 0 && elastic_result.first_final_velocity > 0) ||
+                                                                      (pusher_momentum.vel > 0 && elastic_result.first_final_velocity < 0));
+                             }
+                        }
+
+                        if(!block_push.opposite_entangle_reversed){
+                             S16 current_entangle_index = pushee->entangle_index;
+                             while(current_entangle_index != block_push.pushee_index && current_entangle_index >= 0){
+                                 Block_t* entangler = world.blocks.elements + current_entangle_index;
+                                 BlockPush_t new_block_push = block_push;
+                                 S8 rotations_between_blocks = blocks_rotations_between(entangler, pushee);
+                                 new_block_push.direction_mask = direction_to_direction_mask(direction);
+                                 new_block_push.pushee_index = current_entangle_index;
+                                 new_block_push.portal_rotations = block_push.portal_rotations;
+                                 new_block_push.entangle_rotations = rotations_between_blocks;
+                                 new_block_push.entangled_with_push_index = i;
+                                 all_block_pushes.add(&new_block_push);
+                                 current_entangle_index = entangler->entangle_index;
+                             }
+                        }
                     }
                }
 
                // pass to cause pushes to happen
                {
                     BlockMomentumChanges_t momentum_changes;
-                    S16 simultaneous_block_pushes = 0;
 
                     consolidate_block_pushes(&all_block_pushes, &all_consolidated_block_pushes);
 
 #if 0
-                    if(all_block_pushes.count > 0){
-                         LOG("all block pushes: %d\n", all_block_pushes.count);
-                    }
-
-                    log_block_pushes(all_block_pushes);
-
-                    if(all_consolidated_block_pushes.count > 0){
-                         LOG("pre collision push consolidated block pushes: %d\n", all_consolidated_block_pushes.count);
-                    }
-
                     log_block_pushes(all_consolidated_block_pushes);
 #endif
+                    execute_block_pushes(&all_consolidated_block_pushes, &world, &momentum_changes);
 
-                    for(S16 i = 0; i < all_consolidated_block_pushes.count; i++){
-                         auto& block_push = all_consolidated_block_pushes.pushes[i];
-                         if(block_push.invalidated) continue;
-
-                         auto result = block_collision_push(&block_push, &world);
-
-                         // any momentum changes that stops or changes a blocks momentum, means that block could not have pushed anything, so invalidate it's pushes
-                         for(S16 j = i + 1; j < all_consolidated_block_pushes.count; j++){
-                             auto& check_block_push = all_consolidated_block_pushes.pushes[j];
-
-                             // if the entangled push has already been executed, then we can't invalidate it
-                             if(check_block_push.is_entangled()){
-                                 if(i >= check_block_push.entangled_with_push_index) continue;
-                             }
-
-                             for(S16 m = 0; m < result.momentum_changes.count; m++){
-                                 auto& block_change = result.momentum_changes.changes[m];
-
-                                 for(S16 p = 0; p < check_block_push.pusher_count; p++){
-                                     auto& check_pusher = check_block_push.pushers[p];
-
-                                     if(check_pusher.index != block_change.block_index) continue;
-                                     if(check_pusher.hit_entangler) continue;
-                                     if(block_pushes_are_the_same_collision(all_consolidated_block_pushes, i, j, check_pusher.index)) continue;
-
-                                     if(block_change.x){
-                                         if(direction_in_mask(check_block_push.direction_mask, DIRECTION_LEFT) && block_change.vel >= 0){
-                                             check_block_push.remove_pusher(p);
-                                             p--;
-                                         }else if(direction_in_mask(check_block_push.direction_mask, DIRECTION_RIGHT) && block_change.vel <= 0){
-                                             check_block_push.remove_pusher(p);
-                                             p--;
-                                         }
-                                     }else{
-                                         if(direction_in_mask(check_block_push.direction_mask, DIRECTION_DOWN) && block_change.vel >= 0){
-                                             check_block_push.remove_pusher(p);
-                                             p--;
-                                         }else if(direction_in_mask(check_block_push.direction_mask, DIRECTION_UP) && block_change.vel <= 0){
-                                             check_block_push.remove_pusher(p);
-                                             p--;
-                                         }
-                                     }
-                                 }
-                             }
-                         }
-
-                         momentum_changes.merge(&result.momentum_changes);
-
-                         if(result.additional_block_pushes.count){
-                             all_consolidated_block_pushes.merge(&result.additional_block_pushes);
-                             // TODO: reconsolidate?
-                         }
-
-                         // TODO: I don't think getting the max collided with block count is right fore determining
-                         // the cancellable block pushes
-                         S16 max_collided_with_block_count = 0;
-                         for(S16 p = 0; p < block_push.pusher_count; p++){
-                              if(block_push.pushers[p].collided_with_block_count > max_collided_with_block_count){
-                                   max_collided_with_block_count = block_push.pushers[p].collided_with_block_count;
-                              }
-                         }
-
-                         // for simultaneous pushes, skip ahead because they should not be cancelled
-                         S16 cancellable_block_pushes = i + 1;
-                         if(simultaneous_block_pushes > 0){
-                              simultaneous_block_pushes--;
-                              cancellable_block_pushes += simultaneous_block_pushes;
-                         }else if(max_collided_with_block_count > 1){
-                              simultaneous_block_pushes = max_collided_with_block_count - 1;
-                              cancellable_block_pushes += simultaneous_block_pushes;
-                         }
-
-                         if(result.reapply_push){
-                             i--;
-                         }
-                    }
 
 #if 0
-                    if(momentum_changes.count > 0){
-                         LOG("momentum changes: %d\n", momentum_changes.count);
-                    }
-                    for(S16 c = 0; c < momentum_changes.count; c++){
-                         auto& block_change = momentum_changes.changes[c];
-                         LOG("  block %d m: %d, v: %f in %s\n", block_change.block_index, block_change.mass, block_change.vel, block_change.x ? "x" : "y");
-                    }
+                    log_momentum_changes(&momentum_changes);
 #endif
 
                     // TODO: Loop over momentum changes and build a list of blocks for us to loop over here
-
-                    for(S16 i = 0; i < world.blocks.count; i++){
-                         auto* block = world.blocks.elements + i;
-                         auto block_mass = get_block_stack_mass(&world, block);
-
-                         S16 x_changes = 0;
-                         S16 y_changes = 0;
-                         Vec_t new_vel = vec_zero();
-
-                         // clear momentum for each impacted block
-                         for(S16 c = 0; c < momentum_changes.count; c++){
-                              auto& block_change = momentum_changes.changes[c];
-                              if(block_change.block_index != i) continue;
-
-                              F32 ratio = (F32)(block_change.mass) / (F32)(block_mass);
-
-                              if(block_change.x){
-                                   new_vel.x += block_change.vel * ratio;
-                                   x_changes++;
-                              }else{
-                                   new_vel.y += block_change.vel * ratio;
-                                   y_changes++;
-                              }
-                         }
-
-                         if(x_changes) block->vel.x = new_vel.x;
-                         if(y_changes) block->vel.y = new_vel.y;
-                    }
-
-                    // set coasting or idling based on velocity
-                    for(S16 c = 0; c < momentum_changes.count; c++){
-                         auto& block_change = momentum_changes.changes[c];
-                         auto* block = world.blocks.elements + block_change.block_index;
-                         if(block_change.x){
-                              if(block->vel.x == 0){
-                                   block->horizontal_move.state = MOVE_STATE_IDLING;
-                                   block->horizontal_move.sign = MOVE_SIGN_ZERO;
-                              }else{
-                                   block->horizontal_move.state = MOVE_STATE_COASTING;
-                                   block->horizontal_move.sign = move_sign_from_vel(block->vel.x);
-                                   block->accel.x = 0;
-                              }
-                              block->horizontal_move.time_left = 0;
-                         }else{
-                              if(block->vel.y == 0){
-                                   block->vertical_move.state = MOVE_STATE_IDLING;
-                                   block->vertical_move.sign = MOVE_SIGN_ZERO;
-                              }else{
-                                   block->vertical_move.state = MOVE_STATE_COASTING;
-                                   block->vertical_move.sign = move_sign_from_vel(block->vel.y);
-                                   block->accel.y = 0;
-                              }
-                              block->vertical_move.time_left = 0;
-                         }
-                    }
+                    apply_momentum_changes(&momentum_changes, &world);
                }
 
                // finalize positions

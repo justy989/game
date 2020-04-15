@@ -61,4 +61,5 @@ Vec_t closest_vec_in_quad(Vec_t v, Quad_t quad);
 
 bool direction_in_vec(Vec_t vec, Direction_t direction);
 F32 get_block_normal_pushed_velocity(BlockCut_t cut, S16 mass, F32 force = 1.0);
-F32 rotate_vec_to_see_if_negates(F32 value, bool x, S8 rotations);
+F32 rotate_vec_clockwise_to_see_if_negates(F32 value, bool x, S8 rotations);
+F32 rotate_vec_counter_clockwise_to_see_if_negates(F32 value, bool x, S8 rotations);
