@@ -5083,7 +5083,6 @@ int main(int argc, char** argv){
                          }
                     }
                }
-
                for(S16 y = max.y; y >= min.y; y--){
                     draw_world_row_solids(y, min.x, max.x, &world.tilemap, world.interactive_qt, world.block_qt,
                                           &world.players, camera.world_offset, player_texture);
@@ -5100,7 +5099,7 @@ int main(int argc, char** argv){
                     glBindTexture(GL_TEXTURE_2D, theme_texture);
                     glBegin(GL_QUADS);
                     glColor3f(1.0f, 1.0f, 1.0f);
-               }
+          }
 
                glEnd();
 

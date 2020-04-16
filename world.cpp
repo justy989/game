@@ -1220,13 +1220,13 @@ static void impact_ice(Coord_t center, S8 height, S16 radius, World_t* world, bo
                               case INTERACTIVE_TYPE_POPUP:
                                    if(interactive->popup.lift.ticks == 1 && height <= MELT_SPREAD_HEIGHT){
                                         if(spread_the_ice){
-                                             interactive->popup.iced = false;
                                              add_global_tag(TAG_SPREAD_ICE);
                                              tile->flags |= TILE_FLAG_ICED;
                                         }else{
                                              add_global_tag(TAG_MELT_ICE);
                                              tile->flags &= ~TILE_FLAG_ICED;
                                         }
+                                        interactive->popup.iced = false;
                                    }else if(height < interactive->popup.lift.ticks + MELT_SPREAD_HEIGHT){
                                         interactive->popup.iced = spread_the_ice;
                                         if(spread_the_ice){

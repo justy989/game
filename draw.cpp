@@ -211,7 +211,7 @@ void draw_block(Block_t* block, Vec_t pos_vec, U8 portal_rotations){
 }
 
 void draw_interactive(Interactive_t* interactive, Vec_t pos_vec, Coord_t coord,
-                      TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree){
+                      TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt){
      Vec_t tex_vec = {};
      switch(interactive->type){
      default:
@@ -259,13 +259,13 @@ void draw_interactive(Interactive_t* interactive, Vec_t pos_vec, Coord_t coord,
                draw_wall = true;
 
                // search all portal exits for a portal they can go through
-               PortalExit_t portal_exits = find_portal_exits(coord, tilemap, interactive_quad_tree);
+               PortalExit_t portal_exits = find_portal_exits(coord, tilemap, interactive_qt);
                for(S8 d = 0; d < DIRECTION_COUNT && draw_wall; d++){
                     for(S8 p = 0; p < portal_exits.directions[d].count; p++){
                          if(portal_exits.directions[d].coords[p] == coord) continue;
 
                          Coord_t portal_dest = portal_exits.directions[d].coords[p];
-                         Interactive_t* portal_dest_interactive = quad_tree_find_at(interactive_quad_tree, portal_dest.x, portal_dest.y);
+                         Interactive_t* portal_dest_interactive = quad_tree_find_at(interactive_qt, portal_dest.x, portal_dest.y);
                          if(is_active_portal(portal_dest_interactive)){
                               draw_wall = false;
                               break;
@@ -302,7 +302,59 @@ void draw_interactive(Interactive_t* interactive, Vec_t pos_vec, Coord_t coord,
                draw_theme_frame(pos_vec, theme_frame(frame_x, frame_y));
           }
 
-          draw_theme_frame(pos_vec, theme_frame(interactive->portal.face, (S16)(26 + interactive->portal.on)));
+          S16 combine_adjacent_frame = 0;
+          Interactive_t* first_interactive = NULL;
+          Interactive_t* second_interactive = NULL;
+
+          switch(interactive->portal.face){
+          default:
+               break;
+          case DIRECTION_LEFT:
+          {
+               Coord_t first = coord + DIRECTION_UP;
+               Coord_t second = coord + DIRECTION_DOWN;
+               first_interactive = quad_tree_find_at(interactive_qt, first.x, first.y);
+               second_interactive = quad_tree_find_at(interactive_qt, second.x, second.y);
+               break;
+          }
+          case DIRECTION_UP:
+          {
+               Coord_t first = coord + DIRECTION_RIGHT;
+               Coord_t second = coord + DIRECTION_LEFT;
+               first_interactive = quad_tree_find_at(interactive_qt, first.x, first.y);
+               second_interactive = quad_tree_find_at(interactive_qt, second.x, second.y);
+               break;
+          }
+          case DIRECTION_RIGHT:
+          {
+               Coord_t first = coord + DIRECTION_DOWN;
+               Coord_t second = coord + DIRECTION_UP;
+               first_interactive = quad_tree_find_at(interactive_qt, first.x, first.y);
+               second_interactive = quad_tree_find_at(interactive_qt, second.x, second.y);
+               break;
+          }
+          case DIRECTION_DOWN:
+          {
+               Coord_t first = coord + DIRECTION_LEFT;
+               Coord_t second = coord + DIRECTION_RIGHT;
+               first_interactive = quad_tree_find_at(interactive_qt, first.x, first.y);
+               second_interactive = quad_tree_find_at(interactive_qt, second.x, second.y);
+               break;
+          }
+          }
+
+          if(first_interactive && first_interactive->type == INTERACTIVE_TYPE_PORTAL){
+               if(second_interactive && second_interactive->type == INTERACTIVE_TYPE_PORTAL){
+                    combine_adjacent_frame = 12;
+               }else{
+                    combine_adjacent_frame = 4;
+               }
+          }else if(second_interactive && second_interactive->type == INTERACTIVE_TYPE_PORTAL){
+               combine_adjacent_frame = 8;
+          }
+
+          draw_theme_frame(pos_vec, theme_frame(interactive->portal.face + combine_adjacent_frame, (S16)(26 + interactive->portal.on)));
+
           break;
      }
      case INTERACTIVE_TYPE_WIRE_CROSS:
@@ -315,7 +367,7 @@ void draw_interactive(Interactive_t* interactive, Vec_t pos_vec, Coord_t coord,
           break;
      }
      case INTERACTIVE_TYPE_CLONE_KILLER:
-          draw_theme_frame(pos_vec, theme_frame(4, 27));
+          draw_theme_frame(pos_vec, theme_frame(0, 30));
           break;
      case INTERACTIVE_TYPE_PIT:
           draw_theme_frame(pos_vec, theme_frame(15, 8));
@@ -480,6 +532,8 @@ void draw_flats(Vec_t pos, Tile_t* tile, Interactive_t* interactive, U8 portal_r
 
                draw_interactive(interactive, pos, Coord_t{-1, -1}, nullptr, nullptr);
           }else if(interactive->type == INTERACTIVE_TYPE_POPUP && interactive->popup.lift.ticks == 1){
+               draw_interactive(interactive, pos, Coord_t{-1, -1}, nullptr, nullptr);
+
                if(interactive->popup.iced){
                     pos.y += interactive->popup.lift.ticks * PIXEL_SIZE;
                     Vec_t tex_vec = theme_frame(3, 12);
@@ -487,8 +541,6 @@ void draw_flats(Vec_t pos, Tile_t* tile, Interactive_t* interactive, U8 portal_r
                     draw_theme_frame(pos, tex_vec);
                     glColor3f(1.0f, 1.0f, 1.0f);
                }
-
-               draw_interactive(interactive, pos, Coord_t{-1, -1}, nullptr, nullptr);
           }else if(interactive->type == INTERACTIVE_TYPE_LIGHT_DETECTOR ||
                    interactive->type == INTERACTIVE_TYPE_ICE_DETECTOR){
                draw_interactive(interactive, pos, Coord_t{-1, -1}, nullptr, nullptr);
