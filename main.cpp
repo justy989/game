@@ -16,10 +16,15 @@ Entanglement Puzzles:
 - rotated entangled puzzles where the centroid is on a portal destination coord
 
 Current bugs:
-- two opposite entangled blocks moving towards each other do not do what I expect (stop halfway grid aligned, touching)
 - a block travelling diagonally at a wall will stop on both axis' against the wall because of the collision
 - player is able to get into a block sometimes when standing on a popup that is going down and pushing a block that has fallen off of it
+- blocks moving fast enough can also cause the player to get inside
+- arrows that fall to the ground slow to a stop, even on ice, which don't make no sense, they should detect ice
+- player pushing a block into a stack and keeps pushing, the pushed block, while it doesn't move, still has a velocity in that direction
 - infinite recursion for entangled against pushes (may or may not be important that the pushes go through portals)
+- you can't stop a momentum transfer when the player is on the other side of a portal like you can when no portals are involved
+- when stopping a pair of adjacent blocks sliding on ice, there is a bug where the player can get the block closer to the player to break off of the chain
+  and continue going one more tile slowly before stopping
 - a whole block entangled with a corner block where you push the whole block and try to stop the corner block, the
   corner block is moving crazy fast and the player doesn't stop it as you would expect
 
@@ -961,7 +966,8 @@ DoBlockCollisionResults_t do_block_collision(World_t* world, Block_t* block, S16
 
      if(block->pos_delta.x > 0.0f || block->pos_delta.x < 0.0f){
           S16 boundary_x = range_passes_solid_boundary(block->pos.pixel.x, final_pos.pixel.x, block->cut,
-                                                       true, block->pos.pixel.y, block->pos.z, &world->tilemap, world->interactive_qt);
+                                                       true, block->pos.pixel.y, final_pos.pixel.y, block->pos.z,
+                                                       &world->tilemap, world->interactive_qt);
           if(boundary_x){
                result.repeat_collision_pass = true;
 
@@ -995,7 +1001,8 @@ DoBlockCollisionResults_t do_block_collision(World_t* world, Block_t* block, S16
 
      if(block->pos_delta.y > 0.0f || block->pos_delta.y < 0.0f){
           S16 boundary_y = range_passes_solid_boundary(block->pos.pixel.y, final_pos.pixel.y, block->cut,
-                                                       false, block->pos.pixel.x, block->pos.z, &world->tilemap, world->interactive_qt);
+                                                       false, block->pos.pixel.x, final_pos.pixel.x, block->pos.z,
+                                                       &world->tilemap, world->interactive_qt);
           if(boundary_y){
                result.repeat_collision_pass = true;
 

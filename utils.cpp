@@ -304,8 +304,11 @@ static bool block_against_grid_locked_solid(Position_t pos, BlockCut_t cut, Dire
      return false;
 }
 
-S16 range_passes_solid_boundary(S16 a, S16 b, BlockCut_t cut, bool x, S16 alternate_pixel, S16 z, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt){
+S16 range_passes_solid_boundary(S16 a, S16 b, BlockCut_t cut, bool x, S16 alternate_pixel_start, S16 alternate_pixel_end,
+                                S16 z, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt){
      if(a == b) return 0;
+
+     // TODO: using start and end pos, means if we are going fast enough, we can go through the wall now
 
      S16 dimension = x ? block_get_width_in_pixels(cut) : block_get_height_in_pixels(cut);
 
@@ -314,14 +317,19 @@ S16 range_passes_solid_boundary(S16 a, S16 b, BlockCut_t cut, bool x, S16 altern
 
           for(S16 i = a; i > b; i--){
                if((i % dimension) == 0){
-                    Position_t pos {};
+                    Position_t start_pos {};
+                    Position_t end_pos {};
                     if(x){
-                         pos = pixel_to_pos(Pixel_t{(S16)(i - 1), alternate_pixel});
+                         start_pos = pixel_to_pos(Pixel_t{(S16)(i - 1), alternate_pixel_start});
+                         end_pos = pixel_to_pos(Pixel_t{(S16)(i - 1), alternate_pixel_end});
                     }else{
-                         pos = pixel_to_pos(Pixel_t{alternate_pixel, (S16)(i - 1)});
+                         start_pos = pixel_to_pos(Pixel_t{alternate_pixel_start, (S16)(i - 1)});
+                         end_pos = pixel_to_pos(Pixel_t{alternate_pixel_end, (S16)(i - 1)});
                     }
-                    pos.z = z;
-                    if(block_against_grid_locked_solid(pos, cut, direction, tilemap, interactive_qt)){
+                    start_pos.z = z;
+                    end_pos.z = z;
+                    if(block_against_grid_locked_solid(start_pos, cut, direction, tilemap, interactive_qt) &&
+                       block_against_grid_locked_solid(end_pos, cut, direction, tilemap, interactive_qt)){
                          return i;
                     }
                }
@@ -331,14 +339,19 @@ S16 range_passes_solid_boundary(S16 a, S16 b, BlockCut_t cut, bool x, S16 altern
 
           for(S16 i = a; i <= b; i++){
                if((i % dimension) == 0){
-                    Position_t pos {};
+                    Position_t start_pos {};
+                    Position_t end_pos {};
                     if(x){
-                         pos = pixel_to_pos(Pixel_t{i, alternate_pixel});
+                         start_pos = pixel_to_pos(Pixel_t{i, alternate_pixel_start});
+                         end_pos = pixel_to_pos(Pixel_t{i, alternate_pixel_end});
                     }else{
-                         pos = pixel_to_pos(Pixel_t{alternate_pixel, i});
+                         start_pos = pixel_to_pos(Pixel_t{alternate_pixel_start, i});
+                         end_pos = pixel_to_pos(Pixel_t{alternate_pixel_end, i});
                     }
-                    pos.z = z;
-                    if(block_against_grid_locked_solid(pos, cut, direction, tilemap, interactive_qt)){
+                    start_pos.z = z;
+                    end_pos.z = z;
+                    if(block_against_grid_locked_solid(start_pos, cut, direction, tilemap, interactive_qt) &&
+                       block_against_grid_locked_solid(end_pos, cut, direction, tilemap, interactive_qt)){
                          return i;
                     }
                }
