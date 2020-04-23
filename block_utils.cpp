@@ -2006,31 +2006,55 @@ FindBlocksThroughPortalResult_t find_blocks_through_portals(Coord_t coord, TileM
      return result;
 }
 
-BlockAgainstOthersResult_t find_blocks_at_the_end_of_a_chain(Position_t pos, BlockCut_t cut, Direction_t direction, QuadTreeNode_t<Block_t>* block_qt,
-                                                             QuadTreeNode_t<Interactive_t>* interactive_qt, TileMap_t* tilemap, S8 rotations){
-     BlockAgainstOthersResult_t result;
+BlockChainsResult_t find_block_chain(Block_t* block, Direction_t direction, QuadTreeNode_t<Block_t>* block_qt,
+                                     QuadTreeNode_t<Interactive_t>* interactive_qt, TileMap_t* tilemap, S8 rotations, BlockChain_t* my_chain){
+     BlockChainsResult_t result;
 
-     auto against_result = block_against_other_blocks(pos, cut, direction, block_qt, interactive_qt, tilemap);
+     Position_t block_pos = block_get_position(block);
+     Vec_t block_pos_delta = block_get_pos_delta(block);
+
+     auto against_result = block_against_other_blocks(block_pos + block_pos_delta, block->cut, direction, block_qt, interactive_qt, tilemap);
+
+     BlockChain_t first_chain {};
+
+     if(my_chain == NULL){
+          my_chain = &first_chain;
+          BlockChainEntry_t block_chain_entry {};
+          block_chain_entry.block = block;
+          block_chain_entry.rotations_through_portal = 0;
+          my_chain->add(&block_chain_entry);
+     }
+
+     BlockChain_t* current_chain = NULL;
 
      for(S16 i = 0; i < against_result.count; i++){
-          Position_t block_pos = block_get_position(against_result.againsts[i].block);
-          Vec_t block_pos_delta = block_get_pos_delta(against_result.againsts[i].block);
-
           Direction_t against_direction = direction_rotate_clockwise(direction, against_result.againsts[i].rotations_through_portal);
 
           S8 against_rotations = (rotations + against_result.againsts[i].rotations_through_portal) % DIRECTION_COUNT;
 
-          auto merge_result = find_blocks_at_the_end_of_a_chain(block_pos + block_pos_delta, against_result.againsts[i].block->cut, against_direction,
-                                                                block_qt, interactive_qt, tilemap, against_rotations);
+          BlockChain_t potential_new_chain {};
+
+          // if it is the last against element, we use the chain we were originally passed in if available
+          if(i == (against_result.count - 1)){
+               current_chain = my_chain;
+          }else{
+               potential_new_chain = *my_chain;
+               current_chain = &potential_new_chain;
+          }
+
+          BlockChainEntry_t block_chain_entry {};
+          block_chain_entry.block = against_result.againsts[i].block;
+          block_chain_entry.rotations_through_portal = against_result.againsts[i].rotations_through_portal;
+          current_chain->add(&block_chain_entry);
+
+          auto merge_result = find_block_chain(against_result.againsts[i].block, against_direction,
+                                               block_qt, interactive_qt, tilemap, against_rotations, current_chain);
 
           if(merge_result.count == 0){
-               BlockAgainstOther_t against = against_result.againsts[i];
-               against.rotations_through_portal += rotations;
-               against.rotations_through_portal %= DIRECTION_COUNT;
-               result.add(against);
+               result.add(current_chain);
           }else{
                for(S16 a = 0; a < merge_result.count; a++){
-                    result.add(merge_result.againsts[a]);
+                    result.add(merge_result.chains + a);
                }
           }
      }

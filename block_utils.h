@@ -330,6 +330,37 @@ struct BlockAgainstOthersResult_t{
      }
 };
 
+#define MAX_BLOCKS_IN_CHAIN 16
+
+struct BlockChainEntry_t{
+     Block_t* block = 0;
+     S8 rotations_through_portal = 0;
+};
+
+struct BlockChain_t{
+     BlockChainEntry_t entries[MAX_BLOCKS_IN_CHAIN];
+     S16 count = 0;
+
+     bool add(BlockChainEntry_t* entry){
+          if(count >= MAX_BLOCKS_IN_CHAIN) return false;
+          entries[count] = *entry;
+          count++;
+          return true;
+     }
+};
+
+struct BlockChainsResult_t{
+     BlockChain_t chains[MAX_BLOCKS_AGAINST_BLOCK];
+     S16 count = 0;
+
+     bool add(BlockChain_t* chain){
+          if(count >= MAX_BLOCKS_AGAINST_BLOCK) return false;
+          chains[count] = *chain;
+          count++;
+          return true;
+     }
+};
+
 struct BlockMomentumChange_t{
      S16 block_index = -1;
      S16 mass = 0;
@@ -471,5 +502,6 @@ TransferMomentum_t get_block_push_pusher_momentum(BlockPush_t* push, World_t* wo
 BlockCollisionPushResult_t block_collision_push(BlockPush_t* push, World_t* world);
 
 FindBlocksThroughPortalResult_t find_blocks_through_portals(Coord_t coord, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt, QuadTreeNode_t<Block_t>* block_qt);
-BlockAgainstOthersResult_t find_blocks_at_the_end_of_a_chain(Position_t pos, BlockCut_t cut, Direction_t direction, QuadTreeNode_t<Block_t>* block_qt,
-                                                             QuadTreeNode_t<Interactive_t>* interactive_quad_tree, TileMap_t* tilemap, S8 rotations = 0);
+// LOL
+BlockChainsResult_t find_block_chain(Block_t* block, Direction_t direction, QuadTreeNode_t<Block_t>* block_qt,
+                                     QuadTreeNode_t<Interactive_t>* interactive_qt, TileMap_t* tilemap, S8 rotations = 0, BlockChain_t* my_chain = NULL);

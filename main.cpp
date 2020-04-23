@@ -23,6 +23,7 @@ Current bugs:
 - player pushing a block into a stack and keeps pushing, the pushed block, while it doesn't move, still has a velocity in that direction
 - infinite recursion for entangled against pushes (may or may not be important that the pushes go through portals)
 - you can't stop a momentum transfer when the player is on the other side of a portal like you can when no portals are involved
+- adjacent entangled blocks on ice being hit need to be sorted so the pushes happen in order of the force, this is shown on the top case of map 278
 - when stopping a pair of adjacent blocks sliding on ice, there is a bug where the player can get the block closer to the player to break off of the chain
   and continue going one more tile slowly before stopping
 - a whole block entangled with a corner block where you push the whole block and try to stop the corner block, the
@@ -1216,10 +1217,6 @@ bool block_pushes_are_the_same_collision(BlockPushes_t<128>* block_pushes, S16 s
              start_push.direction_mask == end_push.direction_mask);
 }
 
-// void sort_entangled_block_pushes(BlockPushes_t<128>* block_pushes){
-//
-// }
-
 void add_entangle_pushes_for_end_of_chain_blocks_on_ice(World_t* world, S16 push_index, BlockPushes_t<128>* block_pushes, S16 pusher_rotations = 0){
      BlockPush_t* push = block_pushes->pushes + push_index;
 
@@ -1238,9 +1235,7 @@ void add_entangle_pushes_for_end_of_chain_blocks_on_ice(World_t* world, S16 push
           Direction_t direction = static_cast<Direction_t>(d);
           if(!direction_in_mask(rotated_direction_mask, direction)) continue;
 
-          auto chain_result = find_blocks_at_the_end_of_a_chain(pushee_pos + pushee_pos_delta, pushee->cut,
-                                                                  direction, world->block_qt, world->interactive_qt,
-                                                                  &world->tilemap);
+          auto chain_result = find_block_chain(pushee, direction, world->block_qt, world->interactive_qt, &world->tilemap);
 
           if(chain_result.count > 0){
                push->no_entangled_pushes = true;
@@ -1250,27 +1245,36 @@ void add_entangle_pushes_for_end_of_chain_blocks_on_ice(World_t* world, S16 push
                                                                   direction, world->block_qt, world->interactive_qt,
                                                                   &world->tilemap);
 
-          for(S16 a = 0; a < chain_result.count; a++){
-               S16 against_index = get_block_index(world, chain_result.againsts[a].block);
-               Block_t* against_block = chain_result.againsts[a].block;
+          S16 added_indices[MAX_BLOCKS_IN_CHAIN];
+          S16 added_indices_count = 0;
 
-               if(against_block->entangle_index < 0) continue;
+          for(S16 c = 0; c < chain_result.count; c++){
+               BlockChain_t* chain = chain_result.chains + c;
+               if(chain->count <= 0) continue;
 
-               Position_t against_pos = block_get_position(against_block);
-               Vec_t against_pos_delta = block_get_pos_delta(against_block);
+               Block_t* end_block = chain->entries[chain->count - 1].block;
+               S16 end_index = get_block_index(world, end_block);
+
+               if(end_block->entangle_index < 0) continue;
+
+               Position_t against_pos = block_get_position(end_block);
+               Vec_t against_pos_delta = block_get_pos_delta(end_block);
 
                // TODO: what do we set the force value to here ?
-               if(!block_pushable(against_block, direction, world, 1.0f)) continue;
-               if(!block_on_ice(against_pos, against_pos_delta, against_block->cut, &world->tilemap,
+               if(!block_pushable(end_block, direction, world, 1.0f)) continue;
+               if(!block_on_ice(against_pos, against_pos_delta, end_block->cut, &world->tilemap,
                                 world->interactive_qt, world->block_qt)) continue;
 
-               S16 current_entangle_index = against_block->entangle_index;
-               while(current_entangle_index != against_index && current_entangle_index >= 0){
-                    Block_t* entangler = world->blocks.elements + current_entangle_index;
+               // walk backwards from the end of the chain, find blocks that are entangled with this one and
+               // add a push for them. we do this because the pushes need to happen in a certain order.
+               for(S16 e = chain->count - 1; e >= 0; e--){
+                    Block_t* chain_block = chain->entries[e].block;
+                    if(!blocks_are_entangled(chain_block, end_block, &world->blocks)) continue;
+
                     BlockPush_t new_block_push = *push;
-                    S8 rotations_between_blocks = blocks_rotations_between(entangler, against_block);
+                    S8 rotations_between_blocks = blocks_rotations_between(chain_block, end_block);
                     new_block_push.direction_mask = direction_to_direction_mask(direction);
-                    new_block_push.pushee_index = current_entangle_index;
+                    new_block_push.pushee_index = get_block_index(world, chain_block);
                     new_block_push.portal_rotations = push->portal_rotations;
                     new_block_push.entangle_rotations = rotations_between_blocks;
                     new_block_push.pusher_rotations = pusher_rotations;
@@ -1289,7 +1293,51 @@ void add_entangle_pushes_for_end_of_chain_blocks_on_ice(World_t* world, S16 push
                          }
                     }
 
+                    added_indices[added_indices_count] = new_block_push.pushee_index;
+                    added_indices_count++;
+                    assert(added_indices_count <= MAX_BLOCKS_IN_CHAIN);
+
                     block_pushes->add(&new_block_push);
+               }
+
+               // add pushes for the rest of the entangled blocks we haven't yet added pushes for
+               S16 current_entangle_index = end_block->entangle_index;
+               while(current_entangle_index != end_index && current_entangle_index >= 0){
+                    Block_t* entangler = world->blocks.elements + current_entangle_index;
+
+                    bool already_added = false;
+                    for(S16 a = 0; a < added_indices_count; a++){
+                         if(current_entangle_index == added_indices[a]){
+                              already_added = true;
+                              break;
+                         }
+                    }
+
+                    if(!already_added){
+                         BlockPush_t new_block_push = *push;
+                         S8 rotations_between_blocks = blocks_rotations_between(entangler, end_block);
+                         new_block_push.direction_mask = direction_to_direction_mask(direction);
+                         new_block_push.pushee_index = current_entangle_index;
+                         new_block_push.portal_rotations = push->portal_rotations;
+                         new_block_push.entangle_rotations = rotations_between_blocks;
+                         new_block_push.pusher_rotations = pusher_rotations;
+                         new_block_push.entangled_with_push_index = push_index;
+                         new_block_push.no_consolidate = true;
+                         new_block_push.no_entangled_pushes = false;
+
+                         if(against_result.count > 1){
+                              for(S16 p = 0; p < new_block_push.pusher_count; p++){
+                                   new_block_push.pushers[p].collided_with_block_count = against_result.count;
+                                   new_block_push.pushers[p].hit_entangler = true;
+                              }
+                         }else{
+                              for(S16 p = 0; p < new_block_push.pusher_count; p++){
+                                   new_block_push.pushers[p].hit_entangler = true;
+                              }
+                         }
+
+                         block_pushes->add(&new_block_push);
+                    }
 
                     current_entangle_index = entangler->entangle_index;
                }
