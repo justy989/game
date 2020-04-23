@@ -1828,7 +1828,7 @@ TransferMomentum_t get_block_push_pusher_momentum(BlockPush_t* push, World_t* wo
           pusher_mass = (S16)((F32)(pusher_mass) * (1.0f / (F32)(push->pushers[p].collided_with_block_count)));
 
           S8 total_rotations = (push->portal_rotations + push->entangle_rotations) % DIRECTION_COUNT;
-          Vec_t rotated_pusher_vel = vec_rotate_quadrants_clockwise(pusher->vel, total_rotations);
+          Vec_t rotated_pusher_vel = vec_rotate_quadrants_clockwise(pusher->vel, (total_rotations + push->pusher_rotations) % DIRECTION_COUNT);
           Direction_t rotated_dir = direction_rotate_clockwise(push_direction, total_rotations);
           F32 vel = 0;
 
@@ -1891,18 +1891,6 @@ BlockCollisionPushResult_t block_collision_push(BlockPush_t* push, World_t* worl
                push_pos = pushee->teleport_pos;
                push_pos_delta = pushee->teleport_pos_delta;
           }
-
-#if 0
-          LOG("pushers: %d\n", push->pusher_count);
-          for(S16 p = 0; p < push->pusher_count; p++){
-               auto* pusher = push->pushers + p;
-               auto* pusher_block = world->blocks.elements + push->pushers[p].index;
-               S16 pusher_mass = get_block_stack_mass(world, pusher_block);
-               S16 contributing_mass = (S16)((F32)(pusher_mass) * (1.0f / (F32)(push->pushers[p].collided_with_block_count)));
-               LOG("  index: %d, collided_with_block_count: %d, entangled: %d, mass: %d, contributing mass: %d\n",
-                   pusher->index, pusher->collided_with_block_count, pusher->entangled, pusher_mass, contributing_mass);
-          }
-#endif
 
           TransferMomentum_t instant_momentum = get_block_push_pusher_momentum(push, world, direction);
           instant_momentum.vel = rotate_vec_clockwise_to_see_if_negates(instant_momentum.vel, direction_is_horizontal(direction), total_push_rotations);
@@ -2015,5 +2003,37 @@ FindBlocksThroughPortalResult_t find_blocks_through_portals(Coord_t coord, TileM
           }
      }
 
-    return result;
+     return result;
+}
+
+BlockAgainstOthersResult_t find_blocks_at_the_end_of_a_chain(Position_t pos, BlockCut_t cut, Direction_t direction, QuadTreeNode_t<Block_t>* block_qt,
+                                                             QuadTreeNode_t<Interactive_t>* interactive_qt, TileMap_t* tilemap, S8 rotations){
+     BlockAgainstOthersResult_t result;
+
+     auto against_result = block_against_other_blocks(pos, cut, direction, block_qt, interactive_qt, tilemap);
+
+     for(S16 i = 0; i < against_result.count; i++){
+          Position_t block_pos = block_get_position(against_result.againsts[i].block);
+          Vec_t block_pos_delta = block_get_pos_delta(against_result.againsts[i].block);
+
+          Direction_t against_direction = direction_rotate_clockwise(direction, against_result.againsts[i].rotations_through_portal);
+
+          S8 against_rotations = (rotations + against_result.againsts[i].rotations_through_portal) % DIRECTION_COUNT;
+
+          auto merge_result = find_blocks_at_the_end_of_a_chain(block_pos + block_pos_delta, against_result.againsts[i].block->cut, against_direction,
+                                                                block_qt, interactive_qt, tilemap, against_rotations);
+
+          if(merge_result.count == 0){
+               BlockAgainstOther_t against = against_result.againsts[i];
+               against.rotations_through_portal += rotations;
+               against.rotations_through_portal %= DIRECTION_COUNT;
+               result.add(against);
+          }else{
+               for(S16 a = 0; a < merge_result.count; a++){
+                    result.add(merge_result.againsts[a]);
+               }
+          }
+     }
+
+     return result;
 }

@@ -197,6 +197,16 @@ S16 block_get_top_inclusive_pixel(S16 pixel, BlockCut_t cut){
     return pixel + block_get_height_in_pixels(cut) - 1;
 }
 
+Position_t block_get_position(Block_t* block){
+     if(block->teleport) return block->teleport_pos;
+     return block->pos;
+}
+
+Vec_t block_get_pos_delta(Block_t* block){
+     if(block->teleport) return block->teleport_pos_delta;
+     return block->pos_delta;
+}
+
 void block_stop_horizontally(Block_t* block){
      block->horizontal_move.state = MOVE_STATE_IDLING;
      block->horizontal_move.sign = MOVE_SIGN_ZERO;

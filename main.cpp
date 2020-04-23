@@ -1216,9 +1216,95 @@ bool block_pushes_are_the_same_collision(BlockPushes_t<128>* block_pushes, S16 s
              start_push.direction_mask == end_push.direction_mask);
 }
 
+// void sort_entangled_block_pushes(BlockPushes_t<128>* block_pushes){
+//
+// }
+
+void add_entangle_pushes_for_end_of_chain_blocks_on_ice(World_t* world, S16 push_index, BlockPushes_t<128>* block_pushes, S16 pusher_rotations = 0){
+     BlockPush_t* push = block_pushes->pushes + push_index;
+
+     Block_t* pushee = world->blocks.elements + push->pushee_index;
+
+     Position_t pushee_pos = block_get_position(pushee);
+     Vec_t pushee_pos_delta = block_get_pos_delta(pushee);
+
+     if(!block_on_ice(pushee_pos, pushee_pos_delta, pushee->cut, &world->tilemap,
+                      world->interactive_qt, world->block_qt)) return;
+
+     S8 push_rotations = (push->entangle_rotations + push->portal_rotations) % DIRECTION_COUNT;
+     DirectionMask_t rotated_direction_mask = direction_mask_rotate_clockwise(push->direction_mask, push_rotations);
+
+     for(S16 d = 0; d < DIRECTION_COUNT; d++){
+          Direction_t direction = static_cast<Direction_t>(d);
+          if(!direction_in_mask(rotated_direction_mask, direction)) continue;
+
+          auto chain_result = find_blocks_at_the_end_of_a_chain(pushee_pos + pushee_pos_delta, pushee->cut,
+                                                                  direction, world->block_qt, world->interactive_qt,
+                                                                  &world->tilemap);
+
+          if(chain_result.count > 0){
+               push->no_entangled_pushes = true;
+          }
+
+          auto against_result = block_against_other_blocks(pushee_pos + pushee_pos_delta, pushee->cut,
+                                                                  direction, world->block_qt, world->interactive_qt,
+                                                                  &world->tilemap);
+
+          for(S16 a = 0; a < chain_result.count; a++){
+               S16 against_index = get_block_index(world, chain_result.againsts[a].block);
+               Block_t* against_block = chain_result.againsts[a].block;
+
+               if(against_block->entangle_index < 0) continue;
+
+               Position_t against_pos = block_get_position(against_block);
+               Vec_t against_pos_delta = block_get_pos_delta(against_block);
+
+               // TODO: what do we set the force value to here ?
+               if(!block_pushable(against_block, direction, world, 1.0f)) continue;
+               if(!block_on_ice(against_pos, against_pos_delta, against_block->cut, &world->tilemap,
+                                world->interactive_qt, world->block_qt)) continue;
+
+               S16 current_entangle_index = against_block->entangle_index;
+               while(current_entangle_index != against_index && current_entangle_index >= 0){
+                    Block_t* entangler = world->blocks.elements + current_entangle_index;
+                    BlockPush_t new_block_push = *push;
+                    S8 rotations_between_blocks = blocks_rotations_between(entangler, against_block);
+                    new_block_push.direction_mask = direction_to_direction_mask(direction);
+                    new_block_push.pushee_index = current_entangle_index;
+                    new_block_push.portal_rotations = push->portal_rotations;
+                    new_block_push.entangle_rotations = rotations_between_blocks;
+                    new_block_push.pusher_rotations = pusher_rotations;
+                    new_block_push.entangled_with_push_index = push_index;
+                    new_block_push.no_consolidate = true;
+                    new_block_push.no_entangled_pushes = false;
+
+                    if(against_result.count > 1){
+                         for(S16 p = 0; p < new_block_push.pusher_count; p++){
+                              new_block_push.pushers[p].collided_with_block_count = against_result.count;
+                              new_block_push.pushers[p].hit_entangler = true;
+                         }
+                    }else{
+                         for(S16 p = 0; p < new_block_push.pusher_count; p++){
+                              new_block_push.pushers[p].hit_entangler = true;
+                         }
+                    }
+
+                    block_pushes->add(&new_block_push);
+
+                    current_entangle_index = entangler->entangle_index;
+               }
+          }
+     }
+}
+
 void consolidate_block_pushes(BlockPushes_t<128>* block_pushes, BlockPushes_t<128>* consolidated_block_pushes){
      for(S16 i = 0; i < block_pushes->count; i++){
           auto* push = block_pushes->pushes + i;
+          if(push->invalidated) continue;
+          if(push->no_consolidate){
+               consolidated_block_pushes->add(push);
+               continue;
+          }
 
           assert(push->pusher_count == 1);
 
@@ -1229,6 +1315,8 @@ void consolidate_block_pushes(BlockPushes_t<128>* block_pushes, BlockPushes_t<12
           bool consolidated_current_push = false;
           for(S16 j = 0; j < consolidated_block_pushes->count; j++){
                auto* consolidated_push = consolidated_block_pushes->pushes + j;
+
+               if(consolidated_push->no_consolidate) continue;
 
                if(push->pushee_index == consolidated_push->pushee_index &&
                   rot_direction_mask == consolidated_push->direction_mask){
@@ -1261,7 +1349,7 @@ void execute_block_pushes(BlockPushes_t<128>* block_pushes, World_t* world, Bloc
 
               // if the entangled push has already been executed, then we can't invalidate it
               if(check_block_push.is_entangled()){
-                  if(i >= check_block_push.entangled_with_push_index) continue;
+                  if(i <= check_block_push.entangled_with_push_index) continue;
               }
 
               for(S16 m = 0; m < result.momentum_changes.count; m++){
@@ -1412,6 +1500,9 @@ void log_block_push(BlockPush_t* block_push)
 
 void log_block_pushes(BlockPushes_t<128>& block_pushes)
 {
+    if(block_pushes.count > 0){
+        LOG("block pushes: %d\n", block_pushes.count);
+    }
     for(S16 i = 0; i < block_pushes.count; i++){
         log_block_push(block_pushes.pushes + i);
     }
@@ -4574,10 +4665,18 @@ int main(int argc, char** argv){
 
                collision_results.clear();
 
+               // If the final block in an ice chain, is entangled then create entangled pushes for it
+               S16 original_all_block_pushes_count = all_block_pushes.count;
+               for(S16 i = 0; i < original_all_block_pushes_count; i++){
+                    add_entangle_pushes_for_end_of_chain_blocks_on_ice(&world, i, &all_block_pushes);
+               }
+
                // add entangled pushes
-               for(S16 i = 0; i < all_block_pushes.count; i++){
+               original_all_block_pushes_count = all_block_pushes.count;
+               for(S16 i = 0; i < original_all_block_pushes_count; i++){
                     auto& block_push = all_block_pushes.pushes[i];
                     if(block_push.invalidated) continue;
+                    if(block_push.no_entangled_pushes) continue;
 
                     // if the block being pushed is entangled, add block pushes for those
                     Block_t* pushee = world.blocks.elements + block_push.pushee_index;
@@ -4646,6 +4745,9 @@ int main(int argc, char** argv){
                                  new_block_push.entangle_rotations = rotations_between_blocks;
                                  new_block_push.entangled_with_push_index = i;
                                  all_block_pushes.add(&new_block_push);
+
+                                 add_entangle_pushes_for_end_of_chain_blocks_on_ice(&world, all_block_pushes.count - 1, &all_block_pushes, DIRECTION_COUNT - rotations_between_blocks);
+
                                  current_entangle_index = entangler->entangle_index;
                              }
                         }

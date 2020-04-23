@@ -148,7 +148,10 @@ struct BlockPush_t{
      DirectionMask_t direction_mask = DIRECTION_MASK_NONE;
      S8 portal_rotations = 0;
      S8 entangle_rotations = 0;
+     S8 pusher_rotations = 0;
      bool invalidated = false;
+     bool no_consolidate = false;
+     bool no_entangled_pushes = false;
      S8 entangled_with_push_index = -1;
      F32 force = 1.0f;
      bool opposite_entangle_reversed = false;
@@ -468,3 +471,5 @@ TransferMomentum_t get_block_push_pusher_momentum(BlockPush_t* push, World_t* wo
 BlockCollisionPushResult_t block_collision_push(BlockPush_t* push, World_t* world);
 
 FindBlocksThroughPortalResult_t find_blocks_through_portals(Coord_t coord, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt, QuadTreeNode_t<Block_t>* block_qt);
+BlockAgainstOthersResult_t find_blocks_at_the_end_of_a_chain(Position_t pos, BlockCut_t cut, Direction_t direction, QuadTreeNode_t<Block_t>* block_qt,
+                                                             QuadTreeNode_t<Interactive_t>* interactive_quad_tree, TileMap_t* tilemap, S8 rotations = 0);

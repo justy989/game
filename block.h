@@ -114,6 +114,9 @@ Pixel_t block_bottom_right_pixel(Pixel_t block, BlockCut_t cut);
 Pixel_t block_top_left_pixel(Pixel_t block, BlockCut_t cut);
 Pixel_t block_top_right_pixel(Pixel_t block, BlockCut_t cut);
 
+Position_t block_get_position(Block_t* block);
+Vec_t block_get_pos_delta(Block_t* block);
+
 void block_stop_horizontally(Block_t* block);
 void block_stop_vertically(Block_t* block);
 

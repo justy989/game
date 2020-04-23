@@ -1549,6 +1549,8 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
                }
           }else if((on_ice = block_on_ice(against_block->pos, against_block->pos_delta, against_block->cut,
                                           &world->tilemap, world->interactive_qt, world->block_qt))){
+               if(pushed_block_on_ice) both_on_ice = true;
+
                if(pushed_by_ice && instant_momentum){
                     // check if we are able to move or if we transfer our force to the block
                     transfers_force = true;
@@ -1589,6 +1591,7 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
 
                          auto push_result = block_push(against_block, against_block_push_dir, world, pushed_by_ice, force, &split_instant_momentum);
 
+#if 0
                          if(push_result.pushed){
                               push_entangled_block(against_block, world, against_block_push_dir, pushed_by_ice, force, &split_instant_momentum);
 
@@ -1607,6 +1610,7 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
                                    }
                               }
                          }
+#endif
 
                          // TODO when transferring momentum, split up the mass by how many blocks we are against that are on ice
                          if(direction_is_horizontal(direction)){
@@ -1658,7 +1662,6 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
                          }
                     }
                }else if(pushed_block_on_ice){
-                    both_on_ice = true;
                     bool are_entangled = blocks_are_entangled(block, against_block, &world->blocks);
 
                     if(are_entangled){
@@ -1675,9 +1678,11 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
                     auto push_result = block_push(against_block, against_block_push_dir, world, pushed_by_ice, force, instant_momentum);
 
                     if(push_result.pushed){
+#if 0
                          if(!are_entangled){
                              push_entangled_block(against_block, world, against_block_push_dir, pushed_by_ice, force, instant_momentum);
                          }
+#endif
                     }else{
                          return result;
                     }
@@ -1726,13 +1731,15 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
 
                if(total_block_mass <= PLAYER_MAX_PUSH_MASS_ON_FRICTION){
                    add_global_tag(TAG_PLAYER_PUSHES_MORE_THAN_ONE_MASS);
-                   bool are_entangled = blocks_are_entangled(block, against_block, &world->blocks);
+                   // bool are_entangled = blocks_are_entangled(block, against_block, &world->blocks);
                    auto push_result = block_push(against_block, against_block_push_dir, world, pushed_by_ice, force, instant_momentum);
 
                    if(push_result.pushed){
+#if 0
                         if(!are_entangled){
                             push_entangled_block(against_block, world, against_block_push_dir, pushed_by_ice, force, instant_momentum);
                         }
+#endif
                    }else{
                         return result;
                    }
@@ -2415,7 +2422,6 @@ ElasticCollisionResult_t elastic_transfer_momentum(F32 mass_1, F32 vel_i_1, F32 
 
 ElasticCollisionResult_t elastic_transfer_momentum_to_block(TransferMomentum_t* first_transfer_momentum, World_t* world, Block_t* block, Direction_t direction){
      auto second_block_momentum = get_block_momentum(world, block, direction);
-
      auto result = elastic_transfer_momentum(first_transfer_momentum->mass, first_transfer_momentum->vel, second_block_momentum.mass, second_block_momentum.vel);
 
      // LOG("  elastic transfer from block with %d %f to block %d with %d %f results: %f, %f in the %s\n", first_transfer_momentum->mass, first_transfer_momentum->vel,
