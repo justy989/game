@@ -61,6 +61,19 @@ DirectionMask_t pixel_direction_mask_between(Pixel_t a, Pixel_t b){
      return mask;
 }
 
+DirectionMask_t coord_direction_mask_between(Coord_t a, Coord_t b){
+     DirectionMask_t mask = DIRECTION_MASK_NONE;
+     S16 x_diff = b.x - a.x;
+     S16 y_diff = b.y - a.y;
+
+     if(x_diff > 0) mask = direction_mask_add(mask, DIRECTION_MASK_RIGHT);
+     if(x_diff < 0) mask = direction_mask_add(mask, DIRECTION_MASK_LEFT);
+     if(y_diff > 0) mask = direction_mask_add(mask, DIRECTION_MASK_UP);
+     if(y_diff < 0) mask = direction_mask_add(mask, DIRECTION_MASK_DOWN);
+
+     return mask;
+}
+
 Direction_t vec_direction(Vec_t vec){
      return direction_from_single_mask(vec_direction_mask(vec));
 }
