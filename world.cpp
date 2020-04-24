@@ -1913,7 +1913,10 @@ bool block_pushable(Block_t* block, Direction_t direction, World_t* world, F32 f
 bool reset_players(ObjectArray_t<Player_t>* players){
      destroy(players);
      bool success = init(players, 1);
-     if(success) *players->elements = Player_t{};
+     if(success){
+          *players->elements = Player_t{};
+          players->elements[0].has_bow = true;
+     }
      return success;
 }
 

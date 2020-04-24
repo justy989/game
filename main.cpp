@@ -3974,7 +3974,7 @@ int main(int argc, char** argv){
                                                   check_idle_move_state = block->horizontal_move.state;
                                              }else{
                                                   if(entangled_block->coast_horizontal == BLOCK_COAST_PLAYER &&
-                                                     block->horizontal_move.state != MOVE_STATE_STOPPING) block->coast_vertical = BLOCK_COAST_ENTANGLED_PLAYER;
+                                                     block->vertical_move.state != MOVE_STATE_STOPPING) block->coast_vertical = BLOCK_COAST_ENTANGLED_PLAYER;
                                                   check_idle_move_state = block->vertical_move.state;
                                              }
 
@@ -4007,7 +4007,7 @@ int main(int argc, char** argv){
                                                   check_idle_move_state = block->vertical_move.state;
                                              }else{
                                                   if(entangled_block->coast_vertical == BLOCK_COAST_PLAYER &&
-                                                     block->vertical_move.state != MOVE_STATE_STOPPING) block->coast_horizontal = BLOCK_COAST_ENTANGLED_PLAYER;
+                                                     block->horizontal_move.state != MOVE_STATE_STOPPING) block->coast_horizontal = BLOCK_COAST_ENTANGLED_PLAYER;
                                                   check_idle_move_state = block->horizontal_move.state;
                                              }
 
