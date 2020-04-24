@@ -40,7 +40,7 @@ Bitmap_t bitmap_load_raw(const U8* bytes, U64 byte_count){
 
      bitmap.raw.bytes = (U8*)(malloc(byte_count));
      if(!bitmap.raw.bytes){
-          LOG("%s() failed: failed to allocate %lu bytes for bitmap\n", __FUNCTION__, byte_count);
+          LOG("%s() failed: failed to allocate %" PRIu64 " bytes for bitmap\n", __FUNCTION__, byte_count);
      }
      bitmap.raw.byte_count = byte_count;
 

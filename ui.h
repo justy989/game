@@ -4,7 +4,12 @@
 #include "vec.h"
 #include "tags.h"
 
-#include <GL/gl.h>
+#ifdef __linux
+    #include <GL/gl.h>
+#elif __APPLE__
+    #define GL_SILENCE_DEPRECATION
+    #include <OpenGL/gl.h>
+#endif
 
 #define CHECKBOX_DIMENSION (8.0 * PIXEL_SIZE)
 #define THUMBNAIL_UI_DIMENSION (0.1375f)

@@ -42,7 +42,12 @@ LogMapNumberResult_t load_map_number(S32 map_number, Coord_t* player_start, Worl
 
      // search through directory to find file starting with 3 digit map number
      DIR* d = opendir("content");
-     if(!d) return result;
+     if(!d){
+         printf("load_map_number: opendir() failed\n");
+         return result;
+     }else{
+         printf("load_map_number: opendir() success\n");
+     }
      struct dirent* dir;
      char filepath[512] = {};
      char match[4] = {};

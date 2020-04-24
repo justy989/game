@@ -308,7 +308,7 @@ bool load_map_number_demo(Demo_t* demo, S16 map_number, S64* frame_count){
      demo->entries = demo_entries_get(demo->file);
      *frame_count = 0;
      demo->last_frame = demo->entries.entries[demo->entries.count - 1].frame;
-     LOG("testing demo %s: version %d with %ld actions across %ld frames\n", demo->filepath,
+     LOG("testing demo %s: version %d with %" PRId64 " actions across %" PRId64 " frames\n", demo->filepath,
          demo->version, demo->entries.count, demo->last_frame);
      return true;
 }
@@ -5563,7 +5563,7 @@ int main(int argc, char** argv){
                     draw_quad_wireframe(&pct_bar_outline_quad, 255.0f, 255.0f, 255.0f);
 
                     char buffer[64];
-                    snprintf(buffer, 64, "F: %ld/%ld C: %d", frame_count, play_demo.last_frame, collision_attempts);
+                    snprintf(buffer, 64, "F: %" PRId64 "/%" PRId64 " C: %d", frame_count, play_demo.last_frame, collision_attempts);
 
                     glBindTexture(GL_TEXTURE_2D, text_texture);
                     glBegin(GL_QUADS);

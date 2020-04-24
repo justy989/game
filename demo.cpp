@@ -29,7 +29,7 @@ bool demo_begin(Demo_t* demo){
           fread(&demo->version, sizeof(demo->version), 1, demo->file);
           demo->entries = demo_entries_get(demo->file);
           demo->last_frame = demo->entries.entries[demo->entries.count - 1].frame;
-          LOG("playing demo %s: version %d with %ld actions across %ld frames\n", demo->filepath,
+          LOG("playing demo %s: version %d with %" PRId64 " actions across %" PRId64 " frames\n", demo->filepath,
               demo->version, demo->entries.count, demo->last_frame);
           break;
      }
