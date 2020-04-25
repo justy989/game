@@ -72,6 +72,9 @@ struct BlockPushResult_t{
      BlockElasticCollision_t collisions[BLOCK_PUSH_MAX_COLLISIONS];
      S8 collision_count = 0;
 
+     Block_t* against_pushed = NULL;
+     Direction_t against_push_dir = DIRECTION_COUNT;
+
      bool add_collision(S16 pusher_mass, F32 pusher_vel, S16 pushee_mass, F32 pushee_initial_vel, F32 pushee_vel){
          if(collision_count >= BLOCK_PUSH_MAX_COLLISIONS){
              assert(!"ya dun messed up A-ARON");

@@ -1591,27 +1591,6 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
 
                          auto push_result = block_push(against_block, against_block_push_dir, world, pushed_by_ice, force, &split_instant_momentum);
 
-#if 0
-                         if(push_result.pushed){
-                              push_entangled_block(against_block, world, against_block_push_dir, pushed_by_ice, force, &split_instant_momentum);
-
-                              // if this push entangle call results in our velocity changing, update our block_push_vel
-                              if(from_entangler){
-                                   F32 block_push_vel_delta = 0;
-                                   if(direction_is_horizontal(direction)){
-                                        block_push_vel_delta = block->vel.x - save_block_push_vel;
-                                   }else{
-                                        block_push_vel_delta = block->vel.y - save_block_push_vel;
-                                   }
-
-                                   if(block_push_vel_delta != 0){
-                                        block_push_vel += block_push_vel_delta;
-                                        save_block_push_vel = block_push_vel;
-                                   }
-                              }
-                         }
-#endif
-
                          // TODO when transferring momentum, split up the mass by how many blocks we are against that are on ice
                          if(direction_is_horizontal(direction)){
                              bool transferred_momentum_back = false;
@@ -1678,11 +1657,8 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
                     auto push_result = block_push(against_block, against_block_push_dir, world, pushed_by_ice, force, instant_momentum);
 
                     if(push_result.pushed){
-#if 0
-                         if(!are_entangled){
-                             push_entangled_block(against_block, world, against_block_push_dir, pushed_by_ice, force, instant_momentum);
-                         }
-#endif
+                         result.against_pushed = against_block;
+                         result.against_push_dir = against_block_push_dir;
                     }else{
                          return result;
                     }
@@ -1731,16 +1707,9 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
 
                if(total_block_mass <= PLAYER_MAX_PUSH_MASS_ON_FRICTION){
                    add_global_tag(TAG_PLAYER_PUSHES_MORE_THAN_ONE_MASS);
-                   // bool are_entangled = blocks_are_entangled(block, against_block, &world->blocks);
                    auto push_result = block_push(against_block, against_block_push_dir, world, pushed_by_ice, force, instant_momentum);
 
-                   if(push_result.pushed){
-#if 0
-                        if(!are_entangled){
-                            push_entangled_block(against_block, world, against_block_push_dir, pushed_by_ice, force, instant_momentum);
-                        }
-#endif
-                   }else{
+                   if(!push_result.pushed){
                         return result;
                    }
                }else{
@@ -1772,6 +1741,31 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
      if(block_against_solid_interactive(block, direction, &world->tilemap, world->interactive_qt)){
           return result;
      }
+
+     // check if we are diagonally against a solid and already moving in an orthogonal direction
+     switch(direction){
+     default:
+          break;
+     case DIRECTION_LEFT:
+     case DIRECTION_RIGHT:
+          if(block->vertical_move.state != MOVE_STATE_IDLING && block->accel.y != 0.0f){
+               Direction_t vertical_direction = block->accel.y > 0.0f ? DIRECTION_UP : DIRECTION_DOWN;
+               if(block_diagonally_against_solid(pos, pos_delta, block->cut, direction, vertical_direction, &world->tilemap, world->interactive_qt)){
+                    return result;
+               }
+          }
+          break;
+     case DIRECTION_DOWN:
+     case DIRECTION_UP:
+          if(block->horizontal_move.state != MOVE_STATE_IDLING && block->accel.x != 0.0f){
+               Direction_t horizontal_direction = block->accel.x > 0.0f ? DIRECTION_RIGHT : DIRECTION_LEFT;
+               if(block_diagonally_against_solid(pos, pos_delta, block->cut, horizontal_direction, direction, &world->tilemap, world->interactive_qt)){
+                    return result;
+               }
+          }
+          break;
+     }
+
      auto* player = block_against_player(block, direction, &world->players);
      if(player){
           bool player_should_stop_block = true;

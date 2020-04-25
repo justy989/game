@@ -680,6 +680,38 @@ Tile_t* block_against_solid_tile(Position_t block_pos, Vec_t pos_delta, BlockCut
      return nullptr;
 }
 
+bool block_diagonally_against_solid(Position_t block_pos, Vec_t pos_delta, BlockCut_t cut, Direction_t horizontal_direction,
+                                    Direction_t vertical_direction, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt){
+     Pixel_t pixel_to_check {};
+     Position_t final_pos = block_pos + pos_delta;
+
+     if(horizontal_direction == DIRECTION_LEFT){
+          if(vertical_direction == DIRECTION_DOWN){
+               pixel_to_check = final_pos.pixel + Pixel_t{-1, -1};
+          }else if(vertical_direction == DIRECTION_UP){
+               pixel_to_check = block_top_left_pixel(final_pos.pixel, cut) + Pixel_t{-1, 1};
+          }
+     }else if(horizontal_direction == DIRECTION_RIGHT){
+          if(vertical_direction == DIRECTION_DOWN){
+               pixel_to_check = block_bottom_right_pixel(final_pos.pixel, cut) + Pixel_t{1, -1};
+          }else if(vertical_direction == DIRECTION_UP){
+               pixel_to_check = block_top_right_pixel(final_pos.pixel, cut) + Pixel_t{1, 1};
+          }
+     }
+
+     Coord_t coord_to_check = pixel_to_coord(pixel_to_check);
+
+     if(tilemap_is_solid(tilemap, coord_to_check)){
+          return true;
+     }
+
+     if(quad_tree_interactive_solid_at(interactive_qt, tilemap, coord_to_check, final_pos.z)){
+          return true;
+     }
+
+     return false;
+}
+
 Player_t* block_against_player(Block_t* block, Direction_t direction, ObjectArray_t<Player_t>* players){
      auto block_rect = block_get_inclusive_rect(block);
 
@@ -1644,7 +1676,7 @@ DealWithPushResult_t deal_with_push_result(Block_t* pusher, Direction_t directio
 
 
 void push_entangled_block(Block_t* block, World_t* world, Direction_t push_dir, bool pushed_by_ice, F32 force, TransferMomentum_t* instant_momentum){
-     if(block->entangle_index < 0) return;
+     if(block->entangle_index < 0 || block->entangle_index >= world->blocks.count) return;
 
      PushFromEntangler_t from_entangler;
 
@@ -1696,12 +1728,12 @@ void push_entangled_block(Block_t* block, World_t* world, Direction_t push_dir, 
 
                     auto allowed_result = allowed_to_push(world, entangled_block, rotated_dir, mass_ratio, &rotated_instant_momentum);
                     if(allowed_result.push){
-                         block_push(entangled_block, rotated_dir, world, pushed_by_ice, mass_ratio * allowed_result.mass_ratio, &rotated_instant_momentum, &from_entangler);
+                         block_push(entangled_block, rotated_dir, world, pushed_by_ice, force * mass_ratio * allowed_result.mass_ratio, &rotated_instant_momentum, &from_entangler);
                     }
                }else{
                     auto allowed_result = allowed_to_push(world, entangled_block, rotated_dir, mass_ratio);
                     if(allowed_result.push){
-                         block_push(entangled_block, rotated_dir, world, pushed_by_ice, mass_ratio * allowed_result.mass_ratio, nullptr, &from_entangler);
+                         block_push(entangled_block, rotated_dir, world, pushed_by_ice, force * mass_ratio * allowed_result.mass_ratio, nullptr, &from_entangler);
                     }
                }
           }

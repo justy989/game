@@ -852,6 +852,72 @@ void apply_block_collision(World_t* world, Block_t* block, F32 dt, CheckBlockCol
      }
 }
 
+S16 get_boundary_from_coord(Coord_t coord, Direction_t direction){
+     Pixel_t pixel = coord_to_pixel(coord);
+
+     // the values are opposite of what you would expect because this is about colliding from the direction specified
+     switch(direction){
+     default:
+          break;
+     case DIRECTION_RIGHT:
+          return pixel.x;
+     case DIRECTION_LEFT:
+          return pixel.x + TILE_SIZE_IN_PIXELS;
+     case DIRECTION_UP:
+          return pixel.y;
+     case DIRECTION_DOWN:
+          return pixel.y + TILE_SIZE_IN_PIXELS;
+     }
+
+     return -1;
+}
+
+Pixel_t block_pos_in_solid_boundary(Position_t pos, BlockCut_t cut, Direction_t horizontal_direction, Direction_t vertical_direction, World_t* world){
+     Coord_t bottom_left_coord = pixel_to_coord(pos.pixel);
+     Coord_t bottom_right_coord = pixel_to_coord(block_bottom_right_pixel(pos.pixel, cut));
+     Coord_t top_left_coord = pixel_to_coord(block_top_left_pixel(pos.pixel, cut));
+     Coord_t top_right_coord = pixel_to_coord(block_top_right_pixel(pos.pixel, cut));
+
+     if(tilemap_is_solid(&world->tilemap, bottom_left_coord)){
+          return Pixel_t{get_boundary_from_coord(bottom_left_coord, horizontal_direction), get_boundary_from_coord(bottom_left_coord, vertical_direction)};
+     }
+
+     if(tilemap_is_solid(&world->tilemap, bottom_right_coord)){
+          return Pixel_t{get_boundary_from_coord(bottom_right_coord, horizontal_direction), get_boundary_from_coord(bottom_right_coord, vertical_direction)};
+     }
+
+     if(tilemap_is_solid(&world->tilemap, top_left_coord)){
+          return Pixel_t{get_boundary_from_coord(top_left_coord, horizontal_direction), get_boundary_from_coord(top_left_coord, vertical_direction)};
+     }
+
+     if(tilemap_is_solid(&world->tilemap, top_right_coord)){
+          return Pixel_t{get_boundary_from_coord(top_right_coord, horizontal_direction), get_boundary_from_coord(top_right_coord, vertical_direction)};
+     }
+
+     Interactive_t* interactive = quad_tree_interactive_solid_at(world->interactive_qt, &world->tilemap, bottom_left_coord, pos.z);
+     if(interactive){
+          return Pixel_t{get_boundary_from_coord(bottom_left_coord, horizontal_direction), get_boundary_from_coord(bottom_left_coord, vertical_direction)};
+     }
+
+     interactive = quad_tree_interactive_solid_at(world->interactive_qt, &world->tilemap, bottom_right_coord, pos.z);
+     if(interactive){
+          return Pixel_t{get_boundary_from_coord(bottom_right_coord, horizontal_direction), get_boundary_from_coord(bottom_right_coord, vertical_direction)};
+     }
+
+     interactive = quad_tree_interactive_solid_at(world->interactive_qt, &world->tilemap, top_left_coord, pos.z);
+     if(interactive){
+          return Pixel_t{get_boundary_from_coord(top_left_coord, horizontal_direction), get_boundary_from_coord(top_left_coord, vertical_direction)};
+     }
+
+     interactive = quad_tree_interactive_solid_at(world->interactive_qt, &world->tilemap, top_right_coord, pos.z);
+     if(interactive){
+          return Pixel_t{get_boundary_from_coord(top_right_coord, horizontal_direction), get_boundary_from_coord(top_right_coord, vertical_direction)};
+     }
+
+     return Pixel_t {-1, -1};
+}
+
+
 struct DoBlockCollisionResults_t{
      bool repeat_collision_pass = false;
      S16 update_blocks_count;
@@ -965,7 +1031,7 @@ DoBlockCollisionResults_t do_block_collision(World_t* world, Block_t* block, S16
           }
      }
 
-     if(block->pos_delta.x > 0.0f || block->pos_delta.x < 0.0f){
+     if(block->pos_delta.x != 0.0f){
           S16 boundary_x = range_passes_solid_boundary(block->pos.pixel.x, final_pos.pixel.x, block->cut,
                                                        true, block->pos.pixel.y, final_pos.pixel.y, block->pos.z,
                                                        &world->tilemap, world->interactive_qt);
@@ -983,8 +1049,6 @@ DoBlockCollisionResults_t do_block_collision(World_t* world, Block_t* block, S16
      }
 
      if(stop_on_boundary_y){
-          // LOG("stop on boundary y: start: %d, end: %d, ignore: %d, ignore pixel: %d\n",
-          //     block->pos.pixel.y, final_pos.pixel.y, stop_on_boundary_y, block->started_on_pixel_y);
           S16 boundary_y = range_passes_boundary(block->pos.pixel.y, final_pos.pixel.y, block_get_lowest_dimension(block),
                                                  stop_on_boundary_y == STOP_ON_BOUNDARY_TRACKING_START ? block->started_on_pixel_y : 0);
           if(boundary_y){
@@ -1000,7 +1064,7 @@ DoBlockCollisionResults_t do_block_collision(World_t* world, Block_t* block, S16
           }
      }
 
-     if(block->pos_delta.y > 0.0f || block->pos_delta.y < 0.0f){
+     if(block->pos_delta.y != 0.0f){
           S16 boundary_y = range_passes_solid_boundary(block->pos.pixel.y, final_pos.pixel.y, block->cut,
                                                        false, block->pos.pixel.x, final_pos.pixel.x, block->pos.z,
                                                        &world->tilemap, world->interactive_qt);
@@ -1014,6 +1078,42 @@ DoBlockCollisionResults_t do_block_collision(World_t* world, Block_t* block, S16
                // figure out new pos_delta which will be used for collision in the next iteration
                auto delta_pos = pixel_to_pos(Pixel_t{0, boundary_y}) - block->pos;
                block->pos_delta.y = pos_to_vec(delta_pos).y;
+          }
+     }
+
+     // if we haven't stopped on any boundaries, check if we should diagonally stop on boundaries
+     if(block->pos_delta.y != 0.0f && block->stop_on_pixel_y == 0 &&
+        block->pos_delta.x != 0.0f && block->stop_on_pixel_x == 0){
+          Direction_t horizontal_dir = (block->pos_delta.x > 0) ? DIRECTION_RIGHT : DIRECTION_LEFT;
+          Direction_t vertical_dir = (block->pos_delta.y > 0) ? DIRECTION_UP : DIRECTION_DOWN;
+
+          Pixel_t pre_move_stop_on_boundaries = block_pos_in_solid_boundary(block->pos, block->cut, horizontal_dir, vertical_dir, world);
+          Pixel_t post_move_stop_on_boundaries = block_pos_in_solid_boundary(final_pos, block->cut, horizontal_dir, vertical_dir, world);
+
+          if(pre_move_stop_on_boundaries == Pixel_t{-1, -1} && post_move_stop_on_boundaries != Pixel_t{-1, -1}){
+               if(post_move_stop_on_boundaries.x >= 0){
+                    result.repeat_collision_pass = true;
+
+                    block_stop_horizontally(block);
+                    block->stop_on_pixel_x = post_move_stop_on_boundaries.x;
+                    block->coast_horizontal = BLOCK_COAST_NONE;
+
+                    // figure out new pos_delta which will be used for collision in the next iteration
+                    auto delta_pos = pixel_to_pos(Pixel_t{post_move_stop_on_boundaries.x, 0}) - block->pos;
+                    block->pos_delta.x = pos_to_vec(delta_pos).x;
+               }
+
+               if(post_move_stop_on_boundaries.y >= 0){
+                    result.repeat_collision_pass = true;
+
+                    block_stop_vertically(block);
+                    block->stop_on_pixel_y = post_move_stop_on_boundaries.y;
+                    block->coast_vertical = BLOCK_COAST_NONE;
+
+                    // figure out new pos_delta which will be used for collision in the next iteration
+                    auto delta_pos = pixel_to_pos(Pixel_t{0, post_move_stop_on_boundaries.y}) - block->pos;
+                    block->pos_delta.y = pos_to_vec(delta_pos).y;
+               }
           }
      }
 
@@ -5166,9 +5266,13 @@ int main(int argc, char** argv){
 
                                         if(!push_result.pushed && !push_result.busy){
                                              player->push_time = 0.0f;
-                                        }else if(player->entangle_push_time > BLOCK_PUSH_TIME && block_to_push->entangle_index >= 0 && block_to_push->entangle_index < world.blocks.count){
+                                        }else if(player->entangle_push_time > BLOCK_PUSH_TIME){
                                              player->pushing_block_dir = push_block_dir;
                                              push_entangled_block(block_to_push, &world, push_block_dir, false, allowed_result.mass_ratio);
+                                             if(push_result.against_pushed){
+                                                  push_entangled_block(push_result.against_pushed, &world, push_result.against_push_dir,
+                                                                       false, allowed_result.mass_ratio);
+                                             }
                                              player->entangle_push_time = 0.0f;
                                         }
 

@@ -464,6 +464,8 @@ BlockInsideOthersResult_t block_inside_others(Position_t block_to_check_pos, Vec
                                               ObjectArray_t<Block_t>* block_array);
 Tile_t* block_against_solid_tile(Block_t* block_to_check, Direction_t direction, TileMap_t* tilemap);
 Tile_t* block_against_solid_tile(Position_t block_pos, Vec_t pos_delta, BlockCut_t cut, Direction_t direction, TileMap_t* tilemap);
+bool block_diagonally_against_solid(Position_t block_pos, Vec_t pos_delta, BlockCut_t cut, Direction_t horizontal_direction,
+                                    Direction_t vertical_direction, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt);
 Player_t* block_against_player(Block_t* block_to_check, Direction_t direction, ObjectArray_t<Player_t>* players);
 
 InteractiveHeldResult_t block_held_up_by_popup(Position_t block_pos, BlockCut_t cut, QuadTreeNode_t<Interactive_t>* interactive_qt, S16 min_area = 0);
