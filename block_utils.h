@@ -312,6 +312,7 @@ struct InteractiveHeldResult_t{
 struct BlockAgainstOther_t{
      Block_t* block = nullptr;
      S8 rotations_through_portal = 0;
+     bool through_portal = false;
 };
 
 struct BlockAgainstOthersResult_t{
@@ -452,7 +453,7 @@ Block_t* block_against_another_block(Position_t pos, BlockCut_t cut, Direction_t
 BlockAgainstOther_t block_diagonally_against_block(Position_t pos, BlockCut_t cut, DirectionMask_t directions, TileMap_t* tilemap,
                                                    QuadTreeNode_t<Interactive_t>* interactive_quad_tree, QuadTreeNode_t<Block_t>* block_qt);
 BlockAgainstOthersResult_t block_against_other_blocks(Position_t pos, BlockCut_t cut, Direction_t direction, QuadTreeNode_t<Block_t>* block_qt,
-                                                      QuadTreeNode_t<Interactive_t>* interactive_quad_tree, TileMap_t* tilemap);
+                                                      QuadTreeNode_t<Interactive_t>* interactive_quad_tree, TileMap_t* tilemap, bool require_portal_on = true);
 Block_t* rotated_entangled_blocks_against_centroid(Block_t* block, Direction_t direction, QuadTreeNode_t<Block_t>* block_qt,
                                                    ObjectArray_t<Block_t>* blocks_array,
                                                    QuadTreeNode_t<Interactive_t>* interactive_qt, TileMap_t* tilemap);
@@ -505,7 +506,8 @@ void apply_block_change(ObjectArray_t<Block_t>* blocks_array, BlockChange_t* cha
 TransferMomentum_t get_block_push_pusher_momentum(BlockPush_t* push, World_t* world, Direction_t push_direction);
 BlockCollisionPushResult_t block_collision_push(BlockPush_t* push, World_t* world);
 
-FindBlocksThroughPortalResult_t find_blocks_through_portals(Coord_t coord, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt, QuadTreeNode_t<Block_t>* block_qt);
+FindBlocksThroughPortalResult_t find_blocks_through_portals(Coord_t coord, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt, QuadTreeNode_t<Block_t>* block_qt,
+                                                            bool require_on = true);
 // LOL
 BlockChainsResult_t find_block_chain(Block_t* block, Direction_t direction, QuadTreeNode_t<Block_t>* block_qt,
                                      QuadTreeNode_t<Interactive_t>* interactive_qt, TileMap_t* tilemap, S8 rotations = 0, BlockChain_t* my_chain = NULL);

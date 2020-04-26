@@ -1968,11 +1968,6 @@ Coord_t find_centroid(CentroidStart_t a, CentroidStart_t b){
      direction_mask_to_string(a_mask, a_m, 128);
      direction_mask_to_string(b_mask, b_m, 128);
 
-     // LOG("a: %d, %d %s m: %s, b: %d, %d %s m: %s towards %d, %d\n",
-     //     a.coord.x, a.coord.y, direction_to_string(a.direction), a_m,
-     //     b.coord.x, b.coord.y, direction_to_string(b.direction), b_m,
-     //     first_option.x, first_option.y);
-
      if((a_facing && b_facing) || (a_facing_away && b_facing_away)){
           return first_option;
      }
@@ -1988,11 +1983,6 @@ Coord_t find_centroid(CentroidStart_t a, CentroidStart_t b){
 
      direction_mask_to_string(a_mask, a_m, 128);
      direction_mask_to_string(b_mask, b_m, 128);
-
-     // LOG("a: %d, %d %s m: %s, b: %d, %d %s m: %s towards %d, %d\n",
-     //     a.coord.x, a.coord.y, direction_to_string(a.direction), a_m,
-     //     b.coord.x, b.coord.y, direction_to_string(b.direction), b_m,
-     //     second_option.x, second_option.y);
 
      if((a_facing && b_facing) || (a_facing_away && b_facing_away)){
           return second_option;
@@ -2031,6 +2021,58 @@ Coord_t find_centroid(CentroidStart_t a, CentroidStart_t b){
      if(a_on_same_level && b_on_same_level) return second_option;
 
      return Coord_t{-1, -1};
+}
+
+bool find_and_update_connected_teleported_block(Block_t* block, Direction_t direction, World_t* world){
+     Position_t block_pos = block_get_position(block);
+     Vec_t block_pos_delta_vec = block_get_pos_delta(block);
+     Vec_t block_vel_vec = block_get_vel(block);
+
+     auto against_result = block_against_other_blocks(block_pos + block_pos_delta_vec,
+                                                      block->cut, direction, world->block_qt,
+                                                      world->interactive_qt, &world->tilemap, false);
+
+     F32 block_vel = 0;
+     F32 block_pos_delta = 0;
+
+     if(direction_is_horizontal(direction)){
+         block_vel = block_vel_vec.x;
+         block_pos_delta = block_pos_delta_vec.x;
+     }else{
+         block_vel = block_vel_vec.y;
+         block_pos_delta = block_pos_delta_vec.y;
+     }
+
+     for(S16 a = 0; a < against_result.count; a++){
+         auto* against_other = against_result.againsts + a;
+
+         if(!against_other->through_portal && !block->teleport) continue;
+
+         Vec_t against_block_vel_vec = block_get_vel(against_other->block);
+         Vec_t against_block_pos_delta_vec = block_get_pos_delta(against_other->block);
+
+         Vec_t rotated_against_vel = vec_rotate_quadrants_counter_clockwise(against_block_vel_vec, against_other->rotations_through_portal);
+         Vec_t rotated_against_pos_delta = vec_rotate_quadrants_counter_clockwise(against_block_pos_delta_vec, against_other->rotations_through_portal);
+
+         F32 against_block_vel = 0;
+         F32 against_block_pos_delta = 0;
+
+         if(direction_is_horizontal(direction)){
+             against_block_vel = rotated_against_vel.x;
+             against_block_pos_delta = rotated_against_pos_delta.x;
+         }else{
+             against_block_vel = rotated_against_vel.y;
+             against_block_pos_delta = rotated_against_pos_delta.y;
+         }
+
+         if(block_vel != against_block_vel || block_pos_delta != against_block_pos_delta) continue;
+
+         block->connected_teleport.block_index = get_block_index(world, against_other->block);
+         block->connected_teleport.direction = direction;
+         return true;
+     }
+
+     return false;
 }
 
 int main(int argc, char** argv){
@@ -4430,47 +4472,7 @@ int main(int argc, char** argv){
                                   Direction_t src_portal_dir = src_portal->portal.face;
                                   Direction_t dst_portal_dir = dst_portal->portal.face;
 
-                                  // to fight the battle against floating point error, track any blocks we are connected to (going the same speed)
-                                  {
-                                      auto against_direction = direction_opposite(src_portal_dir);
-                                      auto against_result = block_against_other_blocks(block->pos + block->pos_delta,
-                                                                                       block->cut, against_direction, world.block_qt,
-                                                                                       world.interactive_qt, &world.tilemap);
-
-                                      F32 block_vel = 0;
-                                      F32 block_pos_delta = 0;
-
-                                      if(direction_is_horizontal(against_direction)){
-                                          block_vel = block->vel.x;
-                                          block_pos_delta = block->pos_delta.x;
-                                      }else{
-                                          block_vel = block->vel.y;
-                                          block_pos_delta = block->pos_delta.y;
-                                      }
-
-                                      // TODO: we may need to handle the against portal rotation data it gives us
-                                      for(S16 a = 0; a < against_result.count; a++){
-                                          auto* against_other = against_result.againsts + a;
-
-                                          F32 against_block_vel = 0;
-                                          F32 against_block_pos_delta = 0;
-
-                                          if(direction_is_horizontal(against_direction)){
-                                              against_block_vel = against_other->block->vel.x;
-                                              against_block_pos_delta = against_other->block->pos_delta.x;
-                                          }else{
-                                              against_block_vel = against_other->block->vel.y;
-                                              against_block_pos_delta = against_other->block->pos_delta.y;
-                                          }
-
-                                          if(block_vel != against_block_vel || block_pos_delta != against_block_pos_delta) continue;
-
-                                          auto final_against_dir = direction_rotate_clockwise(against_direction, teleport_result.results[block->clone_id].rotations);
-
-                                          against_other->block->connected_teleport.block_index = i;
-                                          against_other->block->connected_teleport.direction = direction_opposite(final_against_dir);
-                                      }
-                                  }
+                                  find_and_update_connected_teleported_block(block, direction_opposite(dst_portal_dir), &world);
 
                                   if(block->connected_teleport.block_index >= 0)
                                   {
@@ -4489,21 +4491,23 @@ int main(int argc, char** argv){
                                           block_pos_delta = block->teleport_pos_delta.y;
                                       }
 
-                                      // TODO: we may need to handle the against portal rotation data it gives us
                                       for(S16 a = 0; a < against_result.count; a++){
                                           auto* against_other = against_result.againsts + a;
 
                                           if(get_block_index(&world, against_other->block) != block->connected_teleport.block_index) continue;
 
+                                          Vec_t rotated_against_vel = vec_rotate_quadrants_counter_clockwise(against_other->block->vel, against_other->rotations_through_portal);
+                                          Vec_t rotated_against_pos_delta = vec_rotate_quadrants_counter_clockwise(against_other->block->pos_delta, against_other->rotations_through_portal);
+
                                           F32 against_block_vel = 0;
                                           F32 against_block_pos_delta = 0;
 
                                           if(direction_is_horizontal(block->connected_teleport.direction)){
-                                              against_block_vel = against_other->block->vel.x;
-                                              against_block_pos_delta = against_other->block->pos_delta.x;
+                                              against_block_vel = rotated_against_vel.x;
+                                              against_block_pos_delta = rotated_against_pos_delta.x;
                                           }else{
-                                              against_block_vel = against_other->block->vel.y;
-                                              against_block_pos_delta = against_other->block->pos_delta.y;
+                                              against_block_vel = rotated_against_vel.y;
+                                              against_block_pos_delta = rotated_against_pos_delta.y;
                                           }
 
                                           if(block_vel != against_block_vel || block_pos_delta != against_block_pos_delta) continue;
@@ -4703,6 +4707,25 @@ int main(int argc, char** argv){
 
                               repeat_collision_pass = true;
                          }
+                    }
+
+                    // to fight the battle against floating point error, track any blocks we are connected to (going the same speed)
+                    for(S16 i = 0; i < world.blocks.count; i++){
+                         Block_t* block = world.blocks.elements + i;
+
+                         Vec_t block_pos_delta_vec = block_get_pos_delta(block);
+
+                         if(block_pos_delta_vec.x == 0 && block_pos_delta_vec.y == 0) continue;
+
+                         bool against_any = false;
+
+                         for(S16 d = 0; d < DIRECTION_COUNT; d++){
+                              auto direction = static_cast<Direction_t>(d);
+
+                              against_any |= find_and_update_connected_teleported_block(block, direction, &world);
+                         }
+
+                         if(!against_any) block->connected_teleport.block_index = -1;
                     }
 
                     // player movement

@@ -94,11 +94,7 @@ bool block_against_block(Position_t pos, BlockCut_t cut, Block_t* check_block, B
           {
                if(!blocks_at_collidable_height(pos.z, check_block->pos.z)) break;
 
-               auto adjacent_pos = check_block->teleport ?
-                                   check_block->teleport_pos + check_block->teleport_pos_delta
-                                   : check_block->pos + check_block->pos_delta;
-               adjacent_pos += portal_offset;
-
+               auto adjacent_pos = block_get_final_position(check_block) + portal_offset;
                auto boundary_check_pos = adjacent_pos + Pixel_t{block_get_width_in_pixels(check_cut), 0};
                auto distance_to_boundary = fabs(pos_to_vec(boundary_check_pos - pos).x);
 
@@ -117,11 +113,7 @@ bool block_against_block(Position_t pos, BlockCut_t cut, Block_t* check_block, B
           {
                if(!blocks_at_collidable_height(pos.z, check_block->pos.z)) break;
 
-               auto adjacent_pos = check_block->teleport ?
-                                   check_block->teleport_pos + check_block->teleport_pos_delta
-                                   : check_block->pos + check_block->pos_delta;
-               adjacent_pos += portal_offset;
-
+               auto adjacent_pos = block_get_final_position(check_block) + portal_offset;
                auto boundary_check_pos = adjacent_pos;
                auto distance_to_boundary = fabs(pos_to_vec(boundary_check_pos - (pos + Pixel_t{block_get_width_in_pixels(cut), 0})).x);
 
@@ -140,11 +132,7 @@ bool block_against_block(Position_t pos, BlockCut_t cut, Block_t* check_block, B
           {
                if(!blocks_at_collidable_height(pos.z, check_block->pos.z)) break;
 
-               auto adjacent_pos = check_block->teleport ?
-                                   check_block->teleport_pos + check_block->teleport_pos_delta
-                                   : check_block->pos + check_block->pos_delta;
-               adjacent_pos += portal_offset;
-
+               auto adjacent_pos = block_get_final_position(check_block) + portal_offset;
                auto boundary_check_pos = adjacent_pos + Pixel_t{0, block_get_height_in_pixels(cut)};
                auto distance_to_boundary = fabs(pos_to_vec(boundary_check_pos - pos).y);
 
@@ -163,11 +151,7 @@ bool block_against_block(Position_t pos, BlockCut_t cut, Block_t* check_block, B
           {
                if(!blocks_at_collidable_height(pos.z, check_block->pos.z)) break;
 
-               auto adjacent_pos = check_block->teleport ?
-                                   check_block->teleport_pos + check_block->teleport_pos_delta
-                                   : check_block->pos + check_block->pos_delta;
-               adjacent_pos += portal_offset;
-
+               auto adjacent_pos = block_get_final_position(check_block) + portal_offset;
                auto boundary_check_pos = adjacent_pos;
                auto distance_to_boundary = fabs(pos_to_vec(boundary_check_pos - (pos + Pixel_t{0, block_get_height_in_pixels(cut)})).y);
 
@@ -198,7 +182,7 @@ Block_t* block_against_block_in_list(Position_t pos, BlockCut_t cut, Block_t** b
 }
 
 BlockAgainstOthersResult_t block_against_other_blocks(Position_t pos, BlockCut_t cut, Direction_t direction, QuadTreeNode_t<Block_t>* block_qt,
-                                                      QuadTreeNode_t<Interactive_t>* interactive_qt, TileMap_t* tilemap){
+                                                      QuadTreeNode_t<Interactive_t>* interactive_qt, TileMap_t* tilemap, bool require_portal_on){
      BlockAgainstOthersResult_t result;
 
      auto block_center = block_get_center(pos, cut);
@@ -214,22 +198,23 @@ BlockAgainstOthersResult_t block_against_other_blocks(Position_t pos, BlockCut_t
      for(S16 i = 0; i < block_count; i++){
           // lol at me misusing this function, but watevs
           if(block_against_block_in_list(pos, cut, blocks + i, 1, direction, portal_offsets)){
-               BlockAgainstOther_t against_other;
+               BlockAgainstOther_t against_other {};
                against_other.block = blocks[i];
                result.add(against_other);
           }
      }
 
-     auto found_blocks = find_blocks_through_portals(pos_to_coord(pos), tilemap, interactive_qt, block_qt);
+     auto found_blocks = find_blocks_through_portals(pos_to_coord(block_center), tilemap, interactive_qt, block_qt, require_portal_on);
      for(S16 i = 0; i < found_blocks.count; i++){
          auto* found_block = found_blocks.blocks + i;
          blocks[i] = found_block->block;
-         portal_offsets[i] = found_block->position - found_block->block->pos;
+         portal_offsets[i] = found_block->position - block_get_position(found_block->block);
 
          if(block_against_block(pos, cut, blocks[i], found_block->rotated_cut, direction, portal_offsets[i])){
-              BlockAgainstOther_t against_other;
+              BlockAgainstOther_t against_other {};
               against_other.block = blocks[i];
               against_other.rotations_through_portal = found_block->rotations_between_portals;
+              against_other.through_portal = true;
               result.add(against_other);
          }
      }
@@ -289,6 +274,7 @@ BlockAgainstOther_t block_diagonally_against_block(Position_t pos, BlockCut_t cu
           if(corner_pixel == pixel_to_check){
                result.block = found_block->block;
                result.rotations_through_portal = found_block->portal_rotations;
+               result.through_portal = true;
                return result;
           }
 
@@ -315,11 +301,11 @@ Block_t* block_against_another_block(Position_t pos, BlockCut_t cut, Direction_t
           return collided_block;
      }
 
-     auto found_blocks = find_blocks_through_portals(pos_to_coord(pos), tilemap, interactive_qt, block_qt);
+     auto found_blocks = find_blocks_through_portals(pos_to_coord(block_center), tilemap, interactive_qt, block_qt);
      for(S16 i = 0; i < found_blocks.count; i++){
          auto* found_block = found_blocks.blocks + i;
          blocks[i] = found_block->block;
-         auto block_pos = found_block->block->teleport ? found_block->block->teleport_pos + found_block->block->teleport_pos_delta : found_block->block->pos + found_block->block->pos_delta;
+         auto block_pos = block_get_final_position(found_block->block);
          portal_offsets[i] = found_block->position - block_pos;
 
          if(block_against_block(pos, cut, blocks[i], found_block->rotated_cut, direction, portal_offsets[i])){
@@ -573,8 +559,8 @@ BlockInsideBlockListResult_t block_inside_block_list(Position_t block_to_check_p
 
           if(!blocks_at_collidable_height(final_block_to_check_pos.z, block->pos.z)) continue;
 
-          auto block_pos = block->teleport ? block->teleport_pos : block->pos;
-          auto block_pos_delta = block->teleport ? block->teleport_pos_delta : block->pos_delta;
+          auto block_pos = block_get_position(block);
+          auto block_pos_delta = block_get_pos_delta(block);
           auto final_block_pos = block_pos + block_pos_delta + portal_offsets[i];
 
           auto pos_diff = final_block_pos - final_block_to_check_pos;
@@ -667,7 +653,7 @@ BlockInsideOthersResult_t block_inside_others(Position_t block_to_check_pos, Vec
      for(S16 i = 0; i < found_blocks.count; i++){
          auto* found_block = found_blocks.blocks + i;
          blocks[i] = found_block->block;
-         auto block_pos = found_block->block->teleport ? found_block->block->teleport_pos + found_block->block->teleport_pos_delta : found_block->block->pos + found_block->block->pos_delta;
+         auto block_pos = block_get_final_position(found_block->block);
          portal_offsets[i] = found_block->position - block_pos;
          cuts[i] = found_block->rotated_cut;
      }
@@ -2035,7 +2021,8 @@ BlockCollisionPushResult_t block_collision_push(BlockPush_t* push, World_t* worl
      return result;
 }
 
-FindBlocksThroughPortalResult_t find_blocks_through_portals(Coord_t coord, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt, QuadTreeNode_t<Block_t>* block_qt){
+FindBlocksThroughPortalResult_t find_blocks_through_portals(Coord_t coord, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt, QuadTreeNode_t<Block_t>* block_qt,
+                                                            bool require_on){
     FindBlocksThroughPortalResult_t result;
 
      S16 block_count = 0;
@@ -2049,9 +2036,13 @@ FindBlocksThroughPortalResult_t find_blocks_through_portals(Coord_t coord, TileM
           auto portal_src_pixel = coord_to_pixel_at_center(check_coord);
           auto interactive = quad_tree_interactive_find_at(interactive_qt, check_coord);
 
-          if(!is_active_portal(interactive)) continue;
+          if(require_on){
+               if(!is_active_portal(interactive)) continue;
+          }else{
+               if(!(interactive && interactive->type == INTERACTIVE_TYPE_PORTAL)) continue;
+          }
 
-          PortalExit_t portal_exits = find_portal_exits(check_coord, tilemap, interactive_qt);
+          PortalExit_t portal_exits = find_portal_exits(check_coord, tilemap, interactive_qt, require_on);
 
           for(S8 d = 0; d < DIRECTION_COUNT; d++){
                Direction_t current_portal_dir = (Direction_t)(d);
@@ -2077,7 +2068,7 @@ FindBlocksThroughPortalResult_t find_blocks_through_portals(Coord_t coord, TileM
 
                          auto portal_rotations = direction_rotations_between(interactive->portal.face, direction_opposite(current_portal_dir));
 
-                         auto block_real_pos = block->teleport ? block->teleport_pos + block->teleport_pos_delta : block->pos + block->pos_delta;
+                         auto block_real_pos = block_get_final_position(block);
                          auto block_cut = block->teleport ? block->teleport_cut : block->cut;
                          auto block_center = block_get_center(block_real_pos, block_cut);
                          auto dst_offset = block_center - portal_dst_output_center;

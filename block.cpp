@@ -207,6 +207,15 @@ Vec_t block_get_pos_delta(Block_t* block){
      return block->pos_delta;
 }
 
+Vec_t block_get_vel(Block_t* block){
+     if(block->teleport) return block->teleport_vel;
+     return block->vel;
+}
+
+Position_t block_get_final_position(Block_t* block){
+     return block_get_position(block) + block_get_pos_delta(block);
+}
+
 void block_stop_horizontally(Block_t* block){
      block->horizontal_move.state = MOVE_STATE_IDLING;
      block->horizontal_move.sign = MOVE_SIGN_ZERO;
