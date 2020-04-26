@@ -18,8 +18,8 @@ struct World_t{
      ObjectArray_t<Interactive_t> interactives = {};
      ArrowArray_t arrows = {};
 
-     QuadTreeNode_t<Interactive_t>* interactive_qt = nullptr;
-     QuadTreeNode_t<Block_t>* block_qt = nullptr;
+     QuadTreeNode_t<Interactive_t>* interactive_qt = NULL;
+     QuadTreeNode_t<Block_t>* block_qt = NULL;
 
      S32 clone_instance = 0;
 };
@@ -64,6 +64,12 @@ struct BlockElasticCollision_t{
 };
 
 #define BLOCK_PUSH_MAX_COLLISIONS 4
+#define BLOCK_PUSH_MAX_AGAINSTS 8
+
+struct BlockPushedAgainst_t{
+     Block_t* block = NULL;
+     Direction_t direction = DIRECTION_COUNT;
+};
 
 struct BlockPushResult_t{
      bool pushed = false;
@@ -72,8 +78,8 @@ struct BlockPushResult_t{
      BlockElasticCollision_t collisions[BLOCK_PUSH_MAX_COLLISIONS];
      S8 collision_count = 0;
 
-     Block_t* against_pushed = NULL;
-     Direction_t against_push_dir = DIRECTION_COUNT;
+     BlockPushedAgainst_t pushed_againsts[BLOCK_PUSH_MAX_AGAINSTS];
+     S8 pushed_against_count = 0;
 
      bool add_collision(S16 pusher_mass, F32 pusher_vel, S16 pushee_mass, F32 pushee_initial_vel, F32 pushee_vel){
          if(collision_count >= BLOCK_PUSH_MAX_COLLISIONS){
@@ -88,6 +94,13 @@ struct BlockPushResult_t{
          collision.pushee_velocity = pushee_vel;
          collision_count++;
          return true;
+     }
+
+     bool add_pushed_against(BlockPushedAgainst_t* entry){
+          if(pushed_against_count >= BLOCK_PUSH_MAX_AGAINSTS) return false;
+          pushed_againsts[pushed_against_count] = *entry;
+          pushed_against_count++;
+          return true;
      }
 
      // TODO: do we need a merge?
@@ -137,12 +150,12 @@ void spread_ice(Coord_t center, S8 height, S16 radius, World_t* world, bool tele
 void melt_ice(Coord_t center, S8 height, S16 radius, World_t* world, bool teleported = false);
 
 BlockPushMoveDirectionResult_t block_push(Block_t* block, MoveDirection_t move_direction, World_t* world, bool pushed_by_ice,
-                                          F32 force = 1.0f, TransferMomentum_t* instant_momentum = nullptr);
+                                          F32 force = 1.0f, TransferMomentum_t* instant_momentum = NULL, PushFromEntangler_t* from_entangler = NULL);
 BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Direction_t direction, World_t* world,
-                             bool pushed_by_ice, F32 force = 1.0f, TransferMomentum_t* instant_momentum = nullptr,
+                             bool pushed_by_ice, F32 force = 1.0f, TransferMomentum_t* instant_momentum = NULL,
                              PushFromEntangler_t* from_entangler = NULL);
 BlockPushResult_t block_push(Block_t* block, Direction_t direction, World_t* world, bool pushed_by_ice, F32 force = 1.0f,
-                             TransferMomentum_t* instant_momentum = nullptr, PushFromEntangler_t* from_entangler = NULL);
+                             TransferMomentum_t* instant_momentum = NULL, PushFromEntangler_t* from_entangler = NULL);
 bool block_pushable(Block_t* block, Direction_t direction, World_t* world, F32 force);
 bool reset_players(ObjectArray_t<Player_t>* players);
 
@@ -169,4 +182,4 @@ ElasticCollisionResult_t elastic_transfer_momentum_to_block(TransferMomentum_t* 
 
 F32 get_block_static_friction(S16 mass);
 F32 get_block_expected_player_push_velocity(World_t* world, Block_t* block, F32 force = 1.0f);
-AllowedToPushResult_t allowed_to_push(World_t* world, Block_t* block, Direction_t direction, F32 force = 1.0f, TransferMomentum_t* instant_momentum = nullptr);
+AllowedToPushResult_t allowed_to_push(World_t* world, Block_t* block, Direction_t direction, F32 force = 1.0f, TransferMomentum_t* instant_momentum = NULL);

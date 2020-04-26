@@ -255,3 +255,44 @@ S16 block_get_mass(Block_t* b){
 S16 block_get_mass(BlockCut_t cut){
      return block_get_width_in_pixels(cut) * block_get_height_in_pixels(cut);
 }
+
+Pixel_t block_get_corner_pixel(Pixel_t pixel, BlockCut_t cut, BlockCorner_t corner){
+     switch(corner){
+     default:
+          break;
+     case BLOCK_CORNER_BOTTOM_LEFT:
+          return pixel;
+     case BLOCK_CORNER_BOTTOM_RIGHT:
+          return block_bottom_right_pixel(pixel, cut);
+     case BLOCK_CORNER_TOP_LEFT:
+          return block_top_left_pixel(pixel, cut);
+     case BLOCK_CORNER_TOP_RIGHT:
+          return block_top_right_pixel(pixel, cut);
+     }
+
+     return Pixel_t{-1, -1};
+
+}
+
+Pixel_t block_get_corner_pixel(Block_t* block, BlockCorner_t corner){
+     return block_get_corner_pixel(block->pos.pixel, block->cut, corner);
+}
+
+const char* block_corner_to_string(BlockCorner_t corner){
+     switch(corner){
+     default:
+          break;
+     case BLOCK_CORNER_BOTTOM_LEFT:
+          return "BLOCK_CORNER_BOTTOM_LEFT";
+     case BLOCK_CORNER_BOTTOM_RIGHT:
+          return "BLOCK_CORNER_BOTTOM_RIGHT";
+     case BLOCK_CORNER_TOP_LEFT:
+          return "BLOCK_CORNER_TOP_LEFT";
+     case BLOCK_CORNER_TOP_RIGHT:
+          return "BLOCK_CORNER_TOP_RIGHT";
+     case BLOCK_CORNER_COUNT:
+          return "BLOCK_CORNER_COUNT";
+     }
+
+     return "BLOCK_CORNER_UNKNOWN";
+}

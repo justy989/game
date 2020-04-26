@@ -160,3 +160,7 @@ bool position_y_greater_than(Position_t a, Position_t b){
      }
      return false;
 }
+
+bool operator==(Position_t a, Position_t b){
+     return a.pixel == b.pixel && a.decimal == b.decimal && a.z == b.z;
+}

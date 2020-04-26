@@ -2734,6 +2734,19 @@ int main(int argc, char** argv){
                          Tile_t* tile = tilemap_get_tile(&world.tilemap, mouse_select_world_coord(mouse_screen, &camera));
                          if(tile) tile_toggle_wire_activated(tile);
                     } break;
+                    case SDL_SCANCODE_4:
+                         if(game_mode == GAME_MODE_EDITOR && editor.mode == EDITOR_MODE_CATEGORY_SELECT){
+                              auto coord = mouse_select_world_coord(mouse_screen, &camera);
+                              auto rect = rect_surrounding_coord(coord);
+
+                              S16 block_count = 0;
+                              Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
+                              quad_tree_find_in(world.block_qt, rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
+
+                              for(S16 i = 0; i < block_count; i++){
+                                   blocks[i]->entangle_index = -1;
+                              }
+                         }
                     case SDL_SCANCODE_8:
                          if(game_mode == GAME_MODE_EDITOR && editor.mode == EDITOR_MODE_CATEGORY_SELECT){
                               auto coord = mouse_select_world_coord(mouse_screen, &camera);
@@ -5269,8 +5282,9 @@ int main(int argc, char** argv){
                                         }else if(player->entangle_push_time > BLOCK_PUSH_TIME){
                                              player->pushing_block_dir = push_block_dir;
                                              push_entangled_block(block_to_push, &world, push_block_dir, false, allowed_result.mass_ratio);
-                                             if(push_result.against_pushed){
-                                                  push_entangled_block(push_result.against_pushed, &world, push_result.against_push_dir,
+                                             for(S16 a = 0; a < push_result.pushed_against_count; a++){
+                                                  push_entangled_block(push_result.pushed_againsts[a].block, &world,
+                                                                       push_result.pushed_againsts[a].direction,
                                                                        false, allowed_result.mass_ratio);
                                              }
                                              player->entangle_push_time = 0.0f;

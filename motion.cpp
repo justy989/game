@@ -612,3 +612,64 @@ const char* move_direction_to_string(MoveDirection_t move_direction){
 
      return "MOVE_DIRECTION_COUNT";
 }
+
+MoveDirection_t move_direction_from_directions(Direction_t a, Direction_t b){
+     switch(a){
+     default:
+          break;
+     case DIRECTION_LEFT:
+          switch(b){
+          default:
+               return MOVE_DIRECTION_LEFT;
+          case DIRECTION_LEFT:
+          case DIRECTION_RIGHT:
+               return MOVE_DIRECTION_COUNT;
+          case DIRECTION_DOWN:
+               return MOVE_DIRECTION_LEFT_DOWN;
+          case DIRECTION_UP:
+               return MOVE_DIRECTION_LEFT_UP;
+          }
+          break;
+     case DIRECTION_RIGHT:
+          switch(b){
+          default:
+               return MOVE_DIRECTION_RIGHT;
+          case DIRECTION_LEFT:
+          case DIRECTION_RIGHT:
+               return MOVE_DIRECTION_COUNT;
+          case DIRECTION_DOWN:
+               return MOVE_DIRECTION_RIGHT_DOWN;
+          case DIRECTION_UP:
+               return MOVE_DIRECTION_RIGHT_UP;
+          }
+          break;
+     case DIRECTION_DOWN:
+          switch(b){
+          default:
+               return MOVE_DIRECTION_DOWN;
+          case DIRECTION_DOWN:
+          case DIRECTION_UP:
+               return MOVE_DIRECTION_COUNT;
+          case DIRECTION_LEFT:
+               return MOVE_DIRECTION_LEFT_DOWN;
+          case DIRECTION_RIGHT:
+               return MOVE_DIRECTION_RIGHT_DOWN;
+          }
+          break;
+     case DIRECTION_UP:
+          switch(b){
+          default:
+               return MOVE_DIRECTION_UP;
+          case DIRECTION_DOWN:
+          case DIRECTION_UP:
+               return MOVE_DIRECTION_COUNT;
+          case DIRECTION_LEFT:
+               return MOVE_DIRECTION_LEFT_UP;
+          case DIRECTION_RIGHT:
+               return MOVE_DIRECTION_RIGHT_UP;
+          }
+          break;
+     }
+
+     return MOVE_DIRECTION_COUNT;
+}

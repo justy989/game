@@ -148,3 +148,4 @@ bool grid_motion_moving_in_direction(GridMotion_t* grid_motion, Direction_t dire
 const char* move_direction_to_string(MoveDirection_t move_direction);
 MoveDirection_t move_direction_between(Position_t a, Position_t b);
 void move_direction_to_directions(MoveDirection_t move_direction, Direction_t* a, Direction_t* b);
+MoveDirection_t move_direction_from_directions(Direction_t a, Direction_t b);

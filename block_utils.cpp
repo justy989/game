@@ -237,6 +237,66 @@ BlockAgainstOthersResult_t block_against_other_blocks(Position_t pos, BlockCut_t
      return result;
 }
 
+BlockAgainstOther_t block_diagonally_against_block(Position_t pos, BlockCut_t cut, DirectionMask_t directions, TileMap_t* tilemap,
+                                                   QuadTreeNode_t<Interactive_t>* interactive_qt, QuadTreeNode_t<Block_t>* block_qt){
+     BlockAgainstOther_t result {};
+     Pixel_t pixel_to_check;
+     BlockCorner_t corner_to_check;
+
+     if(directions == (DIRECTION_MASK_LEFT | DIRECTION_MASK_DOWN)){
+          pixel_to_check = pos.pixel + Pixel_t{-1, -1};
+          corner_to_check = BLOCK_CORNER_TOP_RIGHT;
+     }else if(directions == (DIRECTION_MASK_LEFT | DIRECTION_MASK_UP)){
+          pixel_to_check = block_top_left_pixel(pos.pixel, cut) + Pixel_t{-1, 1};
+          corner_to_check = BLOCK_CORNER_BOTTOM_RIGHT;
+     }else if(directions == (DIRECTION_MASK_RIGHT | DIRECTION_MASK_DOWN)){
+          pixel_to_check = block_bottom_right_pixel(pos.pixel, cut) + Pixel_t{1, -1};
+          corner_to_check = BLOCK_CORNER_TOP_LEFT;
+     }else if(directions == (DIRECTION_MASK_RIGHT | DIRECTION_MASK_UP)){
+          pixel_to_check = block_top_right_pixel(pos.pixel, cut) + Pixel_t{1, 1};
+          corner_to_check = BLOCK_CORNER_BOTTOM_LEFT;
+     }else{
+          return result;
+     }
+
+     auto block_center = block_get_center(pos, cut);
+     Rect_t surrounding_rect = rect_to_check_surrounding_blocks(block_center.pixel);
+
+     Position_t portal_offsets[MAX_BLOCKS_FOUND_THROUGH_PORTALS];
+     memset(portal_offsets, 0, sizeof(portal_offsets));
+
+     S16 block_count = 0;
+     Block_t* blocks[MAX_BLOCKS_FOUND_THROUGH_PORTALS];
+     quad_tree_find_in(block_qt, surrounding_rect, blocks, &block_count, MAX_BLOCKS_FOUND_THROUGH_PORTALS);
+
+     // TODO: this function is at a pixel level, but should be more granular
+     // adjacent blockers mean, if any blocks are adjacent, then we can't actually have a diagonal collision because
+     // we would have collided with those adjacent blocks first.
+     // bool adjacent_blocker = false;
+     for(S16 i = 0; i < block_count; i++){
+          Pixel_t corner_pixel = block_get_corner_pixel(blocks[i], corner_to_check);
+          if(corner_pixel == pixel_to_check){
+               result.block = blocks[i];
+               return result;
+          }
+     }
+
+     auto found_blocks = find_blocks_through_portals(pos_to_coord(block_center), tilemap, interactive_qt, block_qt);
+     for(S16 i = 0; i < found_blocks.count; i++){
+          auto* found_block = found_blocks.blocks + i;
+          BlockCut_t rotated_cut = block_cut_rotate_clockwise(found_block->block->cut, found_block->portal_rotations);
+          Pixel_t corner_pixel = block_get_corner_pixel(found_block->position.pixel, rotated_cut, corner_to_check);
+          if(corner_pixel == pixel_to_check){
+               result.block = found_block->block;
+               result.rotations_through_portal = found_block->portal_rotations;
+               return result;
+          }
+
+     }
+
+     return result;
+}
+
 Block_t* block_against_another_block(Position_t pos, BlockCut_t cut, Direction_t direction, QuadTreeNode_t<Block_t>* block_qt,
                                      QuadTreeNode_t<Interactive_t>* interactive_qt, TileMap_t* tilemap, Direction_t* push_dir){
      auto block_center = block_get_center(pos, cut);

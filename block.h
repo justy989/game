@@ -24,6 +24,14 @@ enum BlockHeldBy_t{
      BLOCK_HELD_BY_ENTANGLE = 2,
 };
 
+enum BlockCorner_t{
+     BLOCK_CORNER_BOTTOM_LEFT,
+     BLOCK_CORNER_BOTTOM_RIGHT,
+     BLOCK_CORNER_TOP_LEFT,
+     BLOCK_CORNER_TOP_RIGHT,
+     BLOCK_CORNER_COUNT,
+};
+
 struct TransferMomentum_t{
      S16 mass;
      F32 vel;
@@ -113,6 +121,8 @@ S16 block_get_top_inclusive_pixel(S16 pixel, BlockCut_t cut);
 Pixel_t block_bottom_right_pixel(Pixel_t block, BlockCut_t cut);
 Pixel_t block_top_left_pixel(Pixel_t block, BlockCut_t cut);
 Pixel_t block_top_right_pixel(Pixel_t block, BlockCut_t cut);
+Pixel_t block_get_corner_pixel(Pixel_t block, BlockCut_t cut, BlockCorner_t corner);
+Pixel_t block_get_corner_pixel(Block_t* block, BlockCorner_t corner);
 
 Position_t block_get_position(Block_t* block);
 Vec_t block_get_pos_delta(Block_t* block);
@@ -126,6 +136,8 @@ S8 blocks_rotations_between(Block_t* a, Block_t* b);
 
 S16 block_get_mass(Block_t* b);
 S16 block_get_mass(BlockCut_t cut);
+
+const char* block_corner_to_string(BlockCorner_t corner);
 
 #define MAX_BLOCKS_IN_LIST 128
 
