@@ -1,5 +1,5 @@
 CC      := clang++
-FLAGS 	:= -Wall -Werror -Wshadow -Wextra -std=c++11 -ggdb3 -DDEBUG 
+FLAGS 	:= -Wall -Werror -Wshadow -Wextra -std=c++11
 LINK  	:= -lSDL2 -pthread
 OBJ_DIR := ./objects
 EXE   	:= game
@@ -22,6 +22,9 @@ else
 	endif
 endif
 
+debug: FLAGS += -ggdb3 -DDEBUG
+debug: all
+
 all: $(EXE)
 
 $(EXE): $(OBJECTS)
@@ -31,10 +34,10 @@ $(OBJ_DIR)/%.o: %.cpp
 	@mkdir -p $(@D)
 	$(CC) $(FLAGS) -c $< -o $@
 
-.PHONY: all clean release
+.PHONY: all clean release debug
 
 release: FLAGS += -O3
 release: all
 
 clean:
-	-@rm -rvf $(EXE) $(OBJ_DIR)/*
+	-@rm -rf $(EXE) $(OBJ_DIR)/*
