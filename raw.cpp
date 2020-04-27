@@ -28,7 +28,7 @@ Raw_t raw_load_file(const char* filename)
 
      size_t items_read = fread(raw.bytes, (size_t)(raw.byte_count), 1, file);
      if(items_read != 1){
-          fprintf(stderr, "%s() failed to read %lu bytes from %s\n", __FUNCTION__, raw.byte_count, filename);
+          fprintf(stderr, "%s() failed to read %" PRIu64 " bytes from %s\n", __FUNCTION__, raw.byte_count, filename);
           memset(&raw, 0, sizeof(raw));
           fclose(file);
           return raw;
