@@ -1,5 +1,7 @@
 #pragma once
 
+#define __STDC_FORMAT_MACROS
+#include <cinttypes>
 #include <cstdint>
 
 typedef int8_t  S8;
