@@ -103,27 +103,18 @@ build the entangled pushes before the loop and then when invalidating, we need t
 #include <dirent.h>
 
 #include "log.h"
-#include "defines.h"
 #include "direction.h"
-#include "bitmap.h"
 #include "conversion.h"
-#include "object_array.h"
 #include "portal_exit.h"
-#include "block.h"
 #include "utils.h"
 #include "map_format.h"
 #include "draw.h"
 #include "block_utils.h"
-#include "demo.h"
 #include "collision.h"
 #include "world.h"
 #include "editor.h"
 #include "utils.h"
 #include "tags.h"
-#include "camera.h"
-
-// TODO: remove
-#include "static_object_array.h"
 
 #define THUMBNAIL_DIMENSION 128
 
