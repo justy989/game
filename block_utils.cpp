@@ -415,6 +415,8 @@ Block_t* check_portal_for_centroid_with_block(PortalExit_t* portal_exits, Coord_
 Block_t* rotated_entangled_blocks_against_centroid(Block_t* block, Direction_t direction, QuadTreeNode_t<Block_t>* block_qt,
                                                    ObjectArray_t<Block_t>* blocks_array,
                                                    QuadTreeNode_t<Interactive_t>* interactive_qt, TileMap_t* tilemap){
+     if(block->entangle_index < 0) return NULL;
+
      auto block_center = block_get_center(block);
      Rect_t rect = rect_to_check_surrounding_blocks(block_center.pixel);
 

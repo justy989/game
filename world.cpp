@@ -1791,6 +1791,18 @@ bool resolve_push_against_block(Block_t* block, MoveDirection_t move_direction, 
      return true;
 }
 
+bool is_block_against_solid_centroid(Block_t* block, Direction_t direction, F32 force, World_t* world){
+     Block_t* entangled_block = rotated_entangled_blocks_against_centroid(block, direction, world->block_qt, &world->blocks, world->interactive_qt, &world->tilemap);
+     if(entangled_block){
+          S16 block_mass = block_get_mass(block);
+          S16 entangled_block_mass = block_get_mass(entangled_block);
+          F32 mass_ratio = (F32)(block_mass) / (F32)(entangled_block_mass);
+          if((mass_ratio * force) >= 1.0f) return true;
+     }
+
+     return false;
+}
+
 BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Direction_t direction, World_t* world, bool pushed_by_ice, F32 force, TransferMomentum_t* instant_momentum,
                              PushFromEntangler_t* from_entangler){
      // LOG("block_push() %d -> %s with force %f\n", get_block_index(world, block), direction_to_string(direction), force);
@@ -1872,12 +1884,8 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
           auto against_block = rotated_entangled_blocks_against_centroid(block, direction, world->block_qt, &world->blocks,
                                                                          world->interactive_qt, &world->tilemap);
           if(against_block){
-               // TODO: compress this logic with the logic in block_pushable()
                // given the current force, and masses, can this push move the entangled block anyways?
-               S16 block_mass = block_get_mass(block);
-               S16 entangled_block_mass = block_get_mass(against_block);
-               F32 mass_ratio = (F32)(block_mass) / (F32)(entangled_block_mass);
-               if((mass_ratio * force) >= 1.0f) return result;
+               if(is_block_against_solid_centroid(block, direction, force, world)) return result;
           }
      }
 
@@ -2034,16 +2042,7 @@ bool block_pushable(Block_t* block, Direction_t direction, World_t* world, F32 f
           }
      }
 
-     if(block->entangle_index >= 0){
-          Block_t* entangled_block = rotated_entangled_blocks_against_centroid(block, direction, world->block_qt, &world->blocks, world->interactive_qt, &world->tilemap);
-          if(entangled_block){
-               S16 block_mass = block_get_mass(block);
-               S16 entangled_block_mass = block_get_mass(entangled_block);
-               F32 mass_ratio = (F32)(block_mass) / (F32)(entangled_block_mass);
-               if((mass_ratio * force) >= 1.0f) return false;
-          }
-     }
-
+     if(is_block_against_solid_centroid(block, direction, force, world)) return false;
      if(block_against_solid_tile(block, direction, &world->tilemap)) return false;
      if(block_against_solid_interactive(block, direction, &world->tilemap, world->interactive_qt)) return false;
 
