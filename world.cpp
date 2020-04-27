@@ -14,6 +14,7 @@
 #include <string.h>
 #include <math.h>
 #include <stdlib.h>
+#include <errno.h>
 
 static int ascending_block_height_comparer(const void* a, const void* b){
     Block_t* real_a = *(Block_t**)(a);
@@ -43,10 +44,8 @@ LogMapNumberResult_t load_map_number(S32 map_number, Coord_t* player_start, Worl
      // search through directory to find file starting with 3 digit map number
      DIR* d = opendir("content");
      if(!d){
-         printf("load_map_number: opendir() failed\n");
+         LOG("load_map_number(): opendir() failed: %s\n", strerror(errno));
          return result;
-     }else{
-         printf("load_map_number: opendir() success\n");
      }
      struct dirent* dir;
      char filepath[512] = {};

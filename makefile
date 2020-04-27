@@ -3,7 +3,7 @@ FLAGS 	:= -Wall -Werror -Wshadow -Wextra -std=c++11
 LINK  	:= -lSDL2 -pthread
 OBJ_DIR := ./objects
 EXE   	:= game
-SRC     := $(wildcard *.cpp) \
+SRC     := $(wildcard *.cpp)
 
 OBJECTS := $(SRC:%.cpp=$(OBJ_DIR)/%.o)
 
@@ -14,15 +14,15 @@ else
 	UNAME_S := $(shell uname -s)
 	ifeq ($(UNAME_S),Linux)
 		LINK += -lGL
-
+		DBFLAGS = -ggdb3 -DDEBUG
 	endif
 	ifeq ($(UNAME_S),Darwin)
 		LINK += -framework OpenGL
-
+		DBFLAGS = -g
 	endif
 endif
 
-debug: FLAGS += -ggdb3 -DDEBUG
+debug: FLAGS += $(DBFLAGS)
 debug: all
 
 all: $(EXE)
@@ -40,4 +40,4 @@ release: FLAGS += -O3
 release: all
 
 clean:
-	-@rm -rf $(EXE) $(OBJ_DIR)/*
+	-@rm -rf $(EXE) $(OBJ_DIR)
