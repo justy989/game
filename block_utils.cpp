@@ -200,7 +200,7 @@ BlockAgainstOthersResult_t block_against_other_blocks(Position_t pos, BlockCut_t
           if(block_against_block_in_list(pos, cut, blocks + i, 1, direction, portal_offsets)){
                BlockAgainstOther_t against_other {};
                against_other.block = blocks[i];
-               result.add(against_other);
+               result.insert(&against_other);
           }
      }
 
@@ -215,7 +215,7 @@ BlockAgainstOthersResult_t block_against_other_blocks(Position_t pos, BlockCut_t
               against_other.block = blocks[i];
               against_other.rotations_through_portal = found_block->rotations_between_portals;
               against_other.through_portal = true;
-              result.add(against_other);
+              result.insert(&against_other);
          }
      }
 
@@ -1464,9 +1464,9 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                     auto against_result = block_against_other_blocks(last_block_in_chain_final_pos, last_block_in_chain->cut,
                                                                      against_direction, world->block_qt, world->interactive_qt, &world->tilemap);
                     if(against_result.count > 0){
-                         last_block_in_chain = against_result.againsts[0].block;
-                         against_direction = direction_rotate_clockwise(against_direction, against_result.againsts[0].rotations_through_portal);
-                         rotations_between_last_in_chain += against_result.againsts[0].rotations_through_portal;
+                         last_block_in_chain = against_result.objects[0].block;
+                         against_direction = direction_rotate_clockwise(against_direction, against_result.objects[0].rotations_through_portal);
+                         rotations_between_last_in_chain += against_result.objects[0].rotations_through_portal;
                     }else{
                          break;
                     }
@@ -1646,18 +1646,18 @@ DealWithPushResult_t deal_with_push_result(Block_t* pusher, Direction_t directio
                                                             world->block_qt, world->interactive_qt, &world->tilemap);
 
          // ignore if we are against ourselves
-         if(adjacent_results.count && adjacent_results.againsts[0].block != block_receiving_force){
-             auto new_direction_to_check = direction_rotate_clockwise(direction_to_check, adjacent_results.againsts[0].rotations_through_portal);
+         if(adjacent_results.count && adjacent_results.objects[0].block != block_receiving_force){
+             auto new_direction_to_check = direction_rotate_clockwise(direction_to_check, adjacent_results.objects[0].rotations_through_portal);
 
              // if the relevant vel is 0, then the most recent connected block is the one that can absorb the energy of the collision
              // this happens when a block falls off of another block (into a slot) and collides with another block all at the same time
              bool horizontal_direction = direction_is_horizontal(new_direction_to_check);
-             F32 vel = horizontal_direction ? adjacent_results.againsts[0].block->vel.x : adjacent_results.againsts[0].block->vel.y;
+             F32 vel = horizontal_direction ? adjacent_results.objects[0].block->vel.x : adjacent_results.objects[0].block->vel.y;
              if(vel == 0) break;
 
              // end the chain early for blocks that have already received from this chain
-             if(adjacent_results.againsts[0].block->already_received_forceback_from_chain){
-                 adjacent_results.againsts[0].block->already_received_forceback_from_chain = false;
+             if(adjacent_results.objects[0].block->already_received_forceback_from_chain){
+                 adjacent_results.objects[0].block->already_received_forceback_from_chain = false;
                  break;
              }
 
@@ -1668,9 +1668,9 @@ DealWithPushResult_t deal_with_push_result(Block_t* pusher, Direction_t directio
                  if(pusher->vel.y != 0 && pusher->vertical_move.state == MOVE_STATE_IDLING) pusher->vertical_move.state = MOVE_STATE_COASTING;
              }
 
-             block_receiving_force = adjacent_results.againsts[0].block;
-             direction_to_check = direction_rotate_clockwise(direction_to_check, adjacent_results.againsts[0].rotations_through_portal);
-             total_against_rotations += adjacent_results.againsts[0].rotations_through_portal;
+             block_receiving_force = adjacent_results.objects[0].block;
+             direction_to_check = direction_rotate_clockwise(direction_to_check, adjacent_results.objects[0].rotations_through_portal);
+             total_against_rotations += adjacent_results.objects[0].rotations_through_portal;
              total_against_rotations %= DIRECTION_COUNT;
          }else{
              break;
@@ -2086,9 +2086,19 @@ FindBlocksThroughPortalResult_t find_blocks_through_portals(Coord_t coord, TileM
 
                          block_final_pos.pixel -= block_center_pixel_offset(rotated_cut);
 
-                         result.add_block_through_portal(block_final_pos, block, check_coord, portal_dst_coord,
-                                                         interactive->portal.face, current_portal_dir, portal_rotations,
-                                                         rotations_between_portals, rotated_cut);
+                         bool duplicate = false;
+                         for(S16 t = 0; t < result.count; t++){
+                              if(block == result.blocks[t].block && block_final_pos == result.blocks[t].position){
+                                   duplicate = true;
+                                   break;
+                              }
+                         }
+
+                         if(!duplicate){
+                              result.add_block_through_portal(block_final_pos, block, check_coord, portal_dst_coord,
+                                                              interactive->portal.face, current_portal_dir, portal_rotations,
+                                                              rotations_between_portals, rotated_cut);
+                         }
                     }
                }
           }
@@ -2119,9 +2129,10 @@ BlockChainsResult_t find_block_chain(Block_t* block, Direction_t direction, Quad
      BlockChain_t* current_chain = NULL;
 
      for(S16 i = 0; i < against_result.count; i++){
-          Direction_t against_direction = direction_rotate_clockwise(direction, against_result.againsts[i].rotations_through_portal);
+          BlockAgainstOther_t* against_entry = against_result.objects + i;
+          Direction_t against_direction = direction_rotate_clockwise(direction, against_entry->rotations_through_portal);
 
-          S8 against_rotations = (rotations + against_result.againsts[i].rotations_through_portal) % DIRECTION_COUNT;
+          S8 against_rotations = (rotations + against_entry->rotations_through_portal) % DIRECTION_COUNT;
 
           BlockChain_t potential_new_chain {};
 
@@ -2134,11 +2145,11 @@ BlockChainsResult_t find_block_chain(Block_t* block, Direction_t direction, Quad
           }
 
           BlockChainEntry_t block_chain_entry {};
-          block_chain_entry.block = against_result.againsts[i].block;
-          block_chain_entry.rotations_through_portal = against_result.againsts[i].rotations_through_portal;
+          block_chain_entry.block = against_entry->block;
+          block_chain_entry.rotations_through_portal = against_entry->rotations_through_portal;
           current_chain->add(&block_chain_entry);
 
-          auto merge_result = find_block_chain(against_result.againsts[i].block, against_direction,
+          auto merge_result = find_block_chain(against_entry->block, against_direction,
                                                block_qt, interactive_qt, tilemap, against_rotations, current_chain);
 
           if(merge_result.count == 0){

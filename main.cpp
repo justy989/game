@@ -1683,7 +1683,7 @@ void set_against_blocks_coasting_from_player(Block_t* block, Direction_t directi
                                                       direction, world->block_qt, world->interactive_qt, &world->tilemap);
 
      for(S16 a = 0; a < against_result.count; a++){
-         auto* against_other = against_result.againsts + a;
+         auto* against_other = against_result.objects + a;
          Direction_t against_direction = direction_rotate_clockwise(direction, against_other->rotations_through_portal);
 
          if(direction_is_horizontal(against_direction)){
@@ -2024,7 +2024,7 @@ bool find_and_update_connected_teleported_block(Block_t* block, Direction_t dire
      }
 
      for(S16 a = 0; a < against_result.count; a++){
-         auto* against_other = against_result.againsts + a;
+         auto* against_other = against_result.objects + a;
 
          if(!against_other->through_portal && !block->teleport) continue;
 
@@ -4471,7 +4471,7 @@ int main(int argc, char** argv){
                                       }
 
                                       for(S16 a = 0; a < against_result.count; a++){
-                                          auto* against_other = against_result.againsts + a;
+                                          auto* against_other = against_result.objects + a;
 
                                           if(get_block_index(&world, against_other->block) != block->connected_teleport.block_index) continue;
 

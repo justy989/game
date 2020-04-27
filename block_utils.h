@@ -309,6 +309,9 @@ struct BlockAgainstOther_t{
      bool through_portal = false;
 };
 
+using BlockAgainstOthersResult_t = StaticObjectArray_t<BlockAgainstOther_t, MAX_BLOCKS_AGAINST_BLOCK>;
+
+#if 0
 struct BlockAgainstOthersResult_t{
      BlockAgainstOther_t againsts[MAX_BLOCKS_AGAINST_BLOCK];
      S16 count = 0;
@@ -324,6 +327,7 @@ struct BlockAgainstOthersResult_t{
           return true;
      }
 };
+#endif
 
 #define MAX_BLOCKS_IN_CHAIN 16
 

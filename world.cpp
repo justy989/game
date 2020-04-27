@@ -367,8 +367,8 @@ void slow_block_toward_gridlock(World_t* world, Block_t* block, Direction_t dire
      auto against_result = block_against_other_blocks(block->pos + block->pos_delta, block->cut, direction_opposite(direction),
                                                       world->block_qt, world->interactive_qt, &world->tilemap);
      for(S16 i = 0; i < against_result.count; i++){
-         Direction_t against_direction = direction_rotate_clockwise(direction, against_result.againsts[i].rotations_through_portal);
-         Block_t* against_block = against_result.againsts[i].block;
+         Direction_t against_direction = direction_rotate_clockwise(direction, against_result.objects[i].rotations_through_portal);
+         Block_t* against_block = against_result.objects[i].block;
 
          // we don't want to impact a block that is colliding with the block as we are stopping it, but rather a
          // gaggle of blocks sliding together that the player is stopping
@@ -508,8 +508,8 @@ void stop_against_blocks_moving_with_block(World_t* world, Block_t* block, Direc
     auto against_result = block_against_other_blocks(block->pos + block->pos_delta, block->cut, direction,
                                                      world->block_qt, world->interactive_qt, &world->tilemap);
     for(S16 i = 0; i < against_result.count; i++){
-        Direction_t against_direction = direction_rotate_clockwise(direction, against_result.againsts[i].rotations_through_portal);
-        Block_t* against_block = against_result.againsts[i].block;
+        Direction_t against_direction = direction_rotate_clockwise(direction, against_result.objects[i].rotations_through_portal);
+        Block_t* against_block = against_result.objects[i].block;
         Position_t against_center = block_get_center(against_block);
         Position_t new_against_center = against_center;
 
@@ -1824,7 +1824,7 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
 
           for(S16 i = 0; i < against_result.count; i++){
                if(!resolve_push_against_block(block, move_direction, pushed_by_ice, pushed_block_on_ice, force,
-                                              instant_momentum, from_entangler, against_result.againsts + i, against_result.count,
+                                              instant_momentum, from_entangler, against_result.objects + i, against_result.count,
                                               world, &result, &transfers_force)){
                     return result;
                }
@@ -2581,13 +2581,13 @@ static void get_touching_blocks_in_direction(World_t* world, Block_t* block, Dir
                                               world->interactive_qt, &world->tilemap);
      for(S16 i = 0; i < result.count; i++){
           Direction_t result_direction = direction;
-          result_direction = direction_rotate_clockwise(result_direction, result.againsts[i].rotations_through_portal);
-          auto result_block = result.againsts[i].block;
+          result_direction = direction_rotate_clockwise(result_direction, result.objects[i].rotations_through_portal);
+          auto result_block = result.objects[i].block;
 
           if((require_on_ice && block_on_ice(result_block->pos, result_block->pos_delta, result_block->cut,
                                              &world->tilemap, world->interactive_qt, world->block_qt)) ||
               !require_on_ice){
-               get_block_stack(world, result_block, block_list, result.againsts[i].rotations_through_portal);
+               get_block_stack(world, result_block, block_list, result.objects[i].rotations_through_portal);
                get_touching_blocks_in_direction(world, result_block, result_direction, block_list, require_on_ice);
           }
      }
