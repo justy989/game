@@ -120,11 +120,11 @@ F32 calc_accel_from_stop(F32 distance, F32 time);
 F32 calc_accel_across_distance(F32 vel, F32 distance, F32 time);
 DecelToStopResult_t calc_decel_to_stop(F32 initial_pos, F32 final_pos, F32 initial_velocity);
 
-F32 begin_stopping_grid_aligned_motion(BlockCut_t cut, MotionComponent_t* motion, F32 pos, S16 mass);
+F32 begin_stopping_grid_aligned_motion(BlockCut_t cut, MotionComponent_t* motion, S16 pos_pixel, F32 pos_decimal, S16 mass);
 
 void update_motion_free_form(Move_t* move, MotionComponent_t* motion, bool positive_key_down, bool negative_key_down,
                              F32 dt, F32 accel, F32 accel_distance);
-void update_motion_grid_aligned(BlockCut_t cut, Move_t* move, MotionComponent_t* motion, bool coast, F32 dt, F32 pos, S16 mass);
+void update_motion_grid_aligned(BlockCut_t cut, Move_t* move, MotionComponent_t* motion, bool coast, F32 dt, S16 pos_pixel, F32 pos_decimal, S16 mass);
 
 F32 calc_position_motion(F32 v, F32 a, F32 dt);
 F32 calc_velocity_motion(F32 v, F32 a, F32 dt);

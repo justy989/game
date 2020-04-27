@@ -2181,6 +2181,8 @@ int main(int argc, char** argv){
           return -1;
      }
 
+     LOG("%.10f\n", PIXEL_SIZE);
+
      if(test && !load_map_filepath && !suite){
           LOG("cannot test without specifying a map to load\n");
           return 1;
@@ -4196,9 +4198,6 @@ int main(int argc, char** argv){
                for(S16 i = 0; i < world.blocks.count; i++){
                     Block_t* block = world.blocks.elements + i;
 
-                    // TODO: creating this potentially big vector could lead to precision issues
-                    Vec_t pos_vec = pos_to_vec(block->pos);
-
                     MotionComponent_t x_component = motion_x_component(block);
                     MotionComponent_t y_component = motion_y_component(block);
 
@@ -4232,11 +4231,11 @@ int main(int argc, char** argv){
 
                     update_motion_grid_aligned(block->cut, &block->horizontal_move, &x_component,
                                                coasting_horizontally, dt,
-                                               pos_vec.x, mass);
+                                               block->pos.pixel.x, block->pos.decimal.x, mass);
 
                     update_motion_grid_aligned(block->cut, &block->vertical_move, &y_component,
                                                coasting_vertically, dt,
-                                               pos_vec.y, mass);
+                                               block->pos.pixel.y, block->pos.decimal.y, mass);
                }
 
                BlockPushes_t<128> all_block_pushes; // TODO: is 128 this enough ?
@@ -5233,7 +5232,6 @@ int main(int argc, char** argv){
                          block->pos.pixel.y = final_pos.pixel.y;
                          block->pos.decimal.y = final_pos.decimal.y;
                     }
-
                }
 
                // have player push block

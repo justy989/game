@@ -235,27 +235,38 @@ void update_motion_free_form(Move_t* move, MotionComponent_t* motion, bool posit
      }
 }
 
-F32 begin_stopping_grid_aligned_motion(BlockCut_t cut, MotionComponent_t* motion, F32 pos, S16 mass){
+F32 begin_stopping_grid_aligned_motion(BlockCut_t cut, MotionComponent_t* motion, S16 pos_pixel, F32 pos_decimal, S16 mass){
      S16 lowest_dim = block_get_lowest_dimension(cut);
 
-     F32 final_pos = pos + motion->ref->pos_delta;
+     // we are using x's not because we are operating on necessarily x's but so we can re-use code
+
+     Vec_t pos_delta {};
+     pos_delta.x = motion->ref->pos_delta;
+
+     Position_t position {};
+     position.pixel.x = pos_pixel;
+     position.decimal.x = pos_decimal;
+
+     Position_t final_pos = position + pos_delta;;
+     Position_t goal {};
 
      bool positive = motion->ref->vel >= 0;
-     F32 goal = 0;
      if(motion->ref->stop_distance_pixel > 0){
          S16 stop_distance_pixels = motion->ref->stop_distance_pixel;
          if(!positive) stop_distance_pixels = -stop_distance_pixels;
-         goal = closest_grid_center_pixel(lowest_dim, (S16)((final_pos) / PIXEL_SIZE) + stop_distance_pixels) * PIXEL_SIZE;
+         goal.pixel.x = closest_grid_center_pixel(lowest_dim, final_pos.pixel.x + stop_distance_pixels);
      }else{
-         goal = closest_grid_center_pixel(lowest_dim, (S16)(final_pos / PIXEL_SIZE)) * PIXEL_SIZE;
+         goal.pixel.x = closest_grid_center_pixel(lowest_dim, final_pos.pixel.x);
 
          if(positive){
-              if(goal < final_pos){
-                   goal += (lowest_dim * PIXEL_SIZE);
+              if(goal.pixel.x < final_pos.pixel.x ||
+                 (goal.pixel.x == final_pos.pixel.x && goal.decimal.x < final_pos.decimal.x)){
+                   goal.pixel.x += lowest_dim;
               }
          }else{
-              if(goal > final_pos){
-                   goal -= (lowest_dim * PIXEL_SIZE);
+              if(goal.pixel.x > final_pos.pixel.x ||
+                 (goal.pixel.x == final_pos.pixel.x && goal.decimal.x > final_pos.decimal.x)){
+                   goal.pixel.x -= lowest_dim;
               }
          }
 
@@ -267,13 +278,16 @@ F32 begin_stopping_grid_aligned_motion(BlockCut_t cut, MotionComponent_t* motion
          if(grid_cells_to_travel > 1) add_global_tag(TAG_BLOCK_MULTIPLE_INTERVALS_TO_STOP);
 
          if(positive){
-              goal += (lowest_dim * PIXEL_SIZE) * (F32)(grid_cells_to_travel);
+              goal.pixel.x += lowest_dim * grid_cells_to_travel;
          }else{
-              goal -= (lowest_dim * PIXEL_SIZE) * (F32)(grid_cells_to_travel);
+              goal.pixel.x -= lowest_dim * grid_cells_to_travel;
          }
      }
 
-     auto decel_result = calc_decel_to_stop(final_pos, goal, motion->ref->vel);
+     Position_t goal_distance_pos = goal - final_pos;
+     Vec_t goal_distance = pos_to_vec(goal_distance_pos);
+
+     auto decel_result = calc_decel_to_stop(0, goal_distance.x, motion->ref->vel);
      return decel_result.accel;
 }
 
@@ -304,14 +318,14 @@ F32 calc_coast_motion_time_left(BlockCut_t cut, F32 pos, F32 vel){
      return (find_next_grid_center(cut, pos, vel) - pos) / vel;
 }
 
-void update_motion_grid_aligned(BlockCut_t cut, Move_t* move, MotionComponent_t* motion, bool coast, F32 dt, F32 pos, S16 mass){
+void update_motion_grid_aligned(BlockCut_t cut, Move_t* move, MotionComponent_t* motion, bool coast, F32 dt, S16 pos_pixel, F32 pos_decimal, S16 mass){
      switch(move->state){
      default:
      case MOVE_STATE_IDLING:
           break;
      case MOVE_STATE_COASTING:
           if(!coast){
-               motion->ref->accel = begin_stopping_grid_aligned_motion(cut, motion, pos, mass);
+               motion->ref->accel = begin_stopping_grid_aligned_motion(cut, motion, pos_pixel, pos_decimal, mass);
                move->state = MOVE_STATE_STOPPING;
                motion->ref->stop_distance_pixel = 0;
           }
@@ -355,7 +369,7 @@ void update_motion_grid_aligned(BlockCut_t cut, Move_t* move, MotionComponent_t*
                          motion->ref->stop_distance_pixel = 0;
                     }
                }else{
-                    new_accel = begin_stopping_grid_aligned_motion(cut, &sim_motion, pos, mass);
+                    new_accel = begin_stopping_grid_aligned_motion(cut, &sim_motion, pos_pixel, pos_decimal, mass);
                     new_move_state = MOVE_STATE_STOPPING;
                     motion->ref->stop_distance_pixel = 0;
                }
@@ -382,8 +396,17 @@ void update_motion_grid_aligned(BlockCut_t cut, Move_t* move, MotionComponent_t*
 
                    S16 lower_dim = block_get_lowest_dimension(cut);
 
-                   motion->ref->stop_on_pixel = closest_grid_center_pixel(lower_dim, (S16)(pos / PIXEL_SIZE));
-                   motion->ref->pos_delta = (motion->ref->stop_on_pixel * PIXEL_SIZE) - pos;
+
+                   motion->ref->stop_on_pixel = closest_grid_center_pixel(lower_dim, pos_pixel);
+
+                   Position_t stop_on_pos {};
+                   stop_on_pos.pixel.x = motion->ref->stop_on_pixel;
+
+                   Position_t pos {};
+                   pos.pixel.x = pos_pixel;
+                   pos.decimal.x = pos_decimal;
+
+                   motion->ref->pos_delta = pos_to_vec(stop_on_pos - pos).x;
                }else{
                    move->state = MOVE_STATE_COASTING;
                }

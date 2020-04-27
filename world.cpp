@@ -347,7 +347,6 @@ void slow_block_toward_gridlock(World_t* world, Block_t* block, Direction_t dire
      move->state = MOVE_STATE_STOPPING;
      move->distance = 0;
 
-     auto pos = pos_to_vec(block->pos);
      auto block_mass = get_block_stack_mass(world, block);
      F32 block_vel = 0;
 
@@ -356,12 +355,12 @@ void slow_block_toward_gridlock(World_t* world, Block_t* block, Direction_t dire
      if(direction_is_horizontal(direction)){
           block->stopped_by_player_horizontal = true;
           auto motion = motion_x_component(block);
-          block->accel.x = begin_stopping_grid_aligned_motion(block->cut, &motion, pos.x, block_mass); // adjust by one tick since we missed this update
+          block->accel.x = begin_stopping_grid_aligned_motion(block->cut, &motion, block->pos.pixel.x, block->pos.decimal.x, block_mass); // adjust by one tick since we missed this update
           block_vel = block->vel.x;
      }else{
           block->stopped_by_player_vertical = true;
           auto motion = motion_y_component(block);
-          block->accel.y = begin_stopping_grid_aligned_motion(block->cut, &motion, pos.y, block_mass); // adjust by one tick since we missed this update
+          block->accel.y = begin_stopping_grid_aligned_motion(block->cut, &motion, block->pos.pixel.y, block->pos.decimal.y, block_mass); // adjust by one tick since we missed this update
           block_vel = block->vel.y;
      }
 

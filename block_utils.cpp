@@ -1453,7 +1453,8 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
 
                while(true){
                     // TODO: handle multiple against blocks
-                    auto against_result = block_against_other_blocks(last_block_in_chain->pos + last_block_in_chain->pos_delta, last_block_in_chain->cut,
+                    Position_t last_block_in_chain_final_pos = block_get_final_position(last_block_in_chain);
+                    auto against_result = block_against_other_blocks(last_block_in_chain_final_pos, last_block_in_chain->cut,
                                                                      against_direction, world->block_qt, world->interactive_qt, &world->tilemap);
                     if(against_result.count > 0){
                          last_block_in_chain = against_result.againsts[0].block;
