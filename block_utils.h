@@ -311,24 +311,6 @@ struct BlockAgainstOther_t{
 
 using BlockAgainstOthersResult_t = StaticObjectArray_t<BlockAgainstOther_t, MAX_BLOCKS_AGAINST_BLOCK>;
 
-#if 0
-struct BlockAgainstOthersResult_t{
-     BlockAgainstOther_t againsts[MAX_BLOCKS_AGAINST_BLOCK];
-     S16 count = 0;
-
-     bool add(BlockAgainstOther_t against_other){
-          if(count >= MAX_BLOCKS_AGAINST_BLOCK) return false;
-          // refuse duplicates
-          for(S8 i = 0; i < count; i++){
-               if(againsts[i].block == against_other.block) return false;
-          }
-          againsts[count] = against_other;
-          count++;
-          return true;
-     }
-};
-#endif
-
 #define MAX_BLOCKS_IN_CHAIN 16
 
 struct BlockChainEntry_t{
@@ -336,62 +318,24 @@ struct BlockChainEntry_t{
      S8 rotations_through_portal = 0;
 };
 
-struct BlockChain_t{
-     BlockChainEntry_t entries[MAX_BLOCKS_IN_CHAIN];
-     S16 count = 0;
-
-     bool add(BlockChainEntry_t* entry){
-          if(count >= MAX_BLOCKS_IN_CHAIN) return false;
-          entries[count] = *entry;
-          count++;
-          return true;
-     }
-};
-
-struct BlockChainsResult_t{
-     BlockChain_t chains[MAX_BLOCKS_AGAINST_BLOCK];
-     S16 count = 0;
-
-     bool add(BlockChain_t* chain){
-          if(count >= MAX_BLOCKS_AGAINST_BLOCK) return false;
-          chains[count] = *chain;
-          count++;
-          return true;
-     }
-};
+using BlockChain_t = StaticObjectArray_t<BlockChainEntry_t, MAX_BLOCKS_IN_CHAIN>;
+using BlockChainsResult_t = StaticObjectArray_t<BlockChain_t, MAX_BLOCKS_AGAINST_BLOCK>;
 
 struct BlockMomentumChange_t{
      S16 block_index = -1;
      S16 mass = 0;
      F32 vel = 0;
      bool x = false;
-};
 
-struct BlockMomentumChanges_t{
-     BlockMomentumChange_t changes[MAX_BLOCK_CHANGES];
-     S16 count = 0;
-
-     bool add(S16 block_index, S16 mass, F32 vel, bool x){
-          if(count >= MAX_BLOCK_CHANGES) return false;
-          changes[count].block_index = block_index;
-          changes[count].mass = mass;
-          changes[count].vel = vel;
-          changes[count].x = x;
-          count++;
-          return true;
-     }
-
-     void merge(BlockMomentumChanges_t* block_changes){
-          for(S16 i = 0; i < block_changes->count; i++){
-               auto* change = block_changes->changes + i;
-               add(change->block_index, change->mass, change->vel, change->x);
-          }
-     }
-
-     void clear(){
-          count = 0;
+     void init(S16 block_id, S16 masss, F32 velocity, bool is_x){
+          block_index = block_id;
+          mass = masss;
+          vel = velocity;
+          x = is_x;
      }
 };
+
+using BlockMomentumChanges_t = StaticObjectArray_t<BlockMomentumChange_t, MAX_BLOCK_CHANGES>;
 
 #define MAX_BLOCK_PUSHES 128
 
@@ -415,30 +359,7 @@ struct BlockThroughPortal_t{
 
 #define MAX_BLOCKS_FOUND_THROUGH_PORTALS 64
 
-struct FindBlocksThroughPortalResult_t{
-    BlockThroughPortal_t blocks[MAX_BLOCKS_FOUND_THROUGH_PORTALS];
-    S16 count = 0;
-
-    bool add_block_through_portal(Position_t pos, Block_t* block, Coord_t src_portal, Coord_t dst_portal,
-                                  Direction_t src_portal_dir, Direction_t dst_portal_dir,
-                                  S8 portal_rotations, S8 rotations_between_portals, BlockCut_t cut){
-        if(count >= MAX_BLOCKS_FOUND_THROUGH_PORTALS){
-            return false;
-        }
-
-        blocks[count].position = pos;
-        blocks[count].block = block;
-        blocks[count].src_portal = src_portal;
-        blocks[count].dst_portal = dst_portal;
-        blocks[count].src_portal_dir = src_portal_dir;
-        blocks[count].dst_portal_dir = dst_portal_dir;
-        blocks[count].portal_rotations = portal_rotations;
-        blocks[count].rotations_between_portals = rotations_between_portals;
-        blocks[count].rotated_cut = cut;
-        count++;
-        return true;
-    }
-};
+using FindBlocksThroughPortalResult_t = StaticObjectArray_t<BlockThroughPortal_t, MAX_BLOCKS_FOUND_THROUGH_PORTALS>;
 
 void add_block_held(BlockHeldResult_t* result, Block_t* block, Rect_t rect);
 void add_interactive_held(InteractiveHeldResult_t* result, Interactive_t* interactive, Rect_t rect);

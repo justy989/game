@@ -16,4 +16,17 @@ struct StaticObjectArray_t{
           count++;
           return true;
      }
+
+     bool merge(StaticObjectArray_t<T, N>* object_array){
+          for(S16 i = 0; i < object_array->count; i++){
+               if(!insert(object_array->objects + i)){
+                    return false;
+               }
+          }
+          return true;
+     }
+
+     void clear(){
+          count = 0;
+     }
 };

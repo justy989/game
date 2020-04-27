@@ -206,7 +206,7 @@ BlockAgainstOthersResult_t block_against_other_blocks(Position_t pos, BlockCut_t
 
      auto found_blocks = find_blocks_through_portals(pos_to_coord(block_center), tilemap, interactive_qt, block_qt, require_portal_on);
      for(S16 i = 0; i < found_blocks.count; i++){
-         auto* found_block = found_blocks.blocks + i;
+         auto* found_block = found_blocks.objects + i;
          blocks[i] = found_block->block;
          portal_offsets[i] = found_block->position - block_get_position(found_block->block);
 
@@ -268,7 +268,7 @@ BlockAgainstOther_t block_diagonally_against_block(Position_t pos, BlockCut_t cu
 
      auto found_blocks = find_blocks_through_portals(pos_to_coord(block_center), tilemap, interactive_qt, block_qt);
      for(S16 i = 0; i < found_blocks.count; i++){
-          auto* found_block = found_blocks.blocks + i;
+          auto* found_block = found_blocks.objects + i;
           BlockCut_t rotated_cut = block_cut_rotate_clockwise(found_block->block->cut, found_block->portal_rotations);
           Pixel_t corner_pixel = block_get_corner_pixel(found_block->position.pixel, rotated_cut, corner_to_check);
           if(corner_pixel == pixel_to_check){
@@ -303,7 +303,7 @@ Block_t* block_against_another_block(Position_t pos, BlockCut_t cut, Direction_t
 
      auto found_blocks = find_blocks_through_portals(pos_to_coord(block_center), tilemap, interactive_qt, block_qt);
      for(S16 i = 0; i < found_blocks.count; i++){
-         auto* found_block = found_blocks.blocks + i;
+         auto* found_block = found_blocks.objects + i;
          blocks[i] = found_block->block;
          auto block_pos = block_get_final_position(found_block->block);
          portal_offsets[i] = found_block->position - block_pos;
@@ -652,7 +652,7 @@ BlockInsideOthersResult_t block_inside_others(Position_t block_to_check_pos, Vec
 
      auto found_blocks = find_blocks_through_portals(block_coord, tilemap, interactive_qt, block_qt);
      for(S16 i = 0; i < found_blocks.count; i++){
-         auto* found_block = found_blocks.blocks + i;
+         auto* found_block = found_blocks.objects + i;
          blocks[i] = found_block->block;
          auto block_pos = block_get_final_position(found_block->block);
          portal_offsets[i] = found_block->position - block_pos;
@@ -664,7 +664,7 @@ BlockInsideOthersResult_t block_inside_others(Position_t block_to_check_pos, Vec
                                                   blocks, found_blocks.count, block_array, cuts, portal_offsets);
 
      for(S8 i = 0; i < inside_list_result.count; i++){
-         BlockThroughPortal_t* associated_found_block = found_blocks.blocks + inside_list_result.entries[i].entry_index;
+         BlockThroughPortal_t* associated_found_block = found_blocks.objects + inside_list_result.entries[i].entry_index;
 
          if(block_to_check_index == (inside_list_result.entries[i].block - block_array->elements) &&
             direction_in_mask(vec_direction_mask(block_to_check_pos_delta), associated_found_block->dst_portal_dir)){
@@ -851,7 +851,7 @@ static BlockHeldResult_t block_at_height_in_block_rect(Pixel_t block_to_check_pi
 
      auto found_blocks = find_blocks_through_portals(block_to_check_coord, tilemap, interactive_qt, block_qt);
      for(S16 i = 0; i < found_blocks.count; i++){
-         auto* found_block = found_blocks.blocks + i;
+         auto* found_block = found_blocks.objects + i;
 
          if(found_block->position.z != expected_height) continue;
 
@@ -1701,7 +1701,9 @@ DealWithPushResult_t deal_with_push_result(Block_t* pusher, Direction_t directio
 
              if(entangled){
                  // LOG("deal_with_push_result(): adding entangled momentum change for block %d at %f in the %s\n", block_receiving_force_index, collision.pusher_velocity, direction_is_horizontal(direction_to_check) ? "x" : "y");
-                 result.momentum_changes.add(block_receiving_force_index, collision.pusher_mass, collision.pusher_velocity, direction_is_horizontal(direction_to_check));
+                 BlockMomentumChange_t momentum_change {};
+                 momentum_change.init(block_receiving_force_index, collision.pusher_mass, collision.pusher_velocity, direction_is_horizontal(direction_to_check));
+                 result.momentum_changes.insert(&momentum_change);
                  result.new_vel = collision.pusher_velocity;
              }else{
                  if(opposite_entangle_reversed){
@@ -1714,7 +1716,9 @@ DealWithPushResult_t deal_with_push_result(Block_t* pusher, Direction_t directio
                  // LOG("deal_with_push_result(): final forceback direction %s on using momentum %d %f on block %d with momentum %d %f\n",
                  //     direction_to_string(direction_to_check), collision.pushee_mass, rotated_pushee_vel, block_receiving_force_index, pusher_momentum.mass, pusher_momentum.vel);
                  // LOG("  result vel: %f\n", elastic_result.first_final_velocity);
-                 result.momentum_changes.add(block_receiving_force_index, pusher_momentum.mass, elastic_result.first_final_velocity, direction_is_horizontal(direction_to_check));
+                 BlockMomentumChange_t momentum_change {};
+                 momentum_change.init(block_receiving_force_index, pusher_momentum.mass, elastic_result.first_final_velocity, direction_is_horizontal(direction_to_check));
+                 result.momentum_changes.insert(&momentum_change);
                  result.new_vel = elastic_result.first_final_velocity;
              }
          }
@@ -1722,7 +1726,9 @@ DealWithPushResult_t deal_with_push_result(Block_t* pusher, Direction_t directio
 
      if(!transferred_momentum_back && !entangled){
          // LOG("deal_with_push_result(): stopping block: %d in the %s\n", block_receiving_force_index, direction_is_horizontal(direction_to_check) ? "x" : "y");
-         result.momentum_changes.add(block_receiving_force_index, pusher_momentum.mass, 0.0f, direction_is_horizontal(direction_to_check));
+         BlockMomentumChange_t momentum_change {};
+         momentum_change.init(block_receiving_force_index, pusher_momentum.mass, 0.0f, direction_is_horizontal(direction_to_check));
+         result.momentum_changes.insert(&momentum_change);
      }
 
      return result;
@@ -2031,7 +2037,7 @@ BlockCollisionPushResult_t block_collision_push(BlockPush_t* push, World_t* worl
 
 FindBlocksThroughPortalResult_t find_blocks_through_portals(Coord_t coord, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt, QuadTreeNode_t<Block_t>* block_qt,
                                                             bool require_on){
-    FindBlocksThroughPortalResult_t result;
+     FindBlocksThroughPortalResult_t result;
 
      S16 block_count = 0;
      Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
@@ -2088,16 +2094,26 @@ FindBlocksThroughPortalResult_t find_blocks_through_portals(Coord_t coord, TileM
 
                          bool duplicate = false;
                          for(S16 t = 0; t < result.count; t++){
-                              if(block == result.blocks[t].block && block_final_pos == result.blocks[t].position){
+                              if(block == result.objects[t].block && block_final_pos == result.objects[t].position){
                                    duplicate = true;
                                    break;
                               }
                          }
 
                          if(!duplicate){
-                              result.add_block_through_portal(block_final_pos, block, check_coord, portal_dst_coord,
-                                                              interactive->portal.face, current_portal_dir, portal_rotations,
-                                                              rotations_between_portals, rotated_cut);
+                              BlockThroughPortal_t block_through_portal {};
+
+                              block_through_portal.position = block_final_pos;
+                              block_through_portal.block = block;
+                              block_through_portal.src_portal_dir = interactive->portal.face;
+                              block_through_portal.dst_portal_dir = current_portal_dir;
+                              block_through_portal.src_portal = check_coord;
+                              block_through_portal.dst_portal = portal_dst_coord;
+                              block_through_portal.portal_rotations = portal_rotations;
+                              block_through_portal.rotations_between_portals = rotations_between_portals;
+                              block_through_portal.rotated_cut = rotated_cut;
+
+                              result.insert(&block_through_portal);
                          }
                     }
                }
@@ -2123,7 +2139,7 @@ BlockChainsResult_t find_block_chain(Block_t* block, Direction_t direction, Quad
           BlockChainEntry_t block_chain_entry {};
           block_chain_entry.block = block;
           block_chain_entry.rotations_through_portal = 0;
-          my_chain->add(&block_chain_entry);
+          my_chain->insert(&block_chain_entry);
      }
 
      BlockChain_t* current_chain = NULL;
@@ -2147,16 +2163,16 @@ BlockChainsResult_t find_block_chain(Block_t* block, Direction_t direction, Quad
           BlockChainEntry_t block_chain_entry {};
           block_chain_entry.block = against_entry->block;
           block_chain_entry.rotations_through_portal = against_entry->rotations_through_portal;
-          current_chain->add(&block_chain_entry);
+          current_chain->insert(&block_chain_entry);
 
           auto merge_result = find_block_chain(against_entry->block, against_direction,
                                                block_qt, interactive_qt, tilemap, against_rotations, current_chain);
 
           if(merge_result.count == 0){
-               result.add(current_chain);
+               result.insert(current_chain);
           }else{
                for(S16 a = 0; a < merge_result.count; a++){
-                    result.add(merge_result.chains + a);
+                    result.insert(merge_result.objects + a);
                }
           }
      }

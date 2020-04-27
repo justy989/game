@@ -514,7 +514,7 @@ PlayerInBlockRectResult_t player_in_block_rect(Player_t* player, TileMap_t* tile
 
      auto found_blocks = find_blocks_through_portals(player_coord, tilemap, interactive_qt, block_qt);
      for(S16 i = 0; i < found_blocks.count; i++){
-         auto* found_block = found_blocks.blocks + i;
+         auto* found_block = found_blocks.objects + i;
 
          auto block_rect = block_get_inclusive_rect(found_block->position.pixel, found_block->rotated_cut);
          if(pixel_in_rect(player->pos.pixel, block_rect)){
@@ -1344,10 +1344,10 @@ void add_entangle_pushes_for_end_of_chain_blocks_on_ice(World_t* world, S16 push
           S16 added_indices_count = 0;
 
           for(S16 c = 0; c < chain_result.count; c++){
-               BlockChain_t* chain = chain_result.chains + c;
+               BlockChain_t* chain = chain_result.objects + c;
                if(chain->count <= 0) continue;
 
-               Block_t* end_block = chain->entries[chain->count - 1].block;
+               Block_t* end_block = chain->objects[chain->count - 1].block;
                S16 end_index = get_block_index(world, end_block);
 
                if(end_block->entangle_index < 0) continue;
@@ -1363,7 +1363,7 @@ void add_entangle_pushes_for_end_of_chain_blocks_on_ice(World_t* world, S16 push
                // walk backwards from the end of the chain, find blocks that are entangled with this one and
                // add a push for them. we do this because the pushes need to happen in a certain order.
                for(S16 e = chain->count - 1; e >= 0; e--){
-                    Block_t* chain_block = chain->entries[e].block;
+                    Block_t* chain_block = chain->objects[e].block;
                     if(!blocks_are_entangled(chain_block, end_block, &world->blocks)) continue;
 
                     BlockPush_t new_block_push = *push;
@@ -1496,7 +1496,7 @@ void execute_block_pushes(BlockPushes_t<128>* block_pushes, World_t* world, Bloc
               }
 
               for(S16 m = 0; m < result.momentum_changes.count; m++){
-                  auto& block_change = result.momentum_changes.changes[m];
+                  auto& block_change = result.momentum_changes.objects[m];
 
                   for(S16 p = 0; p < check_block_push.pusher_count; p++){
                       auto& check_pusher = check_block_push.pushers[p];
@@ -1569,7 +1569,7 @@ void apply_momentum_changes(BlockMomentumChanges_t* momentum_changes, World_t* w
 
           // clear momentum for each impacted block
           for(S16 c = 0; c < momentum_changes->count; c++){
-               auto& block_change = momentum_changes->changes[c];
+               auto& block_change = momentum_changes->objects[c];
                if(block_change.block_index != i) continue;
 
                F32 ratio = (F32)(block_change.mass) / (F32)(block_mass);
@@ -1589,7 +1589,7 @@ void apply_momentum_changes(BlockMomentumChanges_t* momentum_changes, World_t* w
 
      // set coasting or idling based on velocity
      for(S16 c = 0; c < momentum_changes->count; c++){
-          auto& block_change = momentum_changes->changes[c];
+          auto& block_change = momentum_changes->objects[c];
           auto* block = world->blocks.elements + block_change.block_index;
           if(block_change.x){
                if(block->vel.x == 0){
@@ -1656,7 +1656,7 @@ void log_momentum_changes(BlockMomentumChanges_t* momentum_changes){
           LOG("momentum changes: %d\n", momentum_changes->count);
      }
      for(S16 c = 0; c < momentum_changes->count; c++){
-          auto& block_change = momentum_changes->changes[c];
+          auto& block_change = momentum_changes->objects[c];
           LOG("  block %d m: %d, v: %f in %s\n", block_change.block_index, block_change.mass, block_change.vel, block_change.x ? "x" : "y");
      }
 }

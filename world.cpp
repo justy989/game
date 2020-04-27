@@ -407,7 +407,7 @@ Block_t* player_against_block(Player_t* player, Direction_t direction, QuadTreeN
 
      auto found_blocks = find_blocks_through_portals(player_coord, tilemap, interactive_qt, block_qt);
      for(S16 i = 0; i < found_blocks.count; i++){
-         auto* found_block = found_blocks.blocks + i;
+         auto* found_block = found_blocks.objects + i;
 
          if(!block_in_height_range_of_player(found_block->block, player->pos)) continue;
 
@@ -605,7 +605,7 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
      auto found_blocks = find_blocks_through_portals(player_coord, &world->tilemap, world->interactive_qt, world->block_qt);
 
      for(S16 i = 0; i < found_blocks.count; i++){
-         auto* found_block = found_blocks.blocks + i;
+         auto* found_block = found_blocks.objects + i;
 
          if(!block_in_height_range_of_player(found_block->block, player_pos)) continue;
 
