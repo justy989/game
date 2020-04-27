@@ -12,37 +12,31 @@ struct BlockInsideBlockResult_t{
      Position_t collision_pos;
      Vec_t collision_pos_delta;
      Vec_t collision_overlap;
+
      U8 portal_rotations = 0;
      Coord_t src_portal_coord;
      Coord_t dst_portal_coord;
      bool invalidated = false;
+
+     void init(Block_t* collided_block, Position_t collided_pos, Vec_t collided_pos_delta, Vec_t collided_overlap){
+          block = collided_block;
+          collision_pos = collided_pos;
+          collision_pos_delta = collided_pos_delta;
+          collision_overlap = collided_overlap;
+     }
+
+     void init_portal(Block_t* collided_block, Position_t collided_pos, Vec_t collided_pos_delta, Vec_t collided_overlap,
+                      U8 through_portal_rotations, Coord_t src_portal, Coord_t dst_portal){
+          init(collided_block, collided_pos, collided_pos_delta, collided_overlap);
+          portal_rotations = through_portal_rotations;
+          src_portal_coord = src_portal;
+          dst_portal_coord = dst_portal;
+     }
 };
 
 #define MAX_BLOCK_INSIDE_OTHERS_COUNT 16
 
-struct BlockInsideOthersResult_t{
-     BlockInsideBlockResult_t entries[MAX_BLOCK_INSIDE_OTHERS_COUNT];
-     S8 count = 0;
-
-     bool add(Block_t* block, Position_t collision_pos, Vec_t collision_pos_delta, Vec_t collision_overlap,
-              U8 portal_rotations, Coord_t src_portal_coord, Coord_t dst_portal_coord){
-          if(count >= MAX_BLOCK_INSIDE_OTHERS_COUNT) return false;
-          // refuse duplicates
-          for(S8 i = 0; i < count; i++){
-               if(block == entries[i].block) return false;
-          }
-          entries[count].block = block;
-          entries[count].collision_pos = collision_pos;
-          entries[count].collision_pos_delta = collision_pos_delta;
-          entries[count].collision_overlap = collision_overlap;
-          entries[count].portal_rotations = portal_rotations;
-          entries[count].src_portal_coord = src_portal_coord;
-          entries[count].dst_portal_coord = dst_portal_coord;
-          entries[count].invalidated = false;
-          count++;
-          return true;
-     }
-};
+using BlockInsideOthersResult_t = StaticObjectArray_t<BlockInsideBlockResult_t, MAX_BLOCK_INSIDE_OTHERS_COUNT>;
 
 enum BlockChangeType_t : S8{
      BLOCK_CHANGE_TYPE_POS_DELTA_X,

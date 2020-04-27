@@ -10,6 +10,7 @@
 #include "demo.h"
 #include "raw.h"
 #include "camera.h"
+#include "static_object_array.h"
 
 struct World_t{
      TileMap_t tilemap = {};
@@ -60,6 +61,14 @@ struct BlockElasticCollision_t{
      F32 pushee_initial_velocity = 0;
      F32 pushee_velocity = 0;
 
+     void init(S16 pusher_masss, F32 pusher_vel, S16 pushee_masss, F32 pushee_initial_vel, F32 pushee_vel){
+          pusher_mass = pusher_masss;
+          pusher_velocity = pusher_vel;
+          pushee_mass = pushee_masss;
+          pushee_initial_velocity = pushee_initial_vel;
+          pushee_velocity = pushee_vel;
+     }
+
      bool transferred_momentum_back(){return pusher_velocity != 0;}
 };
 
@@ -75,35 +84,8 @@ struct BlockPushResult_t{
      bool pushed = false;
      bool busy = false;
 
-     BlockElasticCollision_t collisions[BLOCK_PUSH_MAX_COLLISIONS];
-     S8 collision_count = 0;
-
-     BlockPushedAgainst_t pushed_againsts[BLOCK_PUSH_MAX_AGAINSTS];
-     S8 pushed_against_count = 0;
-
-     bool add_collision(S16 pusher_mass, F32 pusher_vel, S16 pushee_mass, F32 pushee_initial_vel, F32 pushee_vel){
-         if(collision_count >= BLOCK_PUSH_MAX_COLLISIONS){
-             assert(!"ya dun messed up A-ARON");
-             return false;
-         }
-         auto& collision = collisions[collision_count];
-         collision.pusher_mass = pusher_mass;
-         collision.pusher_velocity = pusher_vel;
-         collision.pushee_mass = pushee_mass;
-         collision.pushee_initial_velocity = pushee_initial_vel;
-         collision.pushee_velocity = pushee_vel;
-         collision_count++;
-         return true;
-     }
-
-     bool add_pushed_against(BlockPushedAgainst_t* entry){
-          if(pushed_against_count >= BLOCK_PUSH_MAX_AGAINSTS) return false;
-          pushed_againsts[pushed_against_count] = *entry;
-          pushed_against_count++;
-          return true;
-     }
-
-     // TODO: do we need a merge?
+     StaticObjectArray_t<BlockElasticCollision_t, BLOCK_PUSH_MAX_COLLISIONS> collisions;
+     StaticObjectArray_t<BlockPushedAgainst_t, BLOCK_PUSH_MAX_AGAINSTS> againsts_pushed;
 };
 
 struct BlockPushMoveDirectionResult_t{

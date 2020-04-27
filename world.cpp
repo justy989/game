@@ -1370,7 +1370,9 @@ void apply_push_horizontal(Block_t* block, Position_t pos, World_t* world, Direc
                 add_global_tag(TAB_BLOCK_MOMENTUM_COLLISION);
                 auto instant_vel = elastic_result.second_final_velocity;
                 auto pushee_momentum = get_block_momentum(world, block, direction);
-                result->add_collision(instant_momentum->mass, elastic_result.first_final_velocity, pushee_momentum.mass, pushee_momentum.vel, elastic_result.second_final_velocity);
+                BlockElasticCollision_t elastic_collision {};
+                elastic_collision.init(instant_momentum->mass, elastic_result.first_final_velocity, pushee_momentum.mass, pushee_momentum.vel, elastic_result.second_final_velocity);
+                result->collisions.insert(&elastic_collision);
                 if(direction == DIRECTION_LEFT){
                     if(instant_vel > 0) instant_vel = -instant_vel;
                 }else if(direction == DIRECTION_RIGHT){
@@ -1449,7 +1451,9 @@ void apply_push_vertical(Block_t* block, Position_t pos, World_t* world, Directi
                 add_global_tag(TAB_BLOCK_MOMENTUM_COLLISION);
                 auto instant_vel = elastic_result.second_final_velocity;
                 auto pushee_momentum = get_block_momentum(world, block, direction);
-                result->add_collision(instant_momentum->mass, elastic_result.first_final_velocity, pushee_momentum.mass, pushee_momentum.vel, elastic_result.second_final_velocity);
+                BlockElasticCollision_t elastic_collision {};
+                elastic_collision.init(instant_momentum->mass, elastic_result.first_final_velocity, pushee_momentum.mass, pushee_momentum.vel, elastic_result.second_final_velocity);
+                result->collisions.insert(&elastic_collision);
                 if(direction == DIRECTION_DOWN){
                     if(instant_vel > 0) instant_vel = -instant_vel;
                 }else if(direction == DIRECTION_UP){
@@ -1521,8 +1525,8 @@ void update_block_momentum_from_push(Block_t* block, Direction_t direction, Push
      if(direction_is_horizontal(direction)){
          bool transferred_momentum_back = false;
 
-         for(S16 c = 0; c < push_result->collision_count; c++){
-             auto& collision = push_result->collisions[c];
+         for(S16 c = 0; c < push_result->collisions.count; c++){
+             auto& collision = push_result->collisions.objects[c];
 
              if(collision.transferred_momentum_back()){
                  transferred_momentum_back = true;
@@ -1534,7 +1538,7 @@ void update_block_momentum_from_push(Block_t* block, Direction_t direction, Push
                       block->horizontal_move.sign = move_sign_from_vel(block->vel.x);
                       final_result->pushed = true;
                  }else{
-                      final_result->add_collision(collision.pusher_mass, collision.pusher_velocity, collision.pushee_mass, collision.pushee_initial_velocity, collision.pushee_velocity);
+                      final_result->collisions.insert(&collision);
                       // reset_move(&block->horizontal_move);
                       final_result->pushed = false;
                  }
@@ -1545,8 +1549,8 @@ void update_block_momentum_from_push(Block_t* block, Direction_t direction, Push
      }else{
          bool transferred_momentum_back = false;
 
-         for(S16 c = 0; c < push_result->collision_count; c++){
-             auto& collision = push_result->collisions[c];
+         for(S16 c = 0; c < push_result->collisions.count; c++){
+             auto& collision = push_result->collisions.objects[c];
              if(collision.transferred_momentum_back()){
                  transferred_momentum_back = true;
 
@@ -1556,7 +1560,7 @@ void update_block_momentum_from_push(Block_t* block, Direction_t direction, Push
                       block->vertical_move.sign = move_sign_from_vel(block->vel.x);
                       final_result->pushed = true;
                  }else{
-                      final_result->add_collision(collision.pusher_mass, collision.pusher_velocity, collision.pushee_mass, collision.pushee_initial_velocity, collision.pushee_velocity);
+                      final_result->collisions.insert(&collision);
                       // reset_move(&block->vertical_move);
                       final_result->pushed = false;
                  }
@@ -1730,7 +1734,7 @@ bool resolve_push_against_block(Block_t* block, MoveDirection_t move_direction, 
                     BlockPushedAgainst_t pushed_against {};
                     pushed_against.block = against_block;
                     pushed_against.direction = first_against_block_push_dir;
-                    result->add_pushed_against(&pushed_against);
+                    result->againsts_pushed.insert(&pushed_against);
                }
 
                bool second_successful = push_result.vertical_result.pushed;
@@ -1739,7 +1743,7 @@ bool resolve_push_against_block(Block_t* block, MoveDirection_t move_direction, 
                     BlockPushedAgainst_t pushed_against {};
                     pushed_against.block = against_block;
                     pushed_against.direction = second_against_block_push_dir;
-                    result->add_pushed_against(&pushed_against);
+                    result->againsts_pushed.insert(&pushed_against);
                }
 
                if(!first_successful && !second_successful){

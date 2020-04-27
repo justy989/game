@@ -122,6 +122,9 @@ build the entangled pushes before the loop and then when invalidating, we need t
 #include "tags.h"
 #include "camera.h"
 
+// TODO: remove
+#include "static_object_array.h"
+
 #define THUMBNAIL_DIMENSION 128
 
 #define CHECKBOX_START_OFFSET_X (4.0f * PIXEL_SIZE)
@@ -151,6 +154,33 @@ enum GameMode_t{
      GAME_MODE_PLAYING,
      GAME_MODE_EDITOR,
      GAME_MODE_LEVEL_SELECT,
+};
+
+#define MAX_PLAYER_IN_BLOCK_RECT_RESULTS 16
+
+struct PlayerInBlockRectResult_t{
+     struct Entry_t{
+          Block_t* block = nullptr;
+          Position_t block_pos;
+          S8 portal_rotations = 0;
+     };
+
+     StaticObjectArray_t<Entry_t, MAX_PLAYER_IN_BLOCK_RECT_RESULTS> entries;
+};
+
+struct DoBlockCollisionResults_t{
+     bool repeat_collision_pass = false;
+     S16 update_blocks_count;
+};
+
+struct FindMapResult_t{
+     char* path = NULL;
+     int map_number = 0;
+};
+
+struct FindAllMapsResult_t{
+     FindMapResult_t* entries = NULL;
+     U32 count = 0;
 };
 
 F32 get_collision_dt(CheckBlockCollisionResult_t* collision){
@@ -271,6 +301,11 @@ struct CheckBlockCollisions_t{
               i++;
          }
      }
+};
+
+struct CentroidStart_t{
+     Coord_t coord;
+     Direction_t direction;
 };
 
 FILE* load_demo_number(S32 map_number, const char** demo_filepath){
@@ -453,26 +488,6 @@ void build_move_actions_from_player(PlayerAction_t* player_action, Player_t* pla
      }
 }
 
-#define MAX_PLAYER_IN_BLOCK_RECT_RESULTS 16
-
-struct PlayerInBlockRectResult_t{
-     struct Entry_t{
-          Block_t* block = nullptr;
-          Position_t block_pos;
-          S8 portal_rotations = 0;
-     };
-
-     Entry_t entries[MAX_PLAYER_IN_BLOCK_RECT_RESULTS];
-     S8 entry_count = 0;
-
-     void add_entry(Entry_t entry){
-          if(entry_count < MAX_PLAYER_IN_BLOCK_RECT_RESULTS){
-               entries[entry_count] = entry;
-               entry_count++;
-          }
-     }
-};
-
 PlayerInBlockRectResult_t player_in_block_rect(Player_t* player, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt, QuadTreeNode_t<Block_t>* block_qt){
      PlayerInBlockRectResult_t result;
 
@@ -493,7 +508,7 @@ PlayerInBlockRectResult_t player_in_block_rect(Player_t* player, TileMap_t* tile
               entry.block = blocks[b];
               entry.block_pos = block_pos;
               entry.portal_rotations = 0;
-              result.add_entry(entry);
+              result.entries.insert(&entry);
          }
      }
 
@@ -507,7 +522,7 @@ PlayerInBlockRectResult_t player_in_block_rect(Player_t* player, TileMap_t* tile
               entry.block = found_block->block;
               entry.block_pos = found_block->position;
               entry.portal_rotations = found_block->portal_rotations;
-              result.add_entry(entry);
+              result.entries.insert(&entry);
          }
      }
 
@@ -720,7 +735,7 @@ void apply_block_collision(World_t* world, Block_t* block, F32 dt, CheckBlockCol
                     if(closest_final_is_a_corner && closest_entangled_is_a_corner && pos_dimension_delta <= FLT_EPSILON && (total_rotations_between) % 2 == 1){
                          auto entangle_inside_result = block_inside_others(entangled_block->pos, entangled_block->pos_delta, entangled_block->cut, get_block_index(world, entangled_block),
                                                                            entangled_block->clone_id > 0, world->block_qt, world->interactive_qt, &world->tilemap, &world->blocks);
-                         if(entangle_inside_result.count > 0 && entangle_inside_result.entries[0].block == block){
+                         if(entangle_inside_result.count > 0 && entangle_inside_result.objects[0].block == block){
                               // stop the blocks moving toward each other
                               static const VecMaskCollisionEntry_t table[] = {
                                    {static_cast<S8>(DIRECTION_MASK_RIGHT | DIRECTION_MASK_UP), DIRECTION_LEFT, DIRECTION_UP, DIRECTION_DOWN, DIRECTION_RIGHT},
@@ -917,26 +932,6 @@ Pixel_t block_pos_in_solid_boundary(Position_t pos, BlockCut_t cut, Direction_t 
      return Pixel_t {-1, -1};
 }
 
-
-struct DoBlockCollisionResults_t{
-     bool repeat_collision_pass = false;
-     S16 update_blocks_count;
-};
-
-template < typename T, S32 N >
-struct StaticObjectArray_t{
-     T objects[N];
-     S32 count = 0;
-
-     bool insert(const T* obj){
-          if(count >= N){
-               return false;
-          }
-          objects[count] = *obj;
-          count++;
-          return true;
-     }
-};
 
 DoBlockCollisionResults_t do_block_collision(World_t* world, Block_t* block, S16 update_blocks_count){
      DoBlockCollisionResults_t result;
@@ -1749,16 +1744,6 @@ Raw_t create_thumbnail_bitmap(){
     return raw;
 }
 
-struct FindMapResult_t{
-     char* path = NULL;
-     int map_number = 0;
-};
-
-struct FindAllMapsResult_t{
-     FindMapResult_t* entries = NULL;
-     U32 count = 0;
-};
-
 int get_numbered_map(const char* path){
     char number_str[4];
     memset(number_str, 0, 4);
@@ -1904,11 +1889,6 @@ S16 filter_thumbnails(ObjectArray_t<Checkbox_t>* tag_checkboxes, ObjectArray_t<M
 
      return ((match_index - 1) + THUMBNAILS_PER_ROW);
 }
-
-struct CentroidStart_t{
-     Coord_t coord;
-     Direction_t direction;
-};
 
 Coord_t find_centroid(CentroidStart_t a, CentroidStart_t b){
      // find the missing corners of the rectangle
@@ -3800,8 +3780,8 @@ int main(int argc, char** argv){
 
                     if(!player->held_up){
                          auto result = player_in_block_rect(player, &world.tilemap, world.interactive_qt, world.block_qt);
-                         for(S8 e = 0; e < result.entry_count; e++){
-                              auto& entry = result.entries[e];
+                         for(S8 e = 0; e < result.entries.count; e++){
+                              auto& entry = result.entries.objects[e];
                               if(entry.block_pos.z == player->pos.z - HEIGHT_INTERVAL){
                                    hold_players(&world.players);
                               }else if((entry.block_pos.z - 1) == player->pos.z - HEIGHT_INTERVAL){
@@ -4858,8 +4838,8 @@ int main(int argc, char** argv){
                          }
 
                          auto result = player_in_block_rect(player, &world.tilemap, world.interactive_qt, world.block_qt);
-                         for(S8 e = 0; e < result.entry_count; e++){
-                              auto& entry = result.entries[e];
+                         for(S8 e = 0; e < result.entries.count; e++){
+                              auto& entry = result.entries.objects[e];
                               if(entry.block_pos.z == player->pos.z - HEIGHT_INTERVAL){
                                    auto block_index = get_block_index(&world, entry.block);
                                    auto block_pos_delta = entry.block->teleport ? entry.block->teleport_pos_delta : entry.block->pos_delta;
@@ -5305,9 +5285,9 @@ int main(int argc, char** argv){
                                         }else if(player->entangle_push_time > BLOCK_PUSH_TIME){
                                              player->pushing_block_dir = push_block_dir;
                                              push_entangled_block(block_to_push, &world, push_block_dir, false, allowed_result.mass_ratio);
-                                             for(S16 a = 0; a < push_result.pushed_against_count; a++){
-                                                  push_entangled_block(push_result.pushed_againsts[a].block, &world,
-                                                                       push_result.pushed_againsts[a].direction,
+                                             for(S16 a = 0; a < push_result.againsts_pushed.count; a++){
+                                                  push_entangled_block(push_result.againsts_pushed.objects[a].block, &world,
+                                                                       push_result.againsts_pushed.objects[a].direction,
                                                                        false, allowed_result.mass_ratio);
                                              }
                                              player->entangle_push_time = 0.0f;
