@@ -5169,12 +5169,14 @@ int main(int argc, char** argv){
                          auto holder = result.blocks_held[b].block;
 
                          if(block->stop_on_pixel_x == 0 && holder->stop_on_pixel_x != 0){
-                              S16 pixel_diff = (holder->pos.pixel.x - block->pos.pixel.x);
+                              Position_t diff = block->pos - holder->pos;
+                              S16 pixel_diff = closest_pixel(diff.pixel.x, diff.decimal.x);
                               block->stop_on_pixel_x = holder->stop_on_pixel_x + pixel_diff;
                          }
 
                          if(block->stop_on_pixel_y == 0 && holder->stop_on_pixel_y != 0){
-                              S16 pixel_diff = (holder->pos.pixel.y - block->pos.pixel.y);
+                              Position_t diff = block->pos - holder->pos;
+                              S16 pixel_diff = closest_pixel(diff.pixel.y, diff.decimal.y);
                               block->stop_on_pixel_y = holder->stop_on_pixel_y + pixel_diff;
                          }
                     }
