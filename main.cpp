@@ -4112,7 +4112,7 @@ int main(int argc, char** argv){
                                                   if(!held_down){
                                                        Vec_t block_horizontal_vel = {entangled_block->vel.x, 0};
                                                        auto block_move_dir = vec_direction(block_horizontal_vel);
-                                                       if(block_move_dir != DIRECTION_COUNT){
+                                                       if(player->face == block_move_dir){
                                                             S16 block_mass = block_get_mass(player_prev_pushing_block);
                                                             S16 entangled_block_mass = block_get_mass(block);
                                                             F32 mass_ratio = (F32)(block_mass) / (F32)(entangled_block_mass);
@@ -4145,7 +4145,7 @@ int main(int argc, char** argv){
                                                   if(!held_down){
                                                        Vec_t block_vertical_vel = {0, entangled_block->vel.y};
                                                        auto block_move_dir = vec_direction(block_vertical_vel);
-                                                       if(block_move_dir != DIRECTION_COUNT){
+                                                       if(player->face == block_move_dir){
                                                             S16 block_mass = block_get_mass(player_prev_pushing_block);
                                                             S16 entangled_block_mass = block_get_mass(block);
                                                             F32 mass_ratio = (F32)(block_mass) / (F32)(entangled_block_mass);
