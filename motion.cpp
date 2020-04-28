@@ -69,10 +69,10 @@ DecelToStopResult_t calc_decel_to_stop(F32 initial_pos, F32 final_pos, F32 initi
 }
 
 F32 calc_accel_from_stop(F32 distance, F32 time){
-     // pf = pi + vft + 1/2at^2
+     // pf = pi + vit + 1/2at^2
      // d = pf - pi
-     // d = vft + 1/2at^2
-     // vft = 0
+     // d = vit + 1/2at^2
+     // vit = 0
      // d / 1/2t^2 = a
      return distance / (0.5f * time * time);
 }
@@ -83,6 +83,17 @@ F32 calc_accel_across_distance(F32 vel, F32 distance, F32 time){
      // d = vit + 1/2at^2
      // (d - vit) / 1/2t^2 = a
      return (distance - (vel * time)) / (0.5f * time * time);
+}
+
+F32 calc_accel_over_time(F32 initial_vel, F32 final_vel, F32 time){
+     return (final_vel - initial_vel) / time;
+}
+
+F32 calc_vel_over_time(F32 initial_vel, F32 accel, F32 time){
+     // (vf - vi) / t = a
+     // ta = vf - vi
+     // ta + vi = vf
+     return initial_vel + accel * time;
 }
 
 F32 calc_accel_component_move(Move_t move, F32 accel){

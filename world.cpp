@@ -1395,9 +1395,6 @@ void apply_push_horizontal(Block_t* block, Position_t pos, World_t* world, Direc
                 return;
            }
       }else if(block->horizontal_move.state == MOVE_STATE_IDLING || block->horizontal_move.state == MOVE_STATE_COASTING){
-           block->horizontal_move.state = MOVE_STATE_STARTING;
-           block->horizontal_move.sign = (direction == DIRECTION_LEFT) ? MOVE_SIGN_NEGATIVE : MOVE_SIGN_POSITIVE;
-
            if(from_entangler){
                block->accel.x = from_entangler->accel * force;
                block->coast_vel.x = from_entangler->coast_vel * force;
@@ -1420,15 +1417,22 @@ void apply_push_horizontal(Block_t* block, Position_t pos, World_t* world, Direc
 
                if(lower_dim == HALF_TILE_SIZE_IN_PIXELS) accel_time *= SMALL_BLOCK_ACCEL_MULTIPLIER;
 
-               F32 half_distance_to_next_grid_center = calc_half_distance_to_next_grid_center(block->pos.pixel.x,
-                                                                                              block->pos.decimal.x,
+               Position_t block_pos = block_get_position(block);
+               Vec_t block_vel = block_get_vel(block);
+
+               F32 half_distance_to_next_grid_center = calc_half_distance_to_next_grid_center(block_pos.pixel.x,
+                                                                                              block_pos.decimal.x,
                                                                                               lower_dim,
                                                                                               direction == DIRECTION_RIGHT);
-               F32 velocity_ratio = get_block_velocity_ratio(world, block, block->vel.x, force);
-
-               block->accel.x = calc_accel_from_stop(half_distance_to_next_grid_center, accel_time) * force;
-
+               F32 velocity_ratio = get_block_velocity_ratio(world, block, block_vel.x, force);
                F32 ideal_accel = calc_accel_from_stop((lower_dim / 2) * PIXEL_SIZE, accel_time) * force;
+
+               if(block->horizontal_move.state == MOVE_STATE_COASTING){
+                    block->accel.x = ideal_accel;
+                    accel_time = fabs(block_vel.x) / fabs(block->accel.x);
+               }else{
+                    block->accel.x = calc_accel_from_stop(half_distance_to_next_grid_center, accel_time) * force;
+               }
 
                if(direction == DIRECTION_LEFT){
                    ideal_accel = -ideal_accel;
@@ -1438,6 +1442,9 @@ void apply_push_horizontal(Block_t* block, Position_t pos, World_t* world, Direc
                block->coast_vel.x = calc_velocity_motion(0, ideal_accel, accel_time);
                block->horizontal_move.time_left = accel_time - (velocity_ratio * accel_time);
            }
+
+           block->horizontal_move.state = MOVE_STATE_STARTING;
+           block->horizontal_move.sign = (direction == DIRECTION_LEFT) ? MOVE_SIGN_NEGATIVE : MOVE_SIGN_POSITIVE;
       }else{
            result->busy = true;
            return;
@@ -1476,9 +1483,6 @@ void apply_push_vertical(Block_t* block, Position_t pos, World_t* world, Directi
                 return;
            }
       }else if(block->vertical_move.state == MOVE_STATE_IDLING || block->vertical_move.state == MOVE_STATE_COASTING){
-           block->vertical_move.state = MOVE_STATE_STARTING;
-           block->vertical_move.sign = (direction == DIRECTION_DOWN) ? MOVE_SIGN_NEGATIVE : MOVE_SIGN_POSITIVE;
-
            if(from_entangler){
                block->accel.y = from_entangler->accel * force;
                block->coast_vel.y = from_entangler->coast_vel * force;
@@ -1501,22 +1505,34 @@ void apply_push_vertical(Block_t* block, Position_t pos, World_t* world, Directi
 
                if(lower_dim == HALF_TILE_SIZE_IN_PIXELS) accel_time *= SMALL_BLOCK_ACCEL_MULTIPLIER;
 
-               F32 half_distance_to_next_grid_center = calc_half_distance_to_next_grid_center(block->pos.pixel.y,
-                                                                                              block->pos.decimal.y,
+               Position_t block_pos = block_get_position(block);
+               Vec_t block_vel = block_get_vel(block);
+
+               F32 half_distance_to_next_grid_center = calc_half_distance_to_next_grid_center(block_pos.pixel.y,
+                                                                                              block_pos.decimal.y,
                                                                                               lower_dim,
                                                                                               direction == DIRECTION_UP);
-               F32 velocity_ratio = get_block_velocity_ratio(world, block, block->vel.y, force);
-
-               block->accel.y = calc_accel_from_stop(half_distance_to_next_grid_center, accel_time) * force;
-
+               F32 velocity_ratio = get_block_velocity_ratio(world, block, block_vel.y, force);
                F32 ideal_accel = calc_accel_from_stop((lower_dim / 2) * PIXEL_SIZE, accel_time) * force;
+
+               if(block->vertical_move.state == MOVE_STATE_COASTING){
+                    block->accel.y = ideal_accel;
+                    accel_time = fabs(block_vel.y) / fabs(block->accel.y);
+               }else{
+                    block->accel.y = calc_accel_from_stop(half_distance_to_next_grid_center, accel_time) * force;
+               }
+
                if(direction == DIRECTION_DOWN){
                    ideal_accel = -ideal_accel;
                    block->accel.y = -block->accel.y;
                }
+
                block->coast_vel.y = calc_velocity_motion(0, ideal_accel, accel_time);
                block->vertical_move.time_left = accel_time - (velocity_ratio * accel_time);
            }
+
+           block->vertical_move.state = MOVE_STATE_STARTING;
+           block->vertical_move.sign = (direction == DIRECTION_DOWN) ? MOVE_SIGN_NEGATIVE : MOVE_SIGN_POSITIVE;
       }else{
            result->busy = true;
            return;

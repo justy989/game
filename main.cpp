@@ -2152,8 +2152,6 @@ int main(int argc, char** argv){
           return -1;
      }
 
-     LOG("%.10f\n", PIXEL_SIZE);
-
      if(test && !load_map_filepath && !suite){
           LOG("cannot test without specifying a map to load\n");
           return 1;
@@ -4070,12 +4068,12 @@ int main(int argc, char** argv){
                                              Vec_t block_vel = {0, block->vel.y};
                                              if((player->pushing_block_rotation % 2)){
                                                   block_vel = Vec_t{block->vel.x, 0};
-                                                  if(player->pushing_block_dir == vec_direction(block_vel)){
+                                                  if(player->prev_pushing_block == i && player->pushing_block_dir == vec_direction(block_vel)){
                                                        block->coast_horizontal = BLOCK_COAST_PLAYER;
                                                        set_block_coasting_from_player = true;
                                                   }
                                              }else{
-                                                  if(player->pushing_block_dir == vec_direction(block_vel)){
+                                                  if(player->prev_pushing_block == i && player->pushing_block_dir == vec_direction(block_vel)){
                                                        block->coast_vertical = BLOCK_COAST_PLAYER;
                                                        set_block_coasting_from_player = true;
                                                   }

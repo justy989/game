@@ -118,6 +118,8 @@ F32 calc_coast_motion_time_left(BlockCut_t cut, F32 pos, F32 vel);
 
 F32 calc_accel_from_stop(F32 distance, F32 time);
 F32 calc_accel_across_distance(F32 vel, F32 distance, F32 time);
+F32 calc_accel_over_time(F32 initial_vel, F32 final_vel, F32 time);
+F32 calc_vel_over_time(F32 initial_vel, F32 accel, F32 time);
 DecelToStopResult_t calc_decel_to_stop(F32 initial_pos, F32 final_pos, F32 initial_velocity);
 
 F32 begin_stopping_grid_aligned_motion(BlockCut_t cut, MotionComponent_t* motion, S16 pos_pixel, F32 pos_decimal, S16 mass);
