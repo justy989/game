@@ -105,6 +105,16 @@ Pixel_t pixel_rotate_quadrants_clockwise(Pixel_t pixel, S8 rotations_between){
      return pixel;
 }
 
+Coord_t coord_rotate_quadrants_clockwise(Coord_t coord, S8 rotations_between){
+     for(S8 r = 0; r < rotations_between; r++){
+          auto tmp = coord.x;
+          coord.x = coord.y;
+          coord.y = -tmp;
+     }
+
+     return coord;
+}
+
 Position_t position_rotate_quadrants_clockwise(Position_t pos, S8 rotations_between){
      pos.decimal = vec_rotate_quadrants_clockwise(pos.decimal, rotations_between);
      pos.pixel = pixel_rotate_quadrants_clockwise(pos.pixel, rotations_between);
@@ -130,6 +140,16 @@ Pixel_t pixel_rotate_quadrants_counter_clockwise(Pixel_t pixel, S8 rotations_bet
      }
 
      return pixel;
+}
+
+Coord_t coord_rotate_quadrants_counter_clockwise(Coord_t coord, S8 rotations_between){
+     for(S8 r = 0; r < rotations_between; r++){
+          auto tmp = coord.x;
+          coord.x = -coord.y;
+          coord.y = tmp;
+     }
+
+     return coord;
 }
 
 Position_t position_rotate_quadrants_counter_clockwise(Position_t pos, S8 rotations_between){

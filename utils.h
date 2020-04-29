@@ -23,9 +23,11 @@ Vec_t direction_to_vec(Direction_t d);
 
 Vec_t vec_rotate_quadrants_clockwise(Vec_t vec, S8 rotations_between);
 Pixel_t pixel_rotate_quadrants_clockwise(Pixel_t pixel, S8 rotations_between);
+Coord_t coord_rotate_quadrants_clockwise(Coord_t pixel, S8 rotations_between);
 Position_t position_rotate_quadrants_clockwise(Position_t pos, S8 rotations_between);
 Vec_t vec_rotate_quadrants_counter_clockwise(Vec_t vec, S8 rotations_between);
 Pixel_t pixel_rotate_quadrants_counter_clockwise(Pixel_t pixel, S8 rotations_between);
+Coord_t coord_rotate_quadrants_counter_clockwise(Coord_t pixel, S8 rotations_between);
 Position_t position_rotate_quadrants_counter_clockwise(Position_t pos, S8 rotations_between);
 
 Vec_t rotate_vec_between_dirs_clockwise(Direction_t a, Direction_t b, Vec_t vec);

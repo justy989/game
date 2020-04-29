@@ -1213,97 +1213,132 @@ static void impact_ice(Coord_t center, S8 height, S16 radius, World_t* world, bo
           for(S16 x = min.x; x <= max.x; ++x){
                Coord_t coord{x, y};
                Tile_t* tile = tilemap_get_tile(&world->tilemap, coord);
-               if(tile && !tile_is_solid(tile)){
-                    Rect_t coord_rect = rect_surrounding_adjacent_coords(coord);
-                    S16 block_count = 0;
-                    Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
-                    quad_tree_find_in(world->block_qt, coord_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
+               if(tile){
+                    if(!tile_is_solid(tile)){
+                         Rect_t coord_rect = rect_surrounding_adjacent_coords(coord);
+                         S16 block_count = 0;
+                         Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
+                         quad_tree_find_in(world->block_qt, coord_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
 
-                    bool spread_on_block = false;
-                    for(S16 i = 0; i < block_count; i++){
-                         Block_t* block = blocks[i];
-                         if(block_get_coord(block) == coord && height > block->pos.z &&
-                            height < (block->pos.z + HEIGHT_INTERVAL + MELT_SPREAD_HEIGHT) &&
-                            !block_held_down_by_another_block(block, world->block_qt, world->interactive_qt, &world->tilemap).held()){
-                              if(spread_the_ice){
-                                   if(block->element == ELEMENT_NONE) block->element = ELEMENT_ONLY_ICED;
-                                   spread_on_block = true;
-                                   add_global_tag(TAG_BLOCK_BLOCKS_ICE_FROM_BEING_SPREAD);
-                              }else{
-                                   if(block->element == ELEMENT_ONLY_ICED) block->element = ELEMENT_NONE;
-                                   spread_on_block = true;
-                                   add_global_tag(TAG_BLOCK_BLOCKS_ICE_FROM_BEING_MELTED);
+                         bool spread_on_block = false;
+                         for(S16 i = 0; i < block_count; i++){
+                              Block_t* block = blocks[i];
+                              if(block_get_coord(block) == coord && height > block->pos.z &&
+                                 height < (block->pos.z + HEIGHT_INTERVAL + MELT_SPREAD_HEIGHT) &&
+                                 !block_held_down_by_another_block(block, world->block_qt, world->interactive_qt, &world->tilemap).held()){
+                                   if(spread_the_ice){
+                                        if(block->element == ELEMENT_NONE) block->element = ELEMENT_ONLY_ICED;
+                                        spread_on_block = true;
+                                        add_global_tag(TAG_BLOCK_BLOCKS_ICE_FROM_BEING_SPREAD);
+                                   }else{
+                                        if(block->element == ELEMENT_ONLY_ICED) block->element = ELEMENT_NONE;
+                                        spread_on_block = true;
+                                        add_global_tag(TAG_BLOCK_BLOCKS_ICE_FROM_BEING_MELTED);
+                                   }
                               }
                          }
-                    }
 
-                    Interactive_t* interactive = quad_tree_find_at(world->interactive_qt, coord.x, coord.y);
+                         Interactive_t* interactive = quad_tree_find_at(world->interactive_qt, coord.x, coord.y);
 
-                    if(!spread_on_block){
-                         if(interactive){
-                              switch(interactive->type){
-                              case INTERACTIVE_TYPE_POPUP:
-                                   if(interactive->popup.lift.ticks == 1 && height <= MELT_SPREAD_HEIGHT){
-                                        if(spread_the_ice){
-                                             add_global_tag(TAG_SPREAD_ICE);
-                                             tile->flags |= TILE_FLAG_ICED;
-                                        }else{
-                                             add_global_tag(TAG_MELT_ICE);
-                                             tile->flags &= ~TILE_FLAG_ICED;
+                         if(!spread_on_block){
+                              if(interactive){
+                                   switch(interactive->type){
+                                   case INTERACTIVE_TYPE_POPUP:
+                                        if(interactive->popup.lift.ticks == 1 && height <= MELT_SPREAD_HEIGHT){
+                                             if(spread_the_ice){
+                                                  add_global_tag(TAG_SPREAD_ICE);
+                                                  tile->flags |= TILE_FLAG_ICED;
+                                             }else{
+                                                  add_global_tag(TAG_MELT_ICE);
+                                                  tile->flags &= ~TILE_FLAG_ICED;
+                                             }
+                                             interactive->popup.iced = false;
+                                        }else if(height < interactive->popup.lift.ticks + MELT_SPREAD_HEIGHT){
+                                             interactive->popup.iced = spread_the_ice;
+                                             if(spread_the_ice){
+                                                  add_global_tag(TAG_ICED_POPUP);
+                                             }else{
+                                                  add_global_tag(TAG_MELTED_POPUP);
+                                             }
                                         }
-                                        interactive->popup.iced = false;
-                                   }else if(height < interactive->popup.lift.ticks + MELT_SPREAD_HEIGHT){
-                                        interactive->popup.iced = spread_the_ice;
-                                        if(spread_the_ice){
-                                             add_global_tag(TAG_ICED_POPUP);
-                                        }else{
-                                             add_global_tag(TAG_MELTED_POPUP);
+                                        break;
+                                   case INTERACTIVE_TYPE_PRESSURE_PLATE:
+                                   case INTERACTIVE_TYPE_ICE_DETECTOR:
+                                   case INTERACTIVE_TYPE_LIGHT_DETECTOR:
+                                        if(height <= MELT_SPREAD_HEIGHT){
+                                             if(spread_the_ice){
+                                                  add_global_tag(TAG_SPREAD_ICE);
+                                                  add_global_tag(TAG_ICED_PRESSURE_PLATE);
+                                                  tile->flags |= TILE_FLAG_ICED;
+                                             }else{
+                                                  add_global_tag(TAG_MELT_ICE);
+                                                  add_global_tag(TAG_MELTED_PRESSURE_PLATE);
+                                                  tile->flags &= ~TILE_FLAG_ICED;
+                                                  if(interactive->type == INTERACTIVE_TYPE_PRESSURE_PLATE){
+                                                       interactive->pressure_plate.iced_under = false;
+                                                  }
+                                             }
+                                        }
+                                        break;
+                                   default:
+                                        break;
+                                   }
+                              }else if(height <= MELT_SPREAD_HEIGHT){
+                                   if(spread_the_ice){
+                                        tile->flags |= TILE_FLAG_ICED;
+                                   }else{
+                                        add_global_tag(TAG_MELT_ICE);
+                                        tile->flags &= ~TILE_FLAG_ICED;
+                                   }
+                              }
+                         }
+
+                         if(is_active_portal(interactive)){
+                              if(!teleported){
+                                   auto portal_exits = find_portal_exits(coord, &world->tilemap, world->interactive_qt);
+                                   for(S8 d = 0; d < DIRECTION_COUNT; d++){
+                                        for(S8 p = 0; p < portal_exits.directions[d].count; p++){
+                                             if(portal_exits.directions[d].coords[p] == coord) continue;
+                                             S16 x_diff = coord.x - center.x;
+                                             S16 y_diff = coord.y - center.y;
+                                             U8 distance_from_center = (U8)(sqrt(x_diff * x_diff + y_diff * y_diff));
+                                             Direction_t opposite = direction_opposite((Direction_t)(d));
+
+                                             impact_ice(portal_exits.directions[d].coords[p] + opposite, height, radius - distance_from_center,
+                                                        world, true, spread_the_ice);
                                         }
                                    }
-                                   break;
-                              case INTERACTIVE_TYPE_PRESSURE_PLATE:
-                              case INTERACTIVE_TYPE_ICE_DETECTOR:
-                              case INTERACTIVE_TYPE_LIGHT_DETECTOR:
-                                   if(height <= MELT_SPREAD_HEIGHT){
-                                        if(spread_the_ice){
-                                             add_global_tag(TAG_SPREAD_ICE);
-                                             add_global_tag(TAG_ICED_PRESSURE_PLATE);
-                                             tile->flags |= TILE_FLAG_ICED;
-                                        }else{
-                                             add_global_tag(TAG_MELT_ICE);
-                                             add_global_tag(TAG_MELTED_PRESSURE_PLATE);
-                                             tile->flags &= ~TILE_FLAG_ICED;
-                                             if(interactive->type == INTERACTIVE_TYPE_PRESSURE_PLATE){
-                                                  interactive->pressure_plate.iced_under = false;
+                              }
+                         }
+                    }else if(!teleported){
+                         Coord_t diff = coord - center;
+                         if(diff.x != 0 && diff.y != 0){
+                              Coord_t attempts[2] = {
+                                   Coord_t{(S16)(coord.x - diff.x), coord.y},
+                                   Coord_t{coord.x, (S16)(coord.y - diff.y)},
+                              };
+
+                              for(S16 a = 0; a < 2; a++){
+                                   Coord_t attempt = attempts[a];
+                                   Interactive_t* interactive = quad_tree_find_at(world->interactive_qt, attempt.x, attempt.y);
+                                   if(is_active_portal(interactive)){
+                                        auto portal_exits = find_portal_exits(attempt, &world->tilemap, world->interactive_qt);
+                                        for(S8 d = 0; d < DIRECTION_COUNT; d++){
+                                             for(S8 p = 0; p < portal_exits.directions[d].count; p++){
+                                                  if(portal_exits.directions[d].coords[p] == attempt) continue;
+
+                                                  U8 portal_rotations = direction_rotations_between(interactive->portal.face, static_cast<Direction_t>(d));
+
+                                                  Coord_t offset = coord_rotate_quadrants_clockwise(diff, portal_rotations);
+                                                  Coord_t dest = portal_exits.directions[d].coords[p] + offset;
+
+                                                  U8 distance_from_center = (U8)(sqrt(diff.x * diff.x + diff.y * diff.y));
+
+                                                  impact_ice(dest, height, radius - distance_from_center,
+                                                             world, true, spread_the_ice);
                                              }
                                         }
                                    }
-                                   break;
-                              default:
-                                   break;
-                              }
-                         }else if(height <= MELT_SPREAD_HEIGHT){
-                              if(spread_the_ice){
-                                   tile->flags |= TILE_FLAG_ICED;
-                              }else{
-                                   add_global_tag(TAG_MELT_ICE);
-                                   tile->flags &= ~TILE_FLAG_ICED;
-                              }
-                         }
-                    }
-
-                    if(is_active_portal(interactive) && !teleported){
-                         auto portal_exits = find_portal_exits(coord, &world->tilemap, world->interactive_qt);
-                         for(S8 d = 0; d < DIRECTION_COUNT; d++){
-                              for(S8 p = 0; p < portal_exits.directions[d].count; p++){
-                                   if(portal_exits.directions[d].coords[p] == coord) continue;
-                                   S16 x_diff = coord.x - center.x;
-                                   S16 y_diff = coord.y - center.y;
-                                   U8 distance_from_center = (U8)(sqrt(x_diff * x_diff + y_diff * y_diff));
-                                   Direction_t opposite = direction_opposite((Direction_t)(d));
-
-                                   impact_ice(portal_exits.directions[d].coords[p] + opposite, height, radius - distance_from_center,
-                                              world, true, spread_the_ice);
                               }
                          }
                     }
