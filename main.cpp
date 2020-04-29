@@ -935,11 +935,11 @@ DoBlockCollisionResults_t do_block_collision(World_t* world, Block_t* block, S16
 
      // if we are being stopped by the player and have moved more than the player radius (which is
      // a check to ensure we don't stop a block instantaneously) then stop on the coordinate boundaries
-     if(block->stopped_by_player_horizontal && block->vel.x != 0){
+     if(block->stopped_by_player_horizontal && block->vel.x != 0 && block->horizontal_move.state != MOVE_STATE_STARTING){
           stop_on_boundary_x = STOP_ON_BOUNDARY_TRACKING_START;
      }
 
-     if(block->stopped_by_player_vertical && block->vel.y != 0){
+     if(block->stopped_by_player_vertical && block->vel.y != 0 && block->vertical_move.state != MOVE_STATE_STARTING){
           stop_on_boundary_y = STOP_ON_BOUNDARY_TRACKING_START;
      }
 
@@ -4038,6 +4038,7 @@ int main(int argc, char** argv){
                                    Block_t* player_prev_pushing_block = world.blocks.elements + player->prev_pushing_block;
                                    if(player_prev_pushing_block == block){
                                         bool set_block_coasting_from_player = false;
+                                        Direction_t block_move_dir = block_axis_move(block, direction_is_horizontal(player->face));
 
                                         switch(player->face){
                                         default:
@@ -4046,16 +4047,17 @@ int main(int argc, char** argv){
                                         case DIRECTION_RIGHT:
                                         {
                                              // only coast the block is actually moving
-                                             Vec_t block_vel = {block->vel.x, 0};
-                                             if((player->pushing_block_rotation % 2)){
-                                                  block_vel = Vec_t{0, block->vel.y};
+                                             if((player->pushing_block_rotation % 2) == 1){
+                                                  block_move_dir = block_axis_move(block, false);
 
-                                                  if(player->pushing_block_dir == vec_direction(block_vel)){
+                                                  if(player->prev_pushing_block == i && player->pushing_block_dir == block_move_dir){
                                                        block->coast_vertical = BLOCK_COAST_PLAYER;
                                                        set_block_coasting_from_player = true;
                                                   }
                                              }else{
-                                                  if(player->pushing_block_dir == vec_direction(block_vel)){
+                                                  block_move_dir = block_axis_move(block, true);
+
+                                                  if(player->prev_pushing_block == i && player->pushing_block_dir == block_move_dir){
                                                        block->coast_horizontal = BLOCK_COAST_PLAYER;
                                                        set_block_coasting_from_player = true;
                                                   }
@@ -4065,15 +4067,17 @@ int main(int argc, char** argv){
                                         case DIRECTION_UP:
                                         case DIRECTION_DOWN:
                                         {
-                                             Vec_t block_vel = {0, block->vel.y};
-                                             if((player->pushing_block_rotation % 2)){
-                                                  block_vel = Vec_t{block->vel.x, 0};
-                                                  if(player->prev_pushing_block == i && player->pushing_block_dir == vec_direction(block_vel)){
+                                             if((player->pushing_block_rotation % 2) == 1){
+                                                  block_move_dir = block_axis_move(block, true);
+
+                                                  if(player->prev_pushing_block == i && player->pushing_block_dir == block_move_dir){
                                                        block->coast_horizontal = BLOCK_COAST_PLAYER;
                                                        set_block_coasting_from_player = true;
                                                   }
                                              }else{
-                                                  if(player->prev_pushing_block == i && player->pushing_block_dir == vec_direction(block_vel)){
+                                                  block_move_dir = block_axis_move(block, false);
+
+                                                  if(player->prev_pushing_block == i && player->pushing_block_dir == block_move_dir){
                                                        block->coast_vertical = BLOCK_COAST_PLAYER;
                                                        set_block_coasting_from_player = true;
                                                   }
@@ -4086,43 +4090,18 @@ int main(int argc, char** argv){
                                             set_against_blocks_coasting_from_player(block, player->face, &world);
                                         }
                                    }else if(blocks_are_entangled(block, player_prev_pushing_block, &world.blocks) &&
-                                            !block_on_ice(block->pos, block->pos_delta, block->cut, &world.tilemap, world.interactive_qt, world.block_qt) &&
-                                            !block_on_air(block, &world.tilemap, world.interactive_qt, world.block_qt)){
+                                      !block_on_ice(block->pos, block->pos_delta, block->cut, &world.tilemap, world.interactive_qt, world.block_qt) &&
+                                      !block_on_air(block, &world.tilemap, world.interactive_qt, world.block_qt)){
                                         Block_t* entangled_block = player_prev_pushing_block;
-
                                         auto rotations_between = blocks_rotations_between(block, entangled_block);
-                                        MoveState_t check_idle_move_state = MOVE_STATE_IDLING;
 
                                         if(entangled_block->coast_horizontal > BLOCK_COAST_NONE){
                                              if(rotations_between % 2 == 0){
                                                   if(entangled_block->coast_horizontal == BLOCK_COAST_PLAYER &&
                                                      block->horizontal_move.state != MOVE_STATE_STOPPING) block->coast_horizontal = BLOCK_COAST_ENTANGLED_PLAYER;
-                                                  check_idle_move_state = block->horizontal_move.state;
                                              }else{
                                                   if(entangled_block->coast_horizontal == BLOCK_COAST_PLAYER &&
                                                      block->vertical_move.state != MOVE_STATE_STOPPING) block->coast_vertical = BLOCK_COAST_ENTANGLED_PLAYER;
-                                                  check_idle_move_state = block->vertical_move.state;
-                                             }
-
-                                             bool held_down = block_held_down_by_another_block(block, world.block_qt, world.interactive_qt, &world.tilemap).held();
-
-                                             if(check_idle_move_state == MOVE_STATE_IDLING && player->push_time > BLOCK_PUSH_TIME){
-                                                  if(!held_down){
-                                                       Vec_t block_horizontal_vel = {entangled_block->vel.x, 0};
-                                                       auto block_move_dir = vec_direction(block_horizontal_vel);
-                                                       if(player->face == block_move_dir){
-                                                            S16 block_mass = block_get_mass(player_prev_pushing_block);
-                                                            S16 entangled_block_mass = block_get_mass(block);
-                                                            F32 mass_ratio = (F32)(block_mass) / (F32)(entangled_block_mass);
-                                                            auto direction_to_push = direction_rotate_clockwise(block_move_dir, rotations_between);
-                                                            auto allowed_result = allowed_to_push(&world, block, direction_to_push, mass_ratio);
-                                                            if(allowed_result.push){
-                                                                 block_push(block, direction_to_push, &world, false, mass_ratio * allowed_result.mass_ratio);
-                                                            }
-                                                       }
-                                                  }else{
-                                                       add_global_tag(TAG_ENTANGLED_BLOCK_HELD_DOWN_UNMOVABLE);
-                                                  }
                                              }
                                         }
 
@@ -4130,32 +4109,9 @@ int main(int argc, char** argv){
                                              if(rotations_between % 2 == 0){
                                                   if(entangled_block->coast_vertical == BLOCK_COAST_PLAYER &&
                                                      block->vertical_move.state != MOVE_STATE_STOPPING) block->coast_vertical = BLOCK_COAST_ENTANGLED_PLAYER;
-                                                  check_idle_move_state = block->vertical_move.state;
                                              }else{
                                                   if(entangled_block->coast_vertical == BLOCK_COAST_PLAYER &&
                                                      block->horizontal_move.state != MOVE_STATE_STOPPING) block->coast_horizontal = BLOCK_COAST_ENTANGLED_PLAYER;
-                                                  check_idle_move_state = block->horizontal_move.state;
-                                             }
-
-                                             bool held_down = block_held_down_by_another_block(block, world.block_qt, world.interactive_qt, &world.tilemap).held();
-
-                                             if(check_idle_move_state == MOVE_STATE_IDLING && player->push_time > BLOCK_PUSH_TIME){
-                                                  if(!held_down){
-                                                       Vec_t block_vertical_vel = {0, entangled_block->vel.y};
-                                                       auto block_move_dir = vec_direction(block_vertical_vel);
-                                                       if(player->face == block_move_dir){
-                                                            S16 block_mass = block_get_mass(player_prev_pushing_block);
-                                                            S16 entangled_block_mass = block_get_mass(block);
-                                                            F32 mass_ratio = (F32)(block_mass) / (F32)(entangled_block_mass);
-                                                            auto direction_to_push = direction_rotate_clockwise(block_move_dir, rotations_between);
-                                                            auto allowed_result = allowed_to_push(&world, block, direction_to_push, mass_ratio);
-                                                            if(allowed_result.push){
-                                                                 block_push(block, direction_to_push, &world, false, mass_ratio * allowed_result.mass_ratio);
-                                                            }
-                                                       }
-                                                  }else{
-                                                       add_global_tag(TAG_ENTANGLED_BLOCK_HELD_DOWN_UNMOVABLE);
-                                                  }
                                              }
                                         }
                                    }
@@ -4205,6 +4161,85 @@ int main(int argc, char** argv){
                     update_motion_grid_aligned(block->cut, &block->vertical_move, &y_component,
                                                coasting_vertically, dt,
                                                block->pos.pixel.y, block->pos.decimal.y, mass);
+               }
+
+               for(S16 i = 0; i < world.blocks.count; i++){
+                    Block_t* block = world.blocks.elements + i;
+
+                    if(block->coast_vertical <= BLOCK_COAST_ICE  || block->coast_horizontal <= BLOCK_COAST_ICE){
+                         for(S16 p = 0; p < world.players.count; p++){
+                              Player_t* player = world.players.elements + p;
+
+                              // is the player pushing us ?
+                              if(player->prev_pushing_block < 0) continue;
+
+                              Block_t* player_prev_pushing_block = world.blocks.elements + player->prev_pushing_block;
+                              if(blocks_are_entangled(block, player_prev_pushing_block, &world.blocks) &&
+                                 !block_on_ice(block->pos, block->pos_delta, block->cut, &world.tilemap, world.interactive_qt, world.block_qt) &&
+                                 !block_on_air(block, &world.tilemap, world.interactive_qt, world.block_qt)){
+                                   Block_t* entangled_block = player_prev_pushing_block;
+
+                                   auto rotations_between = blocks_rotations_between(block, entangled_block);
+                                   MoveState_t check_idle_move_state = MOVE_STATE_IDLING;
+
+                                   if(entangled_block->coast_horizontal > BLOCK_COAST_NONE){
+                                        if(rotations_between % 2 == 0){
+                                             check_idle_move_state = block->horizontal_move.state;
+                                        }else{
+                                             check_idle_move_state = block->vertical_move.state;
+                                        }
+
+                                        bool held_down = block_held_down_by_another_block(block, world.block_qt, world.interactive_qt, &world.tilemap).held();
+
+                                        if(check_idle_move_state == MOVE_STATE_IDLING && player->push_time > BLOCK_PUSH_TIME){
+                                             if(!held_down){
+                                                  Direction_t block_move_dir = block_axis_move(entangled_block, true);
+                                                  if(player->face == block_move_dir){
+                                                       S16 block_mass = block_get_mass(player_prev_pushing_block);
+                                                       S16 entangled_block_mass = block_get_mass(block);
+                                                       F32 mass_ratio = (F32)(block_mass) / (F32)(entangled_block_mass);
+                                                       auto direction_to_push = direction_rotate_clockwise(block_move_dir, rotations_between);
+                                                       auto allowed_result = allowed_to_push(&world, block, direction_to_push, mass_ratio);
+                                                       if(allowed_result.push){
+                                                            block_push(block, direction_to_push, &world, false, mass_ratio * allowed_result.mass_ratio);
+                                                       }
+                                                  }
+                                             }else{
+                                                  add_global_tag(TAG_ENTANGLED_BLOCK_HELD_DOWN_UNMOVABLE);
+                                             }
+                                        }
+                                   }
+
+                                   if(entangled_block->coast_vertical > BLOCK_COAST_NONE){
+                                        if(rotations_between % 2 == 0){
+                                             check_idle_move_state = block->vertical_move.state;
+                                        }else{
+                                             check_idle_move_state = block->horizontal_move.state;
+                                        }
+
+                                        bool held_down = block_held_down_by_another_block(block, world.block_qt, world.interactive_qt, &world.tilemap).held();
+
+                                        if(check_idle_move_state == MOVE_STATE_IDLING && player->push_time > BLOCK_PUSH_TIME){
+                                             if(!held_down){
+                                                  Direction_t block_move_dir = block_axis_move(entangled_block, false);
+                                                  if(player->face == block_move_dir){
+                                                       S16 block_mass = block_get_mass(player_prev_pushing_block);
+                                                       S16 entangled_block_mass = block_get_mass(block);
+                                                       F32 mass_ratio = (F32)(block_mass) / (F32)(entangled_block_mass);
+                                                       auto direction_to_push = direction_rotate_clockwise(block_move_dir, rotations_between);
+                                                       auto allowed_result = allowed_to_push(&world, block, direction_to_push, mass_ratio);
+                                                       if(allowed_result.push){
+                                                            block_push(block, direction_to_push, &world, false, mass_ratio * allowed_result.mass_ratio);
+                                                       }
+                                                  }
+                                             }else{
+                                                  add_global_tag(TAG_ENTANGLED_BLOCK_HELD_DOWN_UNMOVABLE);
+                                             }
+                                        }
+                                   }
+                              }
+                         }
+                    }
                }
 
                BlockPushes_t<128> all_block_pushes; // TODO: is 128 this enough ?
@@ -5181,6 +5216,17 @@ int main(int argc, char** argv){
                          final_pos = block->pos + block->pos_delta;
                     }
 
+#if 0
+                    if(i == 2)
+                    {
+                         LOG("%ld: p: %d, %d - %.10f, %.10f v: %.10f, %.10f a: %.10f, %.10f\n",
+                             frame_count, block->pos.pixel.x, block->pos.pixel.y,
+                             block->pos.decimal.x, block->pos.decimal.y,
+                             block->vel.x, block->vel.y,
+                             block->accel.x, block->accel.y);
+                    }
+#endif
+
                     // finalize position for each component, stopping on a pixel boundary if we have to
                     if(block->stop_on_pixel_x != 0){
                          block->pos.pixel.x = block->stop_on_pixel_x;
@@ -5211,25 +5257,18 @@ int main(int argc, char** argv){
                     if(player->prev_pushing_block >= 0 && player->prev_pushing_block == player->pushing_block){
                          Block_t* block_to_push = world.blocks.elements + player->prev_pushing_block;
                          DirectionMask_t block_move_dir_mask = vec_direction_mask(block_to_push->vel);
-                         DirectionMask_t teleport_block_move_dir_mask = block_move_dir_mask;
                          auto push_block_dir = player->pushing_block_dir;
-                         auto teleport_push_block_dir = push_block_dir;
 
-                         if(block_to_push->teleport){
-                             teleport_push_block_dir = direction_rotate_clockwise(push_block_dir, block_to_push->teleport_rotation);
-                             teleport_block_move_dir_mask = direction_mask_rotate_clockwise(teleport_block_move_dir_mask, block_to_push->teleport_rotation);
-                         }
-
-                         auto total_block_mass = get_block_mass_in_direction(&world, block_to_push, teleport_push_block_dir);
+                         auto total_block_mass = get_block_mass_in_direction(&world, block_to_push, push_block_dir);
                          auto mass_ratio = (F32)(block_get_mass(block_to_push)) / (F32)(total_block_mass);
 
                          auto expected_final_velocity = get_block_expected_player_push_velocity(&world, block_to_push, mass_ratio);
                          bool already_moving_fast_enough = false;
 
-                         if(direction_in_mask(teleport_block_move_dir_mask, teleport_push_block_dir)){
-                              block_to_push->cur_push_mask = direction_mask_add(block_to_push->cur_push_mask, teleport_push_block_dir);
+                         if(direction_in_mask(block_move_dir_mask, push_block_dir)){
+                              block_to_push->cur_push_mask = direction_mask_add(block_to_push->cur_push_mask, push_block_dir);
 
-                              switch(teleport_push_block_dir){
+                              switch(push_block_dir){
                               default:
                                    break;
                               case DIRECTION_LEFT:
@@ -5251,10 +5290,6 @@ int main(int argc, char** argv){
                               // pass
                               player->push_time += dt;
                               player->entangle_push_time += dt;
-                         }else if(direction_in_mask(direction_mask_opposite(teleport_block_move_dir_mask), teleport_push_block_dir)){
-                              // if the player is pushing against a block moving towards them, the block wins
-                              player->push_time = 0;
-                              player->pushing_block = -1;
                          }else{
                               F32 save_push_time = player->push_time;
 

@@ -1,6 +1,7 @@
 #include "block.h"
 #include "defines.h"
 #include "conversion.h"
+#include "utils.h"
 
 S16 get_object_x(Block_t* block){
      if(block->teleport) return block->teleport_pos.pixel.x + (block_get_width_in_pixels(block->cut) / 2);
@@ -285,6 +286,48 @@ Pixel_t block_get_corner_pixel(Pixel_t pixel, BlockCut_t cut, BlockCorner_t corn
 
 Pixel_t block_get_corner_pixel(Block_t* block, BlockCorner_t corner){
      return block_get_corner_pixel(block->pos.pixel, block->cut, corner);
+}
+
+Move_t block_get_move_in_direction(Block_t* block, Direction_t direction, S16 rotations){
+     Move_t result {};
+
+     if(direction_is_horizontal(direction)){
+          if(rotations % 2 == 0){
+               result = block->horizontal_move;
+          }else{
+               result = block->vertical_move;
+          }
+     }else{
+          if(rotations % 2 == 0){
+               result = block->vertical_move;
+          }else{
+               result = block->horizontal_move;
+          }
+     }
+
+     return result;
+}
+
+Direction_t block_axis_move(Block_t* block, bool x){
+     Direction_t block_move_dir = DIRECTION_COUNT;
+
+     // if we are just starting to move, use acceleration because the player could have pushed us the
+     // opposite direction that we were moving, and it takes time for the accel to overcome the vel
+     if(x){
+          if(block->horizontal_move.state == MOVE_STATE_STARTING){
+               block_move_dir = vec_direction(Vec_t{block->accel.x, 0});
+          }else{
+               block_move_dir = vec_direction(Vec_t{block->vel.x, 0});
+          }
+     }else{
+          if(block->vertical_move.state == MOVE_STATE_STARTING){
+               block_move_dir = vec_direction(Vec_t{0, block->accel.y});
+          }else{
+               block_move_dir = vec_direction(Vec_t{0, block->vel.y});
+          }
+     }
+
+     return block_move_dir;
 }
 
 const char* block_corner_to_string(BlockCorner_t corner){

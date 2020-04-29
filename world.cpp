@@ -646,6 +646,8 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
 
           // this stops the block when it moves into the player
           Vec_t rotated_pos_delta = vec_rotate_quadrants_clockwise(collision.block->pos_delta, collision.portal_rotations);
+          Vec_t rotated_accel = vec_rotate_quadrants_clockwise(collision.block->accel, collision.portal_rotations);
+          MoveState_t relevant_move_state = block_get_move_in_direction(collision.block, collision.dir, collision.portal_rotations).state;
 
           auto* player = world->players.elements + player_index;
 
@@ -668,6 +670,7 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                     if(!would_squish){
                          would_squish = player_against_solid_tile(player, check_dir, &world->tilemap);
                     }
+
                     if(!would_squish){
                          would_squish = player_against_solid_interactive(player, check_dir, world->interactive_qt);
                     }
@@ -692,14 +695,18 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                               collision.block->pos_delta.x = new_pos_delta;
                          }
                     }else if(!(collision.block->pos.z > player->pos.z && block_held_up_by_another_block(collision.block, world->block_qt, world->interactive_qt, &world->tilemap).held())){
-                         F32 block_width = block_get_width_in_pixels(collision.block) * PIXEL_SIZE;
-                         auto new_pos = collision.pos + Vec_t{block_width + PLAYER_RADIUS, 0};
-                         result.pos_delta.x = pos_to_vec(new_pos - player_pos).x;
+                         if(relevant_move_state == MOVE_STATE_STARTING && rotated_accel.x < 0){
+                              // the player has started pushing the block left while it was coasting right so pass on taking any actions
+                         }else{
+                              F32 block_width = block_get_width_in_pixels(collision.block) * PIXEL_SIZE;
+                              auto new_pos = collision.pos + Vec_t{block_width + PLAYER_RADIUS, 0};
+                              result.pos_delta.x = pos_to_vec(new_pos - player_pos).x;
 
-                         if(momentum < PLAYER_SQUISH_MOMENTUM){
-                              auto slow_direction = direction_rotate_counter_clockwise(direction_opposite(collision.dir), collision.portal_rotations);
-                              slow_block_toward_gridlock(world, collision.block, slow_direction);
-                              player_slowing_down = true;
+                              if(momentum < PLAYER_SQUISH_MOMENTUM){
+                                   auto slow_direction = direction_rotate_counter_clockwise(direction_opposite(collision.dir), collision.portal_rotations);
+                                   slow_block_toward_gridlock(world, collision.block, slow_direction);
+                                   player_slowing_down = true;
+                              }
                          }
                     }else{
                          use_this_collision = false;
@@ -723,6 +730,7 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                     if(!would_squish){
                          would_squish = player_against_solid_tile(player, check_dir, &world->tilemap);
                     }
+
                     if(!would_squish){
                          would_squish = player_against_solid_interactive(player, check_dir, world->interactive_qt);
                     }
@@ -745,13 +753,17 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                               collision.block->pos_delta.x = new_pos_delta;
                          }
                     }else if(!(collision.block->pos.z > player->pos.z && block_held_up_by_another_block(collision.block, world->block_qt, world->interactive_qt, &world->tilemap).held())){
-                         auto new_pos = collision.pos - Vec_t{PLAYER_RADIUS, 0};
-                         result.pos_delta.x = pos_to_vec(new_pos - player_pos).x;
+                         if(relevant_move_state == MOVE_STATE_STARTING && rotated_accel.x > 0){
+                              // pass
+                         }else{
+                              auto new_pos = collision.pos - Vec_t{PLAYER_RADIUS, 0};
+                              result.pos_delta.x = pos_to_vec(new_pos - player_pos).x;
 
-                         if(momentum < PLAYER_SQUISH_MOMENTUM){
-                              auto slow_direction = direction_rotate_counter_clockwise(direction_opposite(collision.dir), collision.portal_rotations);
-                              slow_block_toward_gridlock(world, collision.block, slow_direction);
-                              player_slowing_down = true;
+                              if(momentum < PLAYER_SQUISH_MOMENTUM){
+                                   auto slow_direction = direction_rotate_counter_clockwise(direction_opposite(collision.dir), collision.portal_rotations);
+                                   slow_block_toward_gridlock(world, collision.block, slow_direction);
+                                   player_slowing_down = true;
+                              }
                          }
                     }else{
                          use_this_collision = false;
@@ -774,6 +786,7 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                     if(!would_squish){
                          would_squish = player_against_solid_tile(player, check_dir, &world->tilemap);
                     }
+
                     if(!would_squish){
                          would_squish = player_against_solid_interactive(player, check_dir, world->interactive_qt);
                     }
@@ -797,13 +810,17 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
 
                          }
                     }else if(!(collision.block->pos.z > player->pos.z && block_held_up_by_another_block(collision.block, world->block_qt, world->interactive_qt, &world->tilemap).held())){
-                         auto new_pos = collision.pos - Vec_t{0, PLAYER_RADIUS};
-                         result.pos_delta.y = pos_to_vec(new_pos - player_pos).y;
+                         if(relevant_move_state == MOVE_STATE_STARTING && rotated_accel.y > 0){
+                              // pass
+                         }else{
+                              auto new_pos = collision.pos - Vec_t{0, PLAYER_RADIUS};
+                              result.pos_delta.y = pos_to_vec(new_pos - player_pos).y;
 
-                         if(momentum < PLAYER_SQUISH_MOMENTUM){
-                              auto slow_direction = direction_rotate_counter_clockwise(direction_opposite(collision.dir), collision.portal_rotations);
-                              slow_block_toward_gridlock(world, collision.block, slow_direction);
-                              player_slowing_down = true;
+                              if(momentum < PLAYER_SQUISH_MOMENTUM){
+                                   auto slow_direction = direction_rotate_counter_clockwise(direction_opposite(collision.dir), collision.portal_rotations);
+                                   slow_block_toward_gridlock(world, collision.block, slow_direction);
+                                   player_slowing_down = true;
+                              }
                          }
                     }else{
                          use_this_collision = false;
@@ -827,6 +844,7 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                     if(!would_squish){
                          would_squish = player_against_solid_tile(player, check_dir, &world->tilemap);
                     }
+
                     if(!would_squish){
                          would_squish = player_against_solid_interactive(player, check_dir, world->interactive_qt);
                     }
@@ -849,14 +867,18 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                               collision.block->pos_delta.y = new_pos_delta;
                          }
                     }else if(!(collision.block->pos.z > player->pos.z && block_held_up_by_another_block(collision.block, world->block_qt, world->interactive_qt, &world->tilemap).held())){
-                         F32 block_height = block_get_height_in_pixels(collision.block) * PIXEL_SIZE;
-                         auto new_pos = collision.pos + Vec_t{0, block_height + PLAYER_RADIUS};
-                         result.pos_delta.y = pos_to_vec(new_pos - player_pos).y;
+                         if(relevant_move_state == MOVE_STATE_STARTING && rotated_accel.y < 0){
+                              // pass
+                         }else{
+                              F32 block_height = block_get_height_in_pixels(collision.block) * PIXEL_SIZE;
+                              auto new_pos = collision.pos + Vec_t{0, block_height + PLAYER_RADIUS};
+                              result.pos_delta.y = pos_to_vec(new_pos - player_pos).y;
 
-                         if(momentum < PLAYER_SQUISH_MOMENTUM){
-                              auto slow_direction = direction_rotate_counter_clockwise(direction_opposite(collision.dir), collision.portal_rotations);
-                              slow_block_toward_gridlock(world, collision.block, slow_direction);
-                              player_slowing_down = true;
+                              if(momentum < PLAYER_SQUISH_MOMENTUM){
+                                   auto slow_direction = direction_rotate_counter_clockwise(direction_opposite(collision.dir), collision.portal_rotations);
+                                   slow_block_toward_gridlock(world, collision.block, slow_direction);
+                                   player_slowing_down = true;
+                              }
                          }
                     }else{
                          use_this_collision = false;
@@ -1367,6 +1389,8 @@ static F32 get_block_velocity_ratio(World_t* world, Block_t* block, F32 vel, F32
 
 void apply_push_horizontal(Block_t* block, Position_t pos, World_t* world, Direction_t direction, TransferMomentum_t* instant_momentum,
                            bool pushed_by_ice, F32 force, PushFromEntangler_t* from_entangler, BlockPushResult_t* result){
+      DirectionMask_t accel_mask = vec_direction_mask(block->accel);
+
       auto original_move_state = block->horizontal_move.state;
       if(pushed_by_ice){
            auto elastic_result = elastic_transfer_momentum_to_block(instant_momentum, world, block, direction);
@@ -1394,7 +1418,10 @@ void apply_push_horizontal(Block_t* block, Position_t pos, World_t* world, Direc
            }else{
                 return;
            }
-      }else if(block->horizontal_move.state == MOVE_STATE_IDLING || block->horizontal_move.state == MOVE_STATE_COASTING){
+      }else if(block->horizontal_move.state == MOVE_STATE_STARTING && direction_in_mask(accel_mask, direction)){
+           result->busy = true;
+           return;
+      }else{
            if(from_entangler){
                block->accel.x = from_entangler->accel * force;
                block->coast_vel.x = from_entangler->coast_vel * force;
@@ -1424,30 +1451,33 @@ void apply_push_horizontal(Block_t* block, Position_t pos, World_t* world, Direc
                                                                                               block_pos.decimal.x,
                                                                                               lower_dim,
                                                                                               direction == DIRECTION_RIGHT);
+
                F32 velocity_ratio = get_block_velocity_ratio(world, block, block_vel.x, force);
                F32 ideal_accel = calc_accel_from_stop((lower_dim / 2) * PIXEL_SIZE, accel_time) * force;
 
-               if(block->horizontal_move.state == MOVE_STATE_COASTING){
-                    block->accel.x = ideal_accel;
-                    accel_time = fabs(block_vel.x) / fabs(block->accel.x);
-               }else{
-                    block->accel.x = calc_accel_from_stop(half_distance_to_next_grid_center, accel_time) * force;
-               }
+               block->coast_vel.x = calc_velocity_motion(0, ideal_accel, accel_time);
 
                if(direction == DIRECTION_LEFT){
                    ideal_accel = -ideal_accel;
-                   block->accel.x = -block->accel.x;
+                   block->coast_vel.x = -block->coast_vel.x;
                }
 
-               block->coast_vel.x = calc_velocity_motion(0, ideal_accel, accel_time);
+               if(block->horizontal_move.state == MOVE_STATE_COASTING || block->horizontal_move.state == MOVE_STATE_STOPPING){
+                    block->accel.x = ideal_accel;
+                    accel_time = (block->coast_vel.x - block_vel.x) / block->accel.x;
+               }else{
+                    block->accel.x = calc_accel_from_stop(half_distance_to_next_grid_center, accel_time) * force;
+
+                    if(direction == DIRECTION_LEFT){
+                        block->accel.x = -block->accel.x;
+                    }
+               }
+
                block->horizontal_move.time_left = accel_time - (velocity_ratio * accel_time);
            }
 
            block->horizontal_move.state = MOVE_STATE_STARTING;
            block->horizontal_move.sign = (direction == DIRECTION_LEFT) ? MOVE_SIGN_NEGATIVE : MOVE_SIGN_POSITIVE;
-      }else{
-           result->busy = true;
-           return;
       }
 
       block->started_on_pixel_x = pos.pixel.x;
@@ -1455,6 +1485,8 @@ void apply_push_horizontal(Block_t* block, Position_t pos, World_t* world, Direc
 
 void apply_push_vertical(Block_t* block, Position_t pos, World_t* world, Direction_t direction, TransferMomentum_t* instant_momentum,
                          bool pushed_by_ice, F32 force, PushFromEntangler_t* from_entangler, BlockPushResult_t* result){
+      DirectionMask_t accel_mask = vec_direction_mask(block->accel);
+
       auto original_move_state = block->vertical_move.state;
       if(pushed_by_ice){
            auto elastic_result = elastic_transfer_momentum_to_block(instant_momentum, world, block, direction);
@@ -1482,7 +1514,10 @@ void apply_push_vertical(Block_t* block, Position_t pos, World_t* world, Directi
            }else{
                 return;
            }
-      }else if(block->vertical_move.state == MOVE_STATE_IDLING || block->vertical_move.state == MOVE_STATE_COASTING){
+      }else if(block->vertical_move.state == MOVE_STATE_STARTING && direction_in_mask(accel_mask, direction)){
+           result->busy = true;
+           return;
+      }else{
            if(from_entangler){
                block->accel.y = from_entangler->accel * force;
                block->coast_vel.y = from_entangler->coast_vel * force;
@@ -1515,27 +1550,29 @@ void apply_push_vertical(Block_t* block, Position_t pos, World_t* world, Directi
                F32 velocity_ratio = get_block_velocity_ratio(world, block, block_vel.y, force);
                F32 ideal_accel = calc_accel_from_stop((lower_dim / 2) * PIXEL_SIZE, accel_time) * force;
 
-               if(block->vertical_move.state == MOVE_STATE_COASTING){
-                    block->accel.y = ideal_accel;
-                    accel_time = fabs(block_vel.y) / fabs(block->accel.y);
-               }else{
-                    block->accel.y = calc_accel_from_stop(half_distance_to_next_grid_center, accel_time) * force;
-               }
+               block->coast_vel.y = calc_velocity_motion(0, ideal_accel, accel_time);
 
                if(direction == DIRECTION_DOWN){
                    ideal_accel = -ideal_accel;
-                   block->accel.y = -block->accel.y;
+                   block->coast_vel.y = -block->coast_vel.y;
                }
 
-               block->coast_vel.y = calc_velocity_motion(0, ideal_accel, accel_time);
+               if(block->vertical_move.state == MOVE_STATE_COASTING || block->vertical_move.state == MOVE_STATE_STOPPING){
+                    block->accel.y = ideal_accel;
+                    accel_time = (block->coast_vel.y - block_vel.y) / block->accel.y;
+               }else{
+                    block->accel.y = calc_accel_from_stop(half_distance_to_next_grid_center, accel_time) * force;
+
+                    if(direction == DIRECTION_DOWN){
+                        block->accel.y = -block->accel.y;
+                    }
+               }
+
                block->vertical_move.time_left = accel_time - (velocity_ratio * accel_time);
            }
 
            block->vertical_move.state = MOVE_STATE_STARTING;
            block->vertical_move.sign = (direction == DIRECTION_DOWN) ? MOVE_SIGN_NEGATIVE : MOVE_SIGN_POSITIVE;
-      }else{
-           result->busy = true;
-           return;
       }
 
       block->started_on_pixel_y = pos.pixel.y;
@@ -1962,17 +1999,17 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
      }
 
      // if are sliding on ice and are pushed in the opposite direction then stop
-     if(pushed_block_on_ice && !instant_momentum){
+     if(pushed_block_on_ice && !instant_momentum && from_entangler){
           switch(direction){
           default:
                break;
           case DIRECTION_LEFT:
           case DIRECTION_RIGHT:
           {
-               Vec_t horizontal_vel = {block->vel.x, 0};
-               auto moving_dir = vec_direction(horizontal_vel);
+               // TODO: compress this code with similar code elsewhere
+               Direction_t block_move_dir = block_axis_move(block, true);
 
-               if(direction_opposite(moving_dir) == direction){
+               if(direction_opposite(block_move_dir) == direction){
                     S16 block_mass = get_block_stack_mass(world, block);
                     F32 normal_block_velocity = get_block_normal_pushed_velocity(block->cut, block_mass);
                     if(block->vel.x < 0) normal_block_velocity = -normal_block_velocity;
@@ -1998,12 +2035,11 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
           case DIRECTION_UP:
           case DIRECTION_DOWN:
           {
-               Vec_t vertical_vel = {0, block->vel.y};
-               auto moving_dir = vec_direction(vertical_vel);
+               Direction_t block_move_dir = block_axis_move(block, false);
 
                // TODO: handle instant momentum
 
-               if(direction_opposite(moving_dir) == direction){
+               if(direction_opposite(block_move_dir) == direction){
                     S16 block_mass = get_block_stack_mass(world, block);
                     F32 normal_block_velocity = get_block_normal_pushed_velocity(block->cut, block_mass);
                     if(block->vel.y < 0) normal_block_velocity = -normal_block_velocity;
@@ -2091,7 +2127,7 @@ void describe_block(World_t* world, Block_t* block){
          block->entangle_index, block->clone_id);
      LOG("     cut : %s\n", block_cut_to_string(block->cut));
      LOG("  accel  : %.10f, %.10f\n", block->accel.x, block->accel.y);
-     LOG("    vel  : %.10f, %.10f prev_vel: %f, %f\n", block->vel.x, block->vel.y, block->prev_vel.x, block->prev_vel.y);
+     LOG("    vel  : %.10f, %.10f prev_vel: %f, %f coast: %f, %f\n", block->vel.x, block->vel.y, block->prev_vel.x, block->prev_vel.y, block->coast_vel.x, block->coast_vel.y);
      LOG(" pos dt  : %f, %f\n", block->pos_delta.x, block->pos_delta.y);
      LOG(" start px: %d, %d\n", block->started_on_pixel_x, block->started_on_pixel_y);
      LOG(" stop px : %d, %d\n", block->stop_on_pixel_x, block->stop_on_pixel_y);
@@ -2694,6 +2730,7 @@ AllowedToPushResult_t allowed_to_push(World_t* world, Block_t* block, Direction_
 
                if(block_width == HALF_TILE_SIZE_IN_PIXELS || block_height == HALF_TILE_SIZE_IN_PIXELS) accel_time *= SMALL_BLOCK_ACCEL_MULTIPLIER;
 
+               // TODO: why do we use a .y here?
                F32 block_acceleration = (result.mass_ratio * BLOCK_ACCEL((block_center_pixel_offset(block->cut).y * PIXEL_SIZE), accel_time));
                F32 applied_force = (F32)(total_block_mass) * block_acceleration / BLOCK_ACCEL_TIME;
                F32 static_friction = 0;
