@@ -103,6 +103,15 @@ const char* direction_to_string(Direction_t dir){
      return "DIRECTION_UNKNOWN";
 }
 
+bool direction_mask_is_single_direction(DirectionMask_t mask){
+     if(mask == DIRECTION_MASK_LEFT) return true;
+     if(mask == DIRECTION_MASK_RIGHT) return true;
+     if(mask == DIRECTION_MASK_DOWN) return true;
+     if(mask == DIRECTION_MASK_UP) return true;
+
+     return false;
+}
+
 Direction_t direction_from_single_mask(DirectionMask_t mask){
      if(mask & DIRECTION_MASK_UP) return DIRECTION_UP;
      if(mask & DIRECTION_MASK_DOWN) return DIRECTION_DOWN;

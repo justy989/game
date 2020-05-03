@@ -178,6 +178,12 @@ F32 get_collision_dt(CheckBlockCollisionResult_t* collision){
      F32 vel_mag = vec_magnitude(collision->original_vel);
      F32 pos_delta_mag = vec_magnitude(collision->pos_delta);
 
+     // pi + vit = pf
+     // pd = pf - pi
+     // vit = (pf - pi)
+     // vit = pd
+     // t = pd / vi
+
      F32 dt = pos_delta_mag / vel_mag;
      if(dt < 0) return 0;
      if(dt > FRAME_TIME) return FRAME_TIME;
@@ -239,7 +245,7 @@ struct CheckBlockCollisions_t{
 
                    if(collision->collided_block_index == later_collision->block_index &&
                       collision->block_index == later_collision->collided_block_index &&
-                      collision->collided_dir == direction_opposite(later_collision->collided_dir)){
+                      collision->collided_dir_mask == direction_mask_opposite(later_collision->collided_dir_mask)){
                         CheckBlockCollisionResult_t tmp = collisions[swap_index];
                         collisions[swap_index] = *later_collision;
                         *later_collision = tmp;
@@ -266,13 +272,13 @@ struct CheckBlockCollisions_t{
 
                    if(later_collision->same_as_next &&
                       ((collision->collided_block_index == later_collision->collided_block_index &&
-                        collision->collided_dir == later_collision->collided_dir) ||
+                        collision->collided_dir_mask == later_collision->collided_dir_mask) ||
                        (collision->block_index == later_collision->block_index &&
-                        collision->collided_dir == later_collision->collided_dir) ||
+                        collision->collided_dir_mask == later_collision->collided_dir_mask) ||
                        (pair_collision->collided_block_index == later_collision->collided_block_index &&
-                        pair_collision->collided_dir == later_collision->collided_dir) ||
+                        pair_collision->collided_dir_mask == later_collision->collided_dir_mask) ||
                        (pair_collision->block_index == later_collision->block_index &&
-                        pair_collision->collided_dir == later_collision->collided_dir))){
+                        pair_collision->collided_dir_mask == later_collision->collided_dir_mask))){
                         CheckBlockCollisionResult_t tmp = collisions[swap_index];
                         collisions[swap_index] = *later_collision;
                         *later_collision = tmp;
@@ -291,6 +297,10 @@ struct CheckBlockCollisions_t{
 
               i++;
          }
+         // for(S32 i = 0; i < count; i++){
+         //      auto* collision = collisions + i;
+         //      LOG("block %d colides %.10f, %.10f\n", collision->block_index, collision->pos_delta.x, collision->pos_delta.y);
+         // }
      }
 };
 
@@ -645,7 +655,6 @@ void update_stop_on_boundry_while_player_coasting(Direction_t move_dir, Directio
      }
 }
 
-
 void apply_block_collision(World_t* world, Block_t* block, F32 dt, CheckBlockCollisionResult_t* collision_result){
      if(block->teleport){
            if(collision_result->collided){
@@ -854,6 +863,298 @@ void apply_block_collision(World_t* world, Block_t* block, F32 dt, CheckBlockCol
                }else{
                     copy_block_collision_results(block, collision_result);
                }
+          }
+     }
+}
+
+void handle_blocks_colliding_moving_in_the_same_direction_horizontal(Block_t* block, Block_t* last_block_in_chain,
+                                                                     S8 rotations_between_last_in_chain){
+     if(block->vel.x == 0){
+          block_stop_horizontally(block);
+     }else{
+          bool stopped_by_player = false;
+          F32 accel = 0;
+          if(rotations_between_last_in_chain % 2 == 0){
+               stopped_by_player = last_block_in_chain->stopped_by_player_horizontal;
+               accel = last_block_in_chain->accel.x;
+          }else{
+               stopped_by_player = last_block_in_chain->stopped_by_player_vertical;
+               accel = last_block_in_chain->accel.y;
+          }
+          if(stopped_by_player){
+               block->stopped_by_player_horizontal = stopped_by_player;
+               block->horizontal_move.state = MOVE_STATE_STOPPING;
+               block->accel.x = accel;
+          }
+     }
+}
+
+void handle_blocks_colliding_moving_in_the_same_direction_vertical(Block_t* block, Block_t* last_block_in_chain,
+                                                                   S8 rotations_between_last_in_chain){
+     if(block->vel.y == 0){
+          block_stop_vertically(block);
+     }else{
+          bool stopped_by_player = false;
+          F32 accel = 0;
+          if(rotations_between_last_in_chain % 2 == 0){
+               stopped_by_player = last_block_in_chain->stopped_by_player_vertical;
+               accel = last_block_in_chain->accel.y;
+          }else{
+               stopped_by_player = last_block_in_chain->stopped_by_player_horizontal;
+               accel = last_block_in_chain->accel.x;
+          }
+          if(stopped_by_player){
+               block->stopped_by_player_horizontal = stopped_by_player;
+               block->horizontal_move.state = MOVE_STATE_STOPPING;
+               block->accel.y = accel;
+          }
+     }
+}
+
+void generate_pushes_from_collision(World_t* world, CheckBlockCollisionResult_t* collision_result, BlockPushes_t<128>* block_pushes){
+     Block_t* block = world->blocks.elements + collision_result->block_index;
+
+     for(S16 i = 0; i < collision_result->collided_with_blocks.count; i++){
+          auto* collided_with_block = collision_result->collided_with_blocks.objects + i;
+          Block_t* collided_block = world->blocks.elements + collided_with_block->block_index;
+
+          Position_t block_pos = block_get_position(block);
+          Vec_t block_pos_delta = block_get_pos_delta(block);
+          Position_t collided_block_pos = block_get_position(collided_block);
+          Vec_t collided_block_pos_delta = block_get_pos_delta(collided_block);
+
+          bool block_on_ice_or_air = block_on_ice(block_pos, block_pos_delta, block->cut, &world->tilemap, world->interactive_qt, world->block_qt) ||
+                                     block_on_air(block_pos, block_pos_delta, block->cut, &world->tilemap, world->interactive_qt, world->block_qt);
+          bool collided_block_on_ice_or_air = block_on_ice(collided_block_pos, collided_block_pos_delta, collided_block->cut, &world->tilemap, world->interactive_qt, world->block_qt) ||
+                                              block_on_air(collided_block_pos, collided_block_pos_delta, collided_block->cut, &world->tilemap, world->interactive_qt, world->block_qt);
+
+          if(!block_on_ice_or_air || !collided_block_on_ice_or_air) continue;
+
+          bool should_push = true;
+
+          if(direction_mask_is_single_direction(collided_with_block->direction_mask)){
+               Direction_t direction = direction_from_single_mask(collision_result->collided_dir_mask);
+
+               // if we are stopped or travelling the opposite direction of our collision, let the other
+               if(direction == DIRECTION_LEFT){
+                    if(block_pos_delta.x >= 0){
+                         continue;
+                    }
+               }else if(direction == DIRECTION_RIGHT){
+                    if(block_pos_delta.x <= 0){
+                         continue;
+                    }
+               }else if(direction == DIRECTION_DOWN){
+                    if(block_pos_delta.y >= 0){
+                         continue;
+                    }
+               }else if(direction == DIRECTION_UP){
+                    if(block_pos_delta.y <= 0){
+                         continue;
+                    }
+               }
+
+               // TODO: it would be nice to check for this block specifically instead of doing a query again
+               bool against_block = false;
+               auto against_result = block_against_other_blocks(block_pos + block_pos_delta, block->cut, direction, world->block_qt, world->interactive_qt, &world->tilemap);
+               for(S16 a = 0; a < against_result.count; a++){
+                    auto* against = against_result.objects + a;
+                    if(against->block == collided_block){
+                         against_block = true;
+                         break;
+                    }
+               }
+
+               if(!against_block){
+                    continue;
+               }
+
+               Block_t* last_block_in_chain = collided_block;
+               Direction_t against_direction = direction;
+
+               S8 rotations_between_last_in_chain = collided_with_block->portal_rotations;
+
+               while(true){
+                    // TODO: handle multiple against blocks
+                    Position_t last_block_in_chain_final_pos = block_get_final_position(last_block_in_chain);
+                    against_result = block_against_other_blocks(last_block_in_chain_final_pos, last_block_in_chain->cut,
+                                                                     against_direction, world->block_qt, world->interactive_qt, &world->tilemap);
+                    if(against_result.count > 0){
+                         last_block_in_chain = against_result.objects[0].block;
+                         against_direction = direction_rotate_clockwise(against_direction, against_result.objects[0].rotations_through_portal);
+                         rotations_between_last_in_chain += against_result.objects[0].rotations_through_portal;
+                    }else{
+                         break;
+                    }
+               }
+
+               bool last_in_chain_on_frictionless = (block_on_ice(last_block_in_chain->pos, last_block_in_chain->pos_delta,
+                                                                  last_block_in_chain->cut, &world->tilemap, world->interactive_qt, world->block_qt) ||
+                                                     block_on_air(last_block_in_chain->pos, last_block_in_chain->pos_delta,
+                                                                  last_block_in_chain->cut, &world->tilemap, world->interactive_qt, world->block_qt));
+
+               bool being_stopped_by_player = direction_is_horizontal(direction) ?
+                                              last_block_in_chain->stopped_by_player_horizontal :
+                                              last_block_in_chain->stopped_by_player_vertical;
+
+               if(being_stopped_by_player){
+                   being_stopped_by_player &= block_against_player(last_block_in_chain, against_direction, &world->players) != NULL;
+               }
+
+
+               // if the blocks are headed in the same direction but the block is slowing down for either friction or
+               // being stop stopped by the player, slow down with it
+               // TODO: handle the case where a block with a lot of momentum collides with a block being stopped by the player
+               if(!last_in_chain_on_frictionless || being_stopped_by_player){
+                    // TODO: rotated collided block vel based on rotations in chain
+                    switch(direction){
+                    default:
+                        break;
+                    case DIRECTION_LEFT:
+                    {
+                         if(block->vel.x < 0 &&
+                            collided_block->vel.x < 0 &&
+                            block->vel.x < collided_block->vel.x){
+                              block->vel.x = collided_block->vel.x;
+                              handle_blocks_colliding_moving_in_the_same_direction_horizontal(block, last_block_in_chain, rotations_between_last_in_chain);
+                              should_push = false;
+                         }
+                    } break;
+                    case DIRECTION_RIGHT:
+                    {
+                         if(block->vel.x > 0 &&
+                            collided_block->vel.x > 0 &&
+                            block->vel.x > collided_block->vel.x){
+                              block->vel.x = collided_block->vel.x;
+                              handle_blocks_colliding_moving_in_the_same_direction_horizontal(block, last_block_in_chain, rotations_between_last_in_chain);
+                              should_push = false;
+                         }
+                    } break;
+                    case DIRECTION_DOWN:
+                    {
+                         if(block->vel.y < 0 &&
+                            collided_block->vel.y < 0 &&
+                            block->vel.y < collided_block->vel.y){
+                              block->vel.y = collided_block->vel.y;
+                              handle_blocks_colliding_moving_in_the_same_direction_vertical(block, last_block_in_chain, rotations_between_last_in_chain);
+                              should_push = false;
+                         }
+                    } break;
+                    case DIRECTION_UP:
+                    {
+                         if(block->vel.y > 0 &&
+                            collided_block->vel.y > 0 &&
+                            block->vel.y > collided_block->vel.y){
+                              block->vel.y = collided_block->vel.y;
+                              handle_blocks_colliding_moving_in_the_same_direction_vertical(block, last_block_in_chain, rotations_between_last_in_chain);
+                              should_push = false;
+                         }
+                    } break;
+                    }
+               }
+          }else{
+               auto against = block_diagonally_against_block(block->pos + block->pos_delta, block->cut, collided_with_block->direction_mask, &world->tilemap,
+                                                             world->interactive_qt, world->block_qt);
+
+               if(against.block != collided_block) continue;
+
+               Block_t* last_block_in_chain = collided_block;
+               DirectionMask_t against_direction_mask = collided_with_block->direction_mask;
+
+               S8 rotations_between_last_in_chain = collided_with_block->portal_rotations;
+
+               while(true){
+                    // TODO: handle multiple against blocks
+                    Position_t last_block_in_chain_final_pos = block_get_final_position(last_block_in_chain);
+                    against = block_diagonally_against_block(last_block_in_chain_final_pos, last_block_in_chain->cut,
+                                                             against_direction_mask, &world->tilemap, world->interactive_qt, world->block_qt);
+                    if(against.block){
+                         last_block_in_chain = against.block;
+                         against_direction_mask = direction_mask_rotate_clockwise(against_direction_mask, against.rotations_through_portal);
+                         rotations_between_last_in_chain += against.rotations_through_portal;
+                    }else{
+                         break;
+                    }
+               }
+
+               bool last_in_chain_on_frictionless = (block_on_ice(last_block_in_chain->pos, last_block_in_chain->pos_delta,
+                                                                  last_block_in_chain->cut, &world->tilemap, world->interactive_qt, world->block_qt) ||
+                                                     block_on_air(last_block_in_chain->pos, last_block_in_chain->pos_delta,
+                                                                  last_block_in_chain->cut, &world->tilemap, world->interactive_qt, world->block_qt));
+
+               // if the blocks are headed in the same direction but the block is slowing down for either friction or
+               // being stop stopped by the player, slow down with it
+               // TODO: handle the case where a block with a lot of momentum collides with a block being stopped by the player
+               if(!last_in_chain_on_frictionless){
+                    // TODO: rotate collided block vel
+
+                    if(collided_with_block->direction_mask == (DIRECTION_MASK_LEFT | DIRECTION_MASK_DOWN)){
+                         if(block->vel.x < 0 && block->vel.y < 0 &&
+                            collided_block->vel.x < 0 && collided_block->vel.y < 0 &&
+                            block->vel.x < collided_block->vel.x && block->vel.y < collided_block->vel.y){
+                              block->vel.x = collided_block->vel.x;
+                              block->vel.y = collided_block->vel.y;
+                              handle_blocks_colliding_moving_in_the_same_direction_horizontal(block, last_block_in_chain, rotations_between_last_in_chain);
+                              handle_blocks_colliding_moving_in_the_same_direction_vertical(block, last_block_in_chain, rotations_between_last_in_chain);
+                              should_push = false;
+                         }
+                    }else if(collided_with_block->direction_mask == (DIRECTION_MASK_LEFT | DIRECTION_MASK_UP)){
+                         if(block->vel.x < 0 && block->vel.y > 0 &&
+                            collided_block->vel.x < 0 && collided_block->vel.y > 0 &&
+                            block->vel.x < collided_block->vel.x && block->vel.y > collided_block->vel.y){
+                              block->vel.x = collided_block->vel.x;
+                              block->vel.y = collided_block->vel.y;
+                              handle_blocks_colliding_moving_in_the_same_direction_horizontal(block, last_block_in_chain, rotations_between_last_in_chain);
+                              handle_blocks_colliding_moving_in_the_same_direction_vertical(block, last_block_in_chain, rotations_between_last_in_chain);
+                              should_push = false;
+                         }
+                    }else if(collided_with_block->direction_mask == (DIRECTION_MASK_RIGHT | DIRECTION_MASK_DOWN)){
+                         if(block->vel.x > 0 && block->vel.y < 0 &&
+                            collided_block->vel.x > 0 && collided_block->vel.y < 0 &&
+                            block->vel.x > collided_block->vel.x && block->vel.y < collided_block->vel.y){
+                              block->vel.x = collided_block->vel.x;
+                              block->vel.y = collided_block->vel.y;
+                              handle_blocks_colliding_moving_in_the_same_direction_horizontal(block, last_block_in_chain, rotations_between_last_in_chain);
+                              handle_blocks_colliding_moving_in_the_same_direction_vertical(block, last_block_in_chain, rotations_between_last_in_chain);
+                              should_push = false;
+                         }
+                    }else if(collided_with_block->direction_mask == (DIRECTION_MASK_RIGHT | DIRECTION_MASK_UP)){
+                         if(block->vel.x > 0 && block->vel.y > 0 &&
+                            collided_block->vel.x > 0 && collided_block->vel.y > 0 &&
+                            block->vel.x > collided_block->vel.x && block->vel.y > collided_block->vel.y){
+                              block->vel.x = collided_block->vel.x;
+                              block->vel.y = collided_block->vel.y;
+                              handle_blocks_colliding_moving_in_the_same_direction_horizontal(block, last_block_in_chain, rotations_between_last_in_chain);
+                              handle_blocks_colliding_moving_in_the_same_direction_vertical(block, last_block_in_chain, rotations_between_last_in_chain);
+                              should_push = false;
+                         }
+                    }
+               }
+          }
+
+          if(!should_push) continue;
+
+          auto opposite_direction_mask = direction_mask_opposite(collided_with_block->direction_mask);
+
+          bool found_pair_push = false;
+          for(S16 p = 0; p < block_pushes->count; p++){
+               BlockPush_t* push = block_pushes->pushes + p;
+               if(push->pushee_index == collision_result->block_index &&
+                  push->pushers[0].index == collided_with_block->block_index &&
+                  push->direction_mask == opposite_direction_mask){
+                    found_pair_push = true;
+               }
+          }
+
+          if(!found_pair_push){
+               BlockPush_t block_push {};
+
+               block_push.add_pusher(collision_result->block_index, 1);
+               block_push.pushee_index = collided_with_block->block_index;
+               block_push.direction_mask = collided_with_block->direction_mask;
+               block_push.portal_rotations = collided_with_block->portal_rotations;
+
+               block_pushes->add(&block_push);
           }
      }
 }
@@ -4256,8 +4557,18 @@ int main(int argc, char** argv){
                while(repeat_collision_pass && collision_attempts <= max_collision_attempts){
                     repeat_collision_pass = false;
 
-                    // do a collision pass on each block
+                    // do a collision pass on blocks against the world
                     S16 update_blocks_count = world.blocks.count;
+                    for(S16 i = 0; i < update_blocks_count; i++){
+                         auto block = world.blocks.elements + i;
+                         auto block_collision_result = do_block_collision(&world, block, update_blocks_count);
+                         if(block_collision_result.repeat_collision_pass){
+                             repeat_collision_pass = true;
+                         }
+                         update_blocks_count = block_collision_result.update_blocks_count;
+                    }
+
+                    // do a collision pass on blocks against other blocks
                     for(S16 i = 0; i < update_blocks_count; i++){
                          auto* block = world.blocks.elements + i;
                          auto collision_result = check_block_collision(&world, block);
@@ -4272,9 +4583,9 @@ int main(int argc, char** argv){
 
                     collision_results.sort_by_time();
 
+                    // update block positions based on collisions
                     for(S32 i = 0; i < collision_results.count; i++){
                         auto* collision = collision_results.collisions + i;
-                        if(!collision->collided) continue;
                         apply_block_collision(&world, world.blocks.elements + collision->block_index, dt, collision);
 
                         if(!collision->same_as_next){
@@ -4284,20 +4595,15 @@ int main(int argc, char** argv){
                                 collision_results.collisions[j] = check_block_collision(&world, block);
                             }
                         }
+                    }
 
-                        all_block_pushes.merge(&collision->block_pushes);
+                    // generate pushes based on collisions
+                    for(S32 i = 0; i < collision_results.count; i++){
+                        auto* collision = collision_results.collisions + i;
+                        generate_pushes_from_collision(&world, collision, &all_block_pushes);
                     }
 
                     collision_results.reset();
-
-                    for(S16 i = 0; i < update_blocks_count; i++){
-                         auto block = world.blocks.elements + i;
-                         auto block_collision_result = do_block_collision(&world, block, update_blocks_count);
-                         if(block_collision_result.repeat_collision_pass){
-                             repeat_collision_pass = true;
-                         }
-                         update_blocks_count = block_collision_result.update_blocks_count;
-                    }
 
                     // check if blocks extinguish elements of other blocks
                     for(S16 i = 0; i < world.blocks.count; i++){

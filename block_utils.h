@@ -14,8 +14,8 @@ struct BlockInsideBlockResult_t{
      Vec_t collision_overlap;
 
      U8 portal_rotations = 0;
-     Coord_t src_portal_coord;
-     Coord_t dst_portal_coord;
+     Coord_t src_portal_coord = Coord_t{0, 0};
+     Coord_t dst_portal_coord = Coord_t{0, 0};
      bool invalidated = false;
 
      void init(Block_t* collided_block, Position_t collided_pos, Vec_t collided_pos_delta, Vec_t collided_overlap){
@@ -226,6 +226,14 @@ struct BlockPushes_t{
      }
 };
 
+struct BlockCollidedWithBlock_t{
+     S16 block_index = -1;
+     DirectionMask_t direction_mask = DIRECTION_MASK_NONE;
+     S8 portal_rotations = 0;
+};
+
+using BlockCollidedWithBlocks_t = StaticObjectArray_t<BlockCollidedWithBlock_t, MAX_BLOCK_INSIDE_OTHERS_COUNT>;
+
 struct CheckBlockCollisionResult_t{
      bool collided;
      S16 block_index;
@@ -245,15 +253,21 @@ struct CheckBlockCollisionResult_t{
      Move_t horizontal_move;
      Move_t vertical_move;
 
+     F32 collided_distance;
      Position_t collided_pos;
+
+     // TODO: I don't think we use this anymore ?
      S16 collided_block_index;
      U8 collided_portal_rotations;
-     Direction_t collided_dir;
+     DirectionMask_t collided_dir_mask;
+
+     Coord_t collided_src_portal = Coord_t{0, 0};
+     Coord_t collided_dst_portal = Coord_t{0, 0};
 
      F32 horizontal_momentum;
      F32 vertical_momentum;
 
-     BlockPushes_t<4> block_pushes;
+     BlockCollidedWithBlocks_t collided_with_blocks;
 
      void stop_horizontally(){
           reset_move(&horizontal_move);

@@ -208,7 +208,7 @@ BlockAgainstOthersResult_t block_against_other_blocks(Position_t pos, BlockCut_t
      for(S16 i = 0; i < found_blocks.count; i++){
          auto* found_block = found_blocks.objects + i;
          blocks[i] = found_block->block;
-         portal_offsets[i] = found_block->position - block_get_position(found_block->block);
+         portal_offsets[i] = found_block->position - block_get_final_position(found_block->block);
 
          if(block_against_block(pos, cut, blocks[i], found_block->rotated_cut, direction, portal_offsets[i])){
               BlockAgainstOther_t against_other {};
@@ -993,7 +993,7 @@ void handle_block_on_block_action_horizontal(Position_t block_pos, Vec_t block_p
                   result->vel.x = collided_block_vel.x;
                   if(result->vel.x == 0) result->stop_horizontally();
               }
-          }else if(!inside_block_on_frictionless){
+          }else{
              F32 total_pos_delta = fabs(block_pos_delta.x) + fabs(inside_block_entry->collision_pos_delta.x);
              F32 inside_block_overlap_ratio = inside_block_entry->collision_pos_delta.x / total_pos_delta;
 
@@ -1001,8 +1001,11 @@ void handle_block_on_block_action_horizontal(Position_t block_pos, Vec_t block_p
              auto new_pos_delta = pos_to_vec(final_stop_pos - block_pos);
 
              result->pos_delta.x = new_pos_delta.x;
-             result->stop_on_pixel_x = closest_pixel(final_stop_pos.pixel.x, final_stop_pos.decimal.x);
-             result->stop_horizontally();
+
+             if(!inside_block_on_frictionless){
+                  result->stop_on_pixel_x = closest_pixel(final_stop_pos.pixel.x, final_stop_pos.decimal.x);
+                  result->stop_horizontally();
+             }
           }
      }else{
           Position_t final_stop_pos;
@@ -1037,7 +1040,7 @@ void handle_block_on_block_action_vertical(Position_t block_pos, Vec_t block_pos
                   result->vel.y = collided_block_vel.y;
                   if(result->vel.y == 0) result->stop_vertically();
               }
-          }else if(!inside_block_on_frictionless){
+          }else{
              F32 total_pos_delta = fabs(block_pos_delta.y) + fabs(inside_block_entry->collision_pos_delta.y);
              F32 inside_block_overlap_ratio = inside_block_entry->collision_pos_delta.y / total_pos_delta;
 
@@ -1045,8 +1048,11 @@ void handle_block_on_block_action_vertical(Position_t block_pos, Vec_t block_pos
              auto new_pos_delta = pos_to_vec(final_stop_pos - block_pos);
 
              result->pos_delta.y = new_pos_delta.y;
-             result->stop_on_pixel_y = closest_pixel(final_stop_pos.pixel.y, final_stop_pos.decimal.y);
-             result->stop_vertically();
+
+             if(!inside_block_on_frictionless){
+                  result->stop_on_pixel_y = closest_pixel(final_stop_pos.pixel.y, final_stop_pos.decimal.y);
+                  result->stop_vertically();
+             }
           }
      }else{
           Position_t final_stop_pos;
@@ -1065,6 +1071,7 @@ void handle_block_on_block_action_vertical(Position_t block_pos, Vec_t block_pos
      }
 }
 
+// TODO: remove these functions beceause they aren't used anymore
 void handle_blocks_colliding_moving_in_the_same_direction_horizontal(CheckBlockCollisionResult_t* result, Block_t* last_block_in_chain,
                                                                      S8 rotations_between_last_in_chain){
      if(result->vel.x == 0){
@@ -1147,6 +1154,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
      if(block_inside_result.count > 0 ){
           S16 collided_with_blocks_on_ice = 0;
 
+          // TODO: this code might go away with our restructure
           if(block_on_ice(block_pos, block_pos_delta, cut, &world->tilemap, world->interactive_qt, world->block_qt) ||
              block_on_air(block_pos, block_pos_delta, cut, &world->tilemap, world->interactive_qt, world->block_qt)){
                // calculate the momentum if we are on ice for later
@@ -1241,12 +1249,61 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                }
           }
 
+          result.collided_distance = FLT_MAX;
+
           for(S8 i = 0; i < block_inside_result.count; i++){
                BlockInsideBlockResult_t* inside_entry = block_inside_result.objects + i;
                if(inside_entry->invalidated) continue;
 
+               auto moved_block_pos = block_get_center(block_pos, cut);
+               auto move_direction = move_direction_between(moved_block_pos, inside_entry->collision_pos);
+               Direction_t first_direction;
+               Direction_t second_direction;
+               move_direction_to_directions(move_direction, &first_direction, &second_direction);
+
+               auto collided_dir_mask = direction_mask_add(direction_to_direction_mask(first_direction),
+                                                             direction_to_direction_mask(second_direction));
+
+
+               BlockCollidedWithBlock_t collided_with {};
+               collided_with.block_index = get_block_index(world, inside_entry->block);
+               collided_with.direction_mask = collided_dir_mask;
+               collided_with.portal_rotations = inside_entry->portal_rotations;
+               // char m[128];
+               // direction_mask_to_string(collided_dir_mask, m, 128);
+               // LOG("block %d colliding %s with block %d\n", block_index, m, collided_with.block_index);
+               result.collided_with_blocks.insert(&collided_with);
+
+               F32 collision_distance = vec_magnitude(pos_to_vec(inside_entry->collision_pos - block_pos));
+               if(collision_distance > result.collided_distance) continue;
+
+               S16 block_inside_index = -1;
+               if(inside_entry->block){
+                   block_inside_index = get_block_index(world, inside_entry->block);
+               }
+
+               // check if they are on a frictionless surface before
+               // TODO: create a single function block_on_frictionless(), use it in all the places we do this
+               bool a_on_ice_or_air = block_on_ice(block_pos, result.pos_delta, cut, &world->tilemap, world->interactive_qt, world->block_qt) ||
+                                      block_on_air(block_pos, result.pos_delta, cut, &world->tilemap, world->interactive_qt, world->block_qt);
+               bool b_on_ice_or_air = block_on_ice(inside_entry->block->pos, inside_entry->block->pos_delta,
+                                                   inside_entry->block->cut, &world->tilemap, world->interactive_qt, world->block_qt) ||
+                                      block_on_air(inside_entry->block->pos, inside_entry->block->pos_delta,
+                                                   inside_entry->block->cut, &world->tilemap, world->interactive_qt, world->block_qt);
+               bool both_frictionless = a_on_ice_or_air && b_on_ice_or_air;
+
+               // if(a_on_ice_or_air && b_on_ice_or_air){
+               //      if(block_inside_index != block_index){
+               //           if(!direction_in_mask(vec_direction_mask(block_pos_delta), first_direction)){
+               //                // although we collided, the other block is colliding into us, so let that block resolve this mess
+               //                continue;
+               //           }
+               //      }
+               // }
+
                // TODO: handle multiple block indices
                result.collided = true;
+               result.collided_distance = collision_distance;
                result.collided_block_index = get_block_index(world, inside_entry->block);
                result.collided_pos = inside_entry->collision_pos;
                result.collided_portal_rotations = inside_entry->portal_rotations;
@@ -1270,28 +1327,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                     collided_block_center.decimal.y = 0;
                }
 
-               auto moved_block_pos = block_get_center(block_pos, cut);
-               auto move_direction = move_direction_between(moved_block_pos, inside_entry->collision_pos);
-               Direction_t first_direction;
-               Direction_t second_direction;
-               move_direction_to_directions(move_direction, &first_direction, &second_direction);
-
-               // TODO: we may want to expand this for both directions, but the current use case should only be one direction
-               result.collided_dir = first_direction;
-
-               // check if they are on ice before we adjust the position on our block to check
-               bool a_on_ice_or_air = block_on_ice(block_pos, result.pos_delta, cut, &world->tilemap, world->interactive_qt, world->block_qt) ||
-                                      block_on_air(block_pos, result.pos_delta, cut, &world->tilemap, world->interactive_qt, world->block_qt);
-               bool b_on_ice_or_air = block_on_ice(inside_entry->block->pos, inside_entry->block->pos_delta,
-                                                   inside_entry->block->cut, &world->tilemap, world->interactive_qt, world->block_qt) ||
-                                      block_on_air(inside_entry->block->pos, inside_entry->block->pos_delta,
-                                                   inside_entry->block->cut, &world->tilemap, world->interactive_qt, world->block_qt);
-               bool both_frictionless = a_on_ice_or_air && b_on_ice_or_air;
-
-               S16 block_inside_index = -1;
-               if(inside_entry->block){
-                   block_inside_index = get_block_index(world, inside_entry->block);
-               }
+               result.collided_dir_mask = collided_dir_mask;
 
                if(blocks_are_entangled(result.collided_block_index, block_index, &world->blocks)){
                     auto* block = world->blocks.elements + block_index;
@@ -1305,22 +1341,20 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                     // if positions are diagonal to each other and the rotation between them is odd, check if we are moving into each other
                     if(pos_dimension_delta <= DISTANCE_EPSILON && (block->rotation + entangled_block->rotation + result.collided_portal_rotations) % 2 == 1){
                          // just gtfo if this happens, we handle this case outside this function
-                         return result;
+                         continue;
                     }
 
                     // if we are not moving towards the entangled block, it's on them to resolve the collision, so get outta here
                     DirectionMask_t pos_diff_dir_mask = vec_direction_mask(pos_diff);
                     auto pos_delta_dir = vec_direction(block->pos_delta);
                     if(!direction_in_mask(pos_diff_dir_mask, pos_delta_dir)){
-                         return result;
+                         continue;
                     }
                }
 
                auto collided_block_move_mask = vec_direction_mask(inside_entry->block->pos_delta);
 
                if(result.collided_portal_rotations){
-                    // auto save_mask = collided_block_move_mask;
-
                     // unsure why this is correct, but we've proved it via example
                     auto total_rotations = DIRECTION_COUNT - result.collided_portal_rotations;
 
@@ -1331,9 +1365,11 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                }
 
                if(block_inside_index != block_index){
-                    bool inside_block_on_frictionless = (block_on_ice(collided_block->pos, collided_block->pos_delta, collided_block->cut,
+                    Position_t collided_block_pos = block_get_position(collided_block);
+                    Vec_t collided_block_pos_delta = block_get_pos_delta(collided_block);
+                    bool inside_block_on_frictionless = (block_on_ice(collided_block_pos, collided_block_pos_delta, collided_block->cut,
                                                                       &world->tilemap, world->interactive_qt, world->block_qt) ||
-                                                         block_on_air(collided_block->pos, collided_block->pos_delta, collided_block->cut,
+                                                         block_on_air(collided_block_pos, collided_block_pos_delta, collided_block->cut,
                                                                       &world->tilemap, world->interactive_qt, world->block_qt));
 
                     switch(move_direction){
@@ -1453,6 +1489,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                     }
                }
 
+#if 0
                bool should_push = true;
 
                Block_t* last_block_in_chain = inside_entry->block;
@@ -1553,8 +1590,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                          push.add_pusher(block_index, collided_with_blocks_on_ice);
                          push.pushee_index = get_block_index(world, inside_entry->block);
 
-                         push.direction_mask = direction_mask_add(direction_to_direction_mask(first_direction),
-                                                                  direction_to_direction_mask(second_direction));
+                         push.direction_mask = result.collided_dir_mask;
 
                          push.portal_rotations = inside_entry->portal_rotations;
 
@@ -1565,6 +1601,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                          result.block_pushes.add(&push);
                     }
                }
+#endif
           }
      }
 
