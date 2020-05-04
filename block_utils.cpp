@@ -1011,7 +1011,7 @@ void handle_block_on_block_action_horizontal(Position_t block_pos, Vec_t block_p
           }
      }else{
           Position_t final_stop_pos;
-          if(collided_block_center.decimal.x == 0){
+          if(!inside_block_on_frictionless && collided_block_center.decimal.x == 0){
               // if the block is grid aligned let's keep it that way
               final_stop_pos = pixel_pos(collided_block_center.pixel + collision_offset);
               result->stop_on_pixel_x = final_stop_pos.pixel.x;
@@ -1058,7 +1058,7 @@ void handle_block_on_block_action_vertical(Position_t block_pos, Vec_t block_pos
           }
      }else{
           Position_t final_stop_pos;
-          if(collided_block_center.decimal.y == 0){
+          if(!inside_block_on_frictionless && collided_block_center.decimal.y == 0){
               // if the block is grid aligned let's keep it that way
               final_stop_pos = pixel_pos(collided_block_center.pixel + collision_offset);
               result->stop_on_pixel_y = final_stop_pos.pixel.y;

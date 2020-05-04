@@ -957,12 +957,17 @@ void generate_pushes_from_collision(World_t* world, CheckBlockCollisionResult_t*
           if(direction_mask_is_single_direction(collided_with_block->direction_mask)){
                Direction_t direction = direction_from_single_mask(collision_result->collided_dir_mask);
 
+               // LOG("block %d pd: %.10f, %.10f -> pre col: %.10f, %.10f col time rat: %.10f, %.10f\n",
+               //     collision_result->block_index, block_pos_delta.x, block_pos_delta.y, block->pre_collision_pos_delta.x, block->pre_collision_pos_delta.y, block->collision_time_ratio.x, block->collision_time_ratio.y);
+
                // if we are stopped or travelling the opposite direction of our collision, let the other
                if(direction == DIRECTION_LEFT){
                     if(block_pos_delta.x >= 0){
                          continue;
                     }
                     block_pos_delta.y = block->pre_collision_pos_delta.y * block->collision_time_ratio.x;
+                    auto final = block_pos + block_pos_delta;
+                    LOG("  y final: %d, %d - %.10f, %.10f\n", final.pixel.x, final.pixel.y, final.decimal.x, final.decimal.y);
                }else if(direction == DIRECTION_RIGHT){
                     if(block_pos_delta.x <= 0){
                          continue;
@@ -972,7 +977,12 @@ void generate_pushes_from_collision(World_t* world, CheckBlockCollisionResult_t*
                     if(block_pos_delta.y >= 0){
                          continue;
                     }
+                    F32 save_pos_delta = block_pos_delta.x;
                     block_pos_delta.x = block->pre_collision_pos_delta.x * block->collision_time_ratio.y;
+                    LOG("updating block %d pd x %.10f to %.10f pre pd: %.10f rat: %.10f\n",
+                        collision_result->block_index, save_pos_delta, block_pos_delta.x, block->pre_collision_pos_delta.x, block->collision_time_ratio.y);
+                    auto final = block_pos + block_pos_delta;
+                    LOG("  x final: %d, %d - %.10f, %.10f\n", final.pixel.x, final.pixel.y, final.decimal.x, final.decimal.y);
                }else if(direction == DIRECTION_UP){
                     if(block_pos_delta.y <= 0){
                          continue;
@@ -1003,6 +1013,7 @@ void generate_pushes_from_collision(World_t* world, CheckBlockCollisionResult_t*
 
                if(all_on_frictionless){
                     against_block_count = against_result.count;
+                    LOG("block %d against %d blocks\n", collision_result->block_index, against_result.count);
                }
 
                Block_t* last_block_in_chain = collided_block;
@@ -2510,8 +2521,6 @@ int main(int argc, char** argv){
           fprintf(stderr, "failed to create log file: '%s'\n", log_path);
           return -1;
      }
-
-     LOG("pixel size: %.10f\n", PIXEL_SIZE);
 
      if(test && !load_map_filepath && !suite){
           LOG("cannot test without specifying a map to load\n");
@@ -4610,6 +4619,13 @@ int main(int argc, char** argv){
                CheckBlockCollisions_t collision_results;
                collision_results.init(world.blocks.count);
 
+               // before collision, track the pos delta
+               S16 update_blocks_count = world.blocks.count;
+               for(S16 i = 0; i < update_blocks_count; i++){
+                    auto block = world.blocks.elements + i;
+                    block->pre_collision_pos_delta = block->pos_delta;
+               }
+
                // unbounded collision: this should be exciting
                // we have our initial position and our initial pos_delta, update pos_delta for all players and blocks until nothing is colliding anymore
                const S8 max_collision_attempts = 16;
@@ -4618,9 +4634,9 @@ int main(int argc, char** argv){
                     repeat_collision_pass = false;
 
                     // do a collision pass on blocks against the world
-                    S16 update_blocks_count = world.blocks.count;
                     for(S16 i = 0; i < update_blocks_count; i++){
                          auto block = world.blocks.elements + i;
+                         block->pre_collision_pos_delta = block->pos_delta;
                          auto block_collision_result = do_block_collision(&world, block, update_blocks_count);
                          if(block_collision_result.repeat_collision_pass){
                              repeat_collision_pass = true;
@@ -4634,22 +4650,20 @@ int main(int argc, char** argv){
                          auto collision_result = check_block_collision(&world, block);
                          // add collisions that we need to resolve
                          if(collision_result.collided){
-                              collision_results.add_collision(&collision_result);
-
-                              block->pre_collision_pos_delta = block->pos_delta;
-
                               if(block->pos_delta.x == 0){
                                    block->collision_time_ratio.x = 0;
                               }else{
-                                   block->collision_time_ratio.x = collision_result.pos_delta.x / block->pos_delta.x;
+                                   block->collision_time_ratio.x = collision_result.pos_delta.x / block->pre_collision_pos_delta.x;
+                                   LOG("block %d: col pd x: %.10f, pd x: %.10f, res: %.10f\n", i, collision_result.pos_delta.x, block->pos_delta.x, block->collision_time_ratio.x);
                               }
 
                               if(block->pos_delta.y == 0){
                                    block->collision_time_ratio.y = 0;
                               }else{
-                                   block->collision_time_ratio.y = collision_result.pos_delta.y / block->pos_delta.y;
+                                   block->collision_time_ratio.y = collision_result.pos_delta.y / block->pre_collision_pos_delta.y;
                               }
 
+                              collision_results.add_collision(&collision_result);
                          }
                     }
 
