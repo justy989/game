@@ -998,15 +998,17 @@ void handle_block_on_block_action_horizontal(Position_t block_pos, Vec_t block_p
              F32 inside_block_overlap_ratio = block_pos_delta.x / total_pos_delta;
 
              Position_t final_stop_pos = block_pos + block_pos_delta - Vec_t{inside_block_overlap_ratio * inside_block_entry->collision_overlap.x, 0};
-             auto new_pos_delta = pos_to_vec(final_stop_pos - block_pos);
-
-             // LOG("    updating block %d pd x: %.10f to %.10f, overlap rat: %.10f, overlap: %.10f, result overlap: %.10f\n",
-             //     result->block_index, result->pos_delta.x, new_pos_delta.x, inside_block_overlap_ratio, inside_block_entry->collision_overlap.x, inside_block_overlap_ratio * inside_block_entry->collision_overlap.x);
-             result->pos_delta.x = new_pos_delta.x;
 
              if(!inside_block_on_frictionless){
-                  result->stop_on_pixel_x = closest_pixel(final_stop_pos.pixel.x, final_stop_pos.decimal.x);
                   result->stop_horizontally();
+                  result->stop_on_pixel_x = closest_pixel(final_stop_pos.pixel.x, final_stop_pos.decimal.x);
+                  final_stop_pos.pixel.x = result->stop_on_pixel_x;
+                  final_stop_pos.decimal.x = 0;
+                  auto new_pos_delta = pos_to_vec(final_stop_pos - block_pos);
+                  result->pos_delta.x = new_pos_delta.x;
+             }else{
+                  auto new_pos_delta = pos_to_vec(final_stop_pos - block_pos);
+                  result->pos_delta.x = new_pos_delta.x;
              }
           }
      }else{
@@ -1047,13 +1049,17 @@ void handle_block_on_block_action_vertical(Position_t block_pos, Vec_t block_pos
              F32 inside_block_overlap_ratio = block_pos_delta.y / total_pos_delta;
 
              Position_t final_stop_pos = block_pos + block_pos_delta + Vec_t{0, inside_block_overlap_ratio * inside_block_entry->collision_overlap.y};
-             auto new_pos_delta = pos_to_vec(final_stop_pos - block_pos);
-
-             result->pos_delta.y = new_pos_delta.y;
 
              if(!inside_block_on_frictionless){
-                  result->stop_on_pixel_y = closest_pixel(final_stop_pos.pixel.y, final_stop_pos.decimal.y);
                   result->stop_vertically();
+                  result->stop_on_pixel_y = closest_pixel(final_stop_pos.pixel.y, final_stop_pos.decimal.y);
+                  final_stop_pos.pixel.y = result->stop_on_pixel_y;
+                  final_stop_pos.decimal.y = 0;
+                  auto new_pos_delta = pos_to_vec(final_stop_pos - block_pos);
+                  result->pos_delta.y = new_pos_delta.y;
+             }else{
+                  auto new_pos_delta = pos_to_vec(final_stop_pos - block_pos);
+                  result->pos_delta.y = new_pos_delta.y;
              }
           }
      }else{
