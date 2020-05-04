@@ -224,6 +224,10 @@ struct BlockPushes_t{
                if(unique) add(alternate);
           }
      }
+
+     void clear(){
+          count = 0;
+     }
 };
 
 struct BlockCollidedWithBlock_t{
@@ -235,17 +239,18 @@ struct BlockCollidedWithBlock_t{
 using BlockCollidedWithBlocks_t = StaticObjectArray_t<BlockCollidedWithBlock_t, MAX_BLOCK_INSIDE_OTHERS_COUNT>;
 
 struct CheckBlockCollisionResult_t{
-     bool collided;
-     S16 block_index;
-     bool same_as_next;
+     bool collided = false;
+     S16 block_index = -1;
+     bool same_as_next = false;
+     bool unused = false;
 
      Vec_t pos_delta;
      Vec_t original_vel;
      Vec_t vel;
      Vec_t accel;
 
-     S16 stop_on_pixel_x;
-     S16 stop_on_pixel_y;
+     S16 stop_on_pixel_x = -1;
+     S16 stop_on_pixel_y = -1;
 
      bool stopped_by_player_horizontal;
      bool stopped_by_player_vertical;
@@ -254,9 +259,9 @@ struct CheckBlockCollisionResult_t{
      Move_t vertical_move;
 
      F32 collided_distance;
-     Position_t collided_pos;
 
      // TODO: I don't think we use this anymore ?
+     Position_t collided_pos;
      S16 collided_block_index;
      U8 collided_portal_rotations;
      DirectionMask_t collided_dir_mask;

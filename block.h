@@ -85,6 +85,8 @@ struct Block_t : public GridMotion_t{
      S16 previous_mass;
 
      ConnectedTeleport_t connected_teleport;
+     Vec_t pre_collision_pos_delta;
+     Vec_t collision_time_ratio;
 };
 
 S16 get_object_x(Block_t* block);
