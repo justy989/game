@@ -965,29 +965,41 @@ void generate_pushes_from_collision(World_t* world, CheckBlockCollisionResult_t*
                     if(block_pos_delta.x >= 0){
                          continue;
                     }
-                    block_pos_delta.y = block->pre_collision_pos_delta.y * block->collision_time_ratio.x;
-                    auto final = block_pos + block_pos_delta;
-                    LOG("  y final: %d, %d - %.10f, %.10f\n", final.pixel.x, final.pixel.y, final.decimal.x, final.decimal.y);
+                    // to combat floating point precision error (collision_time_ratio is division, while pos_delta is
+                    // usually subtraction), we check if the block was moving diagonally, then we know they'll just be
+                    // reduced the same
+                    if(block->pre_collision_pos_delta.x == block->pre_collision_pos_delta.y){
+                         block_pos_delta.y = block->pos_delta.x;
+                    }else{
+                         block_pos_delta.y = block->pre_collision_pos_delta.y * block->collision_time_ratio.x;
+                    }
                }else if(direction == DIRECTION_RIGHT){
                     if(block_pos_delta.x <= 0){
                          continue;
                     }
-                    block_pos_delta.y = block->pre_collision_pos_delta.y * block->collision_time_ratio.x;
+                    if(block->pre_collision_pos_delta.x == block->pre_collision_pos_delta.y){
+                         block_pos_delta.y = block->pos_delta.x;
+                    }else{
+                         block_pos_delta.y = block->pre_collision_pos_delta.y * block->collision_time_ratio.x;
+                    }
                }else if(direction == DIRECTION_DOWN){
                     if(block_pos_delta.y >= 0){
                          continue;
                     }
-                    F32 save_pos_delta = block_pos_delta.x;
-                    block_pos_delta.x = block->pre_collision_pos_delta.x * block->collision_time_ratio.y;
-                    LOG("updating block %d pd x %.10f to %.10f pre pd: %.10f rat: %.10f\n",
-                        collision_result->block_index, save_pos_delta, block_pos_delta.x, block->pre_collision_pos_delta.x, block->collision_time_ratio.y);
-                    auto final = block_pos + block_pos_delta;
-                    LOG("  x final: %d, %d - %.10f, %.10f\n", final.pixel.x, final.pixel.y, final.decimal.x, final.decimal.y);
+                    if(block->pre_collision_pos_delta.x == block->pre_collision_pos_delta.y){
+                         block_pos_delta.x = block->pos_delta.y;
+                    }else{
+                         block_pos_delta.x = block->pre_collision_pos_delta.x * block->collision_time_ratio.y;
+                    }
                }else if(direction == DIRECTION_UP){
                     if(block_pos_delta.y <= 0){
                          continue;
                     }
-                    block_pos_delta.x = block->pre_collision_pos_delta.x * block->collision_time_ratio.y;
+                    if(block->pre_collision_pos_delta.x == block->pre_collision_pos_delta.y){
+                         block_pos_delta.x = block->pos_delta.y;
+                    }else{
+                         block_pos_delta.x = block->pre_collision_pos_delta.x * block->collision_time_ratio.y;
+                    }
                }
 
                // TODO: it would be nice to check for this block specifically instead of doing a query again
@@ -1013,7 +1025,6 @@ void generate_pushes_from_collision(World_t* world, CheckBlockCollisionResult_t*
 
                if(all_on_frictionless){
                     against_block_count = against_result.count;
-                    LOG("block %d against %d blocks\n", collision_result->block_index, against_result.count);
                }
 
                Block_t* last_block_in_chain = collided_block;
@@ -4654,7 +4665,6 @@ int main(int argc, char** argv){
                                    block->collision_time_ratio.x = 0;
                               }else{
                                    block->collision_time_ratio.x = collision_result.pos_delta.x / block->pre_collision_pos_delta.x;
-                                   LOG("block %d: col pd x: %.10f, pd x: %.10f, res: %.10f\n", i, collision_result.pos_delta.x, block->pos_delta.x, block->collision_time_ratio.x);
                               }
 
                               if(block->pos_delta.y == 0){
