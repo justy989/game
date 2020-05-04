@@ -129,6 +129,7 @@ Pixel_t block_get_corner_pixel(Block_t* block, BlockCorner_t corner);
 Position_t block_get_position(Block_t* block);
 Vec_t block_get_pos_delta(Block_t* block);
 Vec_t block_get_vel(Block_t* block);
+BlockCut_t block_get_cut(Block_t* block);
 
 Position_t block_get_final_position(Block_t* block);
 

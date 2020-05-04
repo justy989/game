@@ -502,8 +502,8 @@ PlayerInBlockRectResult_t player_in_block_rect(Player_t* player, TileMap_t* tile
 
      quad_tree_find_in(block_qt, search_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
      for(S16 b = 0; b < block_count; b++){
-         auto block_pos = blocks[b]->teleport ? blocks[b]->teleport_pos + blocks[b]->teleport_pos_delta : blocks[b]->pos + blocks[b]->pos_delta;
-         auto block_rect = block_get_inclusive_rect(block_pos.pixel, blocks[b]->cut);
+         auto block_pos = block_get_final_position(blocks[b]);
+         auto block_rect = block_get_inclusive_rect(block_pos.pixel, block_get_cut(blocks[b]));
          if(pixel_in_rect(player->pos.pixel, block_rect)){
               PlayerInBlockRectResult_t::Entry_t entry;
               entry.block = blocks[b];
@@ -675,6 +675,7 @@ void apply_block_collision(World_t* world, Block_t* block, F32 dt, CheckBlockCol
                if(collision_result->collided_block_index >= 0 && blocks_are_entangled(collision_result->collided_block_index, block_index, &world->blocks)){
                     // TODO: I don't love indexing the blocks without checking the index is valid first
                     auto* entangled_block = world->blocks.elements + collision_result->collided_block_index;
+                    auto entangled_block_cut = block_get_cut(entangled_block);
 
                     S8 final_entangle_rotation = entangled_block->rotation - collision_result->collided_portal_rotations;
                     S8 total_rotations_between = direction_rotations_between((Direction_t)(block->rotation), (Direction_t)(final_entangle_rotation));
@@ -683,10 +684,11 @@ void apply_block_collision(World_t* world, Block_t* block, F32 dt, CheckBlockCol
                     auto entangled_block_collision_pos = collision_result->collided_pos;
 
                     // the result collided position is the center of the block, so handle this
-                    entangled_block_collision_pos.pixel -= block_center_pixel_offset(entangled_block->cut);
+                    entangled_block_collision_pos.pixel -= block_center_pixel_offset(entangled_block_cut);
 
                     Position_t block_pos = block_get_position(block);
                     Vec_t block_pos_delta = block->pre_collision_pos_delta;
+                    auto block_cut = block_get_cut(block);
                     auto final_block_pos = block_pos + block_pos_delta;
 
                     Quad_t final_block_quad = {0, 0,
@@ -737,7 +739,7 @@ void apply_block_collision(World_t* world, Block_t* block, F32 dt, CheckBlockCol
                     if(closest_final_is_a_corner && closest_entangled_is_a_corner && pos_dimension_delta <= FLT_EPSILON && (total_rotations_between) % 2 == 1){
                          Position_t entangled_block_pos = block_get_position(entangled_block);
                          Vec_t entangled_block_pos_delta = entangled_block->pre_collision_pos_delta;
-                         auto entangle_inside_result = block_inside_others(entangled_block_pos, entangled_block_pos_delta, entangled_block->cut, get_block_index(world, entangled_block),
+                         auto entangle_inside_result = block_inside_others(entangled_block_pos, entangled_block_pos_delta, entangled_block_cut, get_block_index(world, entangled_block),
                                                                            entangled_block->clone_id > 0, world->block_qt, world->interactive_qt, &world->tilemap, &world->blocks);
                          if(entangle_inside_result.count > 0 && entangle_inside_result.objects[0].block == block){
                               // stop the blocks moving toward each other
@@ -788,14 +790,14 @@ void apply_block_collision(World_t* world, Block_t* block, F32 dt, CheckBlockCol
                               if(move_dir_to_stop == DIRECTION_COUNT){
                                    copy_block_collision_results(block, collision_result);
                               }else{
-                                   bool block_on_ice_or_air = block_on_ice(block_pos, block_pos_delta, block->cut,
+                                   bool block_on_ice_or_air = block_on_ice(block_pos, block_pos_delta, block_cut,
                                                                            &world->tilemap, world->interactive_qt, world->block_qt) ||
-                                                              block_on_air(block_pos, block_pos_delta, block->cut,
+                                                              block_on_air(block_pos, block_pos_delta, block_cut,
                                                                            &world->tilemap, world->interactive_qt, world->block_qt);
 
-                                   bool entangled_block_on_ice_or_air = block_on_ice(entangled_block_pos, entangled_block_pos_delta, entangled_block->cut,
+                                   bool entangled_block_on_ice_or_air = block_on_ice(entangled_block_pos, entangled_block_pos_delta, entangled_block_cut,
                                                                                      &world->tilemap, world->interactive_qt, world->block_qt) ||
-                                                                        block_on_air(entangled_block_pos, entangled_block_pos_delta, entangled_block->cut,
+                                                                        block_on_air(entangled_block_pos, entangled_block_pos_delta, entangled_block_cut,
                                                                                      &world->tilemap, world->interactive_qt, world->block_qt);
 
                                    if(block_on_ice_or_air && entangled_block_on_ice_or_air){
@@ -935,6 +937,7 @@ void generate_pushes_from_collision(World_t* world, CheckBlockCollisionResult_t*
      if(collision_result->unused) return;
      Block_t* block = world->blocks.elements + collision_result->block_index;
      Position_t block_pos = block_get_position(block);
+     auto block_cut = block_get_cut(block);
 
      for(S16 i = 0; i < collision_result->collided_with_blocks.count; i++){
           auto* collided_with_block = collision_result->collided_with_blocks.objects + i;
@@ -943,11 +946,12 @@ void generate_pushes_from_collision(World_t* world, CheckBlockCollisionResult_t*
           Vec_t block_pos_delta = block_get_pos_delta(block);
           Position_t collided_block_pos = block_get_position(collided_block);
           Vec_t collided_block_pos_delta = block_get_pos_delta(collided_block);
+          auto collided_block_cut = block_get_cut(collided_block);
 
-          bool block_on_ice_or_air = block_on_ice(block_pos, block_pos_delta, block->cut, &world->tilemap, world->interactive_qt, world->block_qt) ||
-                                     block_on_air(block_pos, block_pos_delta, block->cut, &world->tilemap, world->interactive_qt, world->block_qt);
-          bool collided_block_on_ice_or_air = block_on_ice(collided_block_pos, collided_block_pos_delta, collided_block->cut, &world->tilemap, world->interactive_qt, world->block_qt) ||
-                                              block_on_air(collided_block_pos, collided_block_pos_delta, collided_block->cut, &world->tilemap, world->interactive_qt, world->block_qt);
+          bool block_on_ice_or_air = block_on_ice(block_pos, block_pos_delta, block_cut, &world->tilemap, world->interactive_qt, world->block_qt) ||
+                                     block_on_air(block_pos, block_pos_delta, block_cut, &world->tilemap, world->interactive_qt, world->block_qt);
+          bool collided_block_on_ice_or_air = block_on_ice(collided_block_pos, collided_block_pos_delta, collided_block_cut, &world->tilemap, world->interactive_qt, world->block_qt) ||
+                                              block_on_air(collided_block_pos, collided_block_pos_delta, collided_block_cut, &world->tilemap, world->interactive_qt, world->block_qt);
 
           if(!block_on_ice_or_air || !collided_block_on_ice_or_air) continue;
 
@@ -962,7 +966,7 @@ void generate_pushes_from_collision(World_t* world, CheckBlockCollisionResult_t*
 
                // if we are stopped or travelling the opposite direction of our collision, let the other
                if(direction == DIRECTION_LEFT){
-                    if(block_pos_delta.x >= 0){
+                    if(block->pre_collision_pos_delta.x >= 0){
                          continue;
                     }
                     // to combat floating point precision error (collision_time_ratio is division, while pos_delta is
@@ -974,7 +978,7 @@ void generate_pushes_from_collision(World_t* world, CheckBlockCollisionResult_t*
                          block_pos_delta.y = block->pre_collision_pos_delta.y * block->collision_time_ratio.x;
                     }
                }else if(direction == DIRECTION_RIGHT){
-                    if(block_pos_delta.x <= 0){
+                    if(block->pre_collision_pos_delta.x <= 0){
                          continue;
                     }
                     if(block->pre_collision_pos_delta.x == block->pre_collision_pos_delta.y){
@@ -983,7 +987,7 @@ void generate_pushes_from_collision(World_t* world, CheckBlockCollisionResult_t*
                          block_pos_delta.y = block->pre_collision_pos_delta.y * block->collision_time_ratio.x;
                     }
                }else if(direction == DIRECTION_DOWN){
-                    if(block_pos_delta.y >= 0){
+                    if(block->pre_collision_pos_delta.y >= 0){
                          continue;
                     }
                     if(block->pre_collision_pos_delta.x == block->pre_collision_pos_delta.y){
@@ -992,7 +996,7 @@ void generate_pushes_from_collision(World_t* world, CheckBlockCollisionResult_t*
                          block_pos_delta.x = block->pre_collision_pos_delta.x * block->collision_time_ratio.y;
                     }
                }else if(direction == DIRECTION_UP){
-                    if(block_pos_delta.y <= 0){
+                    if(block->pre_collision_pos_delta.y <= 0){
                          continue;
                     }
                     if(block->pre_collision_pos_delta.x == block->pre_collision_pos_delta.y){
@@ -1004,7 +1008,7 @@ void generate_pushes_from_collision(World_t* world, CheckBlockCollisionResult_t*
 
                // TODO: it would be nice to check for this block specifically instead of doing a query again
                bool against_block = false;
-               auto against_result = block_against_other_blocks(block_pos + block_pos_delta, block->cut, direction, world->block_qt, world->interactive_qt, &world->tilemap);
+               auto against_result = block_against_other_blocks(block_pos + block_pos_delta, block_cut, direction, world->block_qt, world->interactive_qt, &world->tilemap);
                bool all_on_frictionless = true;
                for(S16 a = 0; a < against_result.count; a++){
                     auto* against = against_result.objects + a;
@@ -1014,9 +1018,10 @@ void generate_pushes_from_collision(World_t* world, CheckBlockCollisionResult_t*
 
                     Position_t against_block_pos = block_get_position(against->block);
                     Vec_t against_block_pos_delta = block_get_pos_delta(against->block);
+                    auto against_block_cut = block_get_cut(against->block);
 
-                    all_on_frictionless &= (block_on_ice(against_block_pos, against_block_pos_delta, against->block->cut, &world->tilemap, world->interactive_qt, world->block_qt) ||
-                                            block_on_air(against_block_pos, against_block_pos_delta, against->block->cut, &world->tilemap, world->interactive_qt, world->block_qt));
+                    all_on_frictionless &= (block_on_ice(against_block_pos, against_block_pos_delta, against_block_cut, &world->tilemap, world->interactive_qt, world->block_qt) ||
+                                            block_on_air(against_block_pos, against_block_pos_delta, against_block_cut, &world->tilemap, world->interactive_qt, world->block_qt));
                }
 
                if(!against_block){
@@ -1035,7 +1040,8 @@ void generate_pushes_from_collision(World_t* world, CheckBlockCollisionResult_t*
                while(true){
                     // TODO: handle multiple against blocks
                     Position_t last_block_in_chain_final_pos = block_get_final_position(last_block_in_chain);
-                    auto chain_against_result = block_against_other_blocks(last_block_in_chain_final_pos, last_block_in_chain->cut,
+                    auto last_block_in_chain_cut = block_get_cut(last_block_in_chain);
+                    auto chain_against_result = block_against_other_blocks(last_block_in_chain_final_pos, last_block_in_chain_cut,
                                                                      against_direction, world->block_qt, world->interactive_qt, &world->tilemap);
                     if(chain_against_result.count > 0){
                          last_block_in_chain = chain_against_result.objects[0].block;
@@ -1048,11 +1054,12 @@ void generate_pushes_from_collision(World_t* world, CheckBlockCollisionResult_t*
 
                Position_t last_in_chain_pos = block_get_position(last_block_in_chain);
                Vec_t last_in_chain_pos_delta = block_get_pos_delta(last_block_in_chain);
+               auto last_in_chain_cut = block_get_cut(last_block_in_chain);
 
                bool last_in_chain_on_frictionless = (block_on_ice(last_in_chain_pos, last_in_chain_pos_delta,
-                                                                  last_block_in_chain->cut, &world->tilemap, world->interactive_qt, world->block_qt) ||
+                                                                  last_in_chain_cut, &world->tilemap, world->interactive_qt, world->block_qt) ||
                                                      block_on_air(last_in_chain_pos, last_in_chain_pos_delta,
-                                                                  last_block_in_chain->cut, &world->tilemap, world->interactive_qt, world->block_qt));
+                                                                  last_in_chain_cut, &world->tilemap, world->interactive_qt, world->block_qt));
 
                bool being_stopped_by_player = direction_is_horizontal(direction) ?
                                               last_block_in_chain->stopped_by_player_horizontal :
@@ -1114,7 +1121,7 @@ void generate_pushes_from_collision(World_t* world, CheckBlockCollisionResult_t*
                     }
                }
           }else{
-               auto against = block_diagonally_against_block(block->pos + block->pos_delta, block->cut, collided_with_block->direction_mask, &world->tilemap,
+               auto against = block_diagonally_against_block(block->pos + block->pos_delta, block_cut, collided_with_block->direction_mask, &world->tilemap,
                                                              world->interactive_qt, world->block_qt);
 
                if(against.block != collided_block) continue;
@@ -1129,7 +1136,8 @@ void generate_pushes_from_collision(World_t* world, CheckBlockCollisionResult_t*
                while(true){
                     // TODO: handle multiple against blocks
                     Position_t last_block_in_chain_final_pos = block_get_final_position(last_block_in_chain);
-                    against = block_diagonally_against_block(last_block_in_chain_final_pos, last_block_in_chain->cut,
+                    auto last_block_in_chain_cut = block_get_cut(last_block_in_chain);
+                    against = block_diagonally_against_block(last_block_in_chain_final_pos, last_block_in_chain_cut,
                                                              against_direction_mask, &world->tilemap, world->interactive_qt, world->block_qt);
                     if(against.block){
                          last_block_in_chain = against.block;
@@ -1140,10 +1148,14 @@ void generate_pushes_from_collision(World_t* world, CheckBlockCollisionResult_t*
                     }
                }
 
-               bool last_in_chain_on_frictionless = (block_on_ice(last_block_in_chain->pos, last_block_in_chain->pos_delta,
-                                                                  last_block_in_chain->cut, &world->tilemap, world->interactive_qt, world->block_qt) ||
-                                                     block_on_air(last_block_in_chain->pos, last_block_in_chain->pos_delta,
-                                                                  last_block_in_chain->cut, &world->tilemap, world->interactive_qt, world->block_qt));
+               Position_t last_block_in_chain_pos = block_get_position(last_block_in_chain);
+               Vec_t last_block_in_chain_pos_delta = block_get_pos_delta(last_block_in_chain);
+               BlockCut_t last_block_in_chain_cut = block_get_cut(last_block_in_chain);
+
+               bool last_in_chain_on_frictionless = (block_on_ice(last_block_in_chain_pos, last_block_in_chain_pos_delta,
+                                                                  last_block_in_chain_cut, &world->tilemap, world->interactive_qt, world->block_qt) ||
+                                                     block_on_air(last_block_in_chain_pos, last_block_in_chain_pos_delta,
+                                                                  last_block_in_chain_cut, &world->tilemap, world->interactive_qt, world->block_qt));
 
                // if the blocks are headed in the same direction but the block is slowing down for either friction or
                // being stop stopped by the player, slow down with it
@@ -1320,9 +1332,13 @@ DoBlockCollisionResults_t do_block_collision(World_t* world, Block_t* block, S16
           }
      }
 
+     Position_t block_pos = block_get_position(block);
+     Vec_t block_pos_delta = block_get_pos_delta(block);
+     BlockCut_t block_cut = block_get_cut(block);
+
      // this instance of last_block_pushed is to keep the pushing smooth and not have it stop at the tile boundaries
      if(block != block_pushed &&
-        !block_on_ice(block->pos, block->pos_delta, block->cut, &world->tilemap, world->interactive_qt, world->block_qt) &&
+        !block_on_ice(block_pos, block_pos_delta, block_cut, &world->tilemap, world->interactive_qt, world->block_qt) &&
         !block_on_air(block, &world->tilemap, world->interactive_qt, world->block_qt)){
           if(block_pushed && blocks_are_entangled(block_pushed, block, &world->blocks)){
                Block_t* entangled_block = block_pushed;
@@ -1386,7 +1402,7 @@ DoBlockCollisionResults_t do_block_collision(World_t* world, Block_t* block, S16
      }
 
      if(block->pos_delta.x != 0.0f){
-          S16 boundary_x = range_passes_solid_boundary(block->pos.pixel.x, final_pos.pixel.x, block->cut,
+          S16 boundary_x = range_passes_solid_boundary(block->pos.pixel.x, final_pos.pixel.x, block_cut,
                                                        true, block->pos.pixel.y, final_pos.pixel.y, block->pos.z,
                                                        &world->tilemap, world->interactive_qt);
           if(boundary_x){
@@ -1419,7 +1435,7 @@ DoBlockCollisionResults_t do_block_collision(World_t* world, Block_t* block, S16
      }
 
      if(block->pos_delta.y != 0.0f){
-          S16 boundary_y = range_passes_solid_boundary(block->pos.pixel.y, final_pos.pixel.y, block->cut,
+          S16 boundary_y = range_passes_solid_boundary(block->pos.pixel.y, final_pos.pixel.y, block_cut,
                                                        false, block->pos.pixel.x, final_pos.pixel.x, block->pos.z,
                                                        &world->tilemap, world->interactive_qt);
           if(boundary_y){
@@ -1441,8 +1457,8 @@ DoBlockCollisionResults_t do_block_collision(World_t* world, Block_t* block, S16
           Direction_t horizontal_dir = (block->pos_delta.x > 0) ? DIRECTION_RIGHT : DIRECTION_LEFT;
           Direction_t vertical_dir = (block->pos_delta.y > 0) ? DIRECTION_UP : DIRECTION_DOWN;
 
-          Pixel_t pre_move_stop_on_boundaries = block_pos_in_solid_boundary(block->pos, block->cut, horizontal_dir, vertical_dir, world);
-          Pixel_t post_move_stop_on_boundaries = block_pos_in_solid_boundary(final_pos, block->cut, horizontal_dir, vertical_dir, world);
+          Pixel_t pre_move_stop_on_boundaries = block_pos_in_solid_boundary(block->pos, block_cut, horizontal_dir, vertical_dir, world);
+          Pixel_t post_move_stop_on_boundaries = block_pos_in_solid_boundary(final_pos, block_cut, horizontal_dir, vertical_dir, world);
 
           if(pre_move_stop_on_boundaries == Pixel_t{-1, -1} && post_move_stop_on_boundaries != Pixel_t{-1, -1}){
                if(post_move_stop_on_boundaries.x >= 0){
@@ -1678,8 +1694,9 @@ void add_entangle_pushes_for_end_of_chain_blocks_on_ice(World_t* world, S16 push
 
      Position_t pushee_pos = block_get_position(pushee);
      Vec_t pushee_pos_delta = block_get_pos_delta(pushee);
+     BlockCut_t pushee_cut = block_get_cut(pushee);
 
-     if(!block_on_ice(pushee_pos, pushee_pos_delta, pushee->cut, &world->tilemap,
+     if(!block_on_ice(pushee_pos, pushee_pos_delta, pushee_cut, &world->tilemap,
                       world->interactive_qt, world->block_qt)) return;
 
      S8 push_rotations = (push->entangle_rotations + push->portal_rotations) % DIRECTION_COUNT;
@@ -1695,7 +1712,7 @@ void add_entangle_pushes_for_end_of_chain_blocks_on_ice(World_t* world, S16 push
                push->no_entangled_pushes = true;
           }
 
-          auto against_result = block_against_other_blocks(pushee_pos + pushee_pos_delta, pushee->cut,
+          auto against_result = block_against_other_blocks(pushee_pos + pushee_pos_delta, pushee_cut,
                                                                   direction, world->block_qt, world->interactive_qt,
                                                                   &world->tilemap);
 
@@ -2048,10 +2065,10 @@ void restart_demo(World_t* world, TileMap_t* demo_starting_tilemap, ObjectArray_
 }
 
 void set_against_blocks_coasting_from_player(Block_t* block, Direction_t direction, World_t* world){
-     auto block_pos = block->teleport ? block->teleport_pos + block->teleport_pos_delta : block->pos + block->pos_delta;
+     auto block_pos = block_get_final_position(block);
 
      auto against_result = block_against_other_blocks(block_pos,
-                                                      block->teleport ? block->teleport_cut : block->cut,
+                                                      block_get_cut(block),
                                                       direction, world->block_qt, world->interactive_qt, &world->tilemap);
 
      for(S16 a = 0; a < against_result.count; a++){
@@ -2379,9 +2396,10 @@ bool find_and_update_connected_teleported_block(Block_t* block, Direction_t dire
      Position_t block_pos = block_get_position(block);
      Vec_t block_pos_delta_vec = block_get_pos_delta(block);
      Vec_t block_vel_vec = block_get_vel(block);
+     auto block_cut = block_get_cut(block);
 
      auto against_result = block_against_other_blocks(block_pos + block_pos_delta_vec,
-                                                      block->cut, direction, world->block_qt,
+                                                      block_cut, direction, world->block_qt,
                                                       world->interactive_qt, &world->tilemap, false);
 
      F32 block_vel = 0;
@@ -2800,9 +2818,9 @@ int main(int argc, char** argv){
           if(!play_demo.paused || play_demo.seek_frame >= 0){
                frame_count++;
                if(play_demo.seek_frame == frame_count) play_demo.seek_frame = -1;
+               player_action.last_activate = player_action.activate;
           }
 
-          player_action.last_activate = player_action.activate;
           for(S16 i = 0; i < world.players.count; i++) {
                world.players.elements[i].reface = false;
           }
@@ -5097,12 +5115,19 @@ int main(int argc, char** argv){
                                           if(resize(&world.blocks, world.blocks.count + (S16)(1))){
                                               // a resize will kill our block ptr, so we gotta update it
                                               block = world.blocks.elements + i;
+
                                               Block_t* new_block = world.blocks.elements + new_block_index;
                                               *new_block = *block;
                                               new_block->teleport = false;
                                               new_block->cut = final_src_cut;
                                               new_block->pos.pixel += final_src_offset;
                                               new_block->previous_mass = get_block_stack_mass(&world, new_block);
+
+                                              if(direction_is_horizontal(src_portal_dir)){
+                                                   new_block->stop_on_pixel_x = closest_pixel(new_block->pos.pixel.x, new_block->pos.decimal.x);
+                                              }else{
+                                                   new_block->stop_on_pixel_y = closest_pixel(new_block->pos.pixel.y, new_block->pos.decimal.y);
+                                              }
                                           }
 
                                           block->teleport_pos.pixel += final_dst_offset;

@@ -213,6 +213,11 @@ Vec_t block_get_vel(Block_t* block){
      return block->vel;
 }
 
+BlockCut_t block_get_cut(Block_t* block){
+     if(block->teleport) return block->teleport_cut;
+     return block->cut;
+}
+
 Position_t block_get_final_position(Block_t* block){
      return block_get_position(block) + block_get_pos_delta(block);
 }

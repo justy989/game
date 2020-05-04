@@ -1275,8 +1275,8 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                collided_with.block_index = get_block_index(world, inside_entry->block);
                collided_with.direction_mask = collided_dir_mask;
                collided_with.portal_rotations = inside_entry->portal_rotations;
-               char m[128];
-               direction_mask_to_string(collided_dir_mask, m, 128);
+               // char m[128];
+               // direction_mask_to_string(collided_dir_mask, m, 128);
                // LOG("  colliding %s with block %d\n", m, collided_with.block_index);
                result.collided_with_blocks.insert(&collided_with);
 
@@ -2097,7 +2097,7 @@ FindBlocksThroughPortalResult_t find_blocks_through_portals(Coord_t coord, TileM
                          auto portal_rotations = direction_rotations_between(interactive->portal.face, direction_opposite(current_portal_dir));
 
                          auto block_real_pos = block_get_final_position(block);
-                         auto block_cut = block->teleport ? block->teleport_cut : block->cut;
+                         auto block_cut = block_get_cut(block);
                          auto block_center = block_get_center(block_real_pos, block_cut);
                          auto dst_offset = block_center - portal_dst_output_center;
                          auto src_coord_center = pixel_to_pos(portal_src_pixel);
