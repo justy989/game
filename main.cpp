@@ -297,10 +297,6 @@ struct CheckBlockCollisions_t{
 
               i++;
          }
-         // for(S32 i = 0; i < count; i++){
-         //      auto* collision = collisions + i;
-         //      LOG("block %d colides %.10f, %.10f\n", collision->block_index, collision->pos_delta.x, collision->pos_delta.y);
-         // }
      }
 };
 
@@ -960,9 +956,6 @@ void generate_pushes_from_collision(World_t* world, CheckBlockCollisionResult_t*
 
           if(direction_mask_is_single_direction(collided_with_block->direction_mask)){
                Direction_t direction = direction_from_single_mask(collision_result->collided_dir_mask);
-
-               // LOG("block %d pd: %.10f, %.10f -> pre col: %.10f, %.10f col time rat: %.10f, %.10f\n",
-               //     collision_result->block_index, block_pos_delta.x, block_pos_delta.y, block->pre_collision_pos_delta.x, block->pre_collision_pos_delta.y, block->collision_time_ratio.x, block->collision_time_ratio.y);
 
                // if we are stopped or travelling the opposite direction of our collision, let the other
                if(direction == DIRECTION_LEFT){
@@ -2553,8 +2546,6 @@ int main(int argc, char** argv){
           fprintf(stderr, "failed to create log file: '%s'\n", log_path);
           return -1;
      }
-
-     LOG("%.10f\n", PIXEL_SIZE);
 
      if(test && !load_map_filepath && !suite){
           LOG("cannot test without specifying a map to load\n");
@@ -4494,8 +4485,8 @@ int main(int argc, char** argv){
                                             set_against_blocks_coasting_from_player(block, player->face, &world);
                                         }
                                    }else if(blocks_are_entangled(block, player_prev_pushing_block, &world.blocks) &&
-                                      !block_on_ice(block->pos, block->pos_delta, block->cut, &world.tilemap, world.interactive_qt, world.block_qt) &&
-                                      !block_on_air(block, &world.tilemap, world.interactive_qt, world.block_qt)){
+                                            !block_on_ice(block->pos, block->pos_delta, block->cut, &world.tilemap, world.interactive_qt, world.block_qt) &&
+                                            !block_on_air(block, &world.tilemap, world.interactive_qt, world.block_qt)){
                                         Block_t* entangled_block = player_prev_pushing_block;
                                         auto rotations_between = blocks_rotations_between(block, entangled_block);
 
@@ -4709,15 +4700,6 @@ int main(int argc, char** argv){
                     for(S32 i = 0; i < collision_results.count; i++){
                         auto* collision = collision_results.collisions + i;
                         apply_block_collision(&world, world.blocks.elements + collision->block_index, dt, collision);
-
-                        // if(!collision->same_as_next){
-                             // update collision for all blocks afterwards unless the next collision happens at the
-                             // exact same time, then continue to apply collisions results
-                        //      for(S32 j = i + 1; j < collision_results.count; j++){
-                        //           auto* block = world.blocks.elements + collision_results.collisions[j].block_index;
-                        //           collision_results.collisions[j] = check_block_collision(&world, block);
-                        //      }
-                        // }
                     }
 
 #if 0
@@ -4845,6 +4827,11 @@ int main(int argc, char** argv){
                               add_global_tag(TAG_TELEPORT_BLOCK);
                               block->teleport = true;
                               block->teleport_pos = teleport_result.results[block->clone_id].pos;
+
+                              // LOG("block %d at %d, %d - %.10f, %.10f teleports to %d, %d - %.10f, %.10f\n",
+                              //     i, block->pos.pixel.x, block->pos.pixel.y, block->pos.decimal.x, block->pos.decimal.y,
+                              //     block->teleport_pos.pixel.x, block->teleport_pos.pixel.y, block->teleport_pos.decimal.x, block->teleport_pos.decimal.y);
+
                               block->teleport_cut = block_cut_rotate_clockwise(block->cut, teleport_result.results[block->clone_id].rotations);
                               block->teleport_pos.pixel -= block_center_pixel_offset(block->teleport_cut);
 
@@ -4919,7 +4906,7 @@ int main(int argc, char** argv){
                                   if(block->connected_teleport.block_index >= 0)
                                   {
                                       auto against_result = block_against_other_blocks(block->teleport_pos + block->teleport_pos_delta,
-                                                                                       block->cut, block->connected_teleport.direction, world.block_qt,
+                                                                                       block->teleport_cut, block->connected_teleport.direction, world.block_qt,
                                                                                        world.interactive_qt, &world.tilemap);
 
                                       F32 block_vel = 0;
@@ -4959,13 +4946,13 @@ int main(int argc, char** argv){
                                               break;
                                           case DIRECTION_LEFT:
                                           {
-                                              block->teleport_pos.pixel.x = against_other->block->pos.pixel.x + block_get_height_in_pixels(block->cut);
+                                              block->teleport_pos.pixel.x = against_other->block->pos.pixel.x + block_get_width_in_pixels(against_other->block->cut);
                                               block->teleport_pos.decimal.x = against_other->block->pos.decimal.x;
                                               break;
                                           }
                                           case DIRECTION_RIGHT:
                                           {
-                                              block->teleport_pos.pixel.x = against_other->block->pos.pixel.x - block_get_height_in_pixels(against_other->block->cut);
+                                              block->teleport_pos.pixel.x = against_other->block->pos.pixel.x - block_get_width_in_pixels(against_other->block->cut);
                                               block->teleport_pos.decimal.x = against_other->block->pos.decimal.x;
                                               break;
                                           }
@@ -4977,7 +4964,7 @@ int main(int argc, char** argv){
                                           }
                                           case DIRECTION_UP:
                                           {
-                                              block->teleport_pos.pixel.y = against_other->block->pos.pixel.y - block_get_height_in_pixels(block->cut);
+                                              block->teleport_pos.pixel.y = against_other->block->pos.pixel.y - block_get_height_in_pixels(against_other->block->cut);
                                               block->teleport_pos.decimal.y = against_other->block->pos.decimal.y;
                                               break;
                                           }
@@ -4989,7 +4976,6 @@ int main(int argc, char** argv){
                                   }
 
                                   if(src_portal->portal.wants_to_turn_off && dst_portal->portal.wants_to_turn_off){
-                                      // BlockCut_t original_dst_cut = block->teleport_cut;
                                       BlockCut_t original_src_cut = block->cut;
                                       BlockCut_t final_src_cut = BLOCK_CUT_WHOLE;
                                       BlockCut_t final_dst_cut = BLOCK_CUT_WHOLE;
@@ -5033,54 +5019,54 @@ int main(int argc, char** argv){
                                           }else if(original_src_cut == BLOCK_CUT_LEFT_HALF){
                                               switch(src_portal_dir){
                                               default:
-                                                 break;
+                                                  break;
                                               case DIRECTION_DOWN:
-                                                 final_src_cut = BLOCK_CUT_TOP_LEFT_QUARTER;
-                                                 final_dst_cut = BLOCK_CUT_BOTTOM_LEFT_QUARTER;
-                                                 break;
+                                                  final_src_cut = BLOCK_CUT_TOP_LEFT_QUARTER;
+                                                  final_dst_cut = BLOCK_CUT_BOTTOM_LEFT_QUARTER;
+                                                  break;
                                               case DIRECTION_UP:
-                                                 final_src_cut = BLOCK_CUT_BOTTOM_LEFT_QUARTER;
-                                                 final_dst_cut = BLOCK_CUT_TOP_LEFT_QUARTER;
-                                                 break;
+                                                  final_src_cut = BLOCK_CUT_BOTTOM_LEFT_QUARTER;
+                                                  final_dst_cut = BLOCK_CUT_TOP_LEFT_QUARTER;
+                                                  break;
                                               }
                                           }else if(original_src_cut == BLOCK_CUT_RIGHT_HALF){
                                               switch(src_portal_dir){
                                               default:
-                                                 break;
+                                                  break;
                                               case DIRECTION_DOWN:
-                                                 final_src_cut = BLOCK_CUT_TOP_RIGHT_QUARTER;
-                                                 final_dst_cut = BLOCK_CUT_BOTTOM_RIGHT_QUARTER;
-                                                 break;
+                                                  final_src_cut = BLOCK_CUT_TOP_RIGHT_QUARTER;
+                                                  final_dst_cut = BLOCK_CUT_BOTTOM_RIGHT_QUARTER;
+                                                  break;
                                               case DIRECTION_UP:
-                                                 final_src_cut = BLOCK_CUT_BOTTOM_RIGHT_QUARTER;
-                                                 final_dst_cut = BLOCK_CUT_TOP_RIGHT_QUARTER;
-                                                 break;
+                                                  final_src_cut = BLOCK_CUT_BOTTOM_RIGHT_QUARTER;
+                                                  final_dst_cut = BLOCK_CUT_TOP_RIGHT_QUARTER;
+                                                  break;
                                               }
                                           }else if(original_src_cut == BLOCK_CUT_TOP_HALF){
                                               switch(src_portal_dir){
                                               default:
-                                                 break;
+                                                  break;
                                               case DIRECTION_LEFT:
-                                                 final_src_cut = BLOCK_CUT_TOP_RIGHT_QUARTER;
-                                                 final_dst_cut = BLOCK_CUT_TOP_LEFT_QUARTER;
-                                                 break;
+                                                  final_src_cut = BLOCK_CUT_TOP_RIGHT_QUARTER;
+                                                  final_dst_cut = BLOCK_CUT_TOP_LEFT_QUARTER;
+                                                  break;
                                               case DIRECTION_RIGHT:
-                                                 final_src_cut = BLOCK_CUT_TOP_LEFT_QUARTER;
-                                                 final_dst_cut = BLOCK_CUT_TOP_RIGHT_QUARTER;
-                                                 break;
+                                                  final_src_cut = BLOCK_CUT_TOP_LEFT_QUARTER;
+                                                  final_dst_cut = BLOCK_CUT_TOP_RIGHT_QUARTER;
+                                                  break;
                                               }
                                           }else if(original_src_cut == BLOCK_CUT_BOTTOM_HALF){
                                               switch(src_portal_dir){
                                               default:
-                                                 break;
+                                                  break;
                                               case DIRECTION_LEFT:
-                                                 final_src_cut = BLOCK_CUT_BOTTOM_RIGHT_QUARTER;
-                                                 final_dst_cut = BLOCK_CUT_BOTTOM_LEFT_QUARTER;
-                                                 break;
+                                                  final_src_cut = BLOCK_CUT_BOTTOM_RIGHT_QUARTER;
+                                                  final_dst_cut = BLOCK_CUT_BOTTOM_LEFT_QUARTER;
+                                                  break;
                                               case DIRECTION_RIGHT:
-                                                 final_src_cut = BLOCK_CUT_BOTTOM_LEFT_QUARTER;
-                                                 final_dst_cut = BLOCK_CUT_BOTTOM_RIGHT_QUARTER;
-                                                 break;
+                                                  final_src_cut = BLOCK_CUT_BOTTOM_LEFT_QUARTER;
+                                                  final_dst_cut = BLOCK_CUT_BOTTOM_RIGHT_QUARTER;
+                                                  break;
                                               }
                                           }
 
@@ -5088,17 +5074,17 @@ int main(int argc, char** argv){
 
                                           switch(src_portal_dir){
                                           default:
-                                             break;
+                                              break;
                                           case DIRECTION_LEFT:
-                                             final_src_offset.x = block_center_pixel_offset(block->cut).x;
-                                             break;
+                                              final_src_offset.x = block_center_pixel_offset(block->cut).x;
+                                              break;
                                           case DIRECTION_RIGHT:
-                                             break;
+                                              break;
                                           case DIRECTION_DOWN:
-                                             final_src_offset.y = block_center_pixel_offset(block->cut).y;
-                                             break;
+                                              final_src_offset.y = block_center_pixel_offset(block->cut).y;
+                                              break;
                                           case DIRECTION_UP:
-                                             break;
+                                              break;
                                           }
 
                                           switch(dst_portal_dir){
@@ -5658,17 +5644,6 @@ int main(int argc, char** argv){
                     }else{
                          final_pos = block->pos + block->pos_delta;
                     }
-
-#if 0
-                    if(i == 2)
-                    {
-                         LOG("%ld: p: %d, %d - %.10f, %.10f v: %.10f, %.10f a: %.10f, %.10f\n",
-                             frame_count, block->pos.pixel.x, block->pos.pixel.y,
-                             block->pos.decimal.x, block->pos.decimal.y,
-                             block->vel.x, block->vel.y,
-                             block->accel.x, block->accel.y);
-                    }
-#endif
 
                     // finalize position for each component, stopping on a pixel boundary if we have to
                     if(block->stop_on_pixel_x != 0){
