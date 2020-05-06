@@ -1209,8 +1209,12 @@ void generate_pushes_from_collision(World_t* world, CheckBlockCollisionResult_t*
 
           if(!should_push || against_block_count == 0) continue;
 
-          auto opposite_direction_mask = direction_mask_opposite(collided_with_block->direction_mask);
+          auto rotated_direction_mask = direction_mask_rotate_clockwise(collided_with_block->direction_mask, collided_with_block->portal_rotations);
+          auto opposite_direction_mask = direction_mask_opposite(rotated_direction_mask);
+          char o[256];
+          direction_mask_to_string(opposite_direction_mask, o, 256);
 
+          // if we already created a push (for the alternate block in the alternate direction), do not create this push
           bool found_pair_push = false;
           for(S16 p = 0; p < block_pushes->count; p++){
                BlockPush_t* push = block_pushes->pushes + p;
@@ -1229,9 +1233,8 @@ void generate_pushes_from_collision(World_t* world, CheckBlockCollisionResult_t*
                block_push.direction_mask = collided_with_block->direction_mask;
                block_push.portal_rotations = collided_with_block->portal_rotations;
 
-               // char m[256];
-               // direction_mask_to_string(block_push.direction_mask, m, 256);
-               // LOG("generating push: block %d pushing %d %s\n", collision_result->block_index, block_push.pushee_index, m);
+               char m[256];
+               direction_mask_to_string(block_push.direction_mask, m, 256);
 
                block_pushes->add(&block_push);
           }
@@ -2550,6 +2553,8 @@ int main(int argc, char** argv){
           fprintf(stderr, "failed to create log file: '%s'\n", log_path);
           return -1;
      }
+
+     LOG("%.10f\n", PIXEL_SIZE);
 
      if(test && !load_map_filepath && !suite){
           LOG("cannot test without specifying a map to load\n");
@@ -5462,9 +5467,6 @@ int main(int argc, char** argv){
                              auto total_pusher_momentum = get_block_push_pusher_momentum(&block_push, &world, direction);
                              auto pushee_momentum = get_block_momentum(&world, pushee, push_rotated_direction);
                              auto rotated_pushee_vel = rotate_vec_counter_clockwise_to_see_if_negates(pushee_momentum.vel, direction_is_horizontal(push_rotated_direction), block_push_rotations);
-
-                             char m[256];
-                             direction_mask_to_string(block_push.direction_mask, m, 256);
 
                               // if the push isn't going to cause it to start moving in that direction, don't add the entangle pushes
                              auto elastic_result = elastic_transfer_momentum(total_pusher_momentum.mass, total_pusher_momentum.vel, pushee_momentum.mass, rotated_pushee_vel);
