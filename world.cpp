@@ -1672,8 +1672,12 @@ bool check_entangled_against_block_able_to_move(Block_t* block, Direction_t dire
      while(entangled_against_block){
           Direction_t check_direction = against_direction;
 
-          auto next_against_block = block_against_another_block(entangled_against_block->pos + entangled_against_block->pos_delta,
-                                                                entangled_against_block->cut,
+          Position_t entangled_against_block_pos = block_get_position(entangled_against_block);
+          Vec_t entangled_against_block_pos_delta = block_get_pos_delta(entangled_against_block);
+          BlockCut_t entangled_against_block_cut = block_get_cut(entangled_against_block);
+
+          auto next_against_block = block_against_another_block(entangled_against_block_pos + entangled_against_block_pos_delta,
+                                                                entangled_against_block_cut,
                                                                 check_direction, world->block_qt,
                                                                 world->interactive_qt, &world->tilemap,
                                                                 &check_direction);

@@ -4493,20 +4493,32 @@ int main(int argc, char** argv){
                                         if(entangled_block->coast_horizontal > BLOCK_COAST_NONE){
                                              if(rotations_between % 2 == 0){
                                                   if(entangled_block->coast_horizontal == BLOCK_COAST_PLAYER &&
-                                                     block->horizontal_move.state != MOVE_STATE_STOPPING) block->coast_horizontal = BLOCK_COAST_ENTANGLED_PLAYER;
+                                                     block->horizontal_move.state != MOVE_STATE_STOPPING &&
+                                                     entangled_block->horizontal_move.state != MOVE_STATE_IDLING){
+                                                       block->coast_horizontal = BLOCK_COAST_ENTANGLED_PLAYER;
+                                                  }
                                              }else{
                                                   if(entangled_block->coast_horizontal == BLOCK_COAST_PLAYER &&
-                                                     block->vertical_move.state != MOVE_STATE_STOPPING) block->coast_vertical = BLOCK_COAST_ENTANGLED_PLAYER;
+                                                     block->vertical_move.state != MOVE_STATE_STOPPING &&
+                                                     entangled_block->horizontal_move.state != MOVE_STATE_IDLING){
+                                                       block->coast_vertical = BLOCK_COAST_ENTANGLED_PLAYER;
+                                                  }
                                              }
                                         }
 
                                         if(entangled_block->coast_vertical > BLOCK_COAST_NONE){
                                              if(rotations_between % 2 == 0){
                                                   if(entangled_block->coast_vertical == BLOCK_COAST_PLAYER &&
-                                                     block->vertical_move.state != MOVE_STATE_STOPPING) block->coast_vertical = BLOCK_COAST_ENTANGLED_PLAYER;
+                                                     block->vertical_move.state != MOVE_STATE_STOPPING &&
+                                                     entangled_block->vertical_move.state != MOVE_STATE_IDLING){
+                                                       block->coast_vertical = BLOCK_COAST_ENTANGLED_PLAYER;
+                                                  }
                                              }else{
                                                   if(entangled_block->coast_vertical == BLOCK_COAST_PLAYER &&
-                                                     block->horizontal_move.state != MOVE_STATE_STOPPING) block->coast_horizontal = BLOCK_COAST_ENTANGLED_PLAYER;
+                                                     block->horizontal_move.state != MOVE_STATE_STOPPING &&
+                                                     entangled_block->vertical_move.state != MOVE_STATE_IDLING){
+                                                       block->coast_horizontal = BLOCK_COAST_ENTANGLED_PLAYER;
+                                                  }
                                              }
                                         }
                                    }
@@ -5701,6 +5713,12 @@ int main(int argc, char** argv){
                               case DIRECTION_UP:
                                    already_moving_fast_enough = (block_to_push->vel.y >= expected_final_velocity);
                                    break;
+                              }
+                         }else if(block_move_dir_mask == DIRECTION_MASK_NONE){
+                              DirectionMask_t block_prev_move_dir_mask = vec_direction_mask(block_to_push->prev_vel);
+                              if(direction_in_mask(block_prev_move_dir_mask, push_block_dir)){
+                                   player->push_time = 0;
+                                   player->entangle_push_time = 0;
                               }
                          }
 
