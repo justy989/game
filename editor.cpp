@@ -14,14 +14,14 @@ bool init(Editor_t* editor){
      init(&editor->category_array, EDITOR_CATEGORY_COUNT);
 
      auto* tile_category = editor->category_array.elements + EDITOR_CATEGORY_TILE_ID;
-     init(tile_category, 26);
-     for(S16 i = 0; i < 14; i++){
+     init(tile_category, 27);
+     for(S16 i = 0; i < 15; i++){
           init(&tile_category->elements[i], 1);
           tile_category->elements[i].elements[0].type = STAMP_TYPE_TILE_ID;
           tile_category->elements[i].elements[0].tile_id = (U8)(i);
      }
 
-     auto* tile_id_array = tile_category->elements + 13;
+     auto* tile_id_array = tile_category->elements + 14;
 
      tile_id_array++;
      init(tile_id_array, 2);

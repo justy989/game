@@ -80,7 +80,7 @@ void reset_map(Coord_t player_start, World_t* world, Undo_t* undo, Camera_t* cam
      *player = {};
      player->walk_frame_delta = 1;
      player->pos = coord_to_pos_at_tile_center(player_start);
-     player->has_bow = true;
+     player->has_bow = false;
 
      init(&world->arrows);
 

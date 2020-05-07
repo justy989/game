@@ -2899,6 +2899,14 @@ int main(int argc, char** argv){
                     case SDL_SCANCODE_ESCAPE:
                          quit = true;
                          break;
+                    case SDL_SCANCODE_F1:
+                    {
+                         bool has_bow = !world.players.elements[0].has_bow;
+                         for(S16 i = 0; i < world.players.count; i++){
+                              world.players.elements[i].has_bow = has_bow;
+                         }
+                         break;
+                    }
                     case SDL_SCANCODE_F4:
                          game_mode = GAME_MODE_PLAYING;
                          break;
@@ -3138,10 +3146,11 @@ int main(int argc, char** argv){
                          }
                          break;
                     case SDL_SCANCODE_N:
-                    {
-                         Tile_t* tile = tilemap_get_tile(&world.tilemap, mouse_select_world_coord(mouse_screen, &camera));
-                         if(tile) tile_toggle_wire_activated(tile);
-                    } break;
+                         if(game_mode == GAME_MODE_EDITOR && editor.mode == EDITOR_MODE_CATEGORY_SELECT){
+                              Tile_t* tile = tilemap_get_tile(&world.tilemap, mouse_select_world_coord(mouse_screen, &camera));
+                              if(tile) tile_toggle_wire_activated(tile);
+                         }
+                         break;
                     case SDL_SCANCODE_4:
                          if(game_mode == GAME_MODE_EDITOR && editor.mode == EDITOR_MODE_CATEGORY_SELECT){
                               auto coord = mouse_select_world_coord(mouse_screen, &camera);
@@ -3331,7 +3340,7 @@ int main(int argc, char** argv){
                     {
                          reset_players(&world.players);
                          Player_t* player = world.players.elements;
-                         player->pos.pixel = mouse_select_world_pixel(mouse_screen, &camera) + HALF_TILE_SIZE_PIXEL;
+                         player->pos.pixel = mouse_select_world_pixel(mouse_screen, &camera);
                          player->pos.decimal.x = 0;
                          player->pos.decimal.y = 0;
                          break;
@@ -5969,7 +5978,7 @@ int main(int argc, char** argv){
 
                glEnd();
 
-#if 0
+#if 1
                // light
                glBindTexture(GL_TEXTURE_2D, 0);
                glBegin(GL_QUADS);
@@ -5977,9 +5986,11 @@ int main(int argc, char** argv){
                     for(S16 x = min.x; x <= max.x; x++){
                          Tile_t* tile = world.tilemap.tiles[y] + x;
 
+                         F32 light_value = (F32)(255 - tile->light) / 255.0f;
+
                          Vec_t tile_pos {(F32)(x - min.x) * TILE_SIZE + camera.world_offset.x,
                                          (F32)(y - min.y) * TILE_SIZE + camera.world_offset.y};
-                         glColor4f(0.0f, 0.0f, 0.0f, (F32)(255 - tile->light) / 255.0f);
+                         glColor4f(0.0f, 0.0f, 0.0f, light_value);
                          glVertex2f(tile_pos.x, tile_pos.y);
                          glVertex2f(tile_pos.x, tile_pos.y + TILE_SIZE);
                          glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y + TILE_SIZE);
@@ -6123,16 +6134,16 @@ int main(int argc, char** argv){
 
                // editor
                draw_editor(&editor, &world, &camera, mouse_screen, theme_texture, text_texture);
+          }
 
-               if(reset_timer >= 0.0f){
-                    glBegin(GL_QUADS);
-                    glColor4f(0.0f, 0.0f, 0.0f, reset_timer / RESET_TIME);
-                    glVertex2f(0, 0);
-                    glVertex2f(0, 1);
-                    glVertex2f(1, 1);
-                    glVertex2f(1, 0);
-                    glEnd();
-               }
+          if(reset_timer >= 0.0f){
+               glBegin(GL_QUADS);
+               glColor4f(0.0f, 0.0f, 0.0f, reset_timer / RESET_TIME);
+               glVertex2f(0, 0);
+               glVertex2f(0, 1);
+               glVertex2f(1, 1);
+               glVertex2f(1, 0);
+               glEnd();
           }
 
           if(game_mode == GAME_MODE_PLAYING || game_mode == GAME_MODE_EDITOR){
