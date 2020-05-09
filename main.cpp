@@ -5937,6 +5937,7 @@ int main(int argc, char** argv){
                               for(S8 d = 0; d < DIRECTION_COUNT; d++){
                                    for(S8 i = 0; i < portal_exits.directions[d].count; i++){
                                         if(portal_exits.directions[d].coords[i] == coord) continue;
+
                                         Coord_t portal_coord = portal_exits.directions[d].coords[i] + direction_opposite((Direction_t)(d));
                                         Rect_t coord_rect = rect_surrounding_coord(portal_coord);
                                         coord_rect.left -= HALF_TILE_SIZE_IN_PIXELS;

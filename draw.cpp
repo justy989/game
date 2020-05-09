@@ -451,7 +451,7 @@ Vec_t draw_player(Player_t* player, Vec_t camera, Coord_t source_coord, Coord_t 
           Position_t source_pos = coord_to_pos_at_tile_center(source_coord);
           Position_t center_delta = player->pos - source_pos;
           center_delta = position_rotate_quadrants_clockwise(center_delta, portal_rotations);
-          pos_vec = pos_to_vec(destination_pos + center_delta);
+          pos_vec = pos_to_vec(destination_pos + center_delta) + camera;
      }
 
      S8 player_frame_y = direction_rotate_clockwise(player->face, portal_rotations);
