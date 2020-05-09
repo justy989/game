@@ -230,6 +230,7 @@ void block_stop_horizontally(Block_t* block){
      block->vel.x = 0;
      block->prev_vel.x = 0;
      block->accel.x = 0;
+     block->stopped_by_player_horizontal = false;
 }
 
 void block_stop_vertically(Block_t* block){
@@ -240,6 +241,7 @@ void block_stop_vertically(Block_t* block){
      block->vel.y = 0;
      block->prev_vel.y = 0;
      block->accel.y = 0;
+     block->stopped_by_player_vertical = false;
 }
 
 const char* block_coast_to_string(BlockCoast_t coast){

@@ -80,7 +80,7 @@ void reset_map(Coord_t player_start, World_t* world, Undo_t* undo, Camera_t* cam
      *player = {};
      player->walk_frame_delta = 1;
      player->pos = coord_to_pos_at_tile_center(player_start);
-     player->has_bow = false;
+     player->has_bow = true;
 
      init(&world->arrows);
 
@@ -1516,6 +1516,7 @@ void apply_push_horizontal(Block_t* block, Position_t pos, World_t* world, Direc
       }
 
       block->started_on_pixel_x = pos.pixel.x;
+      block->stopped_by_player_horizontal = false;
 }
 
 void apply_push_vertical(Block_t* block, Position_t pos, World_t* world, Direction_t direction, TransferMomentum_t* instant_momentum,
@@ -1611,6 +1612,7 @@ void apply_push_vertical(Block_t* block, Position_t pos, World_t* world, Directi
       }
 
       block->started_on_pixel_y = pos.pixel.y;
+      block->stopped_by_player_vertical = false;
 }
 
 void update_block_momentum_from_push(Block_t* block, Direction_t direction, PushFromEntangler_t* from_entangler, BlockPushResult_t* push_result, BlockPushResult_t* final_result){

@@ -3712,6 +3712,8 @@ int main(int argc, char** argv){
                          illuminate(pre_move_coord, 255 - light_height, &world);
                     }
 
+                    Coord_t post_move_coord = pre_move_coord;
+
                     if(arrow->stuck_time > 0.0f){
                          arrow->stuck_time += dt;
 
@@ -3741,155 +3743,177 @@ int main(int argc, char** argv){
                               break;
                          }
 
+                         post_move_coord = pixel_to_coord(arrow->pos.pixel);
+
                          if(arrow->stuck_time > ARROW_DISINTEGRATE_DELAY){
                               arrow->alive = false;
                          }
-                         continue;
-                    }
-
-                    F32 arrow_friction = 0.9999f;
-
-                    if(arrow->pos.z > 0){
-                         // TODO: fall based on the timer !
-                         arrow->fall_time += dt;
-                         if(arrow->fall_time > ARROW_FALL_DELAY){
-                              arrow->fall_time -= ARROW_FALL_DELAY;
-                              arrow->pos.z--;
-                         }
                     }else{
-                         arrow_friction = 0.9f;
-                    }
+                         F32 arrow_friction = 0.9999f;
 
-                    Vec_t direction = {};
-                    switch(arrow->face){
-                    default:
-                         break;
-                    case DIRECTION_LEFT:
-                         direction.x = -1;
-                         break;
-                    case DIRECTION_RIGHT:
-                         direction.x = 1;
-                         break;
-                    case DIRECTION_DOWN:
-                         direction.y = -1;
-                         break;
-                    case DIRECTION_UP:
-                         direction.y = 1;
-                         break;
-                    }
+                         if(arrow->pos.z > 0){
+                              // TODO: fall based on the timer !
+                              arrow->fall_time += dt;
+                              if(arrow->fall_time > ARROW_FALL_DELAY){
+                                   arrow->fall_time -= ARROW_FALL_DELAY;
+                                   arrow->pos.z--;
+                              }
+                         }else{
+                              arrow_friction = 0.9f;
+                         }
 
-                    arrow->pos += (direction * dt * arrow->vel);
-                    arrow->vel *= arrow_friction;
-                    Coord_t post_move_coord = pixel_to_coord(arrow->pos.pixel);
+                         Vec_t direction = {};
+                         switch(arrow->face){
+                         default:
+                              break;
+                         case DIRECTION_LEFT:
+                              direction.x = -1;
+                              break;
+                         case DIRECTION_RIGHT:
+                              direction.x = 1;
+                              break;
+                         case DIRECTION_DOWN:
+                              direction.y = -1;
+                              break;
+                         case DIRECTION_UP:
+                              direction.y = 1;
+                              break;
+                         }
 
-                    Rect_t coord_rect = rect_surrounding_coord(post_move_coord);
+                         arrow->pos += (direction * dt * arrow->vel);
+                         arrow->vel *= arrow_friction;
+                         post_move_coord = pixel_to_coord(arrow->pos.pixel);
 
-                    S16 block_count = 0;
-                    Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
-                    quad_tree_find_in(world.block_qt, coord_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
-                    for(S16 b = 0; b < block_count; b++){
-                         // blocks on the coordinate and on the ground block light
-                         Rect_t block_rect = block_get_inclusive_rect(blocks[b]);
-                         S16 block_index = (S16)(blocks[b] - world.blocks.elements);
-                         S8 block_bottom = blocks[b]->pos.z;
-                         S8 block_top = block_bottom + HEIGHT_INTERVAL;
-                         if(pixel_in_rect(arrow->pos.pixel, block_rect) && arrow->element_from_block != block_index){
-                              if(arrow->pos.z >= block_bottom && arrow->pos.z <= block_top){
-                                   add_global_tag(TAG_ARROW_STICKS_INTO_BLOCK);
-                                   arrow->stuck_time = dt;
-                                   arrow->stuck_offset = arrow->pos - block_get_center(blocks[b]);
-                                   arrow->stuck_type = STUCK_BLOCK;
-                                   arrow->stuck_index = get_block_index(&world, blocks[b]);
-                              }else if(arrow->pos.z > block_top && arrow->pos.z < (block_top + HEIGHT_INTERVAL)){
-                                   arrow->element_from_block = block_index;
-                                   if(arrow->element != blocks[b]->element){
-                                        Element_t arrow_element = arrow->element;
-                                        arrow->element = transition_element(arrow->element, blocks[b]->element);
-                                        if(arrow->entangle_index >= 0){
-                                             Arrow_t* entangled_arrow = world.arrows.arrows + arrow->entangle_index;
-                                             entangled_arrow->element = transition_element(entangled_arrow->element, blocks[b]->element);
-                                        }
-                                        if(arrow_element){
-                                             blocks[b]->element = transition_element(blocks[b]->element, arrow_element);
-                                             add_global_tag(TAG_ARROW_CHANGES_BLOCK_ELEMENT);
-                                             if(blocks[b]->entangle_index >= 0 && blocks[b]->entangle_index < world.blocks.count){
-                                                  S16 original_index = blocks[b] - world.blocks.elements;
-                                                  S16 entangle_index = blocks[b]->entangle_index;
-                                                  while(entangle_index != original_index && entangle_index >= 0){
-                                                       Block_t* entangled_block = world.blocks.elements + entangle_index;
-                                                       entangled_block->element = transition_element(entangled_block->element, arrow_element);
-                                                       entangle_index = entangled_block->entangle_index;
+                         Rect_t coord_rect = rect_surrounding_coord(post_move_coord);
+
+                         S16 block_count = 0;
+                         Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
+                         quad_tree_find_in(world.block_qt, coord_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
+                         for(S16 b = 0; b < block_count; b++){
+                              // blocks on the coordinate and on the ground block light
+                              Rect_t block_rect = block_get_inclusive_rect(blocks[b]);
+                              S16 block_index = (S16)(blocks[b] - world.blocks.elements);
+                              S8 block_bottom = blocks[b]->pos.z;
+                              S8 block_top = block_bottom + HEIGHT_INTERVAL;
+                              if(pixel_in_rect(arrow->pos.pixel, block_rect) && arrow->element_from_block != block_index){
+                                   if(arrow->pos.z >= block_bottom && arrow->pos.z <= block_top){
+                                        add_global_tag(TAG_ARROW_STICKS_INTO_BLOCK);
+                                        arrow->stuck_time = dt;
+                                        arrow->stuck_offset = arrow->pos - block_get_center(blocks[b]);
+                                        arrow->stuck_type = STUCK_BLOCK;
+                                        arrow->stuck_index = get_block_index(&world, blocks[b]);
+                                        arrow->vel = 0;
+                                   }else if(arrow->pos.z > block_top && arrow->pos.z < (block_top + HEIGHT_INTERVAL)){
+                                        // TODO(jtardiff): being held down is probably not quite enough to block us from lighting the block
+                                        auto held_down_result = block_held_down_by_another_block(blocks[b], world.block_qt, world.interactive_qt, &world.tilemap);
+                                        if(!held_down_result.held()){
+                                             arrow->element_from_block = block_index;
+                                             if(arrow->element != blocks[b]->element){
+                                                  Element_t arrow_element = arrow->element;
+                                                  arrow->element = transition_element(arrow->element, blocks[b]->element);
+                                                  if(arrow->entangle_index >= 0){
+                                                       Arrow_t* entangled_arrow = world.arrows.arrows + arrow->entangle_index;
+                                                       entangled_arrow->element = transition_element(entangled_arrow->element, blocks[b]->element);
+                                                  }
+                                                  if(arrow_element){
+                                                       blocks[b]->element = transition_element(blocks[b]->element, arrow_element);
+                                                       add_global_tag(TAG_ARROW_CHANGES_BLOCK_ELEMENT);
+                                                       if(blocks[b]->entangle_index >= 0 && blocks[b]->entangle_index < world.blocks.count){
+                                                            S16 original_index = blocks[b] - world.blocks.elements;
+                                                            S16 entangle_index = blocks[b]->entangle_index;
+                                                            while(entangle_index != original_index && entangle_index >= 0){
+                                                                 Block_t* entangled_block = world.blocks.elements + entangle_index;
+                                                                 entangled_block->element = transition_element(entangled_block->element, arrow_element);
+                                                                 entangle_index = entangled_block->entangle_index;
+                                                            }
+                                                       }
                                                   }
                                              }
                                         }
-                                   }
-                              // the block is only iced so we just want to melt the ice, if the block isn't covered
-                              }else if(arrow->pos.z >= block_bottom && arrow->pos.z <= (block_top + MELT_SPREAD_HEIGHT) &&
-                                       !block_held_down_by_another_block(blocks[b], world.block_qt, world.interactive_qt, &world.tilemap).held()){
-                                   if(arrow->element == ELEMENT_FIRE && blocks[b]->element == ELEMENT_ONLY_ICED){
-                                        blocks[b]->element = ELEMENT_NONE;
-                                   }else if(arrow->element == ELEMENT_ICE && blocks[b]->element == ELEMENT_NONE){
-                                        blocks[b]->element = ELEMENT_ONLY_ICED;
+                                   // the block is only iced so we just want to melt the ice, if the block isn't covered
+                                   }else if(arrow->pos.z >= block_bottom && arrow->pos.z <= (block_top + MELT_SPREAD_HEIGHT) &&
+                                            !block_held_down_by_another_block(blocks[b], world.block_qt, world.interactive_qt, &world.tilemap).held()){
+                                        if(arrow->element == ELEMENT_FIRE && blocks[b]->element == ELEMENT_ONLY_ICED){
+                                             blocks[b]->element = ELEMENT_NONE;
+                                        }else if(arrow->element == ELEMENT_ICE && blocks[b]->element == ELEMENT_NONE){
+                                             blocks[b]->element = ELEMENT_ONLY_ICED;
+                                        }
                                    }
                               }
                          }
-                    }
 
-                    if(block_count == 0){
-                         arrow->element_from_block = -1;
+                         if(block_count == 0){
+                              arrow->element_from_block = -1;
+                         }
                     }
 
                     if(pre_move_coord != post_move_coord){
                          Tile_t* tile = tilemap_get_tile(&world.tilemap, post_move_coord);
-                         if(tile && tile_is_solid(tile)){
+                         if(tile && tile_is_solid(tile) && arrow->stuck_time == 0){
                               arrow->stuck_time = dt;
+                              arrow->vel = 0;
                          }
 
                          // catch or give elements
                          if(arrow->element == ELEMENT_FIRE){
-                              melt_ice(post_move_coord, arrow->pos.z, 0, &world);
+                              if(arrow->stuck_time == 0){
+                                   melt_ice(post_move_coord, arrow->pos.z, 0, &world);
+                              }else{
+                                   melt_ice(post_move_coord - arrow->face, arrow->pos.z, 0, &world);
+                              }
                          }else if(arrow->element == ELEMENT_ICE){
-                              spread_ice(post_move_coord, arrow->pos.z, 0, &world);
+                              if(arrow->stuck_time == 0){
+                                   spread_ice(post_move_coord, arrow->pos.z, 0, &world);
+                              }else{
+                                   spread_ice(post_move_coord - arrow->face, arrow->pos.z, 0, &world);
+                              }
                          }
 
-                         Interactive_t* interactive = quad_tree_interactive_find_at(world.interactive_qt, post_move_coord);
-                         if(interactive){
-                              switch(interactive->type){
-                              default:
-                                   break;
-                              case INTERACTIVE_TYPE_LEVER:
-                                   if(arrow->pos.z >= HEIGHT_INTERVAL){
-                                        activate(&world, post_move_coord);
-                                        add_global_tag(TAB_ARROW_ACTIVATES_LEVER);
-                                   }else{
-                                        arrow->stuck_time = dt;
+                         if(arrow->stuck_time == 0){
+                              Interactive_t* interactive = quad_tree_interactive_find_at(world.interactive_qt, post_move_coord);
+                              if(interactive){
+                                   switch(interactive->type){
+                                   default:
+                                        break;
+                                   case INTERACTIVE_TYPE_LEVER:
+                                        if(arrow->pos.z >= HEIGHT_INTERVAL){
+                                             activate(&world, post_move_coord);
+                                             add_global_tag(TAB_ARROW_ACTIVATES_LEVER);
+                                        }else{
+                                             arrow->stuck_time = dt;
+                                             arrow->vel = 0;
+                                        }
+                                        break;
+                                   case INTERACTIVE_TYPE_DOOR:
+                                        if(interactive->door.lift.ticks < arrow->pos.z){
+                                             arrow->stuck_time = dt;
+                                             arrow->stuck_type = STUCK_DOOR;
+                                             arrow->stuck_index = interactive - world.interactives.elements;
+                                             arrow->stuck_offset.z = arrow->pos.z - interactive->door.lift.ticks;
+                                             arrow->vel = 0;
+                                        }
+                                        break;
+                                   case INTERACTIVE_TYPE_POPUP:
+                                        if(interactive->popup.lift.ticks > arrow->pos.z){
+                                             arrow->stuck_time = dt;
+                                             arrow->stuck_type = STUCK_POPUP;
+                                             arrow->stuck_index = interactive - world.interactives.elements;
+                                             arrow->stuck_offset.z = arrow->pos.z - interactive->popup.lift.ticks;
+                                             arrow->vel = 0;
+                                        }
+                                        break;
+                                   case INTERACTIVE_TYPE_PORTAL:
+                                        if(!interactive->portal.on){
+                                             arrow->stuck_time = dt;
+                                             arrow->vel = 0;
+                                             // TODO: arrow drops if portal turns on
+                                        }else if(!portal_has_destination(post_move_coord, &world.tilemap, world.interactive_qt)){
+                                             // TODO: arrow drops if portal turns on
+                                             arrow->stuck_time = dt;
+                                             arrow->vel = 0;
+                                        }
+                                        break;
                                    }
-                                   break;
-                              case INTERACTIVE_TYPE_DOOR:
-                                   if(interactive->door.lift.ticks < arrow->pos.z){
-                                        arrow->stuck_time = dt;
-                                        arrow->stuck_type = STUCK_DOOR;
-                                        arrow->stuck_index = interactive - world.interactives.elements;
-                                        arrow->stuck_offset.z = arrow->pos.z - interactive->door.lift.ticks;
-                                   }
-                                   break;
-                              case INTERACTIVE_TYPE_POPUP:
-                                   if(interactive->popup.lift.ticks > arrow->pos.z){
-                                        arrow->stuck_time = dt;
-                                        arrow->stuck_type = STUCK_POPUP;
-                                        arrow->stuck_index = interactive - world.interactives.elements;
-                                        arrow->stuck_offset.z = arrow->pos.z - interactive->popup.lift.ticks;
-                                   }
-                                   break;
-                              case INTERACTIVE_TYPE_PORTAL:
-                                   if(!interactive->portal.on){
-                                        arrow->stuck_time = dt;
-                                        // TODO: arrow drops if portal turns on
-                                   }else if(!portal_has_destination(post_move_coord, &world.tilemap, world.interactive_qt)){
-                                        // TODO: arrow drops if portal turns on
-                                        arrow->stuck_time = dt;
-                                   }
-                                   break;
                               }
                          }
 
@@ -5653,6 +5677,12 @@ int main(int argc, char** argv){
                          block->horizontal_move = block->teleport_horizontal_move;
                          block->vertical_move = block->teleport_vertical_move;
                          block->cut = block->teleport_cut;
+
+                         if((block->teleport_rotation % 2) == 1){
+                              bool tmp = block->stopped_by_player_horizontal;
+                              block->stopped_by_player_horizontal = block->stopped_by_player_vertical;
+                              block->stopped_by_player_vertical = tmp;
+                         }
 
                          if(block->teleport_split){
                              // TODO: unsure about this *fix*

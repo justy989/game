@@ -278,12 +278,14 @@ struct CheckBlockCollisionResult_t{
           reset_move(&horizontal_move);
           vel.x = 0;
           accel.x = 0;
+          stopped_by_player_horizontal = false;
      }
 
      void stop_vertically(){
           reset_move(&vertical_move);
           vel.y = 0;
           accel.y = 0;
+          stopped_by_player_vertical = false;
      }
 };
 
