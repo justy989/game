@@ -5939,6 +5939,9 @@ int main(int argc, char** argv){
                                         if(portal_exits.directions[d].coords[i] == coord) continue;
 
                                         Coord_t portal_coord = portal_exits.directions[d].coords[i] + direction_opposite((Direction_t)(d));
+
+                                        draw_solid_interactive(portal_coord, coord, &world.tilemap, world.interactive_qt, camera.world_offset);
+
                                         Rect_t coord_rect = rect_surrounding_coord(portal_coord);
                                         coord_rect.left -= HALF_TILE_SIZE_IN_PIXELS;
                                         coord_rect.right += HALF_TILE_SIZE_IN_PIXELS;

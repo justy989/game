@@ -97,13 +97,13 @@ void reset_map(Coord_t player_start, World_t* world, Undo_t* undo, Camera_t* cam
      camera->center_on_tilemap(&world->tilemap);
 }
 
-static void toggle_electricity(TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree, Coord_t coord,
+static void toggle_electricity(TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt, Coord_t coord,
                                Direction_t direction, bool from_wire, bool activated_by_door){
      Coord_t adjacent_coord = coord + direction;
      Tile_t* tile = tilemap_get_tile(tilemap, adjacent_coord);
      if(!tile) return;
 
-     Interactive_t* interactive = quad_tree_interactive_find_at(interactive_quad_tree, adjacent_coord);
+     Interactive_t* interactive = quad_tree_interactive_find_at(interactive_qt, adjacent_coord);
      if(interactive){
           switch(interactive->type){
           default:
@@ -118,7 +118,7 @@ static void toggle_electricity(TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>
           case INTERACTIVE_TYPE_DOOR:
                interactive->door.lift.up = !interactive->door.lift.up;
                // open connecting door
-               if(!activated_by_door) toggle_electricity(tilemap, interactive_quad_tree,
+               if(!activated_by_door) toggle_electricity(tilemap, interactive_qt,
                                                          coord_move(coord, interactive->door.face, 3),
                                                          interactive->door.face, from_wire, true);
                break;
@@ -129,6 +129,19 @@ static void toggle_electricity(TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>
                    }else{
                        interactive->portal.on = !interactive->portal.on;
                    }
+               }else{
+                    PortalExit_t portal_exits = find_portal_exits(adjacent_coord, tilemap, interactive_qt);
+                    for(S8 d = 0; d < DIRECTION_COUNT; d++){
+                         Direction_t current_portal_dir = (Direction_t)(d);
+                         auto portal_exit = portal_exits.directions + d;
+
+                         for(S8 p = 0; p < portal_exit->count; p++){
+                              auto portal_dst_coord = portal_exit->coords[p];
+                              if(portal_dst_coord == adjacent_coord) continue;
+
+                              toggle_electricity(tilemap, interactive_qt, portal_dst_coord, direction_opposite(current_portal_dir), from_wire, false);
+                         }
+                    }
                }
                break;
           }
@@ -216,35 +229,35 @@ static void toggle_electricity(TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>
 
           if(wire_cross){
                if(interactive->wire_cross.mask & DIRECTION_MASK_LEFT && direction != DIRECTION_RIGHT){
-                    toggle_electricity(tilemap, interactive_quad_tree, adjacent_coord, DIRECTION_LEFT, true, false);
+                    toggle_electricity(tilemap, interactive_qt, adjacent_coord, DIRECTION_LEFT, true, false);
                }
 
                if(interactive->wire_cross.mask & DIRECTION_MASK_RIGHT && direction != DIRECTION_LEFT){
-                    toggle_electricity(tilemap, interactive_quad_tree, adjacent_coord, DIRECTION_RIGHT, true, false);
+                    toggle_electricity(tilemap, interactive_qt, adjacent_coord, DIRECTION_RIGHT, true, false);
                }
 
                if(interactive->wire_cross.mask & DIRECTION_MASK_DOWN && direction != DIRECTION_UP){
-                    toggle_electricity(tilemap, interactive_quad_tree, adjacent_coord, DIRECTION_DOWN, true, false);
+                    toggle_electricity(tilemap, interactive_qt, adjacent_coord, DIRECTION_DOWN, true, false);
                }
 
                if(interactive->wire_cross.mask & DIRECTION_MASK_UP && direction != DIRECTION_DOWN){
-                    toggle_electricity(tilemap, interactive_quad_tree, adjacent_coord, DIRECTION_UP, true, false);
+                    toggle_electricity(tilemap, interactive_qt, adjacent_coord, DIRECTION_UP, true, false);
                }
           }else{
                if(tile->flags & TILE_FLAG_WIRE_LEFT && direction != DIRECTION_RIGHT){
-                    toggle_electricity(tilemap, interactive_quad_tree, adjacent_coord, DIRECTION_LEFT, true, false);
+                    toggle_electricity(tilemap, interactive_qt, adjacent_coord, DIRECTION_LEFT, true, false);
                }
 
                if(tile->flags & TILE_FLAG_WIRE_RIGHT && direction != DIRECTION_LEFT){
-                    toggle_electricity(tilemap, interactive_quad_tree, adjacent_coord, DIRECTION_RIGHT, true, false);
+                    toggle_electricity(tilemap, interactive_qt, adjacent_coord, DIRECTION_RIGHT, true, false);
                }
 
                if(tile->flags & TILE_FLAG_WIRE_DOWN && direction != DIRECTION_UP){
-                    toggle_electricity(tilemap, interactive_quad_tree, adjacent_coord, DIRECTION_DOWN, true, false);
+                    toggle_electricity(tilemap, interactive_qt, adjacent_coord, DIRECTION_DOWN, true, false);
                }
 
                if(tile->flags & TILE_FLAG_WIRE_UP && direction != DIRECTION_DOWN){
-                    toggle_electricity(tilemap, interactive_quad_tree, adjacent_coord, DIRECTION_UP, true, false);
+                    toggle_electricity(tilemap, interactive_qt, adjacent_coord, DIRECTION_UP, true, false);
                }
           }
      }else if(tile->flags & (TILE_FLAG_WIRE_CLUSTER_LEFT | TILE_FLAG_WIRE_CLUSTER_MID | TILE_FLAG_WIRE_CLUSTER_RIGHT)){
@@ -319,7 +332,7 @@ static void toggle_electricity(TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>
           bool all_on_after = tile_flags_cluster_all_on(tile->flags);
 
           if(all_on_before != all_on_after){
-               toggle_electricity(tilemap, interactive_quad_tree, adjacent_coord, cluster_direction, true, false);
+               toggle_electricity(tilemap, interactive_qt, adjacent_coord, cluster_direction, true, false);
           }
      }
 }
@@ -937,9 +950,29 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                Coord_t coord {x, y};
 
                Interactive_t* interactive = quad_tree_interactive_solid_at(world->interactive_qt, &world->tilemap, coord, player_pos.z, true);
+               if(!interactive){
+                    PortalExit_t portal_exits = find_portal_exits(coord, &world->tilemap, world->interactive_qt);
+                    for(S8 d = 0; d < DIRECTION_COUNT; d++){
+                         Direction_t current_portal_dir = (Direction_t)(d);
+                         auto portal_exit = portal_exits.directions + d;
+
+                         for(S8 p = 0; p < portal_exit->count; p++){
+                              auto portal_dst_coord = portal_exit->coords[p];
+                              if(portal_dst_coord == coord) continue;
+
+                              Coord_t portal_dst_output_coord = portal_dst_coord + direction_opposite(current_portal_dir);
+
+                              interactive = quad_tree_interactive_solid_at(world->interactive_qt, &world->tilemap, portal_dst_output_coord, player_pos.z);
+                              break;
+                         }
+
+                         if(interactive) break;
+                    }
+               }
+
                if(interactive){
                     bool collided = false;
-                    bool empty_pit = true;
+                    bool empty_pit_or_solid_interactive = true;
                     if(interactive->type == INTERACTIVE_TYPE_PIT){
                          Rect_t pit_rect = rect_surrounding_coord(coord);
                          quad_tree_find_in(world->block_qt, pit_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
@@ -963,19 +996,19 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
 
                               if(rect_in_rect(top_left_corner, block_rect)){
                                   cover_top_left = true;
-                                  empty_pit = false;
+                                  empty_pit_or_solid_interactive = false;
                               }
                               if(rect_in_rect(top_right_corner, block_rect)){
                                   cover_top_right = true;
-                                  empty_pit = false;
+                                  empty_pit_or_solid_interactive = false;
                               }
                               if(rect_in_rect(bottom_left_corner, block_rect)){
                                   cover_bottom_left = true;
-                                  empty_pit = false;
+                                  empty_pit_or_solid_interactive = false;
                               }
                               if(rect_in_rect(bottom_right_corner, block_rect)){
                                   cover_bottom_right = true;
-                                  empty_pit = false;
+                                  empty_pit_or_solid_interactive = false;
                               }
                          }
 
@@ -1012,7 +1045,7 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                          }
                     }
 
-                    if(empty_pit){
+                    if(empty_pit_or_solid_interactive){
                          Rect_t coord_rect = rect_surrounding_coord(coord);
                          position_slide_against_rect(player_pos, coord_rect, PLAYER_RADIUS, &result.pos_delta, &collided);
                          if(collided && !result.collided){

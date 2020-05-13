@@ -62,6 +62,8 @@ void draw_solids(Vec_t pos, Interactive_t* interactive, Block_t** blocks, S16 bl
                  TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree);
 void draw_world_row_flats(S16 y, S16 x_start, S16 x_end, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt,
                           Vec_t camera);
+void draw_solid_interactive(Coord_t src_coord, Coord_t dst_coord, TileMap_t* tilemap,
+                            QuadTreeNode_t<Interactive_t>* interactive_qt, Vec_t camera);
 void draw_world_row_solids(S16 y, S16 x_start, S16 x_end, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt,
                            QuadTreeNode_t<Block_t>* block_qt, ObjectArray_t<Player_t>* players, Vec_t camera, GLuint player_texture);
 void draw_world_row_arrows(S16 y, S16 x_start, S16 x_end, const ArrowArray_t* arrow_aray, Vec_t camera);

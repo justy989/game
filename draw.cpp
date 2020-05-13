@@ -612,36 +612,29 @@ void draw_world_row_flats(S16 y, S16 x_start, S16 x_end, TileMap_t* tilemap, Qua
      }
 }
 
+void draw_solid_interactive(Coord_t src_coord, Coord_t dst_coord, TileMap_t* tilemap,
+                            QuadTreeNode_t<Interactive_t>* interactive_qt, Vec_t camera){
+     Interactive_t* interactive = quad_tree_find_at(interactive_qt, src_coord.x, src_coord.y);
+     if(!interactive) return;
+
+     if(interactive->type == INTERACTIVE_TYPE_PRESSURE_PLATE ||
+        interactive->type == INTERACTIVE_TYPE_ICE_DETECTOR ||
+        interactive->type == INTERACTIVE_TYPE_LIGHT_DETECTOR ||
+        (interactive->type == INTERACTIVE_TYPE_POPUP && interactive->popup.lift.ticks == 1)){
+          // pass
+     }else{
+          Vec_t draw_pos{(F32)(dst_coord.x) * TILE_SIZE, (F32)(dst_coord.y) * TILE_SIZE};
+          draw_pos += camera;
+          draw_interactive(interactive, draw_pos, src_coord, tilemap, interactive_qt);
+     }
+}
+
 void draw_world_row_solids(S16 y, S16 x_start, S16 x_end, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt,
                            QuadTreeNode_t<Block_t>* block_qt, ObjectArray_t<Player_t>* players, Vec_t camera, GLuint player_texture){
-     auto draw_pos = Vec_t{(float)(x_start) * TILE_SIZE, (float)(y) * TILE_SIZE} + camera;
-     auto save_draw_pos = draw_pos;
-
      // solid layer
-     draw_pos = save_draw_pos;
      for(S16 x = x_start; x <= x_end; x++){
-          Interactive_t* interactive = quad_tree_find_at(interactive_qt, x, y);
-          if(interactive){
-               if(interactive->type == INTERACTIVE_TYPE_PRESSURE_PLATE ||
-                  interactive->type == INTERACTIVE_TYPE_ICE_DETECTOR ||
-                  interactive->type == INTERACTIVE_TYPE_LIGHT_DETECTOR ||
-                  (interactive->type == INTERACTIVE_TYPE_POPUP && interactive->popup.lift.ticks == 1)){
-                    // pass
-               }else{
-                    draw_interactive(interactive, draw_pos, Coord_t{x, y}, tilemap, interactive_qt);
-
-                    if(interactive->type == INTERACTIVE_TYPE_POPUP && interactive->popup.iced){
-                         auto ice_draw_pos = draw_pos;
-                         ice_draw_pos.y += interactive->popup.lift.ticks * PIXEL_SIZE;
-                         Vec_t tex_vec = theme_frame(3, 12);
-                         glColor4f(1.0f, 1.0f, 1.0f, 0.5f);
-                         draw_theme_frame(ice_draw_pos, tex_vec);
-                         glColor3f(1.0f, 1.0f, 1.0f);
-                    }
-               }
-          }
-
-          draw_pos.x += TILE_SIZE;
+          Coord_t coord {x, y};
+          draw_solid_interactive(coord, coord, tilemap, interactive_qt, camera);
      }
 
      // block layer
@@ -670,13 +663,13 @@ void draw_world_row_solids(S16 y, S16 x_start, S16 x_end, TileMap_t* tilemap, Qu
      glBindTexture(GL_TEXTURE_2D, player_texture);
      glBegin(GL_QUADS);
 
-     // player layer slayer flayer bayer
+     // player slayer flayer bayer layer
      for(S16 i = 0; i < players->count; i++){
           auto player = players->elements + i;
           auto coord = pos_to_coord(player->pos);
 
           if(coord.y == y && coord.x >= x_start && coord.x <= x_end){
-               draw_pos = draw_player(player, camera, coord, Coord_t{-1, -1}, 0);
+               Vec_t draw_pos = draw_player(player, camera, coord, Coord_t{-1, -1}, 0);
 
                if(i >= 1){
                    glEnd();

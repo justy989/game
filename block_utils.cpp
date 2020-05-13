@@ -479,6 +479,7 @@ Interactive_t* block_against_solid_interactive(Block_t* block_to_check, Directio
           return nullptr;
      }
 
+     // TODO: compress
      Coord_t tile_coord = pixel_to_coord(pixel_a);
      Interactive_t* interactive = quad_tree_interactive_solid_at(interactive_qt, tilemap, tile_coord, block_to_check->pos.z);
      if(interactive){
@@ -489,9 +490,41 @@ Interactive_t* block_against_solid_interactive(Block_t* block_to_check, Directio
           }
      }
 
+     PortalExit_t portal_exits = find_portal_exits(tile_coord, tilemap, interactive_qt);
+     for(S8 d = 0; d < DIRECTION_COUNT; d++){
+          Direction_t current_portal_dir = (Direction_t)(d);
+          auto portal_exit = portal_exits.directions + d;
+
+          for(S8 p = 0; p < portal_exit->count; p++){
+               auto portal_dst_coord = portal_exit->coords[p];
+               if(portal_dst_coord == tile_coord) continue;
+
+               Coord_t portal_dst_output_coord = portal_dst_coord + direction_opposite(current_portal_dir);
+
+               interactive = quad_tree_interactive_solid_at(interactive_qt, tilemap, portal_dst_output_coord, block_to_check->pos.z);
+               if(interactive) return interactive;
+          }
+     }
+
      tile_coord = pixel_to_coord(pixel_b);
      interactive = quad_tree_interactive_solid_at(interactive_qt, tilemap, tile_coord, block_to_check->pos.z);
      if(interactive) return interactive;
+
+     portal_exits = find_portal_exits(tile_coord, tilemap, interactive_qt);
+     for(S8 d = 0; d < DIRECTION_COUNT; d++){
+          Direction_t current_portal_dir = (Direction_t)(d);
+          auto portal_exit = portal_exits.directions + d;
+
+          for(S8 p = 0; p < portal_exit->count; p++){
+               auto portal_dst_coord = portal_exit->coords[p];
+               if(portal_dst_coord == tile_coord) continue;
+
+               Coord_t portal_dst_output_coord = portal_dst_coord + direction_opposite(current_portal_dir);
+
+               interactive = quad_tree_interactive_solid_at(interactive_qt, tilemap, portal_dst_output_coord, block_to_check->pos.z);
+               if(interactive) return interactive;
+          }
+     }
 
      return nullptr;
 }
@@ -696,26 +729,8 @@ BlockInsideOthersResult_t block_inside_others(Position_t block_to_check_pos, Vec
 }
 
 Tile_t* block_against_solid_tile(Block_t* block_to_check, Direction_t direction, TileMap_t* tilemap){
-     Pixel_t pixel_a {};
-     Pixel_t pixel_b {};
-     auto block_cut = block_get_cut(block_to_check);
-
-     if(!block_adjacent_pixels_to_check(block_to_check->pos, block_to_check->pos_delta, block_cut,
-                                        direction, &pixel_a, &pixel_b)){
-          return nullptr;
-     }
-
-     Coord_t tile_coord = pixel_to_coord(pixel_a);
-
-     Tile_t* tile = tilemap_get_tile(tilemap, tile_coord);
-     if(tile && tile->id) return tile;
-
-     tile_coord = pixel_to_coord(pixel_b);
-
-     tile = tilemap_get_tile(tilemap, tile_coord);
-     if(tile && tile->id) return tile;
-
-     return nullptr;
+     return block_against_solid_tile(block_get_position(block_to_check), block_get_pos_delta(block_to_check),
+                                     block_get_cut(block_to_check), direction, tilemap);
 }
 
 Tile_t* block_against_solid_tile(Position_t block_pos, Vec_t pos_delta, BlockCut_t cut, Direction_t direction, TileMap_t* tilemap){
