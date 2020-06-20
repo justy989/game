@@ -22,6 +22,7 @@ enum BlockHeldBy_t{
      BLOCK_HELD_BY_NONE = 0,
      BLOCK_HELD_BY_SOLID = 1,
      BLOCK_HELD_BY_ENTANGLE = 2,
+     BLOCK_HELD_BY_FLOOR = 3,
 };
 
 enum BlockCorner_t{
@@ -87,6 +88,8 @@ struct Block_t : public GridMotion_t{
      ConnectedTeleport_t connected_teleport;
      Vec_t pre_collision_pos_delta;
      Vec_t collision_time_ratio;
+
+     bool over_pit = false;
 };
 
 S16 get_object_x(Block_t* block);

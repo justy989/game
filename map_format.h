@@ -10,7 +10,7 @@
 #include <stdio.h>
 
 // version 4 is just the addition of the thumbnail
-#define MAP_VERSION 5
+#define MAP_VERSION 6
 
 #pragma pack(push, 1)
 struct MapTileV1_t{
@@ -57,6 +57,10 @@ struct PortalV1_t{
     bool on;
 };
 
+struct PitV1_t{
+    S8 id;
+};
+
 struct MapInteractiveV1_t{
      InteractiveType_t type;
      Coord_t coord;
@@ -69,6 +73,22 @@ struct MapInteractiveV1_t{
           MapDoorV1_t door; // up or down
           PortalV1_t portal;
           WireCross_t wire_cross;
+     };
+};
+
+struct MapInteractiveV2_t{
+     InteractiveType_t type;
+     Coord_t coord;
+
+     union{
+          PressurePlate_t pressure_plate;
+          Detector_t detector;
+          MapPopupV1_t popup;
+          Stairs_t stairs;
+          MapDoorV1_t door; // up or down
+          PortalV1_t portal;
+          WireCross_t wire_cross;
+          PitV1_t pit;
      };
 };
 #pragma pack(pop)

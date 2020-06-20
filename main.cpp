@@ -4372,13 +4372,14 @@ int main(int argc, char** argv){
                     }
                }
 
+               // pass to detect if blocks are in a pit or just held up by the floor
                for(S16 i = 0; i < world.blocks.count; i++){
                     auto block = world.blocks.elements + i;
 
                     if(block->pos.z <= 0){
                          if(block->pos.z <= -HEIGHT_INTERVAL) continue;
 
-                         bool over_pit = false;
+                         block->over_pit = false;
 
                          auto coord = block_get_coord(block);
                          auto* interactive = quad_tree_interactive_find_at(world.interactive_qt, coord);
@@ -4388,29 +4389,25 @@ int main(int argc, char** argv){
                               auto block_rect = block_get_inclusive_rect(block);
                               if(rect_completely_in_rect(block_rect, coord_rect) &&
                                  !block->held_up){
-                                   block->vel.x = 0;
-                                   block->vel.y = 0;
-                                   block->accel.x = 0;
-                                   block->accel.y = 0;
-                                   block->pos.decimal.x = 0;
-                                   block->pos.decimal.y = 0;
-                                   block->pos_delta.x = 0;
-                                   block->pos_delta.y = 0;
-                                   reset_move(&block->horizontal_move);
-                                   reset_move(&block->vertical_move);
-                                   add_global_tag(TAG_BLOCK_FALLS_IN_PIT);
-                                   over_pit = true;
+                                   block->over_pit = true;
                               }
                          }
 
-                         if(!over_pit) continue;
+                         if(!block->over_pit && !block->held_up && block->pos.z == 0){
+                              block->held_up |= BLOCK_HELD_BY_FLOOR;
+                         }
                     }
+               }
+
+               for(S16 i = 0; i < world.blocks.count; i++){
+                    auto block = world.blocks.elements + i;
 
                     if(block->entangle_index >= 0){
                          S16 entangle_index = block->entangle_index;
                          while(entangle_index != i && entangle_index >= 0){
                               auto entangled_block = world.blocks.elements + entangle_index;
-                              if(entangled_block->held_up & BLOCK_HELD_BY_SOLID){
+                              if(entangled_block->held_up & BLOCK_HELD_BY_SOLID ||
+                                 entangled_block->held_up & BLOCK_HELD_BY_FLOOR){
                                    block->held_up |= BLOCK_HELD_BY_ENTANGLE;
                                    break;
                               }
@@ -4419,6 +4416,22 @@ int main(int argc, char** argv){
                     }
 
                     if(!block->held_up){
+                         if(block->pos.z <= -HEIGHT_INTERVAL) continue;
+
+                         if(block->over_pit){
+                              block->vel.x = 0;
+                              block->vel.y = 0;
+                              block->accel.x = 0;
+                              block->accel.y = 0;
+                              block->pos.decimal.x = 0;
+                              block->pos.decimal.y = 0;
+                              block->pos_delta.x = 0;
+                              block->pos_delta.y = 0;
+                              reset_move(&block->horizontal_move);
+                              reset_move(&block->vertical_move);
+                              add_global_tag(TAG_BLOCK_FALLS_IN_PIT);
+                         }
+
                          block->fall_time -= dt;
                          if(block->fall_time < 0){
                               block->fall_time = FALL_TIME;

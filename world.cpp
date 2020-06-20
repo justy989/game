@@ -16,6 +16,58 @@
 #include <stdlib.h>
 #include <errno.h>
 
+struct PitFilledIn_t{
+     bool bottom_left_filled_in = false;
+     bool bottom_right_filled_in = false;
+     bool top_left_filled_in = false;
+     bool top_right_filled_in = false;
+
+     Rect_t bottom_left_corner;
+     Rect_t bottom_right_corner;
+     Rect_t top_left_corner;
+     Rect_t top_right_corner;
+};
+
+static PitFilledIn_t calculate_pit_area_filled_in(Coord_t coord, QuadTreeNode_t<Block_t>* block_qt){
+     PitFilledIn_t result {};
+
+     S16 block_count = 0;
+     Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
+     Rect_t pit_rect = rect_surrounding_coord(coord);
+     quad_tree_find_in(block_qt, pit_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
+
+     result.top_left_corner = Rect_t{pit_rect.left, (S16)(pit_rect.bottom + HALF_TILE_SIZE_IN_PIXELS), (S16)(pit_rect.left + HALF_TILE_SIZE_IN_PIXELS - 1), pit_rect.top};
+     result.top_right_corner = Rect_t{(S16)(pit_rect.left + HALF_TILE_SIZE_IN_PIXELS), (S16)(pit_rect.bottom + HALF_TILE_SIZE_IN_PIXELS), pit_rect.right, pit_rect.top};
+     result.bottom_left_corner = Rect_t{pit_rect.left, pit_rect.bottom, (S16)(pit_rect.left + HALF_TILE_SIZE_IN_PIXELS - 1), (S16)(pit_rect.bottom + HALF_TILE_SIZE_IN_PIXELS - 1)};
+     result.bottom_right_corner = Rect_t{(S16)(pit_rect.left + HALF_TILE_SIZE_IN_PIXELS), pit_rect.bottom, pit_rect.right, (S16)(pit_rect.bottom + HALF_TILE_SIZE_IN_PIXELS - 1)};
+
+     for(S16 b = 0; b < block_count; b++){
+          if(blocks[b]->pos.z > -HEIGHT_INTERVAL || blocks[b]->pos.z > 0) continue;
+
+          auto block_rect = block_get_inclusive_rect(blocks[b]);
+
+          if(!rect_completely_in_rect(block_rect, pit_rect)) continue;
+
+          if(rect_in_rect(result.top_left_corner, block_rect)){
+              result.top_left_filled_in = true;
+          }
+
+          if(rect_in_rect(result.top_right_corner, block_rect)){
+              result.top_right_filled_in = true;
+          }
+
+          if(rect_in_rect(result.bottom_left_corner, block_rect)){
+              result.bottom_left_filled_in = true;
+          }
+
+          if(rect_in_rect(result.bottom_right_corner, block_rect)){
+              result.bottom_right_filled_in = true;
+          }
+     }
+
+     return result;
+}
+
 static int ascending_block_height_comparer(const void* a, const void* b){
     Block_t* real_a = *(Block_t**)(a);
     Block_t* real_b = *(Block_t**)(b);
@@ -29,6 +81,7 @@ static int descending_block_height_comparer(const void* a, const void* b){
 
     return real_a->pos.z > real_b->pos.z;
 }
+
 
 void sort_blocks_by_ascending_height(Block_t** blocks, S16 block_count){
     qsort(blocks, block_count, sizeof(*blocks), ascending_block_height_comparer);
@@ -444,7 +497,7 @@ bool player_against_solid_tile(Player_t* player, Direction_t direction, TileMap_
      return tilemap_is_solid(tilemap, pixel_to_coord(pos.pixel));
 }
 
-bool player_against_solid_interactive(Player_t* player, Direction_t direction, QuadTreeNode_t<Interactive_t>* interactive_qt){
+bool player_against_solid_interactive(Player_t* player, Direction_t direction, QuadTreeNode_t<Interactive_t>* interactive_qt, QuadTreeNode_t<Block_t>* block_qt){
      Position_t pos_a;
      Position_t pos_b;
 
@@ -455,6 +508,25 @@ bool player_against_solid_interactive(Player_t* player, Direction_t direction, Q
      if(interactive){
           if(interactive_is_solid(interactive)) return true;
           if(interactive->type == INTERACTIVE_TYPE_PORTAL && interactive->portal.on && player->pos.z > PORTAL_MAX_HEIGHT) return true;
+          if(interactive->type == INTERACTIVE_TYPE_PIT){
+               auto pit_area_filled_in = calculate_pit_area_filled_in(coord, block_qt);
+
+               if(!pit_area_filled_in.bottom_left_filled_in && pixel_in_rect(pos_a.pixel, pit_area_filled_in.bottom_left_corner)){
+                    return true;
+               }
+
+               if(!pit_area_filled_in.bottom_right_filled_in && pixel_in_rect(pos_a.pixel, pit_area_filled_in.bottom_right_corner)){
+                    return true;
+               }
+
+               if(!pit_area_filled_in.top_left_filled_in && pixel_in_rect(pos_a.pixel, pit_area_filled_in.top_left_corner)){
+                    return true;
+               }
+
+               if(!pit_area_filled_in.top_right_filled_in && pixel_in_rect(pos_a.pixel, pit_area_filled_in.top_right_corner)){
+                    return true;
+               }
+          }
      }
 
      coord = pixel_to_coord(pos_b.pixel);
@@ -462,6 +534,25 @@ bool player_against_solid_interactive(Player_t* player, Direction_t direction, Q
      if(interactive){
           if(interactive_is_solid(interactive)) return true;
           if(interactive->type == INTERACTIVE_TYPE_PORTAL && interactive->portal.on && player->pos.z > PORTAL_MAX_HEIGHT) return true;
+          if(interactive->type == INTERACTIVE_TYPE_PIT){
+               auto pit_area_filled_in = calculate_pit_area_filled_in(coord, block_qt);
+
+               if(!pit_area_filled_in.bottom_left_filled_in && pixel_in_rect(pos_b.pixel, pit_area_filled_in.bottom_left_corner)){
+                    return true;
+               }
+
+               if(!pit_area_filled_in.bottom_right_filled_in && pixel_in_rect(pos_b.pixel, pit_area_filled_in.bottom_right_corner)){
+                    return true;
+               }
+
+               if(!pit_area_filled_in.top_left_filled_in && pixel_in_rect(pos_b.pixel, pit_area_filled_in.top_left_corner)){
+                    return true;
+               }
+
+               if(!pit_area_filled_in.top_right_filled_in && pixel_in_rect(pos_b.pixel, pit_area_filled_in.top_right_corner)){
+                    return true;
+               }
+          }
      }
 
      return false;
@@ -685,7 +776,7 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                     }
 
                     if(!would_squish){
-                         would_squish = player_against_solid_interactive(player, check_dir, world->interactive_qt);
+                         would_squish = player_against_solid_interactive(player, check_dir, world->interactive_qt, world->block_qt);
                     }
 
                     // only squish if the block we would be squished against is moving slower, do we stop the block we collided with
@@ -745,7 +836,7 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                     }
 
                     if(!would_squish){
-                         would_squish = player_against_solid_interactive(player, check_dir, world->interactive_qt);
+                         would_squish = player_against_solid_interactive(player, check_dir, world->interactive_qt, world->block_qt);
                     }
 
                     auto group_mass = get_block_mass_in_direction(world, collision.block, collision.dir);
@@ -801,7 +892,7 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                     }
 
                     if(!would_squish){
-                         would_squish = player_against_solid_interactive(player, check_dir, world->interactive_qt);
+                         would_squish = player_against_solid_interactive(player, check_dir, world->interactive_qt, world->block_qt);
                     }
 
                     auto group_mass = get_block_mass_in_direction(world, collision.block, collision.dir);
@@ -859,7 +950,7 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                     }
 
                     if(!would_squish){
-                         would_squish = player_against_solid_interactive(player, check_dir, world->interactive_qt);
+                         would_squish = player_against_solid_interactive(player, check_dir, world->interactive_qt, world->block_qt);
                     }
 
                     auto group_mass = get_block_mass_in_direction(world, collision.block, collision.dir);
@@ -974,70 +1065,39 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
                     bool collided = false;
                     bool empty_pit_or_solid_interactive = true;
                     if(interactive->type == INTERACTIVE_TYPE_PIT){
-                         Rect_t pit_rect = rect_surrounding_coord(coord);
-                         quad_tree_find_in(world->block_qt, pit_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
+                         auto pit_area_filled_in = calculate_pit_area_filled_in(coord, world->block_qt);
 
-                         bool cover_top_left = false;
-                         bool cover_top_right = false;
-                         bool cover_bottom_left = false;
-                         bool cover_bottom_right = false;
-
-                         Rect_t top_left_corner {pit_rect.left, (S16)(pit_rect.bottom + HALF_TILE_SIZE_IN_PIXELS), (S16)(pit_rect.left + HALF_TILE_SIZE_IN_PIXELS - 1), pit_rect.top};
-                         Rect_t top_right_corner {(S16)(pit_rect.left + HALF_TILE_SIZE_IN_PIXELS), (S16)(pit_rect.bottom + HALF_TILE_SIZE_IN_PIXELS), pit_rect.right, pit_rect.top};
-                         Rect_t bottom_left_corner {pit_rect.left, pit_rect.bottom, (S16)(pit_rect.left + HALF_TILE_SIZE_IN_PIXELS - 1), (S16)(pit_rect.bottom + HALF_TILE_SIZE_IN_PIXELS - 1)};
-                         Rect_t bottom_right_corner {(S16)(pit_rect.left + HALF_TILE_SIZE_IN_PIXELS), pit_rect.bottom, pit_rect.right, (S16)(pit_rect.bottom + HALF_TILE_SIZE_IN_PIXELS - 1)};
-
-                         for(S16 b = 0; b < block_count; b++){
-                              if(blocks[b]->pos.z > -HEIGHT_INTERVAL) continue;
-
-                              auto block_rect = block_get_inclusive_rect(blocks[b]);
-
-                              if(!rect_completely_in_rect(block_rect, pit_rect)) continue;
-
-                              if(rect_in_rect(top_left_corner, block_rect)){
-                                  cover_top_left = true;
-                                  empty_pit_or_solid_interactive = false;
-                              }
-                              if(rect_in_rect(top_right_corner, block_rect)){
-                                  cover_top_right = true;
-                                  empty_pit_or_solid_interactive = false;
-                              }
-                              if(rect_in_rect(bottom_left_corner, block_rect)){
-                                  cover_bottom_left = true;
-                                  empty_pit_or_solid_interactive = false;
-                              }
-                              if(rect_in_rect(bottom_right_corner, block_rect)){
-                                  cover_bottom_right = true;
-                                  empty_pit_or_solid_interactive = false;
-                              }
+                         if(pit_area_filled_in.bottom_left_filled_in || pit_area_filled_in.bottom_right_filled_in ||
+                            pit_area_filled_in.top_left_filled_in || pit_area_filled_in.top_right_filled_in){
+                              empty_pit_or_solid_interactive = false;
                          }
 
-                         if(!cover_top_left){
-                             position_slide_against_rect(player_pos, top_left_corner, PLAYER_RADIUS, &result.pos_delta, &collided);
+                         if(!pit_area_filled_in.top_left_filled_in){
+                             position_slide_against_rect(player_pos, pit_area_filled_in.top_left_corner, PLAYER_RADIUS, &result.pos_delta, &collided);
                              if(collided && !result.collided){
                                   result.collided = true;
                                   collided_interactive_dir = direction_between(player_coord, coord);
                              }
                          }
 
-                         if(!cover_top_right){
-                             position_slide_against_rect(player_pos, top_right_corner, PLAYER_RADIUS, &result.pos_delta, &collided);
+                         if(!pit_area_filled_in.top_right_filled_in){
+                             position_slide_against_rect(player_pos, pit_area_filled_in.top_right_corner, PLAYER_RADIUS, &result.pos_delta, &collided);
                              if(collided && !result.collided){
                                   result.collided = true;
                                   collided_interactive_dir = direction_between(player_coord, coord);
                              }
                          }
 
-                         if(!cover_bottom_left){
-                             position_slide_against_rect(player_pos, bottom_left_corner, PLAYER_RADIUS, &result.pos_delta, &collided);
+                         if(!pit_area_filled_in.bottom_left_filled_in){
+                             position_slide_against_rect(player_pos, pit_area_filled_in.bottom_left_corner, PLAYER_RADIUS, &result.pos_delta, &collided);
                              if(collided && !result.collided){
                                   result.collided = true;
                                   collided_interactive_dir = direction_between(player_coord, coord);
                              }
                          }
 
-                         if(!cover_bottom_right){
-                             position_slide_against_rect(player_pos, bottom_right_corner, PLAYER_RADIUS, &result.pos_delta, &collided);
+                         if(!pit_area_filled_in.bottom_right_filled_in){
+                             position_slide_against_rect(player_pos, pit_area_filled_in.bottom_right_corner, PLAYER_RADIUS, &result.pos_delta, &collided);
                              if(collided && !result.collided){
                                   result.collided = true;
                                   collided_interactive_dir = direction_between(player_coord, coord);

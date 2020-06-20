@@ -77,6 +77,10 @@ struct WireCross_t{
      bool on; // can hold a different state than the tile wire state flag
 };
 
+struct Pit_t{
+     S8 id; // just a visual display thing
+};
+
 struct Interactive_t{
      InteractiveType_t type;
      Coord_t coord;
@@ -90,6 +94,7 @@ struct Interactive_t{
           Door_t door;
           Portal_t portal;
           WireCross_t wire_cross;
+          Pit_t pit;
      };
 };
 

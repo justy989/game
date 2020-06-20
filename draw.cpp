@@ -370,8 +370,12 @@ void draw_interactive(Interactive_t* interactive, Vec_t pos_vec, Coord_t coord,
           draw_theme_frame(pos_vec, theme_frame(0, 30));
           break;
      case INTERACTIVE_TYPE_PIT:
-          draw_theme_frame(pos_vec, theme_frame(15, 8));
+     {
+          S8 x = interactive->pit.id % 11;
+          S8 y = interactive->pit.id / 11;
+          draw_theme_frame(pos_vec, theme_frame(1 + x, 30 + y));
           break;
+     }
      }
 }
 
