@@ -980,8 +980,21 @@ bool block_on_ice(Position_t pos, Vec_t pos_delta, BlockCut_t cut, TileMap_t* ti
      return false;
 }
 
+bool block_on_ice(Block_t* block, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt, QuadTreeNode_t<Block_t>* block_qt){
+     return block_on_ice(block_get_position(block), block_get_pos_delta(block), block_get_cut(block), tilemap, interactive_qt, block_qt);
+}
+
 bool block_on_air(Position_t pos, Vec_t pos_delta, BlockCut_t cut, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt, QuadTreeNode_t<Block_t>* block_qt){
-     if(pos.z == 0) return false; // TODO: if we add pits, check for a pit obv
+
+     if(pos.z <= 0){
+          if(pos.z <= -HEIGHT_INTERVAL) return false;
+
+          Pixel_t pixel_to_check = block_get_center(pos, cut).pixel;
+          Coord_t coord_to_check = pixel_to_coord(pixel_to_check);
+
+          Interactive_t* interactive = quad_tree_interactive_find_at(interactive_qt, coord_to_check);
+          if(interactive && interactive->type == INTERACTIVE_TYPE_PIT) return true;
+     }
 
      auto final_pos = pos + pos_delta;
      auto block_center = block_center_pixel(final_pos, cut);
@@ -1000,7 +1013,7 @@ bool block_on_air(Position_t pos, Vec_t pos_delta, BlockCut_t cut, TileMap_t* ti
 }
 
 bool block_on_air(Block_t* block, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt, QuadTreeNode_t<Block_t>* block_qt){
-     return block_on_air(block->pos, block->pos_delta, block->cut, tilemap, interactive_qt, block_qt);
+     return block_on_air(block_get_position(block), block_get_pos_delta(block), block_get_cut(block), tilemap, interactive_qt, block_qt);
 }
 
 void handle_block_on_block_action_horizontal(Position_t block_pos, Vec_t block_pos_delta, Direction_t direction, Position_t collided_block_center, DirectionMask_t collided_block_move_mask,
@@ -1188,8 +1201,7 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
           S16 collided_with_blocks_on_ice = 0;
 
           // TODO: this code might go away with our restructure
-          if(block_on_ice(block_pos, block_pos_delta, cut, &world->tilemap, world->interactive_qt, world->block_qt) ||
-             block_on_air(block_pos, block_pos_delta, cut, &world->tilemap, world->interactive_qt, world->block_qt)){
+          if(block_on_frictionless(block_pos, block_pos_delta, cut, &world->tilemap, world->interactive_qt, world->block_qt)){
                // calculate the momentum if we are on ice for later
                for(S8 i = 0; i < block_inside_result.count; i++){
                     BlockInsideBlockResult_t* inside_entry = block_inside_result.objects + i;
@@ -1278,10 +1290,8 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                     auto inside_block_pos_delta = block_get_pos_delta(inside_entry->block);
                     auto inside_block_cut = block_get_cut(inside_entry->block);
 
-                    if(block_on_ice(inside_block_pos, inside_block_pos_delta,
-                                    inside_block_cut, &world->tilemap, world->interactive_qt, world->block_qt) ||
-                       block_on_air(inside_block_pos, inside_block_pos_delta,
-                                    inside_block_cut, &world->tilemap, world->interactive_qt, world->block_qt)){
+                    if(block_on_frictionless(inside_block_pos, inside_block_pos_delta,
+                                             inside_block_cut, &world->tilemap, world->interactive_qt, world->block_qt)){
                          collided_with_blocks_on_ice++;
                     }
                }
@@ -1327,13 +1337,10 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
 
                // check if they are on a frictionless surface before
                // TODO: create a single function block_on_frictionless(), use it in all the places we do this
-               bool a_on_ice_or_air = block_on_ice(block_pos, result.pos_delta, cut, &world->tilemap, world->interactive_qt, world->block_qt) ||
-                                      block_on_air(block_pos, result.pos_delta, cut, &world->tilemap, world->interactive_qt, world->block_qt);
-               bool b_on_ice_or_air = block_on_ice(inside_block_pos, inside_block_pos_delta,
-                                                   inside_block_cut, &world->tilemap, world->interactive_qt, world->block_qt) ||
-                                      block_on_air(inside_block_pos, inside_block_pos_delta,
-                                                   inside_block_cut, &world->tilemap, world->interactive_qt, world->block_qt);
-               bool both_frictionless = a_on_ice_or_air && b_on_ice_or_air;
+               bool a_on_frictionless = block_on_frictionless(block_pos, result.pos_delta, cut, &world->tilemap, world->interactive_qt, world->block_qt);
+               bool b_on_frictionless = block_on_frictionless(inside_block_pos, inside_block_pos_delta,
+                                                              inside_block_cut, &world->tilemap, world->interactive_qt, world->block_qt);
+               bool both_frictionless = a_on_frictionless && b_on_frictionless;
 
                // TODO: handle multiple block indices
                result.collided = true;
@@ -1381,10 +1388,8 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                     // if positions are diagonal to each other and the rotation between them is odd, check if we are moving into each other
                     if(pos_dimension_delta <= DISTANCE_EPSILON && (block->rotation + entangled_block->rotation + result.collided_portal_rotations) % 2 == 1){
                          // just gtfo if this happens, we handle this case outside this function
-                         bool inside_block_on_frictionless = (block_on_ice(collided_block_pos, collided_block_pos_delta, collided_block_cut,
-                                                                           &world->tilemap, world->interactive_qt, world->block_qt) ||
-                                                              block_on_air(collided_block_pos, collided_block_pos_delta, collided_block_cut,
-                                                                           &world->tilemap, world->interactive_qt, world->block_qt));
+                         bool inside_block_on_frictionless = block_on_frictionless(collided_block_pos, collided_block_pos_delta, collided_block_cut,
+                                                                                   &world->tilemap, world->interactive_qt, world->block_qt);
 
                          switch(move_direction){
                          default:
@@ -1497,10 +1502,8 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
 
                if(block_inside_index != block_index){
                     // TODO: compress with code below, now that we fixed the bug
-                    bool inside_block_on_frictionless = (block_on_ice(collided_block_pos, collided_block_pos_delta, collided_block_cut,
-                                                                      &world->tilemap, world->interactive_qt, world->block_qt) ||
-                                                         block_on_air(collided_block_pos, collided_block_pos_delta, collided_block_cut,
-                                                                      &world->tilemap, world->interactive_qt, world->block_qt));
+                    bool inside_block_on_frictionless = block_on_frictionless(collided_block_pos, collided_block_pos_delta, collided_block_cut,
+                                                                              &world->tilemap, world->interactive_qt, world->block_qt);
 
                     switch(move_direction){
                     default:
@@ -1821,9 +1824,8 @@ void push_entangled_block(Block_t* block, World_t* world, Direction_t push_dir, 
      while(entangle_index != block_index && entangle_index >= 0){
           Block_t* entangled_block = world->blocks.elements + entangle_index;
           bool held_down = block_held_down_by_another_block(entangled_block, world->block_qt, world->interactive_qt, &world->tilemap).held();
-          bool on_ice = block_on_ice(entangled_block->pos, entangled_block->pos_delta, entangled_block->cut,
-                                     &world->tilemap, world->interactive_qt, world->block_qt);
-          if(!held_down || on_ice){
+          bool on_frictionless = block_on_frictionless(entangled_block, &world->tilemap, world->interactive_qt, world->block_qt);
+          if(!held_down || on_frictionless){
                auto rotations_between = direction_rotations_between(static_cast<Direction_t>(entangled_block->rotation), static_cast<Direction_t>(block->rotation));
                Direction_t rotated_dir = direction_rotate_clockwise(push_dir, rotations_between);
 
@@ -1875,9 +1877,8 @@ BlockPushes_t<MAX_BLOCK_PUSHES> push_entangled_block_pushes(Block_t* block, Worl
      while(entangle_index != block_index && entangle_index >= 0){
           Block_t* entangled_block = world->blocks.elements + entangle_index;
           bool held_down = block_held_down_by_another_block(entangled_block, world->block_qt, world->interactive_qt, &world->tilemap).held();
-          bool on_ice = block_on_ice(entangled_block->pos, entangled_block->pos_delta, entangled_block->cut,
-                                     &world->tilemap, world->interactive_qt, world->block_qt);
-          if(!held_down || on_ice){
+          bool on_frictionless = block_on_frictionless(entangled_block, &world->tilemap, world->interactive_qt, world->block_qt);
+          if(!held_down || on_frictionless){
                auto rotations_between = direction_rotations_between(static_cast<Direction_t>(entangled_block->rotation), static_cast<Direction_t>(block->rotation));
                Direction_t rotated_dir = direction_rotate_clockwise(push_dir, rotations_between);
 
@@ -2243,4 +2244,14 @@ BlockChainsResult_t find_block_chain(Block_t* block, Direction_t direction, Quad
      }
 
      return result;
+}
+
+bool block_on_frictionless(Position_t pos, Vec_t pos_delta, BlockCut_t cut, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt,
+                           QuadTreeNode_t<Block_t>* block_qt){
+     return block_on_ice(pos, pos_delta, cut, tilemap, interactive_qt, block_qt) ||
+            block_on_air(pos, pos_delta, cut, tilemap, interactive_qt, block_qt);
+}
+
+bool block_on_frictionless(Block_t* block, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt, QuadTreeNode_t<Block_t>* block_qt){
+     return block_on_frictionless(block_get_position(block), block_get_pos_delta(block), block_get_cut(block), tilemap, interactive_qt, block_qt);
 }

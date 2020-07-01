@@ -389,11 +389,11 @@ bool block_adjacent_pixels_to_check(Position_t pos, Vec_t pos_delta, BlockCut_t 
 
 Block_t* block_against_block_in_list(Position_t pos, BlockCut_t cut, Block_t** blocks, S16 block_count, Direction_t direction, Position_t* portal_offsets);
 Block_t* block_against_another_block(Position_t pos, BlockCut_t cut, Direction_t direction, QuadTreeNode_t<Block_t>* block_qt,
-                                     QuadTreeNode_t<Interactive_t>* interactive_quad_tree, TileMap_t* tilemap, Direction_t* push_dir);
+                                     QuadTreeNode_t<Interactive_t>* interactive_qt, TileMap_t* tilemap, Direction_t* push_dir);
 BlockAgainstOther_t block_diagonally_against_block(Position_t pos, BlockCut_t cut, DirectionMask_t directions, TileMap_t* tilemap,
-                                                   QuadTreeNode_t<Interactive_t>* interactive_quad_tree, QuadTreeNode_t<Block_t>* block_qt);
+                                                   QuadTreeNode_t<Interactive_t>* interactive_qt, QuadTreeNode_t<Block_t>* block_qt);
 BlockAgainstOthersResult_t block_against_other_blocks(Position_t pos, BlockCut_t cut, Direction_t direction, QuadTreeNode_t<Block_t>* block_qt,
-                                                      QuadTreeNode_t<Interactive_t>* interactive_quad_tree, TileMap_t* tilemap, bool require_portal_on = true);
+                                                      QuadTreeNode_t<Interactive_t>* interactive_qt, TileMap_t* tilemap, bool require_portal_on = true);
 Block_t* rotated_entangled_blocks_against_centroid(Block_t* block, Direction_t direction, QuadTreeNode_t<Block_t>* block_qt,
                                                    ObjectArray_t<Block_t>* blocks_array,
                                                    QuadTreeNode_t<Interactive_t>* interactive_qt, TileMap_t* tilemap);
@@ -403,7 +403,7 @@ Interactive_t* block_against_solid_interactive(Block_t* block_to_check, Directio
 BlockInsideOthersResult_t block_inside_others(Position_t block_to_check_pos, Vec_t block_to_check_pos_delta,
                                               BlockCut_t cut, S16 block_to_check_index,
                                               bool block_to_check_cloning, QuadTreeNode_t<Block_t>* block_qt,
-                                              QuadTreeNode_t<Interactive_t>* interactive_quad_tree, TileMap_t* tilemap,
+                                              QuadTreeNode_t<Interactive_t>* interactive_qt, TileMap_t* tilemap,
                                               ObjectArray_t<Block_t>* block_array);
 Tile_t* block_against_solid_tile(Block_t* block_to_check, Direction_t direction, TileMap_t* tilemap);
 Tile_t* block_against_solid_tile(Position_t block_pos, Vec_t pos_delta, BlockCut_t cut, Direction_t direction, TileMap_t* tilemap);
@@ -420,11 +420,16 @@ BlockHeldResult_t block_held_down_by_another_block(Pixel_t block_pixel, S8 block
                                                    QuadTreeNode_t<Block_t>* block_qt, QuadTreeNode_t<Interactive_t>* interactive_qt,
                                                    TileMap_t* tilemap, S16 min_area = 0, bool include_pos_delta = true);
 
-bool block_on_ice(Position_t pos, Vec_t pos_delta, BlockCut_t cut, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree,
+bool block_on_ice(Position_t pos, Vec_t pos_delta, BlockCut_t cut, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt,
                   QuadTreeNode_t<Block_t>* block_qt);
+bool block_on_ice(Block_t* block, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt, QuadTreeNode_t<Block_t>* block_qt);
 
 bool block_on_air(Position_t pos, Vec_t pos_delta, BlockCut_t cut, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt, QuadTreeNode_t<Block_t>* block_qt);
 bool block_on_air(Block_t* block, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt, QuadTreeNode_t<Block_t>* block_qt);
+
+bool block_on_frictionless(Position_t pos, Vec_t pos_delta, BlockCut_t cut, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt,
+                           QuadTreeNode_t<Block_t>* block_qt);
+bool block_on_frictionless(Block_t* block, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt, QuadTreeNode_t<Block_t>* block_qt);
 
 CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t block_pos, Vec_t block_pos_delta, Vec_t block_vel,
                                                                     Vec_t block_accel, BlockCut_t cut, S16 block_stop_on_pixel_x,

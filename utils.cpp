@@ -298,7 +298,7 @@ static bool block_against_grid_locked_solid(Position_t pos, BlockCut_t cut, Dire
      Coord_t adj_coord_a = coord_a - direction;
      Coord_t adj_coord_b = coord_b - direction;
 
-
+     // if the z is below zero, we know we are in a pit
      if(pos.z < 0){
           Interactive_t* interactive_a = quad_tree_find_at(interactive_qt, coord_a.x, coord_a.y);
           Interactive_t* interactive_b = quad_tree_find_at(interactive_qt, coord_b.x, coord_b.y);

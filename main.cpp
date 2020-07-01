@@ -786,17 +786,13 @@ void apply_block_collision(World_t* world, Block_t* block, F32 dt, CheckBlockCol
                               if(move_dir_to_stop == DIRECTION_COUNT){
                                    copy_block_collision_results(block, collision_result);
                               }else{
-                                   bool block_on_ice_or_air = block_on_ice(block_pos, block_pos_delta, block_cut,
-                                                                           &world->tilemap, world->interactive_qt, world->block_qt) ||
-                                                              block_on_air(block_pos, block_pos_delta, block_cut,
-                                                                           &world->tilemap, world->interactive_qt, world->block_qt);
+                                   bool block_is_on_frictionless = block_on_frictionless(block_pos, block_pos_delta, block_cut,
+                                                                                         &world->tilemap, world->interactive_qt, world->block_qt);
 
-                                   bool entangled_block_on_ice_or_air = block_on_ice(entangled_block_pos, entangled_block_pos_delta, entangled_block_cut,
-                                                                                     &world->tilemap, world->interactive_qt, world->block_qt) ||
-                                                                        block_on_air(entangled_block_pos, entangled_block_pos_delta, entangled_block_cut,
-                                                                                     &world->tilemap, world->interactive_qt, world->block_qt);
+                                   bool entangled_block_is_on_frictionless = block_on_frictionless(entangled_block_pos, entangled_block_pos_delta, entangled_block_cut,
+                                                                                                   &world->tilemap, world->interactive_qt, world->block_qt);
 
-                                   if(block_on_ice_or_air && entangled_block_on_ice_or_air){
+                                   if(block_is_on_frictionless && entangled_block_is_on_frictionless){
                                         // TODO: handle this case for blocks not entangled on ice
                                         // TODO: handle pushing blocks diagonally
 
@@ -944,12 +940,10 @@ void generate_pushes_from_collision(World_t* world, CheckBlockCollisionResult_t*
           Vec_t collided_block_pos_delta = block_get_pos_delta(collided_block);
           auto collided_block_cut = block_get_cut(collided_block);
 
-          bool block_on_ice_or_air = block_on_ice(block_pos, block_pos_delta, block_cut, &world->tilemap, world->interactive_qt, world->block_qt) ||
-                                     block_on_air(block_pos, block_pos_delta, block_cut, &world->tilemap, world->interactive_qt, world->block_qt);
-          bool collided_block_on_ice_or_air = block_on_ice(collided_block_pos, collided_block_pos_delta, collided_block_cut, &world->tilemap, world->interactive_qt, world->block_qt) ||
-                                              block_on_air(collided_block_pos, collided_block_pos_delta, collided_block_cut, &world->tilemap, world->interactive_qt, world->block_qt);
+          bool block_is_on_frictionless = block_on_frictionless(block_pos, block_pos_delta, block_cut, &world->tilemap, world->interactive_qt, world->block_qt);
+          bool collided_block_is_on_frictionless = block_on_frictionless(collided_block_pos, collided_block_pos_delta, collided_block_cut, &world->tilemap, world->interactive_qt, world->block_qt);
 
-          if(!block_on_ice_or_air || !collided_block_on_ice_or_air) continue;
+          if(!block_is_on_frictionless || !collided_block_is_on_frictionless) continue;
 
           S16 against_block_count = 0;
           bool should_push = true;
@@ -1013,8 +1007,7 @@ void generate_pushes_from_collision(World_t* world, CheckBlockCollisionResult_t*
                     Vec_t against_block_pos_delta = block_get_pos_delta(against->block);
                     auto against_block_cut = block_get_cut(against->block);
 
-                    all_on_frictionless &= (block_on_ice(against_block_pos, against_block_pos_delta, against_block_cut, &world->tilemap, world->interactive_qt, world->block_qt) ||
-                                            block_on_air(against_block_pos, against_block_pos_delta, against_block_cut, &world->tilemap, world->interactive_qt, world->block_qt));
+                    all_on_frictionless &= block_on_frictionless(against_block_pos, against_block_pos_delta, against_block_cut, &world->tilemap, world->interactive_qt, world->block_qt);
                }
 
                if(!against_block){
@@ -1049,10 +1042,8 @@ void generate_pushes_from_collision(World_t* world, CheckBlockCollisionResult_t*
                Vec_t last_in_chain_pos_delta = block_get_pos_delta(last_block_in_chain);
                auto last_in_chain_cut = block_get_cut(last_block_in_chain);
 
-               bool last_in_chain_on_frictionless = (block_on_ice(last_in_chain_pos, last_in_chain_pos_delta,
-                                                                  last_in_chain_cut, &world->tilemap, world->interactive_qt, world->block_qt) ||
-                                                     block_on_air(last_in_chain_pos, last_in_chain_pos_delta,
-                                                                  last_in_chain_cut, &world->tilemap, world->interactive_qt, world->block_qt));
+               bool last_in_chain_on_frictionless = block_on_frictionless(last_in_chain_pos, last_in_chain_pos_delta,
+                                                                          last_in_chain_cut, &world->tilemap, world->interactive_qt, world->block_qt);
 
                bool being_stopped_by_player = direction_is_horizontal(direction) ?
                                               last_block_in_chain->stopped_by_player_horizontal :
@@ -1145,10 +1136,8 @@ void generate_pushes_from_collision(World_t* world, CheckBlockCollisionResult_t*
                Vec_t last_block_in_chain_pos_delta = block_get_pos_delta(last_block_in_chain);
                BlockCut_t last_block_in_chain_cut = block_get_cut(last_block_in_chain);
 
-               bool last_in_chain_on_frictionless = (block_on_ice(last_block_in_chain_pos, last_block_in_chain_pos_delta,
-                                                                  last_block_in_chain_cut, &world->tilemap, world->interactive_qt, world->block_qt) ||
-                                                     block_on_air(last_block_in_chain_pos, last_block_in_chain_pos_delta,
-                                                                  last_block_in_chain_cut, &world->tilemap, world->interactive_qt, world->block_qt));
+               bool last_in_chain_on_frictionless = block_on_frictionless(last_block_in_chain_pos, last_block_in_chain_pos_delta,
+                                                                          last_block_in_chain_cut, &world->tilemap, world->interactive_qt, world->block_qt);
 
                // if the blocks are headed in the same direction but the block is slowing down for either friction or
                // being stop stopped by the player, slow down with it
@@ -1692,8 +1681,8 @@ void add_entangle_pushes_for_end_of_chain_blocks_on_ice(World_t* world, S16 push
      Vec_t pushee_pos_delta = block_get_pos_delta(pushee);
      BlockCut_t pushee_cut = block_get_cut(pushee);
 
-     if(!block_on_ice(pushee_pos, pushee_pos_delta, pushee_cut, &world->tilemap,
-                      world->interactive_qt, world->block_qt)) return;
+     if(!block_on_frictionless(pushee_pos, pushee_pos_delta, pushee_cut, &world->tilemap,
+                               world->interactive_qt, world->block_qt)) return;
 
      S8 push_rotations = (push->entangle_rotations + push->portal_rotations) % DIRECTION_COUNT;
      DirectionMask_t rotated_direction_mask = direction_mask_rotate_clockwise(push->direction_mask, push_rotations);
@@ -1729,8 +1718,8 @@ void add_entangle_pushes_for_end_of_chain_blocks_on_ice(World_t* world, S16 push
 
                // TODO: what do we set the force value to here ?
                if(!block_pushable(end_block, direction, world, 1.0f)) continue;
-               if(!block_on_ice(against_pos, against_pos_delta, end_block->cut, &world->tilemap,
-                                world->interactive_qt, world->block_qt)) continue;
+               if(!block_on_frictionless(against_pos, against_pos_delta, end_block->cut, &world->tilemap,
+                                         world->interactive_qt, world->block_qt)) continue;
 
                // walk backwards from the end of the chain, find blocks that are entangled with this one and
                // add a push for them. we do this because the pushes need to happen in a certain order.
@@ -4448,7 +4437,7 @@ int main(int argc, char** argv){
                               auto pos = teleport_result.results[block->clone_id].pos;
                               pos.pixel -= block_center_pixel_offset(block->cut);
                               auto pos_delta = teleport_result.results[block->clone_id].delta;
-                              would_teleport_onto_ice = block_on_ice(pos, pos_delta, block->cut, &world.tilemap, world.interactive_qt, world.block_qt);
+                              would_teleport_onto_ice = block_on_frictionless(pos, pos_delta, block->cut, &world.tilemap, world.interactive_qt, world.block_qt);
                          }
 
                          if(block_on_ice(block->pos, block->pos_delta, block->cut, &world.tilemap, world.interactive_qt, world.block_qt) || would_teleport_onto_ice){
@@ -5496,8 +5485,7 @@ int main(int argc, char** argv){
                         if(!block_pushable(pushee, push_rotated_direction, &world, block_push.force)) continue;
 
                         if(entangled_with_all_pushers &&
-                           (block_on_ice(pushee->pos, pushee->pos_delta, pushee->cut, &world.tilemap, world.interactive_qt, world.block_qt) ||
-                            block_on_air(pushee, &world.tilemap, world.interactive_qt, world.block_qt))){
+                           block_on_frictionless(pushee, &world.tilemap, world.interactive_qt, world.block_qt)){
                              auto total_pusher_momentum = get_block_push_pusher_momentum(&block_push, &world, direction);
                              auto pushee_momentum = get_block_momentum(&world, pushee, push_rotated_direction);
                              auto rotated_pushee_vel = rotate_vec_counter_clockwise_to_see_if_negates(pushee_momentum.vel, direction_is_horizontal(push_rotated_direction), block_push_rotations);
