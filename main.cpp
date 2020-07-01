@@ -4419,16 +4419,6 @@ int main(int argc, char** argv){
                          if(block->pos.z <= -HEIGHT_INTERVAL) continue;
 
                          if(block->over_pit){
-                              block->vel.x = 0;
-                              block->vel.y = 0;
-                              block->accel.x = 0;
-                              block->accel.y = 0;
-                              block->pos.decimal.x = 0;
-                              block->pos.decimal.y = 0;
-                              block->pos_delta.x = 0;
-                              block->pos_delta.y = 0;
-                              reset_move(&block->horizontal_move);
-                              reset_move(&block->vertical_move);
                               add_global_tag(TAG_BLOCK_FALLS_IN_PIT);
                          }
 

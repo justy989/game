@@ -298,6 +298,18 @@ static bool block_against_grid_locked_solid(Position_t pos, BlockCut_t cut, Dire
      Coord_t adj_coord_a = coord_a - direction;
      Coord_t adj_coord_b = coord_b - direction;
 
+
+     if(pos.z < 0){
+          Interactive_t* interactive_a = quad_tree_find_at(interactive_qt, coord_a.x, coord_a.y);
+          Interactive_t* interactive_b = quad_tree_find_at(interactive_qt, coord_b.x, coord_b.y);
+
+          if(interactive_a && interactive_a->type == INTERACTIVE_TYPE_PIT && interactive_b && interactive_b->type == INTERACTIVE_TYPE_PIT){
+               return false;
+          }else{
+               return true;
+          }
+     }
+
      Interactive_t* interactive_a = quad_tree_interactive_solid_at(interactive_qt, tilemap, coord_a, pos.z);
      Interactive_t* interactive_b = quad_tree_interactive_solid_at(interactive_qt, tilemap, coord_b, pos.z);
 
