@@ -4375,7 +4375,12 @@ int main(int argc, char** argv){
 
                          if(interactive && interactive->type == INTERACTIVE_TYPE_PIT){
                               auto coord_rect = rect_surrounding_coord(coord);
-                              auto block_rect = block_get_inclusive_rect(block);
+                              auto block_pos = block_get_position(block);
+                              auto block_pos_delta = block_get_pos_delta(block);
+                              auto final_block_pos = block_pos + block_pos_delta;
+                              block_pos.pixel.x = passes_over_pixel(block_pos.pixel.x, final_block_pos.pixel.x);
+                              block_pos.pixel.y = passes_over_pixel(block_pos.pixel.y, final_block_pos.pixel.y);
+                              auto block_rect = block_get_inclusive_rect(block_pos.pixel, block_get_cut(block));
                               if(rect_completely_in_rect(block_rect, coord_rect) &&
                                  !block->held_up){
                                    block->over_pit = true;

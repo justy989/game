@@ -984,18 +984,7 @@ bool block_on_ice(Block_t* block, TileMap_t* tilemap, QuadTreeNode_t<Interactive
      return block_on_ice(block_get_position(block), block_get_pos_delta(block), block_get_cut(block), tilemap, interactive_qt, block_qt);
 }
 
-bool block_on_air(Position_t pos, Vec_t pos_delta, BlockCut_t cut, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt, QuadTreeNode_t<Block_t>* block_qt){
-
-     if(pos.z <= 0){
-          if(pos.z <= -HEIGHT_INTERVAL) return false;
-
-          Pixel_t pixel_to_check = block_get_center(pos, cut).pixel;
-          Coord_t coord_to_check = pixel_to_coord(pixel_to_check);
-
-          Interactive_t* interactive = quad_tree_interactive_find_at(interactive_qt, coord_to_check);
-          if(interactive && interactive->type == INTERACTIVE_TYPE_PIT) return true;
-     }
-
+static bool block_held_up_otherwise_on_air(Position_t pos, Vec_t pos_delta, BlockCut_t cut, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt, QuadTreeNode_t<Block_t>* block_qt){
      auto final_pos = pos + pos_delta;
      auto block_center = block_center_pixel(final_pos, cut);
      auto block_result = block_at_height_in_block_rect(final_pos.pixel, cut, block_qt,
@@ -1010,6 +999,24 @@ bool block_on_air(Position_t pos, Vec_t pos_delta, BlockCut_t cut, TileMap_t* ti
      }
 
      return true;
+}
+
+bool block_on_air(Position_t pos, Vec_t pos_delta, BlockCut_t cut, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt, QuadTreeNode_t<Block_t>* block_qt){
+     if(pos.z <= 0){
+          if(pos.z <= -HEIGHT_INTERVAL) return false;
+
+          Pixel_t pixel_to_check = block_get_center(pos, cut).pixel;
+          Coord_t coord_to_check = pixel_to_coord(pixel_to_check);
+
+          Interactive_t* interactive = quad_tree_interactive_find_at(interactive_qt, coord_to_check);
+          if(interactive && interactive->type == INTERACTIVE_TYPE_PIT){
+               return block_held_up_otherwise_on_air(pos, pos_delta, cut, tilemap, interactive_qt, block_qt);
+          }
+
+          if(pos.z == 0) return false;
+     }
+
+     return block_held_up_otherwise_on_air(pos, pos_delta, cut, tilemap, interactive_qt, block_qt);
 }
 
 bool block_on_air(Block_t* block, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt, QuadTreeNode_t<Block_t>* block_qt){
