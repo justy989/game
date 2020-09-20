@@ -956,6 +956,8 @@ bool block_on_ice(Position_t pos, Vec_t pos_delta, BlockCut_t cut, TileMap_t* ti
                         return true;
                     }
                }
+          }else if(interactive->type == INTERACTIVE_TYPE_PIT && interactive->pit.iced){
+               return pos.z == -HEIGHT_INTERVAL;
           }
      }
 

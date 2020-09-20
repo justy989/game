@@ -9,6 +9,28 @@
 #include <float.h>
 #include <ctype.h>
 
+static void draw_ice(Vec_t pos){
+     glEnd();
+
+     GLint save_texture;
+     glGetIntegerv(GL_TEXTURE_BINDING_2D, &save_texture);
+
+     // get state ready for ice
+     glBindTexture(GL_TEXTURE_2D, 0);
+     glColor4f(196.0f / 255.0f, 217.0f / 255.0f, 1.0f, 0.45f);
+     glBegin(GL_QUADS);
+     glVertex2f(pos.x, pos.y);
+     glVertex2f(pos.x, pos.y + TILE_SIZE);
+     glVertex2f(pos.x + TILE_SIZE, pos.y + TILE_SIZE);
+     glVertex2f(pos.x + TILE_SIZE, pos.y);
+     glEnd();
+
+     // reset state back to default
+     glBindTexture(GL_TEXTURE_2D, save_texture);
+     glBegin(GL_QUADS);
+     glColor3f(1.0f, 1.0f, 1.0f);
+}
+
 Vec_t theme_frame(S16 x, S16 y){
      y = (THEME_FRAMES_TALL - (S16)(1)) - y;
      return Vec_t{(F32)(x) * THEME_FRAME_WIDTH, (F32)(y) * THEME_FRAME_HEIGHT};
@@ -218,9 +240,9 @@ void draw_interactive(Interactive_t* interactive, Vec_t pos_vec, Coord_t coord,
           break;
      case INTERACTIVE_TYPE_PRESSURE_PLATE:
      {
-          S16 frame_x = 7;
-          if(interactive->pressure_plate.down) frame_x++;
-          tex_vec = theme_frame(frame_x, 8);
+          S16 frame_y = 8;
+          if(interactive->pressure_plate.down) frame_y--;
+          tex_vec = theme_frame(7, frame_y);
           draw_theme_frame(pos_vec, tex_vec);
      } break;
      case INTERACTIVE_TYPE_LEVER:
@@ -369,13 +391,6 @@ void draw_interactive(Interactive_t* interactive, Vec_t pos_vec, Coord_t coord,
      case INTERACTIVE_TYPE_CLONE_KILLER:
           draw_theme_frame(pos_vec, theme_frame(0, 30));
           break;
-     case INTERACTIVE_TYPE_PIT:
-     {
-          S8 x = interactive->pit.id % 11;
-          S8 y = interactive->pit.id / 11;
-          draw_theme_frame(pos_vec, theme_frame(1 + x, 30 + y));
-          break;
-     }
      }
 }
 
@@ -424,28 +439,6 @@ void draw_selection(Coord_t selection_start, Coord_t selection_end, Camera_t* ca
      glMatrixMode(GL_PROJECTION);
      glLoadIdentity();
      glOrtho(0.0f, 1.0f, 0.0f, 1.0f, 0.0, 1.0);
-}
-
-static void draw_ice(Vec_t pos){
-     glEnd();
-
-     GLint save_texture;
-     glGetIntegerv(GL_TEXTURE_BINDING_2D, &save_texture);
-
-     // get state ready for ice
-     glBindTexture(GL_TEXTURE_2D, 0);
-     glColor4f(196.0f / 255.0f, 217.0f / 255.0f, 1.0f, 0.45f);
-     glBegin(GL_QUADS);
-     glVertex2f(pos.x, pos.y);
-     glVertex2f(pos.x, pos.y + TILE_SIZE);
-     glVertex2f(pos.x + TILE_SIZE, pos.y + TILE_SIZE);
-     glVertex2f(pos.x + TILE_SIZE, pos.y);
-     glEnd();
-
-     // reset state back to default
-     glBindTexture(GL_TEXTURE_2D, save_texture);
-     glBegin(GL_QUADS);
-     glColor3f(1.0f, 1.0f, 1.0f);
 }
 
 Vec_t draw_player(Player_t* player, Vec_t camera, Coord_t source_coord, Coord_t destination_coord, S8 portal_rotations){
@@ -548,6 +541,15 @@ void draw_flats(Vec_t pos, Tile_t* tile, Interactive_t* interactive, U8 portal_r
           }else if(interactive->type == INTERACTIVE_TYPE_LIGHT_DETECTOR ||
                    interactive->type == INTERACTIVE_TYPE_ICE_DETECTOR){
                draw_interactive(interactive, pos, Coord_t{-1, -1}, nullptr, nullptr);
+          }
+          else if(interactive->type == INTERACTIVE_TYPE_PIT){
+               S8 x = interactive->pit.id % 11;
+               S8 y = interactive->pit.id / 11;
+               draw_theme_frame(pos, theme_frame(1 + x, 30 + y));
+
+               if(interactive->pit.iced){
+                    draw_ice(pos);
+               }
           }
      }
 

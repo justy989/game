@@ -10,7 +10,8 @@
 #include <stdio.h>
 
 // version 4 is just the addition of the thumbnail
-#define MAP_VERSION 6
+// version 7 adds the iced flag to the pit
+#define MAP_VERSION 7
 
 #pragma pack(push, 1)
 struct MapTileV1_t{
@@ -61,6 +62,11 @@ struct PitV1_t{
     S8 id;
 };
 
+struct PitV2_t{
+    S8 id;
+    bool iced;
+};
+
 struct MapInteractiveV1_t{
      InteractiveType_t type;
      Coord_t coord;
@@ -85,10 +91,26 @@ struct MapInteractiveV2_t{
           Detector_t detector;
           MapPopupV1_t popup;
           Stairs_t stairs;
-          MapDoorV1_t door; // up or down
+          MapDoorV1_t door;
           PortalV1_t portal;
           WireCross_t wire_cross;
           PitV1_t pit;
+     };
+};
+
+struct MapInteractiveV3_t{
+     InteractiveType_t type;
+     Coord_t coord;
+
+     union{
+          PressurePlate_t pressure_plate;
+          Detector_t detector;
+          MapPopupV1_t popup;
+          Stairs_t stairs;
+          MapDoorV1_t door;
+          PortalV1_t portal;
+          WireCross_t wire_cross;
+          PitV2_t pit;
      };
 };
 #pragma pack(pop)

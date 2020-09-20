@@ -1373,6 +1373,11 @@ static void impact_ice(Coord_t center, S8 height, S16 radius, World_t* world, bo
                                              }
                                         }
                                         break;
+                                   case INTERACTIVE_TYPE_PIT:
+                                        if(height <= 0){
+                                             interactive->pit.iced = spread_the_ice;
+                                        }
+                                        break;
                                    default:
                                         break;
                                    }
@@ -2375,6 +2380,7 @@ void describe_coord(Coord_t coord, World_t* world){
                break;
           case INTERACTIVE_TYPE_PIT:
                type_string = "PIT";
+               snprintf(info_string, info_string_len, "iced: %d", interactive->pit.iced);
                break;
           }
 

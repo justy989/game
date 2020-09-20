@@ -81,6 +81,11 @@ bool interactive_equal(const Interactive_t* a, const Interactive_t* b){
                return false;
           }
           break;
+     case INTERACTIVE_TYPE_PIT:
+          if(a->pit.iced != b->pit.iced){
+               return false;
+          }
+          break;
      }
 
      return true;

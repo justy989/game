@@ -79,6 +79,7 @@ struct WireCross_t{
 
 struct Pit_t{
      S8 id; // just a visual display thing
+     bool iced;
 };
 
 struct Interactive_t{
