@@ -5930,6 +5930,40 @@ int main(int argc, char** argv){
                     }
                }
 
+               {
+                    glEnd();
+
+                    GLint save_texture;
+                    glGetIntegerv(GL_TEXTURE_BINDING_2D, &save_texture);
+                    glBindTexture(GL_TEXTURE_2D, 0);
+
+                    // draw ice on pits
+                    for(S16 y = max.y; y >= min.y; y--){
+                         for(S16 x = min.x; x <= max.x; x++){
+                              Interactive_t* interactive = quad_tree_find_at(world.interactive_qt, x, y);
+                              if(interactive && interactive->type == INTERACTIVE_TYPE_PIT){
+                                   auto draw_pos = Vec_t{(float)(x) * TILE_SIZE, (float)(y) * TILE_SIZE} + camera.world_offset;
+                                   if(interactive->pit.iced){
+                                        draw_pos.y -= (PIXEL_SIZE * HEIGHT_INTERVAL);
+
+                                        Quad_t quad;
+                                        quad.left = draw_pos.x;
+                                        quad.right = draw_pos.x + TILE_SIZE;
+                                        quad.top = draw_pos.y;
+                                        quad.bottom = draw_pos.y + TILE_SIZE;
+
+                                        draw_color_quad(quad, 196.0f / 255.0f, 217.0f / 255.0f, 1.0f, 0.45f);
+                                        draw_color_quad(quad, 0.0f, 0.0f, 0.0f, 0.3f);
+                                   }
+                              }
+                         }
+                    }
+
+                    glBindTexture(GL_TEXTURE_2D, save_texture);
+                    glBegin(GL_QUADS);
+                    glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+               }
+
                for(S16 y = max.y; y >= min.y; y--){
                     draw_world_row_flats(y, min.x, max.x, &world.tilemap, world.interactive_qt, camera.world_offset);
 

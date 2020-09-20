@@ -10,21 +10,38 @@
 #include <ctype.h>
 #include <math.h>
 
+void draw_color_quad(Quad_t quad, F32 r, F32 g, F32 b, F32 a){
+     glBegin(GL_QUADS);
+     glColor4f(r, g, b, a);
+     glVertex2f(quad.left,  quad.top);
+     glVertex2f(quad.left,  quad.bottom);
+     glVertex2f(quad.right, quad.bottom);
+     glVertex2f(quad.right, quad.top);
+     glEnd();
+}
+
 static void draw_ice(Vec_t pos){
      glEnd();
 
      GLint save_texture;
      glGetIntegerv(GL_TEXTURE_BINDING_2D, &save_texture);
 
+     Quad_t quad;
+     quad.left = pos.x;
+     quad.bottom = pos.y;
+     quad.right = pos.x + TILE_SIZE;
+     quad.top = pos.y + TILE_SIZE;
+
      // get state ready for ice
      glBindTexture(GL_TEXTURE_2D, 0);
-     glColor4f(196.0f / 255.0f, 217.0f / 255.0f, 1.0f, 0.45f);
-     glBegin(GL_QUADS);
-     glVertex2f(pos.x, pos.y);
-     glVertex2f(pos.x, pos.y + TILE_SIZE);
-     glVertex2f(pos.x + TILE_SIZE, pos.y + TILE_SIZE);
-     glVertex2f(pos.x + TILE_SIZE, pos.y);
-     glEnd();
+     draw_color_quad(quad, 196.0f / 255.0f, 217.0f / 255.0f, 1.0f, 0.45f);
+     // glColor4f(196.0f / 255.0f, 217.0f / 255.0f, 1.0f, 0.45f);
+     // glBegin(GL_QUADS);
+     // glVertex2f(pos.x, pos.y);
+     // glVertex2f(pos.x, pos.y + TILE_SIZE);
+     // glVertex2f(pos.x + TILE_SIZE, pos.y + TILE_SIZE);
+     // glVertex2f(pos.x + TILE_SIZE, pos.y);
+     // glEnd();
 
      // reset state back to default
      glBindTexture(GL_TEXTURE_2D, save_texture);
@@ -32,24 +49,17 @@ static void draw_ice(Vec_t pos){
      glColor3f(1.0f, 1.0f, 1.0f);
 }
 
-static void draw_opaque_quad(Quad_t quad, float opacity){
+static void draw_opaque_quad(Quad_t quad, F32 opacity){
      glEnd();
 
      GLint save_texture;
      glGetIntegerv(GL_TEXTURE_BINDING_2D, &save_texture);
 
-     glBindTexture(GL_TEXTURE_2D, 0);
-     glBegin(GL_QUADS);
-     glColor4f(0.0f, 0.0f, 0.0f, opacity);
-     glVertex2f(quad.left,  quad.top);
-     glVertex2f(quad.left,  quad.bottom);
-     glVertex2f(quad.right, quad.bottom);
-     glVertex2f(quad.right, quad.top);
-     glEnd();
+     draw_color_quad(quad, 0.0f, 0.0f, 0.0f, opacity);
 
      glBindTexture(GL_TEXTURE_2D, save_texture);
      glBegin(GL_QUADS);
-     glColor3f(1.0f, 1.0f, 1.0f);
+     glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
 }
 
 Vec_t theme_frame(S16 x, S16 y){
@@ -232,11 +242,6 @@ void draw_block(Block_t* block, Vec_t pos_vec, U8 portal_rotations){
           draw_double_theme_frame(pos_vec, tex_vec);
      }
 
-     if(block->entangle_index >= 0){
-          tex_vec = theme_frame(0, 22);
-          draw_theme_frame(pos_vec, tex_vec);
-     }
-
      // For the shadow on the ground under the block. The shadow extends to the ground and overlays other blocks'
      // shadows causing the darker and darker effect
      if(block->pos.z > 0){
@@ -257,6 +262,11 @@ void draw_block(Block_t* block, Vec_t pos_vec, U8 portal_rotations){
           glColor4f(0.0f, 0.0f, 0.0f, fade * block_shadow_opacity);
           draw_double_theme_frame(pos_vec, tex_vec);
           glColor3f(1.0f, 1.0f, 1.0f);
+     }
+
+     if(block->entangle_index >= 0){
+          tex_vec = theme_frame(0, 22);
+          draw_theme_frame(pos_vec, tex_vec);
      }
 }
 
@@ -424,10 +434,6 @@ void draw_interactive(Interactive_t* interactive, Vec_t pos_vec, Coord_t coord,
           S8 x = interactive->pit.id % 11;
           S8 y = interactive->pit.id / 11;
           draw_theme_frame(pos_vec, theme_frame(1 + x, 30 + y));
-
-          if(interactive->pit.iced){
-               draw_ice(pos_vec);
-          }
      } break;
      }
 }
