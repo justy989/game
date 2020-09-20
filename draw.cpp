@@ -8,6 +8,7 @@
 
 #include <float.h>
 #include <ctype.h>
+#include <math.h>
 
 static void draw_ice(Vec_t pos){
      glEnd();
@@ -26,6 +27,26 @@ static void draw_ice(Vec_t pos){
      glEnd();
 
      // reset state back to default
+     glBindTexture(GL_TEXTURE_2D, save_texture);
+     glBegin(GL_QUADS);
+     glColor3f(1.0f, 1.0f, 1.0f);
+}
+
+static void draw_opaque_quad(Quad_t quad, float opacity){
+     glEnd();
+
+     GLint save_texture;
+     glGetIntegerv(GL_TEXTURE_BINDING_2D, &save_texture);
+
+     glBindTexture(GL_TEXTURE_2D, 0);
+     glBegin(GL_QUADS);
+     glColor4f(0.0f, 0.0f, 0.0f, opacity);
+     glVertex2f(quad.left,  quad.top);
+     glVertex2f(quad.left,  quad.bottom);
+     glVertex2f(quad.right, quad.bottom);
+     glVertex2f(quad.right, quad.top);
+     glEnd();
+
      glBindTexture(GL_TEXTURE_2D, save_texture);
      glBegin(GL_QUADS);
      glColor3f(1.0f, 1.0f, 1.0f);
@@ -174,6 +195,17 @@ void draw_tile_flags(U16 flags, Vec_t tile_pos){
 void draw_block(Block_t* block, Vec_t pos_vec, U8 portal_rotations){
      static const F32 block_shadow_opacity = 0.3f;
 
+     // draw a shadow below the block when we are on the bottom of the pit
+     if(block->pos.z == -HEIGHT_INTERVAL){
+          Quad_t quad;
+          quad.left = pos_vec.x - PIXEL_SIZE;
+          quad.right = pos_vec.x + (F32)(TILE_SIZE_IN_PIXELS) * PIXEL_SIZE + PIXEL_SIZE;
+          quad.top = pos_vec.y - PIXEL_SIZE;
+          quad.bottom = pos_vec.y + (F32)(TILE_SIZE_IN_PIXELS) * PIXEL_SIZE;
+
+          draw_opaque_quad(quad, block_shadow_opacity * 0.5f);
+     }
+
      Vec_t tex_vec = vec_zero();
      if(block->cut == BLOCK_CUT_WHOLE){
          U8 rotation = (block->rotation + portal_rotations) % static_cast<U8>(DIRECTION_COUNT);
@@ -205,29 +237,25 @@ void draw_block(Block_t* block, Vec_t pos_vec, U8 portal_rotations){
           draw_theme_frame(pos_vec, tex_vec);
      }
 
+     // For the shadow on the ground under the block. The shadow extends to the ground and overlays other blocks'
+     // shadows causing the darker and darker effect
      if(block->pos.z > 0){
           Quad_t quad;
           quad.left = pos_vec.x;
-          quad.right = pos_vec.x + (F32)(TILE_SIZE_IN_PIXELS) * PIXEL_SIZE;;
+          quad.right = pos_vec.x + (F32)(TILE_SIZE_IN_PIXELS) * PIXEL_SIZE;
           quad.top = pos_vec.y;
           quad.bottom = pos_vec.y - (F32)(block->pos.z) * PIXEL_SIZE;
 
-          glEnd();
+          draw_opaque_quad(quad, block_shadow_opacity);
+     }
 
-          GLint save_texture;
-          glGetIntegerv(GL_TEXTURE_BINDING_2D, &save_texture);
+     // TODO: make the shadow appear over the pit
 
-          glBindTexture(GL_TEXTURE_2D, 0);
-          glBegin(GL_QUADS);
-          glColor4f(0.0f, 0.0f, 0.0f, block_shadow_opacity);
-          glVertex2f(quad.left,  quad.top);
-          glVertex2f(quad.left,  quad.bottom);
-          glVertex2f(quad.right, quad.bottom);
-          glVertex2f(quad.right, quad.top);
-          glEnd();
-
-          glBindTexture(GL_TEXTURE_2D, save_texture);
-          glBegin(GL_QUADS);
+     // when the block falls into a pit, fade it to darker
+     if(block->pos.z < 0){
+          F32 fade = (F32)(block->pos.z) / (F32)(-HEIGHT_INTERVAL);
+          glColor4f(0.0f, 0.0f, 0.0f, fade * block_shadow_opacity);
+          draw_double_theme_frame(pos_vec, tex_vec);
           glColor3f(1.0f, 1.0f, 1.0f);
      }
 }
@@ -391,6 +419,16 @@ void draw_interactive(Interactive_t* interactive, Vec_t pos_vec, Coord_t coord,
      case INTERACTIVE_TYPE_CLONE_KILLER:
           draw_theme_frame(pos_vec, theme_frame(0, 30));
           break;
+     case INTERACTIVE_TYPE_PIT:
+     {
+          S8 x = interactive->pit.id % 11;
+          S8 y = interactive->pit.id / 11;
+          draw_theme_frame(pos_vec, theme_frame(1 + x, 30 + y));
+
+          if(interactive->pit.iced){
+               draw_ice(pos_vec);
+          }
+     } break;
      }
 }
 
@@ -504,7 +542,11 @@ Vec_t draw_player(Player_t* player, Vec_t camera, Coord_t source_coord, Coord_t 
 }
 
 void draw_flats(Vec_t pos, Tile_t* tile, Interactive_t* interactive, U8 portal_rotations){
-     draw_tile_id(tile->id, pos);
+     if(interactive && interactive->type == INTERACTIVE_TYPE_PIT){
+          // don't draw tile if there is a pit
+     }else{
+          draw_tile_id(tile->id, pos);
+     }
 
      U16 tile_flags = tile->flags;
      for(U8 i = 0; i < portal_rotations; i++){
@@ -541,15 +583,6 @@ void draw_flats(Vec_t pos, Tile_t* tile, Interactive_t* interactive, U8 portal_r
           }else if(interactive->type == INTERACTIVE_TYPE_LIGHT_DETECTOR ||
                    interactive->type == INTERACTIVE_TYPE_ICE_DETECTOR){
                draw_interactive(interactive, pos, Coord_t{-1, -1}, nullptr, nullptr);
-          }
-          else if(interactive->type == INTERACTIVE_TYPE_PIT){
-               S8 x = interactive->pit.id % 11;
-               S8 y = interactive->pit.id / 11;
-               draw_theme_frame(pos, theme_frame(1 + x, 30 + y));
-
-               if(interactive->pit.iced){
-                    draw_ice(pos);
-               }
           }
      }
 
@@ -626,6 +659,7 @@ void draw_solid_interactive(Coord_t src_coord, Coord_t dst_coord, TileMap_t* til
      if(interactive->type == INTERACTIVE_TYPE_PRESSURE_PLATE ||
         interactive->type == INTERACTIVE_TYPE_ICE_DETECTOR ||
         interactive->type == INTERACTIVE_TYPE_LIGHT_DETECTOR ||
+        interactive->type == INTERACTIVE_TYPE_PIT ||
         (interactive->type == INTERACTIVE_TYPE_POPUP && interactive->popup.lift.ticks == 1)){
           // pass
      }else{
@@ -649,13 +683,14 @@ void draw_world_row_solids(S16 y, S16 x_start, S16 x_end, TileMap_t* tilemap, Qu
                                (S16)((y * TILE_SIZE_IN_PIXELS) + TILE_SIZE_IN_PIXELS)};
 
      S16 block_count = 0;
-     Block_t* blocks[256]; // oh god i hope we don't need more than that?
+     Block_t* blocks[256]; // TODO: oh god i hope we don't need more than that?
      quad_tree_find_in(block_qt, search_rect, blocks, &block_count, 256);
 
      sort_blocks_by_descending_height(blocks, block_count);
 
      for(S16 i = 0; i < block_count; i++){
           auto block = blocks[i];
+          if(block->pos.z < 0) continue;
           auto draw_block_pos = block->pos;
           draw_block_pos.pixel.y += block->pos.z;
           draw_block(block, pos_to_vec(draw_block_pos) + camera, 0);

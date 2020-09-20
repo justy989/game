@@ -5918,8 +5918,40 @@ int main(int argc, char** argv){
                glBegin(GL_QUADS);
                glColor3f(1.0f, 1.0f, 1.0f);
 
+               // draw pits in our first pass
+               for(S16 y = max.y; y >= min.y; y--){
+                    for(S16 x = min.x; x <= max.x; x++){
+                         Coord_t coord{x, y};
+                         Interactive_t* interactive = quad_tree_find_at(world.interactive_qt, x, y);
+                         if(interactive && interactive->type == INTERACTIVE_TYPE_PIT){
+                              auto draw_pos = Vec_t{(float)(x) * TILE_SIZE, (float)(y) * TILE_SIZE} + camera.world_offset;
+                              draw_interactive(interactive, draw_pos, coord, &world.tilemap, world.interactive_qt);
+                         }
+                    }
+               }
+
                for(S16 y = max.y; y >= min.y; y--){
                     draw_world_row_flats(y, min.x, max.x, &world.tilemap, world.interactive_qt, camera.world_offset);
+
+                    // TODO: compress with logic in draw_world_row_solids()
+                    auto search_rect = Rect_t{(S16)(min.x * TILE_SIZE_IN_PIXELS), (S16)(y * TILE_SIZE_IN_PIXELS),
+                                              (S16)((max.x * TILE_SIZE_IN_PIXELS) + TILE_SIZE_IN_PIXELS),
+                                              (S16)((y * TILE_SIZE_IN_PIXELS) + TILE_SIZE_IN_PIXELS)};
+
+                    S16 block_count = 0;
+                    Block_t* blocks[256]; // TODO: oh god i hope we don't need more than that?
+                    quad_tree_find_in(world.block_qt, search_rect, blocks, &block_count, 256);
+
+                    sort_blocks_by_descending_height(blocks, block_count);
+
+                    for(S16 i = 0; i < block_count; i++){
+                         auto block = blocks[i];
+                         if(block->pos.z >= 0) continue;
+
+                         auto draw_block_pos = block->pos;
+                         draw_block_pos.pixel.y += block->pos.z;
+                         draw_block(block, pos_to_vec(draw_block_pos) + camera.world_offset, 0);
+                    }
                }
 
                for(S16 y = max.y; y >= min.y; y--){
@@ -6008,7 +6040,7 @@ int main(int argc, char** argv){
 
                glEnd();
 
-#if 1
+#if 0
                // light
                glBindTexture(GL_TEXTURE_2D, 0);
                glBegin(GL_QUADS);
