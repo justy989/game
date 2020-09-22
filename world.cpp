@@ -2009,9 +2009,7 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
      BlockPushResult_t result {};
      auto against_result = block_against_other_blocks(pos + pos_delta, block->cut, direction, world->block_qt, world->interactive_qt,
                                                       &world->tilemap);
-     // bool both_on_ice = false;
-     bool pushed_block_on_ice = block_on_ice(pos, pos_delta, block->cut, &world->tilemap, world->interactive_qt, world->block_qt);
-     // bool transfers_force = false;
+     bool pushed_block_on_frictionless = block_on_frictionless(pos, pos_delta, block->cut, &world->tilemap, world->interactive_qt, world->block_qt);
 
      F32 block_push_vel = 0;
      F32 save_block_push_vel = 0;
@@ -2031,7 +2029,7 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
           MoveDirection_t move_direction = move_direction_from_directions(direction, DIRECTION_COUNT);
 
           for(S16 i = 0; i < against_result.count; i++){
-               if(!resolve_push_against_block(block, move_direction, pushed_by_ice, pushed_block_on_ice, force,
+               if(!resolve_push_against_block(block, move_direction, pushed_by_ice, pushed_block_on_frictionless, force,
                                               instant_momentum, from_entangler, against_result.objects + i, against_result.count,
                                               world, &result, &transfers_force)){
                     return result;
@@ -2050,7 +2048,7 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
                auto against = block_diagonally_against_block(pos + pos_delta, block->cut, directions, &world->tilemap, world->interactive_qt, world->block_qt);
                if(against.block != NULL){
                     MoveDirection_t move_direction = move_direction_from_directions(direction, vertical_direction);
-                    if(!resolve_push_against_block(block, move_direction, pushed_by_ice, pushed_block_on_ice, force, instant_momentum,
+                    if(!resolve_push_against_block(block, move_direction, pushed_by_ice, pushed_block_on_frictionless, force, instant_momentum,
                                                    from_entangler, &against, 1, world, &result, &transfers_force)){
                          return result;
                     }
@@ -2065,7 +2063,7 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
                auto against = block_diagonally_against_block(pos + pos_delta, block->cut, directions, &world->tilemap, world->interactive_qt, world->block_qt);
                if(against.block != NULL){
                     MoveDirection_t move_direction = move_direction_from_directions(horizontal_direction, direction);
-                    if(!resolve_push_against_block(block, move_direction, pushed_by_ice, pushed_block_on_ice, force, instant_momentum,
+                    if(!resolve_push_against_block(block, move_direction, pushed_by_ice, pushed_block_on_frictionless, force, instant_momentum,
                                                    from_entangler, &against, 1, world, &result, &transfers_force)){
                          return result;
                     }
@@ -2138,7 +2136,7 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
      }
 
      // if are sliding on ice and are pushed in the opposite direction then stop
-     if(pushed_block_on_ice && !instant_momentum && from_entangler){
+     if(pushed_block_on_frictionless && !instant_momentum && from_entangler){
           switch(direction){
           default:
                break;
