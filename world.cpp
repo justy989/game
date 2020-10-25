@@ -1831,6 +1831,8 @@ bool resolve_push_against_block(Block_t* block, MoveDirection_t move_direction, 
      bool on_ice = false;
      bool both_on_ice = false;
 
+     bool are_entangled = blocks_are_entangled(block, against_block, &world->blocks);
+
      if(against_block == block){
           if(pushed_by_ice && block_on_ice(against_block->pos, against_block->pos_delta, against_block->cut,
                                            &world->tilemap, world->interactive_qt, world->block_qt)){
@@ -1840,6 +1842,9 @@ bool resolve_push_against_block(Block_t* block, MoveDirection_t move_direction, 
           }
      }else if((on_ice = block_on_ice(against_block->pos, against_block->pos_delta, against_block->cut,
                                      &world->tilemap, world->interactive_qt, world->block_qt))){
+          // if the block originally pushed is not on ice, we don't push this one either
+          if(!pushed_block_on_ice && !are_entangled) return false;
+
           if(pushed_block_on_ice) both_on_ice = true;
 
           if(pushed_by_ice && instant_momentum){
@@ -1909,8 +1914,6 @@ bool resolve_push_against_block(Block_t* block, MoveDirection_t move_direction, 
                     }
                }
           }else if(pushed_block_on_ice){
-               bool are_entangled = blocks_are_entangled(block, against_block, &world->blocks);
-
                if(are_entangled){
                     // if they are opposite entangled (potentially through a portal) then they just push into each other
                     S8 total_collided_rotations = direction_rotations_between(first_direction, first_against_block_push_dir) + against_block->rotation;
