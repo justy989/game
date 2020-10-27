@@ -247,7 +247,7 @@ bool init(Editor_t* editor){
      interactive_pressure_plate_category->elements[1].elements[0].interactive.pressure_plate.iced_under = true;
 
      auto* interactive_popup_category = editor->category_array.elements + EDITOR_CATEGORY_INTERACTIVE_POPUP;
-     init(interactive_popup_category, 2);
+     init(interactive_popup_category, 4);
      init(interactive_popup_category->elements, 1);
      interactive_popup_category->elements[0].elements[0].type = STAMP_TYPE_INTERACTIVE;
      interactive_popup_category->elements[0].elements[0].interactive.type = INTERACTIVE_TYPE_POPUP;
@@ -258,6 +258,18 @@ bool init(Editor_t* editor){
      interactive_popup_category->elements[1].elements[0].interactive.type = INTERACTIVE_TYPE_POPUP;
      interactive_popup_category->elements[1].elements[0].interactive.popup.lift.ticks = 1;
      interactive_popup_category->elements[1].elements[0].interactive.popup.lift.up = false;
+     init(interactive_popup_category->elements + 2, 2);
+     interactive_popup_category->elements[2].elements[0].type = STAMP_TYPE_INTERACTIVE;
+     interactive_popup_category->elements[2].elements[0].interactive.type = INTERACTIVE_TYPE_POPUP;
+     interactive_popup_category->elements[2].elements[0].interactive.popup.lift.ticks = HEIGHT_INTERVAL + 1;
+     interactive_popup_category->elements[2].elements[0].interactive.popup.lift.up = true;
+     interactive_popup_category->elements[2].elements[0].interactive.popup.iced    = true;
+     init(interactive_popup_category->elements + 3, 1);
+     interactive_popup_category->elements[3].elements[0].type = STAMP_TYPE_INTERACTIVE;
+     interactive_popup_category->elements[3].elements[0].interactive.type = INTERACTIVE_TYPE_POPUP;
+     interactive_popup_category->elements[3].elements[0].interactive.popup.lift.ticks = 1;
+     interactive_popup_category->elements[3].elements[0].interactive.popup.lift.up = false;
+     interactive_popup_category->elements[3].elements[0].interactive.popup.iced    = true;
 
      auto* interactive_door_category = editor->category_array.elements + EDITOR_CATEGORY_INTERACTIVE_DOOR;
      init(interactive_door_category, 8);

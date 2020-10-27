@@ -293,6 +293,14 @@ void draw_interactive(Interactive_t* interactive, Vec_t pos_vec, Coord_t coord,
      case INTERACTIVE_TYPE_POPUP:
           tex_vec = theme_frame(interactive->popup.lift.ticks - (S16)(1), 8);
           draw_double_theme_frame(pos_vec, tex_vec);
+          if(interactive->popup.iced){
+               tex_vec = theme_frame(8, 8);
+               glColor4f(1.0f, 1.0f, 1.0f, 0.5f);
+               Vec_t ice_pos_vec = pos_vec;
+               ice_pos_vec.y += (F32)(interactive->popup.lift.ticks - 1) * PIXEL_SIZE;
+               draw_double_theme_frame(ice_pos_vec, tex_vec);
+               glColor3f(1.0f, 1.0f, 1.0f);
+          }
           break;
      case INTERACTIVE_TYPE_DOOR:
           tex_vec = theme_frame(interactive->door.lift.ticks + (S16)(8), (S16)(11) + interactive->door.face);
@@ -578,14 +586,6 @@ void draw_flats(Vec_t pos, Tile_t* tile, Interactive_t* interactive, U8 portal_r
                draw_interactive(interactive, pos, Coord_t{-1, -1}, nullptr, nullptr);
           }else if(interactive->type == INTERACTIVE_TYPE_POPUP && interactive->popup.lift.ticks == 1){
                draw_interactive(interactive, pos, Coord_t{-1, -1}, nullptr, nullptr);
-
-               if(interactive->popup.iced){
-                    pos.y += interactive->popup.lift.ticks * PIXEL_SIZE;
-                    Vec_t tex_vec = theme_frame(3, 12);
-                    glColor4f(1.0f, 1.0f, 1.0f, 0.5f);
-                    draw_theme_frame(pos, tex_vec);
-                    glColor3f(1.0f, 1.0f, 1.0f);
-               }
           }else if(interactive->type == INTERACTIVE_TYPE_LIGHT_DETECTOR ||
                    interactive->type == INTERACTIVE_TYPE_ICE_DETECTOR){
                draw_interactive(interactive, pos, Coord_t{-1, -1}, nullptr, nullptr);
