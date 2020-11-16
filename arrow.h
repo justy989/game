@@ -45,3 +45,4 @@ struct ArrowArray_t{
 
 bool init(ArrowArray_t* arrow_array);
 Arrow_t* arrow_spawn(ArrowArray_t* arrow_array, Position_t pos, Direction_t face);
+void init_arrow(Arrow_t* arrow);

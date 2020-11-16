@@ -2849,6 +2849,7 @@ int main(int argc, char** argv){
                                    map_number_filepath = load_result.filepath;
 
                                    if(load_map_number_demo(&play_demo, map_number, &frame_count)){
+                                        init(&world.arrows);
                                         continue; // reset to the top of the loop
                                    }else{
                                         return 1;
