@@ -145,7 +145,10 @@ void undo_commit(Undo_t* undo, ObjectArray_t<Player_t>* players, TileMap_t* tile
      // don't save undo if any blocks are moving, or doors are opening
      if(!ignore_moving_stuff){
           for(S16 i = 0; i < blocks->count; i++){
-               if(blocks->elements[i].vel.x != 0.0f || blocks->elements[i].vel.y != 0.0f) return;
+               Block_t* block = blocks->elements + i;
+               if(block->vel.x != 0.0f || block->vel.y != 0.0f ||
+                  block->horizontal_move.state == MOVE_STATE_STARTING ||
+                  block->vertical_move.state == MOVE_STATE_STARTING) return;
           }
 
           for(S16 i = 0; i < interactives->count; i++){
