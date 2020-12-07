@@ -4005,7 +4005,7 @@ int main(int argc, char** argv){
 
                     if(player_action.undo){
                          undo_commit(&undo, &world.players, &world.tilemap, &world.blocks, &world.interactives, true);
-                         undo_revert(&undo, &world.players, &world.tilemap, &world.blocks, &world.interactives);
+                         undo_revert(&undo, &world.players, &world.tilemap, &world.blocks, &world.interactives, player->has_bow);
                          quad_tree_free(world.interactive_qt);
                          world.interactive_qt = quad_tree_build(&world.interactives);
                          quad_tree_free(world.block_qt);

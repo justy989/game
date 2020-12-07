@@ -24,6 +24,7 @@ struct UndoPlayer_t{
      Vec_t decimal;
      S8 z;
      Direction_t face;
+     U8 rotation;
 };
 
 enum UndoDiffType_t : U8{
@@ -71,4 +72,4 @@ void undo_snapshot(Undo_t* undo, ObjectArray_t<Player_t>* players, TileMap_t* ti
 void undo_commit(Undo_t* undo, ObjectArray_t<Player_t>* players, TileMap_t* tilemap, ObjectArray_t<Block_t>* blocks,
                  ObjectArray_t<Interactive_t>* interactives, bool ignore_moving_stuff = false);
 void undo_revert(Undo_t* undo, ObjectArray_t<Player_t>* players, TileMap_t* tilemap, ObjectArray_t<Block_t>* blocks,
-                 ObjectArray_t<Interactive_t>* interactives);
+                 ObjectArray_t<Interactive_t>* interactives, bool has_bow);

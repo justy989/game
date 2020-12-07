@@ -102,6 +102,7 @@ void undo_snapshot(Undo_t* undo, ObjectArray_t<Player_t>* players, TileMap_t* ti
           undo_player->decimal = player->pos.decimal;
           undo_player->z = player->pos.z;
           undo_player->face = player->face;
+          undo_player->rotation = player->rotation;
      }
 
      for(S16 y = 0; y < tilemap->height; y++){
@@ -367,7 +368,7 @@ void undo_commit(Undo_t* undo, ObjectArray_t<Player_t>* players, TileMap_t* tile
 }
 
 void undo_revert(Undo_t* undo, ObjectArray_t<Player_t>* players, TileMap_t* tilemap, ObjectArray_t<Block_t>* blocks,
-                 ObjectArray_t<Interactive_t>* interactives){
+                 ObjectArray_t<Interactive_t>* interactives, bool has_bow){
      if(undo->history.current <= undo->history.start) return;
 
      auto* ptr = (char*)(undo->history.current);
@@ -395,7 +396,8 @@ void undo_revert(Undo_t* undo, ObjectArray_t<Player_t>* players, TileMap_t* tile
                player->pos.decimal = player_entry->decimal;
                player->pos.z = player_entry->z;
                player->face = player_entry->face;
-               player->has_bow = true;
+               player->has_bow = has_bow;
+               player->rotation = player_entry->rotation;
           } break;
           case UNDO_DIFF_TYPE_TILE_FLAGS:
           {
