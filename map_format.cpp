@@ -1126,6 +1126,7 @@ bool load_map_from_file(FILE* file, Coord_t* player_start, TileMap_t* tilemap, O
 
 bool load_map(const char* filepath, Coord_t* player_start, TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array,
               ObjectArray_t<Interactive_t>* interactive_array){
+     LOG("load map %s\n", filepath);
      FILE* f = fopen(filepath, "rb");
      if(!f){
           LOG("%s(): fopen() failed\n", __FUNCTION__);
@@ -1198,7 +1199,7 @@ bool load_map_tags(const char* filepath, bool* tags){
      fread(&map_version, sizeof(map_version), 1, file);
 
      if(map_version < 5){
-         LOG("map version %u does not support tags\n", map_version);
+         LOG("warning: map version %u on map %s does not support tags\n", map_version, filepath);
          return false;
      }
 

@@ -116,7 +116,6 @@ LogMapNumberResult_t load_map_number(S32 map_number, Coord_t* player_start, Worl
 
      if(!filepath[0]) return result;
 
-     LOG("load map %s\n", filepath);
      result.success = load_map(filepath, player_start, &world->tilemap, &world->blocks, &world->interactives);
      if(result.success) result.filepath = strdup(filepath);
      return result;
@@ -1235,9 +1234,7 @@ static void illuminate_line(Coord_t start, Coord_t end, U8 value, World_t* world
 
           Block_t* block = nullptr;
           if(coords[i] != start){
-               S16 px = coords[i].x * TILE_SIZE_IN_PIXELS;
-               S16 py = coords[i].y * TILE_SIZE_IN_PIXELS;
-               Rect_t coord_rect {px, py, (S16)(px + TILE_SIZE_IN_PIXELS), (S16)(py + TILE_SIZE_IN_PIXELS)};
+               Rect_t coord_rect = rect_surrounding_adjacent_coords(coords[i]);
 
                S16 block_count = 0;
                Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
@@ -1905,12 +1902,14 @@ bool resolve_push_against_block(Block_t* block, MoveDirection_t move_direction, 
                          return false;
                     }
 
-                    auto push_result = block_push(against_block, final_move_direction, world, pushed_by_ice, force, &split_instant_momentum);
+                    if(result){
+                         auto push_result = block_push(against_block, final_move_direction, world, pushed_by_ice, force, &split_instant_momentum);
 
-                    update_block_momentum_from_push(block, first_direction, from_entangler, &push_result.horizontal_result, result);
+                         update_block_momentum_from_push(block, first_direction, from_entangler, &push_result.horizontal_result, result);
 
-                    if(second_direction != DIRECTION_COUNT){
-                         update_block_momentum_from_push(block, second_direction, from_entangler, &push_result.vertical_result, result);
+                         if(second_direction != DIRECTION_COUNT){
+                              update_block_momentum_from_push(block, second_direction, from_entangler, &push_result.vertical_result, result);
+                         }
                     }
                }
           }else if(pushed_block_on_ice){
@@ -1929,7 +1928,7 @@ bool resolve_push_against_block(Block_t* block, MoveDirection_t move_direction, 
 
                bool first_successful = push_result.horizontal_result.pushed;
 
-               if(push_result.horizontal_result.pushed){
+               if(push_result.horizontal_result.pushed && result){
                     BlockPushedAgainst_t pushed_against {};
                     pushed_against.block = against_block;
                     pushed_against.direction = first_against_block_push_dir;
@@ -1938,7 +1937,7 @@ bool resolve_push_against_block(Block_t* block, MoveDirection_t move_direction, 
 
                bool second_successful = push_result.vertical_result.pushed;
 
-               if(push_result.vertical_result.pushed){
+               if(push_result.vertical_result.pushed && result){
                     BlockPushedAgainst_t pushed_against {};
                     pushed_against.block = against_block;
                     pushed_against.direction = second_against_block_push_dir;
@@ -1982,7 +1981,25 @@ bool resolve_push_against_block(Block_t* block, MoveDirection_t move_direction, 
                }
           }
 
-          if(!first_successful && !second_successful){
+          bool adjacent_block_already_moving = false;
+
+          {
+               bool horizontal = direction_is_horizontal(first_against_block_push_dir);
+               MoveState_t move_state = horizontal ? against_block->horizontal_move.state : against_block->vertical_move.state;
+               if(move_state == MOVE_STATE_STARTING &&
+                  direction_in_mask(vec_direction_mask(against_block->accel), first_against_block_push_dir)){
+                    adjacent_block_already_moving = true;
+               }
+
+               horizontal = direction_is_horizontal(second_against_block_push_dir);
+               move_state = horizontal ? against_block->horizontal_move.state : against_block->vertical_move.state;
+               if(move_state == MOVE_STATE_STARTING &&
+                  direction_in_mask(vec_direction_mask(against_block->accel), second_against_block_push_dir)){
+                    adjacent_block_already_moving = true;
+               }
+          }
+
+          if(!first_successful && !second_successful && !adjacent_block_already_moving){
                return false;
           }
      }
@@ -2002,14 +2019,10 @@ bool is_block_against_solid_centroid(Block_t* block, Direction_t direction, F32 
      return false;
 }
 
-BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Direction_t direction, World_t* world, bool pushed_by_ice, F32 force, TransferMomentum_t* instant_momentum,
-                             PushFromEntangler_t* from_entangler){
-     // LOG("block_push() %d -> %s with force %f\n", get_block_index(world, block), direction_to_string(direction), force);
-     // if(instant_momentum){
-     //     LOG(" instant momentum %d, %f\n", instant_momentum->mass, instant_momentum->vel);
-     // }
-
-     BlockPushResult_t result {};
+bool block_would_push(Block_t* block, Position_t pos, Vec_t pos_delta, Direction_t direction, World_t* world,
+                      bool pushed_by_ice, F32 force, TransferMomentum_t* instant_momentum,
+                      PushFromEntangler_t* from_entangler, BlockPushResult_t* result)
+{
      auto against_result = block_against_other_blocks(pos + pos_delta, block->cut, direction, world->block_qt, world->interactive_qt,
                                                       &world->tilemap);
      bool pushed_block_on_frictionless = block_on_frictionless(pos, pos_delta, block->cut, &world->tilemap, world->interactive_qt, world->block_qt);
@@ -2034,8 +2047,8 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
           for(S16 i = 0; i < against_result.count; i++){
                if(!resolve_push_against_block(block, move_direction, pushed_by_ice, pushed_block_on_frictionless, force,
                                               instant_momentum, from_entangler, against_result.objects + i, against_result.count,
-                                              world, &result, &transfers_force)){
-                    return result;
+                                              world, result, &transfers_force)){
+                    return false;
                }
           }
      }
@@ -2053,7 +2066,7 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
                     MoveDirection_t move_direction = move_direction_from_directions(direction, vertical_direction);
                     if(!resolve_push_against_block(block, move_direction, pushed_by_ice, pushed_block_on_frictionless, force, instant_momentum,
                                                    from_entangler, &against, 1, world, &result, &transfers_force)){
-                         return result;
+                         return false;
                     }
                }
           }
@@ -2068,29 +2081,30 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
                     MoveDirection_t move_direction = move_direction_from_directions(horizontal_direction, direction);
                     if(!resolve_push_against_block(block, move_direction, pushed_by_ice, pushed_block_on_frictionless, force, instant_momentum,
                                                    from_entangler, &against, 1, world, &result, &transfers_force)){
-                         return result;
+                         return false;
                     }
                }
           }
           break;
      }
 
-     if(transfers_force) return result;
+     if(transfers_force) return false;
 
      if(!pushed_by_ice){
           auto against_block = rotated_entangled_blocks_against_centroid(block, direction, world->block_qt, &world->blocks,
                                                                          world->interactive_qt, &world->tilemap);
           if(against_block){
                // given the current force, and masses, can this push move the entangled block anyways?
-               if(is_block_against_solid_centroid(block, direction, force, world)) return result;
+               if(is_block_against_solid_centroid(block, direction, force, world)) return false;
           }
      }
 
      if(block_against_solid_tile(pos, pos_delta, block->cut, direction, &world->tilemap)){
-          return result;
+          return false;
      }
+
      if(block_against_solid_interactive(block, direction, &world->tilemap, world->interactive_qt)){
-          return result;
+          return false;
      }
 
      // check if we are diagonally against a solid and already moving in an orthogonal direction
@@ -2102,7 +2116,7 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
           if(block->vertical_move.state != MOVE_STATE_IDLING && block->accel.y != 0.0f){
                Direction_t vertical_direction = block->accel.y > 0.0f ? DIRECTION_UP : DIRECTION_DOWN;
                if(block_diagonally_against_solid(pos, pos_delta, block->cut, direction, vertical_direction, &world->tilemap, world->interactive_qt)){
-                    return result;
+                    return false;
                }
           }
           break;
@@ -2111,11 +2125,52 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
           if(block->horizontal_move.state != MOVE_STATE_IDLING && block->accel.x != 0.0f){
                Direction_t horizontal_direction = block->accel.x > 0.0f ? DIRECTION_RIGHT : DIRECTION_LEFT;
                if(block_diagonally_against_solid(pos, pos_delta, block->cut, horizontal_direction, direction, &world->tilemap, world->interactive_qt)){
-                    return result;
+                    return false;
                }
           }
           break;
      }
+
+     auto* player = block_against_player(block, direction, &world->players);
+     if(player){
+          bool player_should_stop_block = true;
+
+          if(pushed_by_ice){
+               // if the block was pushed by ice, then check how much momentum was behind it
+               auto block_momentum = instant_momentum ? instant_momentum->vel * instant_momentum->mass : 0;
+               if(block_momentum >= PLAYER_SQUISH_MOMENTUM) player_should_stop_block = false;
+
+               if(direction_in_vec(block->vel, direction)){
+                    player_should_stop_block = false;
+               }
+          }
+
+          if(player_should_stop_block){
+               player->stopping_block_from = direction_opposite(direction);
+               player->stopping_block_from_time = PLAYER_STOP_IDLE_BLOCK_TIMER;
+               return false;
+          }
+     }
+
+     return true;
+}
+
+BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Direction_t direction, World_t* world,
+                             bool pushed_by_ice, F32 force, TransferMomentum_t* instant_momentum,
+                             PushFromEntangler_t* from_entangler){
+     // LOG("block_push() %d -> %s with force %f\n", get_block_index(world, block), direction_to_string(direction), force);
+     // if(instant_momentum){
+     //     LOG(" instant momentum %d, %f\n", instant_momentum->mass, instant_momentum->vel);
+     // }
+
+     BlockPushResult_t result {};
+     if(!block_would_push(block, pos, pos_delta, direction, world,
+                          pushed_by_ice, force, instant_momentum,
+                          from_entangler, &result)){
+          return result;
+     }
+
+     bool pushed_block_on_frictionless = block_on_frictionless(pos, pos_delta, block->cut, &world->tilemap, world->interactive_qt, world->block_qt);
 
      auto* player = block_against_player(block, direction, &world->players);
      if(player){
@@ -2889,4 +2944,20 @@ AllowedToPushResult_t allowed_to_push(World_t* world, Block_t* block, Direction_
      }
 
      return result;
+}
+
+PushFromEntangler_t build_push_from_entangler(Block_t* block, Direction_t push_dir, F32 force){
+     PushFromEntangler_t from_entangler;
+
+     if(direction_is_horizontal(push_dir)){
+         from_entangler.accel = block->accel.x / force;
+         from_entangler.move_time_left = block->horizontal_move.time_left;
+         from_entangler.coast_vel = block->coast_vel.x / force;
+     }else{
+         from_entangler.accel = block->accel.y / force;
+         from_entangler.move_time_left = block->vertical_move.time_left;
+         from_entangler.coast_vel = block->coast_vel.y / force;
+     }
+     from_entangler.cut = block->cut;
+     return from_entangler;
 }

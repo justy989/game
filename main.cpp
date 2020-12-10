@@ -174,6 +174,16 @@ struct FindAllMapsResult_t{
      U32 count = 0;
 };
 
+struct PlayerBlockPush_t{
+     bool succeeded = false;
+     U32 player_index = 0;
+     Direction_t direction = DIRECTION_COUNT;
+     U32 block_index = 0;
+     AllowedToPushResult_t allowed_to_push;
+     bool entangled = false;
+     PushFromEntangler_t push_from_entangler = {};
+};
+
 F32 get_collision_dt(CheckBlockCollisionResult_t* collision){
      F32 vel_mag = vec_magnitude(collision->original_vel);
      F32 pos_delta_mag = vec_magnitude(collision->pos_delta);
@@ -2676,6 +2686,9 @@ int main(int argc, char** argv){
      ObjectArray_t<Interactive_t> demo_starting_interactives {};
 
      Quad_t pct_bar_outline_quad = {0, 2.0f * PIXEL_SIZE, 1.0f, 0.02f};
+
+     ObjectArray_t<PlayerBlockPush_t> player_block_pushes {};
+     memset(&player_block_pushes, 0, sizeof(player_block_pushes));
 
      if(load_map_filepath){
           if(!load_map(load_map_filepath, &player_start, &world.tilemap, &world.blocks, &world.interactives)){
@@ -5778,6 +5791,7 @@ int main(int argc, char** argv){
                                         if(!push_result.pushed || push_result.busy){
                                              player->push_time = 0.0f;
                                         }else{
+                                             player->push_time = 0.0f;
                                              player->pushing_block_dir = push_block_dir;
                                              push_entangled_block(block_to_push, &world, push_block_dir, false, allowed_result.mass_ratio);
                                              for(S16 a = 0; a < push_result.againsts_pushed.count; a++){
@@ -5787,7 +5801,56 @@ int main(int argc, char** argv){
                                              }
                                         }
 
-                                        if(block_to_push->pos.z > 0) player->push_time = -0.5f; // TODO: wtf is this line?
+//                                        if(!resize(&player_block_pushes, player_block_pushes.count + 1)){
+//                                             LOG("%d: Ran out of memory trying to do player %d block pushes...\n", __LINE__, player_block_pushes.count + 1);
+//                                        }else{
+//                                             auto* player_block_push = player_block_pushes.elements + (player_block_pushes.count - 1);
+//                                             player_block_push->succeeded = false;
+//                                             player_block_push->entangled = false;
+//                                             player_block_push->player_index = i;
+//                                             player_block_push->block_index = block_to_push - world.blocks.elements;
+//                                             player_block_push->direction = push_block_dir;
+//                                             player_block_push->allowed_to_push = allowed_result;
+//
+//                                             PushFromEntangler_t from_entangler = build_push_from_entangler(block_to_push, push_block_dir, allowed_result.mass_ratio);
+//
+//                                             S16 block_mass = block_get_mass(block_to_push);
+//                                             S16 original_block_index = player_block_push->block_index;
+//                                             S16 entangle_index = block_to_push->entangle_index;
+//                                             while(entangle_index != (S16)(original_block_index) && entangle_index >= 0){
+//                                                  Block_t* entangled_block = world.blocks.elements + entangle_index;
+//                                                  bool held_down = block_held_down_by_another_block(entangled_block, world.block_qt, world.interactive_qt, &world.tilemap).held();
+//                                                  bool on_frictionless = block_on_frictionless(entangled_block, &world.tilemap, world.interactive_qt, world.block_qt);
+//                                                  if(!held_down || on_frictionless){
+//                                                       auto rotations_between = direction_rotations_between(static_cast<Direction_t>(entangled_block->rotation), static_cast<Direction_t>(block_to_push->rotation));
+//                                                       Direction_t rotated_dir = direction_rotate_clockwise(push_block_dir, rotations_between);
+//
+//                                                       S16 entangled_block_mass = block_get_mass(entangled_block);
+//                                                       F32 entangled_mass_ratio = (F32)(block_mass) / (F32)(entangled_block_mass);
+//
+//                                                       auto entangle_allowed_result = allowed_to_push(&world, entangled_block, rotated_dir, entangled_mass_ratio);
+//                                                       if(entangle_allowed_result.push){
+//                                                            // block_push(entangled_block, rotated_dir, world, pushed_by_ice, force * mass_ratio * allowed_result.mass_ratio, nullptr, &from_entangler);
+//                                                            if(!resize(&player_block_pushes, player_block_pushes.count + 1)){
+//                                                                 LOG("%d: Ran out of memory trying to do player %d block pushes...\n", __LINE__, player_block_pushes.count + 1);
+//                                                            }else{
+//                                                                 // update entangled allowed result mass ratio because that is the force we are going to be using for our push
+//                                                                 entangle_allowed_result.mass_ratio = allowed_result.mass_ratio * entangled_mass_ratio * entangle_allowed_result.mass_ratio;
+//
+//                                                                 player_block_push = player_block_pushes.elements + (player_block_pushes.count - 1);
+//                                                                 player_block_push->succeeded = false;
+//                                                                 player_block_push->entangled = true;
+//                                                                 player_block_push->player_index = i;
+//                                                                 player_block_push->block_index = entangled_block - world.blocks.elements;
+//                                                                 player_block_push->direction = rotated_dir;
+//                                                                 player_block_push->allowed_to_push = entangle_allowed_result;
+//                                                                 player_block_push->push_from_entangler = from_entangler;
+//                                                            }
+//                                                       }
+//                                                  }
+//                                                  entangle_index = entangled_block->entangle_index;
+//                                             }
+//                                        }
                                    }
                               }
                          }
@@ -5795,6 +5858,45 @@ int main(int argc, char** argv){
                          player->push_time = 0;
                     }
                }
+
+//                if(player_block_pushes.count > 0){
+//                     // for(S16 p = 0; p < 2; p++){
+//                     for(S16 i = 0; i < player_block_pushes.count; i++){
+//                          auto* player_block_push = player_block_pushes.elements + i;
+//                          if (player_block_push->succeeded) continue;
+//
+//                          auto* player = world.players.elements + player_block_push->player_index;
+//                          auto* block_to_push = world.blocks.elements + player_block_push->block_index;
+//
+//                          BlockPushResult_t push_result = {};
+//
+//                          if (player_block_push->entangled){
+//                               push_result = block_push(block_to_push, player_block_push->direction, &world, false,
+//                                                        player_block_push->allowed_to_push.mass_ratio, nullptr,
+//                                                        &player_block_push->push_from_entangler);
+//                          }else{
+//                               push_result = block_push(block_to_push, player_block_push->direction, &world, false,
+//                                                             player_block_push->allowed_to_push.mass_ratio);
+//                          }
+//
+//                          if(!push_result.pushed || push_result.busy){
+//                               if(!player_block_push->entangled){
+//                                    player->push_time = 0.0f;
+//                               }
+//                          }else{
+//                               player_block_push->succeeded = true;
+//                          }
+//
+//                          // if the block raises up while we are pushing it, reset the push time
+//                          // TODO: This is incorrect because we could just be normally on top of a block pushing another block
+//                          // if (p > 0){
+//                          if(block_to_push->pos.z > 0) player->push_time = -0.5f;
+//                          // }
+//                     }
+//                     // }
+//
+//                     destroy(&player_block_pushes);
+//                }
 
                // update interactives
                for(S16 i = 0; i < world.interactives.count; i++){
@@ -6072,7 +6174,7 @@ int main(int argc, char** argv){
 
                glEnd();
 
-#if 0
+#if 1
                // light
                glBindTexture(GL_TEXTURE_2D, 0);
                glBegin(GL_QUADS);

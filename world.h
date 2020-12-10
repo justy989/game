@@ -133,6 +133,9 @@ void melt_ice(Coord_t center, S8 height, S16 radius, World_t* world, bool telepo
 
 BlockPushMoveDirectionResult_t block_push(Block_t* block, MoveDirection_t move_direction, World_t* world, bool pushed_by_ice,
                                           F32 force = 1.0f, TransferMomentum_t* instant_momentum = NULL, PushFromEntangler_t* from_entangler = NULL);
+bool block_would_push(Block_t* block, Position_t pos, Vec_t pos_delta, Direction_t direction, World_t* world,
+                      bool pushed_by_ice, F32 force = 1.0f, TransferMomentum_t* instant_momentum = NULL,
+                      PushFromEntangler_t* from_entangler = NULL, BlockPushResult_t* result = NULL);
 BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Direction_t direction, World_t* world,
                              bool pushed_by_ice, F32 force = 1.0f, TransferMomentum_t* instant_momentum = NULL,
                              PushFromEntangler_t* from_entangler = NULL);
@@ -165,3 +168,4 @@ ElasticCollisionResult_t elastic_transfer_momentum_to_block(TransferMomentum_t* 
 F32 get_block_static_friction(S16 mass);
 F32 get_block_expected_player_push_velocity(World_t* world, Block_t* block, F32 force = 1.0f);
 AllowedToPushResult_t allowed_to_push(World_t* world, Block_t* block, Direction_t direction, F32 force = 1.0f, TransferMomentum_t* instant_momentum = NULL);
+PushFromEntangler_t build_push_from_entangler(Block_t* block, Direction_t push_dir, F32 force);

@@ -1814,18 +1814,7 @@ DealWithPushResult_t deal_with_push_result(Block_t* pusher, Direction_t directio
 void push_entangled_block(Block_t* block, World_t* world, Direction_t push_dir, bool pushed_by_ice, F32 force, TransferMomentum_t* instant_momentum){
      if(block->entangle_index < 0 || block->entangle_index >= world->blocks.count) return;
 
-     PushFromEntangler_t from_entangler;
-
-     if(direction_is_horizontal(push_dir)){
-         from_entangler.accel = block->accel.x / force;
-         from_entangler.move_time_left = block->horizontal_move.time_left;
-         from_entangler.coast_vel = block->coast_vel.x / force;
-     }else{
-         from_entangler.accel = block->accel.y / force;
-         from_entangler.move_time_left = block->vertical_move.time_left;
-         from_entangler.coast_vel = block->coast_vel.y / force;
-     }
-     from_entangler.cut = block->cut;
+     PushFromEntangler_t from_entangler = build_push_from_entangler(block, push_dir, force);
 
      S16 block_mass = block_get_mass(block);
      S16 block_index = block - world->blocks.elements;
