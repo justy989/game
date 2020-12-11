@@ -2065,7 +2065,7 @@ bool block_would_push(Block_t* block, Position_t pos, Vec_t pos_delta, Direction
                if(against.block != NULL){
                     MoveDirection_t move_direction = move_direction_from_directions(direction, vertical_direction);
                     if(!resolve_push_against_block(block, move_direction, pushed_by_ice, pushed_block_on_frictionless, force, instant_momentum,
-                                                   from_entangler, &against, 1, world, &result, &transfers_force)){
+                                                   from_entangler, &against, 1, world, result, &transfers_force)){
                          return false;
                     }
                }
@@ -2080,7 +2080,7 @@ bool block_would_push(Block_t* block, Position_t pos, Vec_t pos_delta, Direction
                if(against.block != NULL){
                     MoveDirection_t move_direction = move_direction_from_directions(horizontal_direction, direction);
                     if(!resolve_push_against_block(block, move_direction, pushed_by_ice, pushed_block_on_frictionless, force, instant_momentum,
-                                                   from_entangler, &against, 1, world, &result, &transfers_force)){
+                                                   from_entangler, &against, 1, world, result, &transfers_force)){
                          return false;
                     }
                }
