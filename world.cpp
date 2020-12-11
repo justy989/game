@@ -2158,9 +2158,13 @@ bool block_would_push(Block_t* block, Position_t pos, Vec_t pos_delta, Direction
 BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Direction_t direction, World_t* world,
                              bool pushed_by_ice, F32 force, TransferMomentum_t* instant_momentum,
                              PushFromEntangler_t* from_entangler){
-     // LOG("block_push() %d -> %s with force %f\n", get_block_index(world, block), direction_to_string(direction), force);
+     // LOG("block_push() %d -> %s with force %f by ice: %d\n", get_block_index(world, block), direction_to_string(direction), force, pushed_by_ice);
      // if(instant_momentum){
      //     LOG(" instant momentum %d, %f\n", instant_momentum->mass, instant_momentum->vel);
+     // }
+     // if(from_entangler){
+     //      LOG(" from entangler: accel: %f, move_time_left: %f, coast_vel: %f, cut: %d\n", from_entangler->accel,
+     //          from_entangler->move_time_left, from_entangler->coast_vel, from_entangler->cut);
      // }
 
      BlockPushResult_t result {};
