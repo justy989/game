@@ -2477,10 +2477,13 @@ bool player_block_push_meets_entangled_req(PlayerBlockPush_t* player_block_push,
                     auto* itr = player_block_pushes->elements + i;
                     if((S16)(itr->block_index) == entangle_index){
                          all_entanglers_meet_physical_reqs &= player_block_push_meets_physical_req(itr, player_block_pushes, world);
+                         found_entangler = true;
                          break;
                     }
                }
-               if(!found_entangler) all_entanglers_meet_physical_reqs = false;
+               if(!found_entangler){
+                    all_entanglers_meet_physical_reqs = false;
+               }
                entangle_index = entangled_block->entangle_index;
           }
           return all_entanglers_meet_physical_reqs;
