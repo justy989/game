@@ -2446,13 +2446,15 @@ bool player_block_push_add_ordered_physical_reqs(PlayerBlockPush_t* player_block
      auto block_pos_delta = block_get_pos_delta(block);
      auto block_cut = block_get_cut(block);
      Direction_t push_direction = DIRECTION_COUNT;
+
      auto* against_block = block_against_another_block(block_pos + block_pos_delta, block_cut, player_block_push->direction, world->block_qt,
                                                  world->interactive_qt, &world->tilemap, &push_direction);
      if(against_block){
           U32 against_block_index = against_block - world->blocks.elements;
           for(S16 i = 0; i < player_block_pushes->count; i++){
                auto* itr = player_block_pushes->elements + i;
-               if(itr->block_index == against_block_index){
+               if(itr->block_index == against_block_index &&
+                  itr->direction == player_block_push->direction){
                     if(!player_block_push_add_ordered_physical_reqs(itr, player_block_pushes, world, ordered_player_block_pushes)){
                          return false;
                     }
@@ -2485,7 +2487,8 @@ bool player_block_push_add_ordered_entangled_reqs(PlayerBlockPush_t* player_bloc
 
                for(S16 i = 0; i < player_block_pushes->count; i++){
                     auto* itr = player_block_pushes->elements + i;
-                    if((S16)(itr->block_index) == entangle_index){
+                    if((S16)(itr->block_index) == entangle_index &&
+                       itr->direction == player_block_push->direction){
                          if(!player_block_push_add_ordered_physical_reqs(itr, player_block_pushes, world,
                                                                          ordered_player_block_pushes)){
                               return false;
@@ -5965,16 +5968,15 @@ int main(int argc, char** argv){
                     //      LOG("%d player block pushes on frame %ld\n", player_block_pushes.count, frame_count);
                     //      for(S16 i = 0; i < player_block_pushes.count; i++){
                     //           auto* player_block_push = player_block_pushes.elements + i;
-                    //           LOG("  player: %d, block: %d, dir: %s, entangled: %d\n", player_block_push->player_index,
+                    //           LOG("  player: %d, block: %d, dir: %s, entangled: %d, force: %f\n", player_block_push->player_index,
                     //               player_block_push->block_index, direction_to_string(player_block_push->direction),
-                    //               player_block_push->entangled);
+                    //               player_block_push->entangled, player_block_push->allowed_to_push.mass_ratio);
                     //      }
                     // }
 
                     // build a list of ordered block pushes based on dependencies
                     for(S16 i = 0; i < player_block_pushes.count; i++){
                          auto* player_block_push = player_block_pushes.elements + i;
-
                          if (player_block_push->entangled){
                               if(player_block_push_add_ordered_entangled_reqs(player_block_push, &player_block_pushes, &world, &ordered_player_block_pushes)){
                                    player_block_push_add_ordered_physical_reqs(player_block_push, &player_block_pushes, &world, &ordered_player_block_pushes);
@@ -5989,9 +5991,9 @@ int main(int argc, char** argv){
                     //      LOG("%d ordered player block pushes on frame %ld\n", ordered_player_block_pushes.count, frame_count);
                     //      for(S16 i = 0; i < ordered_player_block_pushes.count; i++){
                     //           auto* player_block_push = ordered_player_block_pushes.elements[i];
-                    //           LOG("  player: %d, block: %d, dir: %s, entangled: %d\n", player_block_push->player_index,
+                    //           LOG("  player: %d, block: %d, dir: %s, entangled: %d, force: %f\n", player_block_push->player_index,
                     //               player_block_push->block_index, direction_to_string(player_block_push->direction),
-                    //               player_block_push->entangled);
+                    //               player_block_push->entangled, player_block_push->allowed_to_push.mass_ratio);
                     //      }
                     // }
 
