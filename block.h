@@ -147,6 +147,7 @@ S16 block_get_mass(Block_t* b);
 S16 block_get_mass(BlockCut_t cut);
 
 Move_t block_get_move_in_direction(Block_t* block, Direction_t direction, S16 rotations = 0);
+bool block_starting_to_move_in_direction(Block_t* block, Direction_t direction);
 Direction_t block_axis_move(Block_t* block, bool x);
 
 const char* block_corner_to_string(BlockCorner_t corner);

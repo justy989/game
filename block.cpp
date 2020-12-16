@@ -298,6 +298,8 @@ Pixel_t block_get_corner_pixel(Block_t* block, BlockCorner_t corner){
 Move_t block_get_move_in_direction(Block_t* block, Direction_t direction, S16 rotations){
      Move_t result {};
 
+     if(direction == DIRECTION_COUNT) return result;
+
      if(direction_is_horizontal(direction)){
           if(rotations % 2 == 0){
                result = block->horizontal_move;
@@ -313,6 +315,15 @@ Move_t block_get_move_in_direction(Block_t* block, Direction_t direction, S16 ro
      }
 
      return result;
+}
+
+bool block_starting_to_move_in_direction(Block_t* block, Direction_t direction){
+     if(direction == DIRECTION_COUNT){
+          return false;
+     }
+
+     auto move = block_get_move_in_direction(block, direction);
+     return move.state == MOVE_STATE_STARTING;
 }
 
 Direction_t block_axis_move(Block_t* block, bool x){

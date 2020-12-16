@@ -132,15 +132,17 @@ void spread_ice(Coord_t center, S8 height, S16 radius, World_t* world, bool tele
 void melt_ice(Coord_t center, S8 height, S16 radius, World_t* world, bool teleported = false);
 
 BlockPushMoveDirectionResult_t block_push(Block_t* block, MoveDirection_t move_direction, World_t* world, bool pushed_by_ice,
-                                          F32 force = 1.0f, TransferMomentum_t* instant_momentum = NULL, PushFromEntangler_t* from_entangler = NULL);
+                                          F32 force = 1.0f, TransferMomentum_t* instant_momentum = NULL, PushFromEntangler_t* from_entangler = NULL,
+                                          bool side_effects = false);
 bool block_would_push(Block_t* block, Position_t pos, Vec_t pos_delta, Direction_t direction, World_t* world,
                       bool pushed_by_ice, F32 force = 1.0f, TransferMomentum_t* instant_momentum = NULL,
-                      PushFromEntangler_t* from_entangler = NULL, BlockPushResult_t* result = NULL);
+                      PushFromEntangler_t* from_entangler = NULL, bool side_effects = true, BlockPushResult_t* result = NULL);
+// side_effects bool is to fake call these to see what would happen to a given block. The side effects are pushing other blocks
 BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Direction_t direction, World_t* world,
                              bool pushed_by_ice, F32 force = 1.0f, TransferMomentum_t* instant_momentum = NULL,
-                             PushFromEntangler_t* from_entangler = NULL);
+                             PushFromEntangler_t* from_entangler = NULL, bool side_effects = true);
 BlockPushResult_t block_push(Block_t* block, Direction_t direction, World_t* world, bool pushed_by_ice, F32 force = 1.0f,
-                             TransferMomentum_t* instant_momentum = NULL, PushFromEntangler_t* from_entangler = NULL);
+                             TransferMomentum_t* instant_momentum = NULL, PushFromEntangler_t* from_entangler = NULL, bool side_effects = true);
 bool block_pushable(Block_t* block, Direction_t direction, World_t* world, F32 force);
 bool reset_players(ObjectArray_t<Player_t>* players);
 
