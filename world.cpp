@@ -1984,7 +1984,7 @@ bool resolve_push_against_block(Block_t* block, MoveDirection_t move_direction, 
 
               first_successful = push_result.pushed;
 
-              if(push_result.pushed){
+              if(push_result.pushed && result){
                    BlockPushedAgainst_t pushed_against {};
                    pushed_against.block = against_block;
                    pushed_against.direction = first_against_block_push_dir;
@@ -2003,7 +2003,7 @@ bool resolve_push_against_block(Block_t* block, MoveDirection_t move_direction, 
 
                    second_successful = push_result.pushed;
 
-                   if(push_result.pushed){
+                   if(push_result.pushed && result){
                         BlockPushedAgainst_t pushed_against {};
                         pushed_against.block = against_block;
                         pushed_against.direction = first_against_block_push_dir;
