@@ -2186,26 +2186,9 @@ bool block_would_push(Block_t* block, Position_t pos, Vec_t pos_delta, Direction
      return true;
 }
 
-BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Direction_t direction, World_t* world,
-                             bool pushed_by_ice, F32 force, TransferMomentum_t* instant_momentum,
-                             PushFromEntangler_t* from_entangler, bool side_effects){
-     // LOG("block_push() %d -> %s with force %f by ice: %d side effects: %d\n", get_block_index(world, block),
-     //     direction_to_string(direction), force, pushed_by_ice, side_effects);
-     // if(instant_momentum){
-     //     LOG(" instant momentum %d, %f\n", instant_momentum->mass, instant_momentum->vel);
-     // }
-     // if(from_entangler){
-     //      LOG(" from entangler: accel: %f, move_time_left: %f, coast_vel: %f, cut: %d\n", from_entangler->accel,
-     //          from_entangler->move_time_left, from_entangler->coast_vel, from_entangler->cut);
-     // }
-
-     BlockPushResult_t result {};
-     if(!block_would_push(block, pos, pos_delta, direction, world,
-                          pushed_by_ice, force, instant_momentum,
-                          from_entangler, side_effects, &result)){
-          return result;
-     }
-
+void block_do_push(Block_t* block, Position_t pos, Vec_t pos_delta, Direction_t direction, World_t* world,
+                   bool pushed_by_ice, BlockPushResult_t* result, F32 force, TransferMomentum_t* instant_momentum,
+                   PushFromEntangler_t* from_entangler){
      bool pushed_block_on_frictionless = block_on_frictionless(pos, pos_delta, block->cut, &world->tilemap, world->interactive_qt, world->block_qt);
 
      auto* player = block_against_player(block, direction, &world->players);
@@ -2225,7 +2208,7 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
           if(player_should_stop_block){
                player->stopping_block_from = direction_opposite(direction);
                player->stopping_block_from_time = PLAYER_STOP_IDLE_BLOCK_TIMER;
-               return result;
+               return;
           }
      }
 
@@ -2248,7 +2231,7 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
 
                     if(fabs(final_vel) <= FLT_EPSILON){
                         slow_block_toward_gridlock(world, block, direction_opposite(direction));
-                        return result;
+                        return;
                     }else{
                         // TODO: This calculation is probably wrong in terms of forces, but gets us the gameplay impact we want, come back to this
                         block->accel.x = (final_vel - block->vel.x) / BLOCK_ACCEL_TIME;
@@ -2257,7 +2240,7 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
                         block->horizontal_move.state = MOVE_STATE_STARTING;
                         block->started_on_pixel_x = 0;
                         block->stop_distance_pixel_x = 0;
-                        return result;
+                        return;
                     }
                }
                break;
@@ -2278,7 +2261,7 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
 
                     if(fabs(final_vel) <= FLT_EPSILON){
                         slow_block_toward_gridlock(world, block, direction_opposite(direction));
-                        return result;
+                        return;
                     }else{
                         block->accel.y = (final_vel - block->vel.y) / BLOCK_ACCEL_TIME;
                         block->target_vel.y = final_vel;
@@ -2286,7 +2269,7 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
                         block->vertical_move.state = MOVE_STATE_STARTING;
                         block->started_on_pixel_y = 0;
                         block->stop_distance_pixel_y = 0;
-                        return result;
+                        return;
                     }
                }
                break;
@@ -2299,19 +2282,43 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
           break;
      case DIRECTION_LEFT:
      case DIRECTION_RIGHT:
-          if(!apply_push_horizontal(block, pos, world, direction, instant_momentum, pushed_by_ice, force, from_entangler, &result)){
-               return result;
+          if(!apply_push_horizontal(block, pos, world, direction, instant_momentum, pushed_by_ice, force, from_entangler, result)){
+               return;
           }
           break;
      case DIRECTION_DOWN:
      case DIRECTION_UP:
-          if(!apply_push_vertical(block, pos, world, direction, instant_momentum, pushed_by_ice, force, from_entangler, &result)){
-               return result;
+          if(!apply_push_vertical(block, pos, world, direction, instant_momentum, pushed_by_ice, force, from_entangler, result)){
+               return;
           }
           break;
      }
 
-     result.pushed = true;
+     result->pushed = true;
+}
+
+BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Direction_t direction, World_t* world,
+                             bool pushed_by_ice, F32 force, TransferMomentum_t* instant_momentum,
+                             PushFromEntangler_t* from_entangler, bool side_effects){
+     // LOG("block_push() %d -> %s with force %f by ice: %d side effects: %d\n", get_block_index(world, block),
+     //     direction_to_string(direction), force, pushed_by_ice, side_effects);
+     // if(instant_momentum){
+     //     LOG(" instant momentum %d, %f\n", instant_momentum->mass, instant_momentum->vel);
+     // }
+     // if(from_entangler){
+     //      LOG(" from entangler: accel: %f, move_time_left: %f, coast_vel: %f, cut: %d\n", from_entangler->accel,
+     //          from_entangler->move_time_left, from_entangler->coast_vel, from_entangler->cut);
+     // }
+
+     BlockPushResult_t result {};
+     if(!block_would_push(block, pos, pos_delta, direction, world,
+                          pushed_by_ice, force, instant_momentum,
+                          from_entangler, side_effects, &result)){
+          return result;
+     }
+
+     block_do_push(block, pos, pos_delta, direction, world, pushed_by_ice, &result, force, instant_momentum,
+                   from_entangler);
      return result;
 }
 
