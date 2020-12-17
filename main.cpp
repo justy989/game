@@ -2487,8 +2487,7 @@ bool player_block_push_add_ordered_entangled_reqs(PlayerBlockPush_t* player_bloc
 
                for(S16 i = 0; i < player_block_pushes->count; i++){
                     auto* itr = player_block_pushes->elements + i;
-                    if((S16)(itr->block_index) == entangle_index &&
-                       itr->direction == player_block_push->direction){
+                    if((S16)(itr->block_index) == entangle_index){
                          if(!player_block_push_add_ordered_physical_reqs(itr, player_block_pushes, world,
                                                                          ordered_player_block_pushes)){
                               return false;
