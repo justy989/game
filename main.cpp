@@ -14,6 +14,10 @@ Entanglement Puzzles:
 - entangle puzzle with an extra non-entangled block where you don't want one of the entangled blocks to move, and you use
   the non-entangled block to accomplish that
 - rotated entangled puzzles where the centroid is on a portal destination coord
+Puzzle Ideas:
+- Portal puzzle where you need to create an infinite cycle of blocks flowing into and out of a portal. Then, you need to push
+  a block perpendicular through the path. The goal is the make the infinite cycle in a certain way to allow the final block
+  to be pushed through
 
 Current bugs:
 - a block travelling diagonally at a wall will stop on both axis' against the wall because of the collision
