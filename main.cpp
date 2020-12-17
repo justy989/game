@@ -186,6 +186,11 @@ struct PlayerBlockPush_t{
      bool is_entangled(){return entangled_push_index >= 0;}
 };
 
+struct RestoreBlock_t{
+     Block_t block;
+     S16 index = -1;
+};
+
 F32 get_collision_dt(CheckBlockCollisionResult_t* collision){
      F32 vel_mag = vec_magnitude(collision->original_vel);
      F32 pos_delta_mag = vec_magnitude(collision->pos_delta);
@@ -2442,7 +2447,8 @@ bool find_and_update_connected_teleported_block(Block_t* block, Direction_t dire
 }
 
 bool player_block_push_add_ordered_physical_reqs(PlayerBlockPush_t* player_block_push, ObjectArray_t<PlayerBlockPush_t>* player_block_pushes,
-                                                 World_t* world, ObjectArray_t<PlayerBlockPush_t*>* ordered_player_block_pushes){
+                                                 World_t* world, ObjectArray_t<PlayerBlockPush_t*>* ordered_player_block_pushes,
+                                                 ObjectArray_t<RestoreBlock_t>* restore_blocks){
      auto* block = world->blocks.elements + player_block_push->block_index;
      auto block_pos = block_get_position(block);
      auto block_pos_delta = block_get_pos_delta(block);
@@ -2457,21 +2463,36 @@ bool player_block_push_add_ordered_physical_reqs(PlayerBlockPush_t* player_block
                auto* itr = player_block_pushes->elements + i;
                if(itr->block_index == against_block_index &&
                   itr->direction == player_block_push->direction){
-                    if(!player_block_push_add_ordered_physical_reqs(itr, player_block_pushes, world, ordered_player_block_pushes)){
+                    if(!player_block_push_add_ordered_physical_reqs(itr, player_block_pushes, world, ordered_player_block_pushes, restore_blocks)){
                          return false;
                     }
                }
           }
      }
 
+     RestoreBlock_t restore_block {};
+     restore_block.block = *block;
+     restore_block.index = player_block_push->block_index;
+
      bool would_push = false;
      if(player_block_push->is_entangled()){
           would_push = block_would_push(block, block_pos, block_pos_delta, player_block_push->direction, world, false,
                                         player_block_push->allowed_to_push.mass_ratio, nullptr,
                                         &player_block_push->push_from_entangler, false);
+          if(would_push){
+               BlockPushResult_t result {};
+               block_do_push(block, block_pos, block_pos_delta, player_block_push->direction, world, false,
+                             &result, player_block_push->allowed_to_push.mass_ratio, nullptr,
+                             &player_block_push->push_from_entangler);
+          }
      }else{
           would_push = block_would_push(block, block_pos, block_pos_delta, player_block_push->direction, world, false,
                                         player_block_push->allowed_to_push.mass_ratio, nullptr, nullptr, false);
+          if(would_push){
+               BlockPushResult_t result {};
+               block_do_push(block, block_pos, block_pos_delta, player_block_push->direction, world, false,
+                             &result, player_block_push->allowed_to_push.mass_ratio, nullptr, nullptr);
+          }
      }
 
      if(would_push || against_block == nullptr){
@@ -2481,17 +2502,25 @@ bool player_block_push_add_ordered_physical_reqs(PlayerBlockPush_t* player_block
           }else{
                LOG("ran out of memory trying to allocate %d ordered block pushes\n", ordered_player_block_pushes->count + 1);
           }
+
+          if(resize(restore_blocks, restore_blocks->count + 1)){
+               auto* new_restore_block = restore_blocks->elements + (restore_blocks->count - 1);
+               *new_restore_block = restore_block;
+          }else{
+               LOG("ran out of memory trying to allocate %d restore blocks\n", restore_blocks->count + 1);
+          }
      }
      return would_push;
 }
 
 bool player_block_push_add_ordered_entangled_reqs(PlayerBlockPush_t* player_block_push,
                                                   ObjectArray_t<PlayerBlockPush_t>* player_block_pushes,
-                                                  World_t* world, ObjectArray_t<PlayerBlockPush_t*>* ordered_player_block_pushes){
+                                                  World_t* world, ObjectArray_t<PlayerBlockPush_t*>* ordered_player_block_pushes,
+                                                  ObjectArray_t<RestoreBlock_t>* restore_blocks){
      if(player_block_push->is_entangled()){
           auto* entangled_player_block_push = player_block_pushes->elements + player_block_push->entangled_push_index;
           if(!player_block_push_add_ordered_physical_reqs(entangled_player_block_push, player_block_pushes, world,
-                                                          ordered_player_block_pushes)){
+                                                          ordered_player_block_pushes, restore_blocks)){
                return false;
           }
      }
@@ -2841,6 +2870,8 @@ int main(int argc, char** argv){
      memset(&player_block_pushes, 0, sizeof(player_block_pushes));
      ObjectArray_t<PlayerBlockPush_t*> ordered_player_block_pushes {};
      memset(&ordered_player_block_pushes, 0, sizeof(ordered_player_block_pushes));
+     ObjectArray_t<RestoreBlock_t> restore_blocks {};
+     memset(&restore_blocks, 0, sizeof(restore_blocks));
 
      if(load_map_filepath){
           if(!load_map(load_map_filepath, &player_start, &world.tilemap, &world.blocks, &world.interactives)){
@@ -5979,12 +6010,21 @@ int main(int argc, char** argv){
                     for(S16 i = 0; i < player_block_pushes.count; i++){
                          auto* player_block_push = player_block_pushes.elements + i;
                          if (player_block_push->is_entangled()){
-                              if(player_block_push_add_ordered_entangled_reqs(player_block_push, &player_block_pushes, &world, &ordered_player_block_pushes)){
-                                   player_block_push_add_ordered_physical_reqs(player_block_push, &player_block_pushes, &world, &ordered_player_block_pushes);
+                              if(player_block_push_add_ordered_entangled_reqs(player_block_push, &player_block_pushes, &world, &ordered_player_block_pushes, &restore_blocks)){
+                                   player_block_push_add_ordered_physical_reqs(player_block_push, &player_block_pushes, &world, &ordered_player_block_pushes, &restore_blocks);
                               }
                          }else{
-                              player_block_push_add_ordered_physical_reqs(player_block_push, &player_block_pushes, &world, &ordered_player_block_pushes);
+                              player_block_push_add_ordered_physical_reqs(player_block_push, &player_block_pushes, &world, &ordered_player_block_pushes, &restore_blocks);
                          }
+
+                         // restore the blocks we messed up to detect dependencies
+                         for(S16 b = 0; b < restore_blocks.count; b++){
+                              auto* restore_block = restore_blocks.elements + b;
+                              auto* block = world.blocks.elements + restore_block->index;
+                              *block = restore_block->block;
+                         }
+
+                         destroy(&restore_blocks);
                     }
 
                     // for debugging
