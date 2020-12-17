@@ -180,8 +180,10 @@ struct PlayerBlockPush_t{
      U32 block_index = 0;
      AllowedToPushResult_t allowed_to_push;
      PushFromEntangler_t push_from_entangler = {};
-     bool entangled = false;
+     S16 entangled_push_index = -1; // -1 sentinal that it isn't entangled
      bool performed = false;
+
+     bool is_entangled(){return entangled_push_index >= 0;}
 };
 
 F32 get_collision_dt(CheckBlockCollisionResult_t* collision){
@@ -2462,10 +2464,17 @@ bool player_block_push_add_ordered_physical_reqs(PlayerBlockPush_t* player_block
           }
      }
 
-     bool result = block_would_push(block, block_pos, block_pos_delta, player_block_push->direction, world, false,
-                                    player_block_push->allowed_to_push.mass_ratio, nullptr,
-                                    &player_block_push->push_from_entangler, false);
-     if(result || against_block == nullptr){
+     bool would_push = false;
+     if(player_block_push->is_entangled()){
+          would_push = block_would_push(block, block_pos, block_pos_delta, player_block_push->direction, world, false,
+                                        player_block_push->allowed_to_push.mass_ratio, nullptr,
+                                        &player_block_push->push_from_entangler, false);
+     }else{
+          would_push = block_would_push(block, block_pos, block_pos_delta, player_block_push->direction, world, false,
+                                        player_block_push->allowed_to_push.mass_ratio, nullptr, nullptr, false);
+     }
+
+     if(would_push || against_block == nullptr){
           if(resize(ordered_player_block_pushes, ordered_player_block_pushes->count + 1)){
                auto* ordered_player_block_push = ordered_player_block_pushes->elements + (ordered_player_block_pushes->count - 1);
                *ordered_player_block_push = player_block_push;
@@ -2473,29 +2482,17 @@ bool player_block_push_add_ordered_physical_reqs(PlayerBlockPush_t* player_block
                LOG("ran out of memory trying to allocate %d ordered block pushes\n", ordered_player_block_pushes->count + 1);
           }
      }
-     return result;
+     return would_push;
 }
 
 bool player_block_push_add_ordered_entangled_reqs(PlayerBlockPush_t* player_block_push,
                                                   ObjectArray_t<PlayerBlockPush_t>* player_block_pushes,
                                                   World_t* world, ObjectArray_t<PlayerBlockPush_t*>* ordered_player_block_pushes){
-     if(player_block_push->entangled){
-          auto* block_to_push = world->blocks.elements + player_block_push->block_index;
-          S16 entangle_index = block_to_push->entangle_index;
-          while(entangle_index != (S16)(player_block_push->block_index) && entangle_index >= 0){
-               auto* entangled_block = world->blocks.elements + entangle_index;
-
-               for(S16 i = 0; i < player_block_pushes->count; i++){
-                    auto* itr = player_block_pushes->elements + i;
-                    if((S16)(itr->block_index) == entangle_index){
-                         if(!player_block_push_add_ordered_physical_reqs(itr, player_block_pushes, world,
-                                                                         ordered_player_block_pushes)){
-                              return false;
-                         }
-                         break;
-                    }
-               }
-               entangle_index = entangled_block->entangle_index;
+     if(player_block_push->is_entangled()){
+          auto* entangled_player_block_push = player_block_pushes->elements + player_block_push->entangled_push_index;
+          if(!player_block_push_add_ordered_physical_reqs(entangled_player_block_push, player_block_pushes, world,
+                                                          ordered_player_block_pushes)){
+               return false;
           }
      }
 
@@ -2505,7 +2502,7 @@ bool player_block_push_add_ordered_entangled_reqs(PlayerBlockPush_t* player_bloc
 void add_entangled_player_block_pushes(ObjectArray_t<PlayerBlockPush_t>* player_block_pushes,
                                        Block_t* block_to_push, Direction_t push_direction,
                                        AllowedToPushResult_t* allowed_to_push_result, S16 player_index,
-                                       World_t* world);
+                                       S16 entangled_push_index, World_t* world);
 
 void add_pushes_for_against_results(BlockPushResult_t* push_result, ObjectArray_t<PlayerBlockPush_t>* player_block_pushes,
                                     S16 player_index, AllowedToPushResult_t* allowed_to_push_result, World_t* world){
@@ -2513,9 +2510,10 @@ void add_pushes_for_against_results(BlockPushResult_t* push_result, ObjectArray_
           if(!resize(player_block_pushes, player_block_pushes->count + 1)){
                LOG("%d: Ran out of memory trying to do player %d block pushes...\n", __LINE__, player_block_pushes->count + 1);
           }else{
-               auto* player_block_push = player_block_pushes->elements + (player_block_pushes->count - 1);
+               S16 against_entangled_push_index = (player_block_pushes->count - 1);
+               auto* player_block_push = player_block_pushes->elements + against_entangled_push_index;
                player_block_push->performed = false;
-               player_block_push->entangled = false;
+               player_block_push->entangled_push_index = -1;
                player_block_push->player_index = player_index;
                player_block_push->block_index = push_result->againsts_pushed.objects[a].block - world->blocks.elements;
                player_block_push->direction = push_result->againsts_pushed.objects[a].direction;
@@ -2523,7 +2521,7 @@ void add_pushes_for_against_results(BlockPushResult_t* push_result, ObjectArray_
 
                add_entangled_player_block_pushes(player_block_pushes, push_result->againsts_pushed.objects[a].block,
                                                  push_result->againsts_pushed.objects[a].direction, allowed_to_push_result,
-                                                 player_index, world);
+                                                 player_index, against_entangled_push_index, world);
           }
      }
 }
@@ -2531,7 +2529,7 @@ void add_pushes_for_against_results(BlockPushResult_t* push_result, ObjectArray_
 void add_entangled_player_block_pushes(ObjectArray_t<PlayerBlockPush_t>* player_block_pushes,
                                        Block_t* block_to_push, Direction_t push_direction,
                                        AllowedToPushResult_t* allowed_to_push_result, S16 player_index,
-                                       World_t* world){
+                                       S16 entangled_push_index, World_t* world){
      Block_t save_block = *block_to_push;
      auto push_result = block_push(block_to_push, push_direction, world, false, allowed_to_push_result->mass_ratio, nullptr, nullptr, false);
      add_pushes_for_against_results(&push_result, player_block_pushes, player_index, allowed_to_push_result, world);
@@ -2569,7 +2567,7 @@ void add_entangled_player_block_pushes(ObjectArray_t<PlayerBlockPush_t>* player_
 
                               auto* player_block_push = player_block_pushes->elements + (player_block_pushes->count - 1);
                               player_block_push->performed = false;
-                              player_block_push->entangled = true;
+                              player_block_push->entangled_push_index = entangled_push_index;
                               player_block_push->player_index = player_index;
                               player_block_push->block_index = entangled_block - world->blocks.elements;
                               player_block_push->direction = rotated_dir;
@@ -5943,15 +5941,19 @@ int main(int argc, char** argv){
                                         if(!resize(&player_block_pushes, player_block_pushes.count + 1)){
                                              LOG("%d: Ran out of memory trying to do player %d block pushes...\n", __LINE__, player_block_pushes.count + 1);
                                         }else{
-                                             auto* player_block_push = player_block_pushes.elements + (player_block_pushes.count - 1);
+                                             S16 entangled_push_index = (player_block_pushes.count - 1);
+
+                                             auto* player_block_push = player_block_pushes.elements + entangled_push_index;
                                              player_block_push->performed = false;
-                                             player_block_push->entangled = false;
+                                             player_block_push->entangled_push_index = -1;
                                              player_block_push->player_index = i;
                                              player_block_push->block_index = block_to_push - world.blocks.elements;
                                              player_block_push->direction = push_block_dir;
                                              player_block_push->allowed_to_push = allowed_result;
 
-                                             add_entangled_player_block_pushes(&player_block_pushes, block_to_push, push_block_dir, &allowed_result, i, &world);
+                                             add_entangled_player_block_pushes(&player_block_pushes, block_to_push,
+                                                                               push_block_dir, &allowed_result, i,
+                                                                               entangled_push_index, &world);
                                         }
                                    }
                               }
@@ -5969,14 +5971,14 @@ int main(int argc, char** argv){
                     //           auto* player_block_push = player_block_pushes.elements + i;
                     //           LOG("  player: %d, block: %d, dir: %s, entangled: %d, force: %f\n", player_block_push->player_index,
                     //               player_block_push->block_index, direction_to_string(player_block_push->direction),
-                    //               player_block_push->entangled, player_block_push->allowed_to_push.mass_ratio);
+                    //               player_block_push->is_entangled(), player_block_push->allowed_to_push.mass_ratio);
                     //      }
                     // }
 
                     // build a list of ordered block pushes based on dependencies
                     for(S16 i = 0; i < player_block_pushes.count; i++){
                          auto* player_block_push = player_block_pushes.elements + i;
-                         if (player_block_push->entangled){
+                         if (player_block_push->is_entangled()){
                               if(player_block_push_add_ordered_entangled_reqs(player_block_push, &player_block_pushes, &world, &ordered_player_block_pushes)){
                                    player_block_push_add_ordered_physical_reqs(player_block_push, &player_block_pushes, &world, &ordered_player_block_pushes);
                               }
@@ -5992,7 +5994,7 @@ int main(int argc, char** argv){
                     //           auto* player_block_push = ordered_player_block_pushes.elements[i];
                     //           LOG("  player: %d, block: %d, dir: %s, entangled: %d, force: %f\n", player_block_push->player_index,
                     //               player_block_push->block_index, direction_to_string(player_block_push->direction),
-                    //               player_block_push->entangled, player_block_push->allowed_to_push.mass_ratio);
+                    //               player_block_push->is_entangled(), player_block_push->allowed_to_push.mass_ratio);
                     //      }
                     // }
 
@@ -6009,7 +6011,7 @@ int main(int argc, char** argv){
 
                          BlockPushResult_t push_result = {};
 
-                         if (player_block_push->entangled){
+                         if (player_block_push->is_entangled()){
                               push_result = block_push(block_to_push, player_block_push->direction, &world, false,
                                                        player_block_push->allowed_to_push.mass_ratio, nullptr,
                                                        &player_block_push->push_from_entangler, false);
@@ -6020,7 +6022,7 @@ int main(int argc, char** argv){
                          }
 
                          if(!push_result.pushed || push_result.busy){
-                              if(player && !player_block_push->entangled){
+                              if(player && !player_block_push->is_entangled()){
                                    player->push_time = 0.0f;
                               }
                          }
