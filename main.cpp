@@ -49,7 +49,6 @@ Features:
 - When pushing blocks against blocks that are off-grid (due to pushing against a player), sometimes the blocks can't move towards other off-grid blocks
 - Players impact carry velocity until the block teleports
 - update get mass and block push to handle infinite mass cases
-- A visual way to tell which blocks are entangled
 - arrow kills player
 - Multiple players pushing blocks at once
 
@@ -2925,6 +2924,33 @@ int main(int argc, char** argv){
      }
 
      Camera_t camera {};
+
+     // init entangle colors
+     EntangleTints_t entangle_tints;
+     memset(&entangle_tints, 0, sizeof(entangle_tints));
+     {
+          if(!resize(&entangle_tints.tints, 8)){
+               LOG("failed to allocate 8 entangle tints\n");
+               return -1;
+          }
+
+          auto* entangle_tint = entangle_tints.tints.elements + 0;
+          *entangle_tint = BitmapPixel_t{32, 32, 32};
+          entangle_tint = entangle_tints.tints.elements + 1;
+          *entangle_tint = BitmapPixel_t{137, 56, 56};
+          entangle_tint = entangle_tints.tints.elements + 2;
+          *entangle_tint = BitmapPixel_t{69, 123, 77};
+          entangle_tint = entangle_tints.tints.elements + 3;
+          *entangle_tint = BitmapPixel_t{150, 111, 78};
+          entangle_tint = entangle_tints.tints.elements + 4;
+          *entangle_tint = BitmapPixel_t{70, 107, 138};
+          entangle_tint = entangle_tints.tints.elements + 5;
+          *entangle_tint = BitmapPixel_t{116, 90, 160};
+          entangle_tint = entangle_tints.tints.elements + 6;
+          *entangle_tint = BitmapPixel_t{55, 125, 108};
+          entangle_tint = entangle_tints.tints.elements + 7;
+          *entangle_tint = BitmapPixel_t{255, 255, 255};
+     }
 
      reset_map(player_start, &world, &undo, &camera);
      init(&editor);
@@ -6184,6 +6210,59 @@ int main(int argc, char** argv){
 
           if((suite && !show_suite) || play_demo.seek_frame >= 0) continue;
 
+          // calculate entangle_tints
+          {
+               U32 tint_index = 0;
+               for(S16 i = 0; i < world.blocks.count; i++){
+                    Block_t* block = world.blocks.elements + i;
+                    if(block->entangle_index < 0) continue;
+
+                    bool already_tinted = false;
+                    for(S16 t = 0; t < entangle_tints.block_to_tint_index.count; t++){
+                         auto* converter = entangle_tints.block_to_tint_index.elements + t;
+                         if(block == converter->block){
+                              already_tinted = true;
+                              break;
+                         }
+                    }
+                    if(already_tinted) continue;
+
+                    // count entanglers
+                    S16 entangler_count = 1;
+                    S16 entangle_index = block->entangle_index;
+                    while(entangle_index != i && entangle_index >= 0){
+                         entangler_count++;
+                         auto* entangled_block = world.blocks.elements + entangle_index;
+                         entangle_index = entangled_block->entangle_index;
+                    }
+
+                    // resize convert to account for all entanglers
+                    if(!resize(&entangle_tints.block_to_tint_index, entangle_tints.block_to_tint_index.count + entangler_count)){
+                         LOG("failed to allocate memory for %d entangle tints\n", entangle_tints.block_to_tint_index.count + entangler_count);
+                         break;
+                    }
+                    auto* new_converter = entangle_tints.block_to_tint_index.elements + (entangle_tints.block_to_tint_index.count - 1);
+                    new_converter->block = block;
+                    new_converter->index = tint_index;
+
+                    S16 entangler_itr = 2;
+                    entangle_index = block->entangle_index;
+                    while(entangle_index != i && entangle_index >= 0){
+                         auto* entangled_block = world.blocks.elements + entangle_index;
+
+                         new_converter = entangle_tints.block_to_tint_index.elements + (entangle_tints.block_to_tint_index.count - entangler_itr);
+                         new_converter->block = entangled_block;
+                         new_converter->index = tint_index;
+
+                         entangle_index = entangled_block->entangle_index;
+                         entangler_itr++;
+                    }
+
+                    tint_index++;
+                    tint_index %= entangle_tints.tints.count;
+               }
+          }
+
           // begin drawing
           Coord_t min = Coord_t{};
           Coord_t max = min + Coord_t{world.tilemap.width, world.tilemap.height};
@@ -6338,9 +6417,10 @@ int main(int argc, char** argv){
                          }
                     }
                }
+
                for(S16 y = max.y; y >= min.y; y--){
                     draw_world_row_solids(y, min.x, max.x, &world.tilemap, world.interactive_qt, world.block_qt,
-                                          &world.players, camera.world_offset, player_texture);
+                                          &world.players, camera.world_offset, player_texture, &entangle_tints);
 
                     glEnd();
                     glBindTexture(GL_TEXTURE_2D, arrow_texture);
@@ -6354,7 +6434,7 @@ int main(int argc, char** argv){
                     glBindTexture(GL_TEXTURE_2D, theme_texture);
                     glBegin(GL_QUADS);
                     glColor3f(1.0f, 1.0f, 1.0f);
-          }
+               }
 
                glEnd();
 
@@ -6584,6 +6664,8 @@ int main(int argc, char** argv){
           SDL_GL_SwapWindow(window);
 
           glBindFramebuffer(GL_FRAMEBUFFER, render_framebuffer);
+
+          destroy(&entangle_tints.block_to_tint_index);
      }
 
      if(play_demo.mode == DEMO_MODE_PLAY){

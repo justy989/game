@@ -39,6 +39,24 @@
 struct Editor_t;
 struct World_t;
 
+struct Color3f_t{
+     F32 red;
+     F32 green;
+     F32 blue;
+};
+
+struct BlockToTintIndex_t{
+     Block_t* block;
+     U32 index;
+};
+
+struct EntangleTints_t{
+     ObjectArray_t<BitmapPixel_t> tints;
+
+     // TODO: linear search could be improved
+     ObjectArray_t<BlockToTintIndex_t> block_to_tint_index;
+};
+
 Vec_t theme_frame(S16 x, S16 y);
 Vec_t arrow_frame(S16 x, S16 y);
 Vec_t player_frame(S16 x, S16 y);
@@ -67,7 +85,8 @@ void draw_world_row_flats(S16 y, S16 x_start, S16 x_end, TileMap_t* tilemap, Qua
 void draw_solid_interactive(Coord_t src_coord, Coord_t dst_coord, TileMap_t* tilemap,
                             QuadTreeNode_t<Interactive_t>* interactive_qt, Vec_t camera);
 void draw_world_row_solids(S16 y, S16 x_start, S16 x_end, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt,
-                           QuadTreeNode_t<Block_t>* block_qt, ObjectArray_t<Player_t>* players, Vec_t camera, GLuint player_texture);
+                           QuadTreeNode_t<Block_t>* block_qt, ObjectArray_t<Player_t>* players, Vec_t camera, GLuint player_texture,
+                           EntangleTints_t* entangle_tints);
 void draw_world_row_arrows(S16 y, S16 x_start, S16 x_end, const ArrowArray_t* arrow_aray, Vec_t camera);
 void draw_portal_blocks(Block_t** blocks, S16 block_count, Coord_t source_coord, Coord_t destination_coord, S8 portal_rotations, Vec_t camera);
 void draw_portal_players(ObjectArray_t<Player_t>* players, Rect_t region, Coord_t source_coord, Coord_t destination_coord,
@@ -81,3 +100,5 @@ void draw_text(const char* message, Vec_t pos, Vec_t dim = Vec_t{TEXT_CHAR_WIDTH
 void draw_editor(Editor_t* editor, World_t* world, Camera_t* camera, Vec_t mouse_screen,
                  GLuint theme_texture, GLuint text_texture);
 void draw_checkbox(Checkbox_t* checkbox, Vec_t scroll);
+
+Color3f_t rgb_to_color3f(BitmapPixel_t* p);

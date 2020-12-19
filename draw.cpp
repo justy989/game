@@ -263,11 +263,6 @@ void draw_block(Block_t* block, Vec_t pos_vec, U8 portal_rotations){
           draw_double_theme_frame(pos_vec, tex_vec);
           glColor3f(1.0f, 1.0f, 1.0f);
      }
-
-     if(block->entangle_index >= 0){
-          tex_vec = theme_frame(0, 22);
-          draw_theme_frame(pos_vec, tex_vec);
-     }
 }
 
 void draw_interactive(Interactive_t* interactive, Vec_t pos_vec, Coord_t coord,
@@ -676,7 +671,8 @@ void draw_solid_interactive(Coord_t src_coord, Coord_t dst_coord, TileMap_t* til
 }
 
 void draw_world_row_solids(S16 y, S16 x_start, S16 x_end, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt,
-                           QuadTreeNode_t<Block_t>* block_qt, ObjectArray_t<Player_t>* players, Vec_t camera, GLuint player_texture){
+                           QuadTreeNode_t<Block_t>* block_qt, ObjectArray_t<Player_t>* players, Vec_t camera, GLuint player_texture,
+                           EntangleTints_t* entangle_tints){
      // solid layer
      for(S16 x = x_start; x <= x_end; x++){
           Coord_t coord {x, y};
@@ -699,7 +695,33 @@ void draw_world_row_solids(S16 y, S16 x_start, S16 x_end, TileMap_t* tilemap, Qu
           if(block->pos.z < 0) continue;
           auto draw_block_pos = block->pos;
           draw_block_pos.pixel.y += block->pos.z;
-          draw_block(block, pos_to_vec(draw_block_pos) + camera, 0);
+          auto final_pos = pos_to_vec(draw_block_pos) + camera;
+          draw_block(block, final_pos, 0);
+
+          if(block->entangle_index >= 0){
+               U32 tint_index = -1;
+               for(S16 t = 0; t < entangle_tints->block_to_tint_index.count; t++){
+                    auto* converter = entangle_tints->block_to_tint_index.elements + t;
+                    if(converter->block == block){
+                         tint_index = converter->index;
+                         break;
+                    }
+               }
+
+               if(tint_index >= 0){
+                    // figure out tint
+                    auto tex_vec = theme_frame(12, 29);
+                    auto* entangle_tint = entangle_tints->tints.elements + tint_index;
+
+                    // draw tint on entangle
+                    auto tint_color = rgb_to_color3f(entangle_tint);
+                    glColor3f(tint_color.red, tint_color.green, tint_color.blue);
+                    draw_double_theme_frame(final_pos, tex_vec);
+
+                    // reset color
+                    glColor3f(1.0f, 1.0f, 1.0f);
+               }
+          }
      }
 
      glEnd();
@@ -1064,4 +1086,12 @@ void draw_checkbox(Checkbox_t* checkbox, Vec_t scroll){
     if(!checkbox->checked) tex.y += THEME_FRAME_HEIGHT * 0.5f;
     Vec_t tex_dim {THEME_FRAME_WIDTH * 0.5f, THEME_FRAME_HEIGHT * 0.5f};
     draw_screen_texture(pos, tex, dim, tex_dim);
+}
+
+Color3f_t rgb_to_color3f(BitmapPixel_t* p){
+     Color3f_t color3f;
+     color3f.red = static_cast<F32>(p->red) / 255.0f;
+     color3f.green = static_cast<F32>(p->green) / 255.0f;
+     color3f.blue = static_cast<F32>(p->blue) / 255.0f;
+     return color3f;
 }
