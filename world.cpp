@@ -1763,11 +1763,22 @@ void update_block_momentum_from_push(Block_t* block, Direction_t direction, Push
      }
 }
 
+static bool adjacent_block_has_just_been_pushed(Block_t* block, Direction_t direction){
+     bool horizontal = direction_is_horizontal(direction);
+     MoveState_t move_state = horizontal ? block->horizontal_move.state : block->vertical_move.state;
+     if(move_state == MOVE_STATE_STARTING &&
+        direction_in_mask(vec_direction_mask(block->accel), direction)){
+          return true;
+     }
+
+     return false;
+}
+
 bool check_entangled_against_block_able_to_move(Block_t* block, Direction_t direction, Block_t* against_block, Direction_t against_direction, bool both_on_ice, World_t* world){
      if(direction == DIRECTION_COUNT) return false;
 
      // if block is entangled with the block it collides with, check if the entangled block can move, this is kind of duplicate work
-     bool only_against_entanglers = true;
+     bool only_against_stationary_entanglers = true;
      Block_t* entangled_against_block = against_block;
      while(entangled_against_block){
           Direction_t check_direction = against_direction;
@@ -1784,15 +1795,16 @@ bool check_entangled_against_block_able_to_move(Block_t* block, Direction_t dire
           if(next_against_block == nullptr) break;
           if(!blocks_are_entangled(entangled_against_block, next_against_block, &world->blocks) &&
              !block_on_ice(next_against_block->pos, entangled_against_block->pos_delta, entangled_against_block->cut,
-                           &world->tilemap, world->interactive_qt, world->block_qt)){
-               only_against_entanglers = false;
+                           &world->tilemap, world->interactive_qt, world->block_qt) &&
+             !adjacent_block_has_just_been_pushed(next_against_block, direction)){
+               only_against_stationary_entanglers = false;
                break;
           }
 
           entangled_against_block = next_against_block;
      }
 
-     if(!only_against_entanglers){
+     if(!only_against_stationary_entanglers){
           return false;
      }
 
@@ -1843,7 +1855,9 @@ bool resolve_push_against_block(Block_t* block, MoveDirection_t move_direction, 
      }else if((on_ice = block_on_ice(against_block->pos, against_block->pos_delta, against_block->cut,
                                      &world->tilemap, world->interactive_qt, world->block_qt))){
           // if the block originally pushed is not on ice, we don't push this one either
-          if(!pushed_block_on_ice && !are_entangled) return false;
+          if(!pushed_block_on_ice && !are_entangled){
+               return false;
+          }
 
           if(pushed_block_on_ice) both_on_ice = true;
 
@@ -2015,17 +2029,11 @@ bool resolve_push_against_block(Block_t* block, MoveDirection_t move_direction, 
           bool adjacent_block_already_moving = false;
 
           {
-               bool horizontal = direction_is_horizontal(first_against_block_push_dir);
-               MoveState_t move_state = horizontal ? against_block->horizontal_move.state : against_block->vertical_move.state;
-               if(move_state == MOVE_STATE_STARTING &&
-                  direction_in_mask(vec_direction_mask(against_block->accel), first_against_block_push_dir)){
+               if(adjacent_block_has_just_been_pushed(against_block, first_against_block_push_dir)){
                     adjacent_block_already_moving = true;
                }
 
-               horizontal = direction_is_horizontal(second_against_block_push_dir);
-               move_state = horizontal ? against_block->horizontal_move.state : against_block->vertical_move.state;
-               if(move_state == MOVE_STATE_STARTING &&
-                  direction_in_mask(vec_direction_mask(against_block->accel), second_against_block_push_dir)){
+               if(adjacent_block_has_just_been_pushed(against_block, second_against_block_push_dir)){
                     adjacent_block_already_moving = true;
                }
           }
@@ -2119,7 +2127,9 @@ bool block_would_push(Block_t* block, Position_t pos, Vec_t pos_delta, Direction
           break;
      }
 
-     if(transfers_force) return false;
+     if(transfers_force){
+          return false;
+     }
 
      if(!pushed_by_ice){
           auto against_block = rotated_entangled_blocks_against_centroid(block, direction, world->block_qt, &world->blocks,
