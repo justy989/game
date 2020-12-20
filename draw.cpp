@@ -746,7 +746,7 @@ void draw_world_row_solids(S16 y, S16 x_start, S16 x_end, TileMap_t* tilemap, Qu
                    glBegin(GL_QUADS);
 
                    draw_pos -= Vec_t{HALF_TILE_SIZE, HALF_TILE_SIZE};
-                   auto tex_vec = theme_frame(0, 22);
+                   auto tex_vec = theme_frame(12, 29);
                    draw_theme_frame(draw_pos, tex_vec);
 
                    glEnd();

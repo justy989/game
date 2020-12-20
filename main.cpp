@@ -50,7 +50,8 @@ Features:
 - Players impact carry velocity until the block teleports
 - update get mass and block push to handle infinite mass cases
 - arrow kills player
-- Multiple players pushing blocks at once
+- Multiple players pushing the same block
+- Block collisions on ice should also do graph dependency ?
 
 Cleanup:
 - Probably make a get_x_component(), get_y_component() for position as well ? That could help reduce code
