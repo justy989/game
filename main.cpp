@@ -18,6 +18,9 @@ Puzzle Ideas:
 - Portal puzzle where you need to create an infinite cycle of blocks flowing into and out of a portal. Then, you need to push
   a block perpendicular through the path. The goal is the make the infinite cycle in a certain way to allow the final block
   to be pushed through
+- I'm really not sure if there is anything interesting to do with the fact that 2 players can space themselves apart to effectively
+  shoot multiple arrows in the same direction in quick succession. It's seems like a cool subtle idea, but it also mostly seems to
+  be about very precise timing.
 
 Current bugs:
 - a block travelling diagonally at a wall will stop on both axis' against the wall because of the collision
@@ -186,6 +189,8 @@ struct PlayerBlockPush_t{
      PushFromEntangler_t push_from_entangler = {};
      S16 entangled_push_index = -1; // -1 sentinal that it isn't entangled
      bool performed = false;
+     bool duplicate = false;
+     ObjectArray_t<S16> additional_player_indices = {};
 
      bool is_entangled(){return entangled_push_index >= 0;}
 };
@@ -2545,12 +2550,14 @@ void add_pushes_for_against_results(BlockPushResult_t* push_result, ObjectArray_
           }else{
                S16 against_entangled_push_index = (player_block_pushes->count - 1);
                auto* player_block_push = player_block_pushes->elements + against_entangled_push_index;
+               player_block_push->duplicate = false;
                player_block_push->performed = false;
                player_block_push->entangled_push_index = -1;
                player_block_push->player_index = player_index;
                player_block_push->block_index = push_result->againsts_pushed.objects[a].block - world->blocks.elements;
                player_block_push->direction = push_result->againsts_pushed.objects[a].direction;
                player_block_push->allowed_to_push = *allowed_to_push_result;
+               memset(&player_block_push->additional_player_indices, 0, sizeof(player_block_push->additional_player_indices));
 
                add_entangled_player_block_pushes(player_block_pushes, push_result->againsts_pushed.objects[a].block,
                                                  push_result->againsts_pushed.objects[a].direction, allowed_to_push_result,
@@ -2599,6 +2606,7 @@ void add_entangled_player_block_pushes(ObjectArray_t<PlayerBlockPush_t>* player_
                               entangle_allowed_result.mass_ratio = allowed_to_push_result->mass_ratio * entangled_mass_ratio * entangle_allowed_result.mass_ratio;
 
                               auto* player_block_push = player_block_pushes->elements + (player_block_pushes->count - 1);
+                              player_block_push->duplicate = false;
                               player_block_push->performed = false;
                               player_block_push->entangled_push_index = entangled_push_index;
                               player_block_push->player_index = player_index;
@@ -2606,6 +2614,7 @@ void add_entangled_player_block_pushes(ObjectArray_t<PlayerBlockPush_t>* player_
                               player_block_push->direction = rotated_dir;
                               player_block_push->allowed_to_push = entangle_allowed_result;
                               player_block_push->push_from_entangler = from_entangler;
+                              memset(&player_block_push->additional_player_indices, 0, sizeof(player_block_push->additional_player_indices));
 
                               Block_t save_entangled_block = *entangled_block;
                               auto entangled_push_result = block_push(entangled_block, rotated_dir, world, false, entangle_allowed_result.mass_ratio, nullptr, nullptr, false);
@@ -6006,12 +6015,14 @@ int main(int argc, char** argv){
                                              S16 entangled_push_index = (player_block_pushes.count - 1);
 
                                              auto* player_block_push = player_block_pushes.elements + entangled_push_index;
+                                             player_block_push->duplicate = false;
                                              player_block_push->performed = false;
                                              player_block_push->entangled_push_index = -1;
                                              player_block_push->player_index = i;
                                              player_block_push->block_index = block_to_push - world.blocks.elements;
                                              player_block_push->direction = push_block_dir;
                                              player_block_push->allowed_to_push = allowed_result;
+                                             memset(&player_block_push->additional_player_indices, 0, sizeof(player_block_push->additional_player_indices));
 
                                              add_entangled_player_block_pushes(&player_block_pushes, block_to_push,
                                                                                push_block_dir, &allowed_result, i,
@@ -6027,20 +6038,43 @@ int main(int argc, char** argv){
 
                if(player_block_pushes.count > 0){
                     // for debugging
-                    // if(player_block_pushes.count > 0){
-                    //      LOG("%d player block pushes on frame %ld\n", player_block_pushes.count, frame_count);
-                    //      for(S16 i = 0; i < player_block_pushes.count; i++){
-                    //           auto* player_block_push = player_block_pushes.elements + i;
-                    //           LOG("  player: %d, block: %d, dir: %s, entangled: %d, force: %f\n", player_block_push->player_index,
-                    //               player_block_push->block_index, direction_to_string(player_block_push->direction),
-                    //               player_block_push->is_entangled(), player_block_push->allowed_to_push.mass_ratio);
-                    //      }
-                    // }
+                    if(player_block_pushes.count > 0){
+                         LOG("%d player block pushes on frame %ld\n", player_block_pushes.count, frame_count);
+                         for(S16 i = 0; i < player_block_pushes.count; i++){
+                              auto* player_block_push = player_block_pushes.elements + i;
+                              LOG("  player: %d, block: %d, dir: %s, entangled: %d, force: %f\n", player_block_push->player_index,
+                                  player_block_push->block_index, direction_to_string(player_block_push->direction),
+                                  player_block_push->is_entangled(), player_block_push->allowed_to_push.mass_ratio);
+                         }
+                    }
+
+                    // consolidate pushes on the same block
+                    for(S16 i = 0; i < player_block_pushes.count; i++){
+                         auto* player_block_push = player_block_pushes.elements + i;
+                         for(S16 c = i + 1; c < player_block_pushes.count; c++){
+                              auto* other_player_block_push = player_block_pushes.elements + c;
+
+                              // if the pushes match in block and direction, then combine into a single push and add the forces
+                              if(player_block_push->block_index == other_player_block_push->block_index &&
+                                 player_block_push->direction == other_player_block_push->direction){
+                                   if(!resize(&player_block_push->additional_player_indices, player_block_push->additional_player_indices.count + 1)){
+                                        LOG("failed to allocate %d additional player indices\n", player_block_push->additional_player_indices.count + 1);
+                                   }else{
+                                        other_player_block_push->duplicate = true;
+                                        auto* new_index = player_block_push->additional_player_indices.elements + (player_block_push->additional_player_indices.count - 1);
+                                        *new_index = other_player_block_push->player_index;
+                                        player_block_push->allowed_to_push.mass_ratio += other_player_block_push->allowed_to_push.mass_ratio;
+                                   }
+                              }
+                         }
+                    }
 
                     // build a list of ordered block pushes based on dependencies
                     for(S16 i = 0; i < player_block_pushes.count; i++){
                          auto* player_block_push = player_block_pushes.elements + i;
-                         if (player_block_push->is_entangled()){
+                         if(player_block_push->duplicate) continue;
+
+                         if(player_block_push->is_entangled()){
                               if(player_block_push_add_ordered_entangled_reqs(player_block_push, &player_block_pushes, &world, &ordered_player_block_pushes, &restore_blocks)){
                                    player_block_push_add_ordered_physical_reqs(player_block_push, &player_block_pushes, &world, &ordered_player_block_pushes, &restore_blocks);
                               }
@@ -6095,6 +6129,11 @@ int main(int argc, char** argv){
                          if(!push_result.pushed || push_result.busy){
                               if(player && !player_block_push->is_entangled()){
                                    player->push_time = 0.0f;
+
+                                   for(S16 p = 0; p < player_block_push->additional_player_indices.count; p++){
+                                        auto* other_player = world.players.elements + player_block_push->additional_player_indices.elements[p];
+                                        other_player->push_time = 0.0f;
+                                   }
                               }
                          }
 
@@ -6103,6 +6142,11 @@ int main(int argc, char** argv){
                          // if the block raises up while we are pushing it, reset the push time
                          // TODO: This is incorrect because we could just be normally on top of a block pushing another block
                          if(block_to_push->pos.z > 0) player->push_time = -0.5f;
+                    }
+
+                    // cleanup
+                    for(S16 i = 0; i < player_block_pushes.count; i++){
+                         destroy(&player_block_pushes.elements[i].additional_player_indices);
                     }
 
                     destroy(&player_block_pushes);
