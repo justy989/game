@@ -1694,7 +1694,6 @@ struct DealWithPushResult_t{
      BlockMomentumChanges_t momentum_changes;
      Block_t* block_receiving_force = nullptr;
      Direction_t final_direction = DIRECTION_COUNT;
-     F32 new_vel = 0;
      bool reapply_push = false;
 };
 
@@ -1780,7 +1779,6 @@ DealWithPushResult_t deal_with_push_result(Block_t* pusher, Direction_t directio
                  BlockMomentumChange_t momentum_change {};
                  momentum_change.init(block_receiving_force_index, collision.pusher_mass, collision.pusher_velocity, direction_is_horizontal(direction_to_check));
                  result.momentum_changes.insert(&momentum_change);
-                 result.new_vel = collision.pusher_velocity;
              }else{
                  if(opposite_entangle_reversed){
                      collision.pushee_mass *= 2;
@@ -1795,7 +1793,6 @@ DealWithPushResult_t deal_with_push_result(Block_t* pusher, Direction_t directio
                  BlockMomentumChange_t momentum_change {};
                  momentum_change.init(block_receiving_force_index, pusher_momentum.mass, elastic_result.first_final_velocity, direction_is_horizontal(direction_to_check));
                  result.momentum_changes.insert(&momentum_change);
-                 result.new_vel = elastic_result.first_final_velocity;
              }
          }
      }
@@ -2021,35 +2018,13 @@ BlockCollisionPushResult_t block_collision_push(BlockPush_t* push, World_t* worl
           // rotate by the portal and entangle rotations
           Direction_t push_direction = direction_rotate_clockwise(direction, total_push_rotations);
 
-          F32 current_collision_block_vel = 0;
-          F32 current_pos_delta = 0;
-
-          switch(push_direction){
-          default:
-               break;
-          case DIRECTION_LEFT:
-          case DIRECTION_RIGHT:
-               current_collision_block_vel = pushee->vel.x;
-               current_pos_delta = pushee->pos_delta.x;
-               break;
-          case DIRECTION_UP:
-          case DIRECTION_DOWN:
-               current_collision_block_vel = pushee->vel.y;
-               current_pos_delta = pushee->pos_delta.y;
-               break;
-          }
-
-          auto push_pos = pushee->pos;
-          auto push_pos_delta = pushee->pos_delta;
-
-          if(pushee->teleport){
-               push_pos = pushee->teleport_pos;
-               push_pos_delta = pushee->teleport_pos_delta;
-          }
+          auto push_pos = block_get_position(pushee);
+          auto push_pos_delta = block_get_pos_delta(pushee);
 
           TransferMomentum_t instant_momentum = get_block_push_pusher_momentum(push, world, direction);
           instant_momentum.vel = rotate_vec_clockwise_to_see_if_negates(instant_momentum.vel, direction_is_horizontal(direction), total_push_rotations);
 
+          // TODO: we should not need this once we have momentum transfers apply to all entanglers
           if(push->opposite_entangle_reversed){
                instant_momentum.mass *= 2;
           }
@@ -2079,9 +2054,6 @@ BlockCollisionPushResult_t block_collision_push(BlockPush_t* push, World_t* worl
                    pusher = pushee;
                    local_rotations = 0;
                }
-
-               S16 pusher_mass = get_block_stack_mass(world, pusher);
-               pusher_mass = (S16)((F32)(pusher_mass) * (1.0f / (F32)(push->pushers[p].collided_with_block_count)));
 
                auto deal_with_push_result_result = deal_with_push_result(pusher, direction_to_check, local_rotations,
                                                                          world, &push_result, push->pushers[p].collided_with_block_count,
