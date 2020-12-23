@@ -135,7 +135,7 @@ struct BlockPusher_t{
      bool opposite_entangle_reversed = false;
 };
 
-struct BlockPush_t{
+struct BlockMomentumPush_t{
      BlockPusher_t pushers[MAX_BLOCK_PUSHERS];
      S8 pusher_count = 0;
      S16 pushee_index = -1;
@@ -186,11 +186,11 @@ struct BlockPush_t{
 };
 
 template <S16 MAX_BLOCK_PUSHES>
-struct BlockPushes_t{
-     BlockPush_t pushes[MAX_BLOCK_PUSHES];
+struct BlockMomentumPushes_t{
+     BlockMomentumPush_t pushes[MAX_BLOCK_PUSHES];
      S16 count = 0;
 
-     bool add(BlockPush_t* push){
+     bool add(BlockMomentumPush_t* push){
           if(count < MAX_BLOCK_PUSHES){
                pushes[count] = *push;
                count++;
@@ -202,14 +202,14 @@ struct BlockPushes_t{
 
      // TODO: it'd be nice if this wasn't N^2
      template <S16 ALTERNATE_MAX_BLOCK_PUSHES>
-     void merge(BlockPushes_t<ALTERNATE_MAX_BLOCK_PUSHES>* alternate_pushes){
+     void merge(BlockMomentumPushes_t<ALTERNATE_MAX_BLOCK_PUSHES>* alternate_pushes){
           for(S16 p = 0; p < alternate_pushes->count; p++){
-               BlockPush_t* alternate = alternate_pushes->pushes + p;
+               BlockMomentumPush_t* alternate = alternate_pushes->pushes + p;
                bool unique = true;
 
                if(alternate->pusher_count > 0){
                     for(S16 i = 0; i < count; i++){
-                         BlockPush_t* check = pushes + i;
+                         BlockMomentumPush_t* check = pushes + i;
                          if(check->pusher_count <= 0) continue;
                          if((check->pushers[0].index == alternate->pushers[0].index &&
                              check->pushee_index == alternate->pushee_index) ||
@@ -361,7 +361,7 @@ using BlockMomentumChanges_t = StaticObjectArray_t<BlockMomentumChange_t, MAX_BL
 #define MAX_BLOCK_PUSHES 128
 
 struct BlockCollisionPushResult_t{
-     BlockPushes_t<MAX_BLOCK_PUSHES> additional_block_pushes;
+     BlockMomentumPushes_t<MAX_BLOCK_PUSHES> additional_block_pushes;
      BlockMomentumChanges_t momentum_changes;
      bool reapply_push = false;
 };
@@ -448,8 +448,8 @@ bool blocks_are_entangled(Block_t* a, Block_t* b, ObjectArray_t<Block_t>* blocks
 bool blocks_are_entangled(S16 a_index, S16 b_index, ObjectArray_t<Block_t>* blocks_array);
 
 void apply_block_change(ObjectArray_t<Block_t>* blocks_array, BlockChange_t* change);
-TransferMomentum_t get_block_push_pusher_momentum(BlockPush_t* push, World_t* world, Direction_t push_direction);
-BlockCollisionPushResult_t block_collision_push(BlockPush_t* push, World_t* world);
+TransferMomentum_t get_block_push_pusher_momentum(BlockMomentumPush_t* push, World_t* world, Direction_t push_direction);
+BlockCollisionPushResult_t block_collision_push(BlockMomentumPush_t* push, World_t* world);
 
 FindBlocksThroughPortalResult_t find_blocks_through_portals(Coord_t coord, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt, QuadTreeNode_t<Block_t>* block_qt,
                                                             bool require_on = true);

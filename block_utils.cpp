@@ -1693,7 +1693,6 @@ Interactive_t* block_is_teleporting(Block_t* block, QuadTreeNode_t<Interactive_t
 struct DealWithPushResult_t{
      BlockMomentumChanges_t momentum_changes;
      Block_t* block_receiving_force = nullptr;
-     Direction_t final_direction = DIRECTION_COUNT;
      bool reapply_push = false;
 };
 
@@ -1707,49 +1706,45 @@ DealWithPushResult_t deal_with_push_result(Block_t* pusher, Direction_t directio
      S8 total_against_rotations = ((DIRECTION_COUNT - portal_rotations) % DIRECTION_COUNT);
 
      auto pusher_direction = direction_opposite(direction_to_check);
-
      auto block_receiving_force = pusher;
 
-     // TODO: handle multiple blocks we could be against
-     // Work backwards through the chain of against blocks to find the block that receives the force
-     while(true){
-         auto block_receiving_force_final_pos = block_receiving_force->pos + block_receiving_force->pos_delta;
-         if(block_receiving_force->teleport) block_receiving_force_final_pos = block_receiving_force->teleport_pos + block_receiving_force->teleport_pos_delta;
+     // TODO: handle across multiple chains
+     auto chain_results = find_block_chain(pusher, direction_to_check, world->block_qt, world->interactive_qt, &world->tilemap, 0, nullptr);
+     if(chain_results.count > 0 && chain_results.objects[0].count > 0){
+          for(S16 i  = 0; i < chain_results.objects[0].count; i++){
+               auto* against_block_result = chain_results.objects[0].objects + i;
 
-         auto block_receiving_force_cut = block_get_cut(block_receiving_force);
-         auto adjacent_results = block_against_other_blocks(block_receiving_force_final_pos, block_receiving_force_cut, direction_to_check,
-                                                            world->block_qt, world->interactive_qt, &world->tilemap);
+               // if the relevant vel is 0, then the most recent connected block is the one that can absorb the energy of the collision
+               // this happens when a block falls off of another block (into a slot) and collides with another block all at the same time
+               auto new_direction_to_check = direction_rotate_clockwise(direction_to_check,
+                                                                        against_block_result->rotations_through_portal);
+               bool horizontal_direction = direction_is_horizontal(new_direction_to_check);
+               F32 vel = horizontal_direction ? against_block_result->block->vel.x : against_block_result->block->vel.y;
+               if(vel == 0) break;
 
-         // ignore if we are against ourselves
-         if(adjacent_results.count && adjacent_results.objects[0].block != block_receiving_force){
-             auto new_direction_to_check = direction_rotate_clockwise(direction_to_check, adjacent_results.objects[0].rotations_through_portal);
+               // TODO: Is this right ? It seems like we should really take into account how much force was applied to
+               // determine whether it should impact the last or second to last block in the chain
+               // if a block has already received force to respond to, we want to apply the force to the block before it in the chain
+               if(against_block_result->block->already_received_forceback_from_chain){
+                   against_block_result->block->already_received_forceback_from_chain = false;
+                   break;
+               }
 
-             // if the relevant vel is 0, then the most recent connected block is the one that can absorb the energy of the collision
-             // this happens when a block falls off of another block (into a slot) and collides with another block all at the same time
-             bool horizontal_direction = direction_is_horizontal(new_direction_to_check);
-             F32 vel = horizontal_direction ? adjacent_results.objects[0].block->vel.x : adjacent_results.objects[0].block->vel.y;
-             if(vel == 0) break;
+               // TODO: figure out what this is for to comment it
+               if(chain_results.objects[0].objects[i].block != block_receiving_force){
+                    result.reapply_push = true;
+                    if(horizontal_direction){
+                        if(pusher->vel.x != 0 && pusher->horizontal_move.state == MOVE_STATE_IDLING) pusher->horizontal_move.state = MOVE_STATE_COASTING;
+                    }else{
+                        if(pusher->vel.y != 0 && pusher->vertical_move.state == MOVE_STATE_IDLING) pusher->vertical_move.state = MOVE_STATE_COASTING;
+                    }
+               }
 
-             // end the chain early for blocks that have already received from this chain
-             if(adjacent_results.objects[0].block->already_received_forceback_from_chain){
-                 adjacent_results.objects[0].block->already_received_forceback_from_chain = false;
-                 break;
-             }
-
-             result.reapply_push = true;
-             if(horizontal_direction){
-                 if(pusher->vel.x != 0 && pusher->horizontal_move.state == MOVE_STATE_IDLING) pusher->horizontal_move.state = MOVE_STATE_COASTING;
-             }else{
-                 if(pusher->vel.y != 0 && pusher->vertical_move.state == MOVE_STATE_IDLING) pusher->vertical_move.state = MOVE_STATE_COASTING;
-             }
-
-             block_receiving_force = adjacent_results.objects[0].block;
-             direction_to_check = direction_rotate_clockwise(direction_to_check, adjacent_results.objects[0].rotations_through_portal);
-             total_against_rotations += adjacent_results.objects[0].rotations_through_portal;
-             total_against_rotations %= DIRECTION_COUNT;
-         }else{
-             break;
-         }
+               block_receiving_force = against_block_result->block;
+               total_against_rotations += against_block_result->rotations_through_portal;
+               total_against_rotations %= DIRECTION_COUNT;
+               direction_to_check = new_direction_to_check;
+          }
      }
 
      // if the force flows through, set the flag in the last block in the chain to mark it has received force (from this function down below)
@@ -1758,7 +1753,6 @@ DealWithPushResult_t deal_with_push_result(Block_t* pusher, Direction_t directio
      }
 
      result.block_receiving_force = block_receiving_force;
-     result.final_direction = direction_to_check;
 
      S16 block_receiving_force_index = block_receiving_force - world->blocks.elements;
 
@@ -1862,8 +1856,8 @@ void push_entangled_block(Block_t* block, World_t* world, Direction_t push_dir, 
      }
 }
 
-BlockPushes_t<MAX_BLOCK_PUSHES> push_entangled_block_pushes(Block_t* block, World_t* world, Direction_t push_dir, Block_t* pusher, S16 collided_with_block_count, TransferMomentum_t* instant_momentum){
-     BlockPushes_t<MAX_BLOCK_PUSHES> result;
+BlockMomentumPushes_t<MAX_BLOCK_PUSHES> push_entangled_block_pushes(Block_t* block, World_t* world, Direction_t push_dir, Block_t* pusher, S16 collided_with_block_count, TransferMomentum_t* instant_momentum){
+     BlockMomentumPushes_t<MAX_BLOCK_PUSHES> result;
      if(block->entangle_index < 0) return result;
 
      S16 block_mass = block_get_mass(block);
@@ -1901,7 +1895,7 @@ BlockPushes_t<MAX_BLOCK_PUSHES> push_entangled_block_pushes(Block_t* block, Worl
 
                auto allowed_result = allowed_to_push(world, entangled_block, rotated_dir, mass_ratio, &rotated_instant_momentum);
                if(allowed_result.push){
-                    BlockPush_t push;
+                    BlockMomentumPush_t push;
                     push.add_pusher(get_block_index(world, pusher), collided_with_block_count);
                     push.pushee_index = get_block_index(world, entangled_block);
                     push.direction_mask = direction_to_direction_mask(rotated_dir);
@@ -1968,7 +1962,7 @@ void apply_block_change(ObjectArray_t<Block_t>* blocks_array, BlockChange_t* cha
      }
 }
 
-TransferMomentum_t get_block_push_pusher_momentum(BlockPush_t* push, World_t* world, Direction_t push_direction){
+TransferMomentum_t get_block_push_pusher_momentum(BlockMomentumPush_t* push, World_t* world, Direction_t push_direction){
      TransferMomentum_t result {0, 0};
      F32 total_momentum = 0;
 
@@ -2005,7 +1999,7 @@ TransferMomentum_t get_block_push_pusher_momentum(BlockPush_t* push, World_t* wo
      return result;
 }
 
-BlockCollisionPushResult_t block_collision_push(BlockPush_t* push, World_t* world){
+BlockCollisionPushResult_t block_collision_push(BlockMomentumPush_t* push, World_t* world){
      BlockCollisionPushResult_t result;
 
      S8 total_push_rotations = (push->portal_rotations + push->entangle_rotations) % DIRECTION_COUNT;

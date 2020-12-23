@@ -945,7 +945,7 @@ void handle_blocks_colliding_moving_in_the_same_direction_vertical(Block_t* bloc
      }
 }
 
-void generate_pushes_from_collision(World_t* world, CheckBlockCollisionResult_t* collision_result, BlockPushes_t<128>* block_pushes){
+void generate_pushes_from_collision(World_t* world, CheckBlockCollisionResult_t* collision_result, BlockMomentumPushes_t<128>* block_pushes){
      if(collision_result->unused) return;
      Block_t* block = world->blocks.elements + collision_result->block_index;
      Position_t block_pos = block_get_position(block);
@@ -1219,7 +1219,7 @@ void generate_pushes_from_collision(World_t* world, CheckBlockCollisionResult_t*
           // if we already created a push (for the alternate block in the alternate direction), do not create this push
           bool found_pair_push = false;
           for(S16 p = 0; p < block_pushes->count; p++){
-               BlockPush_t* push = block_pushes->pushes + p;
+               BlockMomentumPush_t* push = block_pushes->pushes + p;
                if(push->pushee_index == collision_result->block_index &&
                   push->pushers[0].index == collided_with_block->block_index &&
                   push->direction_mask == opposite_direction_mask){
@@ -1228,7 +1228,7 @@ void generate_pushes_from_collision(World_t* world, CheckBlockCollisionResult_t*
           }
 
           if(!found_pair_push){
-               BlockPush_t block_push {};
+               BlockMomentumPush_t block_push {};
 
                block_push.add_pusher(collision_result->block_index, against_block_count);
                block_push.pushee_index = collided_with_block->block_index;
@@ -1659,7 +1659,7 @@ Pixel_t get_corner_pixel_from_pos(Position_t pos, DirectionMask_t from_center){
      return result;
 }
 
-bool block_pushes_are_the_same_collision(BlockPushes_t<128>* block_pushes, S16 start_index, S16 end_index, S16 block_index){
+bool block_pushes_are_the_same_collision(BlockMomentumPushes_t<128>* block_pushes, S16 start_index, S16 end_index, S16 block_index){
      if(start_index < 0 || start_index > block_pushes->count) return false;
      if(end_index < 0 || end_index > block_pushes->count) return false;
      if(start_index > end_index) return false;
@@ -1692,8 +1692,8 @@ bool block_pushes_are_the_same_collision(BlockPushes_t<128>* block_pushes, S16 s
              start_push.direction_mask == end_push.direction_mask);
 }
 
-void add_entangle_pushes_for_end_of_chain_blocks_on_ice(World_t* world, S16 push_index, BlockPushes_t<128>* block_pushes, S16 pusher_rotations = 0){
-     BlockPush_t* push = block_pushes->pushes + push_index;
+void add_entangle_pushes_for_end_of_chain_blocks_on_ice(World_t* world, S16 push_index, BlockMomentumPushes_t<128>* block_pushes, S16 pusher_rotations = 0){
+     BlockMomentumPush_t* push = block_pushes->pushes + push_index;
 
      Block_t* pushee = world->blocks.elements + push->pushee_index;
 
@@ -1747,7 +1747,7 @@ void add_entangle_pushes_for_end_of_chain_blocks_on_ice(World_t* world, S16 push
                     Block_t* chain_block = chain->objects[e].block;
                     if(!blocks_are_entangled(chain_block, end_block, &world->blocks)) continue;
 
-                    BlockPush_t new_block_push = *push;
+                    BlockMomentumPush_t new_block_push = *push;
                     S8 rotations_between_blocks = blocks_rotations_between(chain_block, end_block);
                     new_block_push.direction_mask = direction_to_direction_mask(direction);
                     new_block_push.pushee_index = get_block_index(world, chain_block);
@@ -1790,7 +1790,7 @@ void add_entangle_pushes_for_end_of_chain_blocks_on_ice(World_t* world, S16 push
                     }
 
                     if(!already_added){
-                         BlockPush_t new_block_push = *push;
+                         BlockMomentumPush_t new_block_push = *push;
                          S8 rotations_between_blocks = blocks_rotations_between(entangler, end_block);
                          new_block_push.direction_mask = direction_to_direction_mask(direction);
                          new_block_push.pushee_index = current_entangle_index;
@@ -1821,7 +1821,7 @@ void add_entangle_pushes_for_end_of_chain_blocks_on_ice(World_t* world, S16 push
      }
 }
 
-void consolidate_block_pushes(BlockPushes_t<128>* block_pushes, BlockPushes_t<128>* consolidated_block_pushes){
+void consolidate_block_pushes(BlockMomentumPushes_t<128>* block_pushes, BlockMomentumPushes_t<128>* consolidated_block_pushes){
      for(S16 i = 0; i < block_pushes->count; i++){
           auto* push = block_pushes->pushes + i;
           if(push->invalidated) continue;
@@ -1858,7 +1858,7 @@ void consolidate_block_pushes(BlockPushes_t<128>* block_pushes, BlockPushes_t<12
      }
 }
 
-void execute_block_pushes(BlockPushes_t<128>* block_pushes, World_t* world, BlockMomentumChanges_t* momentum_changes){
+void execute_block_pushes(BlockMomentumPushes_t<128>* block_pushes, World_t* world, BlockMomentumChanges_t* momentum_changes){
      S16 simultaneous_block_pushes = 0;
 
      for(S16 i = 0; i < block_pushes->count; i++){
@@ -2000,7 +2000,7 @@ void log_block_pusher(BlockPusher_t* pusher){
     LOG("   pusher %d, collided_with %d, hit_entangler: %d\n", pusher->index, pusher->collided_with_block_count, pusher->hit_entangler);
 }
 
-void log_block_push(BlockPush_t* block_push)
+void log_block_push(BlockMomentumPush_t* block_push)
 {
     const S16 direction_mask_string_size = 64;
     char direction_mask_string[direction_mask_string_size];
@@ -2022,7 +2022,7 @@ void log_block_push(BlockPush_t* block_push)
     }
 }
 
-void log_block_pushes(BlockPushes_t<128>& block_pushes)
+void log_block_pushes(BlockMomentumPushes_t<128>& block_pushes)
 {
     if(block_pushes.count > 0){
         LOG("block pushes: %d\n", block_pushes.count);
@@ -4909,8 +4909,8 @@ int main(int argc, char** argv){
                     }
                }
 
-               BlockPushes_t<128> all_block_pushes; // TODO: is 128 this enough ?
-               BlockPushes_t<128> all_consolidated_block_pushes;
+               BlockMomentumPushes_t<128> all_block_pushes; // TODO: is 128 this enough ?
+               BlockMomentumPushes_t<128> all_consolidated_block_pushes;
 
                // TODO: maybe one day make this happen only when we load the map
                CheckBlockCollisions_t collision_results;
@@ -5752,7 +5752,7 @@ int main(int argc, char** argv){
                              S16 current_entangle_index = pushee->entangle_index;
                              while(current_entangle_index != block_push.pushee_index && current_entangle_index >= 0){
                                  Block_t* entangler = world.blocks.elements + current_entangle_index;
-                                 BlockPush_t new_block_push = block_push;
+                                 BlockMomentumPush_t new_block_push = block_push;
                                  S8 rotations_between_blocks = blocks_rotations_between(entangler, pushee);
                                  new_block_push.direction_mask = direction_to_direction_mask(direction);
                                  new_block_push.pushee_index = current_entangle_index;
