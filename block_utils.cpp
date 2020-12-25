@@ -1965,14 +1965,11 @@ BlockCollisionPushResult_t block_collision_push(BlockMomentumPush_t* push, World
                              break;
                          }
 
-                         // TODO: figure out what this is for to comment it
+                         // If we passed the previous check and the current block is not the block receiving the force,
+                         // then reapply the push. This is important for chains moving together working correctly.
+                         // However, I don't think this is how exactly it should work.
                          if(chain_results.objects[0].objects[i].block != block_receiving_force){
                               result.reapply_push = true;
-                              if(horizontal_direction){
-                                  if(pusher->vel.x != 0 && pusher->horizontal_move.state == MOVE_STATE_IDLING) pusher->horizontal_move.state = MOVE_STATE_COASTING;
-                              }else{
-                                  if(pusher->vel.y != 0 && pusher->vertical_move.state == MOVE_STATE_IDLING) pusher->vertical_move.state = MOVE_STATE_COASTING;
-                              }
                          }
 
                          block_receiving_force = against_block_result->block;
