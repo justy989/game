@@ -56,13 +56,16 @@ struct ElasticCollisionResult_t{
 
 struct BlockElasticCollision_t{
      S16 pusher_mass = 0;
+     F32 pusher_initial_velocity = 0;
      F32 pusher_velocity = 0;
      S16 pushee_mass = 0;
      F32 pushee_initial_velocity = 0;
      F32 pushee_velocity = 0;
 
-     void init(S16 pusher_masss, F32 pusher_vel, S16 pushee_masss, F32 pushee_initial_vel, F32 pushee_vel){
+     void init(S16 pusher_masss, F32 pusher_initial_vel, F32 pusher_vel, S16 pushee_masss, F32 pushee_initial_vel,
+               F32 pushee_vel){
           pusher_mass = pusher_masss;
+          pusher_initial_velocity = pusher_initial_vel;
           pusher_velocity = pusher_vel;
           pushee_mass = pushee_masss;
           pushee_initial_velocity = pushee_initial_vel;

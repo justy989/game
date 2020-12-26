@@ -1858,7 +1858,7 @@ void consolidate_block_pushes(BlockMomentumPushes_t<128>* block_pushes, BlockMom
      }
 }
 
-void execute_block_pushes(BlockMomentumPushes_t<128>* block_pushes, World_t* world, BlockMomentumChanges_t* momentum_changes){
+void execute_block_pushes(BlockMomentumPushes_t<128>* block_pushes, World_t* world, BlockMomentumCollisions_t* momentum_collisions){
      S16 simultaneous_block_pushes = 0;
 
      for(S16 i = 0; i < block_pushes->count; i++){
@@ -1876,8 +1876,8 @@ void execute_block_pushes(BlockMomentumPushes_t<128>* block_pushes, World_t* wor
                   if(i <= check_block_push.entangled_with_push_index) continue;
               }
 
-              for(S16 m = 0; m < result.momentum_changes.count; m++){
-                  auto& block_change = result.momentum_changes.objects[m];
+              for(S16 m = 0; m < result.momentum_collisions.count; m++){
+                  auto& block_change = result.momentum_collisions.objects[m];
 
                   for(S16 p = 0; p < check_block_push.pusher_count; p++){
                       auto& check_pusher = check_block_push.pushers[p];
@@ -1907,7 +1907,7 @@ void execute_block_pushes(BlockMomentumPushes_t<128>* block_pushes, World_t* wor
               }
           }
 
-          momentum_changes->merge(&result.momentum_changes);
+          momentum_collisions->merge(&result.momentum_collisions);
 
           if(result.additional_block_pushes.count){
               block_pushes->merge(&result.additional_block_pushes);
@@ -1939,38 +1939,94 @@ void execute_block_pushes(BlockMomentumPushes_t<128>* block_pushes, World_t* wor
      }
 }
 
-void apply_momentum_changes(BlockMomentumChanges_t* momentum_changes, World_t* world){
+void apply_momentum_collisions(BlockMomentumCollisions_t* momentum_collisions, World_t* world){
      for(S16 i = 0; i < world->blocks.count; i++){
           auto* block = world->blocks.elements + i;
-          auto block_mass = get_block_stack_mass(world, block);
 
-          S16 x_changes = 0;
-          S16 y_changes = 0;
-          Vec_t new_vel = vec_zero();
+          F32 x_momentum = 0;
+          F32 y_momentum = 0;
+          F32 x_vel = 0;
+          F32 y_vel = 0;
+          S32 x_mass = 0;
+          S32 y_mass = 0;
+          bool stop_x = false;
+          bool stop_y = false;
+
+          // TODO: remove this once we get things working again
+          // auto block_mass = get_block_stack_mass(world, block);
+          // S16 x_changes = 0;
+          // S16 y_changes = 0;
+          // Vec_t new_vel = vec_zero();
 
           // clear momentum for each impacted block
-          for(S16 c = 0; c < momentum_changes->count; c++){
-               auto& block_change = momentum_changes->objects[c];
+          // for(S16 c = 0; c < momentum_collisions->count; c++){
+          //      auto& block_change = momentum_collisions->objects[c];
+          //      if(block_change.block_index != i) continue;
+
+               // F32 ratio = (F32)(block_change.mass) / (F32)(block_mass);
+
+               // if(block_change.x){
+               //      new_vel.x += block_change.vel * ratio;
+               //      x_changes++;
+               // }else{
+               //      new_vel.y += block_change.vel * ratio;
+               //      y_changes++;
+               // }
+          // }
+
+          // if(x_changes) block->vel.x = new_vel.x;
+          // if(y_changes) block->vel.y = new_vel.y;
+
+          // gather all the mass and momentum we are colliding with in each axis
+          for(S16 c = 0; c < momentum_collisions->count; c++){
+               auto& block_change = momentum_collisions->objects[c];
                if(block_change.block_index != i) continue;
-
-               F32 ratio = (F32)(block_change.mass) / (F32)(block_mass);
-
                if(block_change.x){
-                    new_vel.x += block_change.vel * ratio;
-                    x_changes++;
+                    if(block_change.momentum_transfer){
+                         x_mass += block_change.mass;
+                         x_momentum += (F32)(block_change.mass) * block_change.vel;
+                    }else{
+                         stop_x = true;
+                    }
                }else{
-                    new_vel.y += block_change.vel * ratio;
-                    y_changes++;
+                    if(block_change.momentum_transfer){
+                         y_mass += block_change.mass;
+                         y_momentum += (F32)(block_change.mass) * block_change.vel;
+                    }else{
+                         stop_y = true;
+                    }
                }
           }
 
-          if(x_changes) block->vel.x = new_vel.x;
-          if(y_changes) block->vel.y = new_vel.y;
+          // figure out the velocities and calculate the final elastic result from the total momentum we hit
+          if(stop_x){
+               block->vel.x = 0;
+          }else if(x_mass > 0){
+               x_vel = x_momentum / (F32)(x_mass);
+               Direction_t move_direction = block_axis_move(block, true);
+               if(move_direction != DIRECTION_COUNT){
+                    auto pusher_momentum = get_block_momentum(world, block, move_direction);
+                    auto elastic_result = elastic_transfer_momentum(pusher_momentum.mass, pusher_momentum.vel, x_mass, x_vel);
+                    block->vel.x = elastic_result.first_final_velocity;
+               }
+          }
+
+          if(stop_y){
+               block->vel.y = 0;
+          }else if(y_mass > 0){
+               y_vel = y_momentum / (F32)(y_mass);
+               Direction_t move_direction = block_axis_move(block, false);
+               if(move_direction != DIRECTION_COUNT){
+                    auto pusher_momentum = get_block_momentum(world, block, move_direction);
+                    auto elastic_result = elastic_transfer_momentum(pusher_momentum.mass, pusher_momentum.vel, y_mass, y_vel);
+                    block->vel.y = elastic_result.first_final_velocity;
+               }
+          }
      }
 
-     // set coasting or idling based on velocity
-     for(S16 c = 0; c < momentum_changes->count; c++){
-          auto& block_change = momentum_changes->objects[c];
+     // set coasting or idling based on new velocity
+     for(S16 c = 0; c < momentum_collisions->count; c++){
+          auto& block_change = momentum_collisions->objects[c];
           auto* block = world->blocks.elements + block_change.block_index;
           if(block_change.x){
                if(block->vel.x == 0){
@@ -2032,13 +2088,17 @@ void log_block_pushes(BlockMomentumPushes_t<128>& block_pushes)
     }
 }
 
-void log_momentum_changes(BlockMomentumChanges_t* momentum_changes){
-     if(momentum_changes->count > 0){
-          LOG("momentum changes: %d\n", momentum_changes->count);
+void log_momentum_collisions(BlockMomentumCollisions_t* momentum_collisions){
+     if(momentum_collisions->count > 0){
+          LOG("momentum collisions: %d\n", momentum_collisions->count);
      }
-     for(S16 c = 0; c < momentum_changes->count; c++){
-          auto& block_change = momentum_changes->objects[c];
-          LOG("  block %d m: %d, v: %f in %s\n", block_change.block_index, block_change.mass, block_change.vel, block_change.x ? "x" : "y");
+     for(S16 c = 0; c < momentum_collisions->count; c++){
+          auto& block_change = momentum_collisions->objects[c];
+          if(block_change.momentum_transfer){
+               LOG("  block %d m: %d, v: %f in %s\n", block_change.block_index, block_change.mass, block_change.vel, block_change.x ? "x" : "y");
+          }else{
+               LOG("  block %d unsuccessful push in %s\n", block_change.block_index, block_change.x ? "x" : "y");
+          }
      }
 }
 
@@ -5771,22 +5831,22 @@ int main(int argc, char** argv){
 
                // pass to cause pushes to happen
                {
-                    BlockMomentumChanges_t momentum_changes;
+                    BlockMomentumCollisions_t momentum_collisions;
 
                     consolidate_block_pushes(&all_block_pushes, &all_consolidated_block_pushes);
 
 #if 0
                     log_block_pushes(all_consolidated_block_pushes);
 #endif
-                    execute_block_pushes(&all_consolidated_block_pushes, &world, &momentum_changes);
 
+                    execute_block_pushes(&all_consolidated_block_pushes, &world, &momentum_collisions);
 
 #if 0
-                    log_momentum_changes(&momentum_changes);
+                    log_momentum_collisions(&momentum_collisions);
 #endif
 
                     // TODO: Loop over momentum changes and build a list of blocks for us to loop over here
-                    apply_momentum_changes(&momentum_changes, &world);
+                    apply_momentum_collisions(&momentum_collisions, &world);
                }
 
                // finalize positions

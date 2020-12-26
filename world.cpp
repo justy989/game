@@ -1530,7 +1530,8 @@ bool apply_push_horizontal(Block_t* block, Position_t pos, World_t* world, Direc
                 auto instant_vel = elastic_result.second_final_velocity;
                 auto pushee_momentum = get_block_momentum(world, block, direction);
                 BlockElasticCollision_t elastic_collision {};
-                elastic_collision.init(instant_momentum->mass, elastic_result.first_final_velocity, pushee_momentum.mass, pushee_momentum.vel, elastic_result.second_final_velocity);
+                elastic_collision.init(instant_momentum->mass, instant_momentum->vel, elastic_result.first_final_velocity,
+                                       pushee_momentum.mass, pushee_momentum.vel, elastic_result.second_final_velocity);
                 result->collisions.insert(&elastic_collision);
                 if(direction == DIRECTION_LEFT){
                     if(instant_vel > 0) instant_vel = -instant_vel;
@@ -1628,7 +1629,8 @@ bool apply_push_vertical(Block_t* block, Position_t pos, World_t* world, Directi
                 auto instant_vel = elastic_result.second_final_velocity;
                 auto pushee_momentum = get_block_momentum(world, block, direction);
                 BlockElasticCollision_t elastic_collision {};
-                elastic_collision.init(instant_momentum->mass, elastic_result.first_final_velocity, pushee_momentum.mass, pushee_momentum.vel, elastic_result.second_final_velocity);
+                elastic_collision.init(instant_momentum->mass, instant_momentum->vel, elastic_result.first_final_velocity,
+                                       pushee_momentum.mass, pushee_momentum.vel, elastic_result.second_final_velocity);
                 result->collisions.insert(&elastic_collision);
                 if(direction == DIRECTION_DOWN){
                     if(instant_vel > 0) instant_vel = -instant_vel;

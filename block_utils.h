@@ -342,27 +342,30 @@ struct BlockChainEntry_t{
 using BlockChain_t = StaticObjectArray_t<BlockChainEntry_t, MAX_BLOCKS_IN_CHAIN>;
 using BlockChainsResult_t = StaticObjectArray_t<BlockChain_t, MAX_BLOCKS_AGAINST_BLOCK>;
 
-struct BlockMomentumChange_t{
+struct BlockMomentumCollision_t{
      S16 block_index = -1;
      S16 mass = 0;
      F32 vel = 0;
      bool x = false;
+     bool momentum_transfer = false; // whether or not the momentum collision happened. if the push is not successful,
+                                     // that means the chain was probably against a wall or player
 
-     void init(S16 block_id, S16 masss, F32 velocity, bool is_x){
+     void init(S16 block_id, S16 masss, F32 velocity, bool is_x, bool momentum_was_transferred){
           block_index = block_id;
           mass = masss;
           vel = velocity;
           x = is_x;
+          momentum_transfer = momentum_was_transferred;
      }
 };
 
-using BlockMomentumChanges_t = StaticObjectArray_t<BlockMomentumChange_t, MAX_BLOCK_CHANGES>;
+using BlockMomentumCollisions_t = StaticObjectArray_t<BlockMomentumCollision_t, MAX_BLOCK_CHANGES>;
 
 #define MAX_BLOCK_PUSHES 128
 
 struct BlockCollisionPushResult_t{
      BlockMomentumPushes_t<MAX_BLOCK_PUSHES> additional_block_pushes;
-     BlockMomentumChanges_t momentum_changes;
+     BlockMomentumCollisions_t momentum_collisions;
      bool reapply_push = false;
 };
 
