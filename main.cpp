@@ -1877,31 +1877,18 @@ void execute_block_pushes(BlockMomentumPushes_t<128>* block_pushes, World_t* wor
               }
 
               for(S16 m = 0; m < result.momentum_collisions.count; m++){
-                  auto& block_change = result.momentum_collisions.objects[m];
+                  auto& momentum_collision = result.momentum_collisions.objects[m];
 
                   for(S16 p = 0; p < check_block_push.pusher_count; p++){
                       auto& check_pusher = check_block_push.pushers[p];
 
-                      if(check_pusher.index != block_change.block_index) continue;
+                      if(check_pusher.index != momentum_collision.block_index) continue;
                       if(check_pusher.hit_entangler) continue;
                       if(block_pushes_are_the_same_collision(block_pushes, i, j, check_pusher.index)) continue;
 
-                      if(block_change.x){
-                          if(direction_in_mask(check_block_push.direction_mask, DIRECTION_LEFT) && block_change.vel >= 0){
-                              check_block_push.remove_pusher(p);
-                              p--;
-                          }else if(direction_in_mask(check_block_push.direction_mask, DIRECTION_RIGHT) && block_change.vel <= 0){
-                              check_block_push.remove_pusher(p);
-                              p--;
-                          }
-                      }else{
-                          if(direction_in_mask(check_block_push.direction_mask, DIRECTION_DOWN) && block_change.vel >= 0){
-                              check_block_push.remove_pusher(p);
-                              p--;
-                          }else if(direction_in_mask(check_block_push.direction_mask, DIRECTION_UP) && block_change.vel <= 0){
-                              check_block_push.remove_pusher(p);
-                              p--;
-                          }
+                      if(direction_in_mask(check_block_push.direction_mask, direction_opposite(momentum_collision.from))){
+                          check_block_push.remove_pusher(p);
+                          p--;
                       }
                   }
               }
@@ -1935,6 +1922,7 @@ void execute_block_pushes(BlockMomentumPushes_t<128>* block_pushes, World_t* wor
 
           if(result.reapply_push){
               i--;
+              block_push.reapply_count++;
           }
      }
 }

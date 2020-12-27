@@ -149,6 +149,7 @@ struct BlockMomentumPush_t{
      S8 entangled_with_push_index = -1;
      F32 force = 1.0f;
      bool opposite_entangle_reversed = false;
+     S16 reapply_count = 0;
 
      bool add_pusher(S16 index, S16 collided_with_block_count = 1, bool hit_entangler = false,
                      S8 pusher_entangle_rotations = 0, S8 pusher_portal_rotations = 0, bool opposite_entangle_reversed_flag = false){
@@ -347,14 +348,16 @@ struct BlockMomentumCollision_t{
      S16 mass = 0;
      F32 vel = 0;
      bool x = false;
+     Direction_t from = DIRECTION_COUNT;
      bool momentum_transfer = false; // whether or not the momentum collision happened. if the push is not successful,
                                      // that means the chain was probably against a wall or player
 
-     void init(S16 block_id, S16 masss, F32 velocity, bool is_x, bool momentum_was_transferred){
+     void init(S16 block_id, S16 masss, F32 velocity, bool is_x, Direction_t is_from, bool momentum_was_transferred){
           block_index = block_id;
           mass = masss;
           vel = velocity;
           x = is_x;
+          from = is_from;
           momentum_transfer = momentum_was_transferred;
      }
 };

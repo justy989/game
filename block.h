@@ -79,7 +79,6 @@ struct Block_t : public GridMotion_t{
      BlockCoast_t coast_vertical = BLOCK_COAST_NONE;
      bool stopped_by_player_horizontal = false;
      bool stopped_by_player_vertical = false;
-     bool already_received_forceback_from_chain = false;
 
      CarriedPosDelta_t carried_pos_delta;
 
