@@ -1785,8 +1785,8 @@ void add_entangle_pushes_for_end_of_chain_blocks_on_ice(World_t* world, S16 push
           }
 
           auto against_result = block_against_other_blocks(pushee_pos + pushee_pos_delta, pushee_cut,
-                                                                  direction, world->block_qt, world->interactive_qt,
-                                                                  &world->tilemap);
+                                                           direction, world->block_qt, world->interactive_qt,
+                                                           &world->tilemap);
 
           S16 added_indices[MAX_BLOCKS_IN_CHAIN];
           S16 added_indices_count = 0;
@@ -1904,11 +1904,11 @@ void generate_entangled_block_pushes(BlockMomentumPushes_t<128>* block_pushes, B
           if(block_push.pure_entangle) continue;
 
           // TODO: the logic around the use of this bool could apply when only one of the pushers is entangled, not sure what the logic would be there
-          bool entangled_with_all_pushers = true;
-          for(S16 p = 0; p < block_push.pusher_count; p++){
-              Block_t* pusher = world->blocks.elements + block_push.pushers[p].index;
-              entangled_with_all_pushers &= blocks_are_entangled(pushee, pusher, &world->blocks);
-          }
+          // bool entangled_with_all_pushers = true;
+          // for(S16 p = 0; p < block_push.pusher_count; p++){
+          //     Block_t* pusher = world->blocks.elements + block_push.pushers[p].index;
+          //     entangled_with_all_pushers &= blocks_are_entangled(pushee, pusher, &world->blocks);
+          // }
 
           for(S8 d = 0; d < DIRECTION_COUNT; d++){
               Direction_t direction = static_cast<Direction_t>(d);
@@ -1956,7 +1956,8 @@ void generate_entangled_block_pushes(BlockMomentumPushes_t<128>* block_pushes, B
                   Vec_t entangler_pos_delta = block_get_pos_delta(entangler);
                   auto entangler_cut = block_get_cut(entangler);
                   S8 rotations_between_blocks = blocks_rotations_between(entangler, pushee);
-                  Direction_t direction_to_check = direction_rotate_clockwise(direction, rotations_between_blocks);
+                  S8 total_rotations = (rotations_between_blocks + block_push_rotations) % DIRECTION_COUNT;
+                  Direction_t direction_to_check = direction_rotate_clockwise(direction, total_rotations);
 
                   auto block_against_result = block_against_other_blocks(entangler_pos + entangler_pos_delta,
                                                                          entangler_cut, direction_to_check, world->block_qt,

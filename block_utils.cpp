@@ -1850,16 +1850,30 @@ void apply_block_change(ObjectArray_t<Block_t>* blocks_array, BlockChange_t* cha
      }
 }
 
+F32 update_momentum_if_block_push_is_opposite_entangled(Block_t* a, Block_t* b, BlockMomentumPush_t* push, World_t* world, F32 original_vel){
+     // for opposite entangled blocks pushing against each other
+     S16 push_rotations = (push->entangle_rotations + push->portal_rotations) % DIRECTION_COUNT;
+     if((blocks_are_entangled(a, b, &world->blocks) &&
+         ((blocks_rotations_between(a, b) + push_rotations) % DIRECTION_COUNT) == 2) ||
+         (a == b && push_rotations == 2)){
+          // TODO make sure they are pushing against each other..., like actually moving towards each other with momentum
+          return original_vel * 2;
+     }
+
+     return original_vel;
+}
+
 TransferMomentum_t get_push_pusher_momentum(BlockPusher_t* pusher, BlockMomentumPush_t* push, Direction_t push_direction,
                                             World_t* world){
      TransferMomentum_t result;
 
-     auto* block = world->blocks.elements + pusher->index;
-     S16 pusher_mass = get_block_stack_mass(world, block);
+     auto* pushee_block = world->blocks.elements + push->pushee_index;
+     auto* pusher_block = world->blocks.elements + pusher->index;
+     S16 pusher_mass = get_block_stack_mass(world, pusher_block);
      result.mass = (S16)((F32)(pusher_mass) * (1.0f / (F32)(pusher->collided_with_block_count)));
 
      S8 total_rotations = (push->portal_rotations + push->entangle_rotations) % DIRECTION_COUNT;
-     Vec_t rotated_pusher_vel = vec_rotate_quadrants_clockwise(block->vel, (total_rotations + push->pusher_rotations) % DIRECTION_COUNT);
+     Vec_t rotated_pusher_vel = vec_rotate_quadrants_clockwise(pusher_block->vel, (total_rotations + push->pusher_rotations) % DIRECTION_COUNT);
      Direction_t rotated_dir = direction_rotate_clockwise(push_direction, total_rotations);
 
      if(direction_is_horizontal(rotated_dir)){
@@ -1873,6 +1887,8 @@ TransferMomentum_t get_push_pusher_momentum(BlockPusher_t* pusher, BlockMomentum
      }else{
           if(result.vel > 0) result.vel = -result.vel;
      }
+
+     result.vel = update_momentum_if_block_push_is_opposite_entangled(pusher_block, pushee_block, push, world, result.vel);
 
      return result;
 }
@@ -2038,6 +2054,8 @@ BlockCollisionPushResult_t block_collision_push(BlockMomentumPush_t* push, World
                // get the momentum in the current direction for the block receiving the force
                auto pusher_momentum = get_block_momentum(world, block_receiving_force, direction_opposite(direction_to_check));
 
+               pusher_momentum.vel = update_momentum_if_block_push_is_opposite_entangled(block_receiving_force, pushee, push, world, pusher_momentum.vel);
+
                // TODO: remove this, as it is wrong
                // split the mass by how many blocks our pusher actually collided with
                // pusher_momentum.mass = pusher_momentum.mass / push->pushers[p].collided_with_block_count;
@@ -2096,14 +2114,16 @@ BlockCollisionPushResult_t block_collision_push(BlockMomentumPush_t* push, World
                    //                          direction_is_horizontal(direction_to_check), direction_to_check, true);
                    //     result.momentum_collisions.insert(&momentum_change);
                    // }else{
-                        BlockMomentumCollision_t momentum_change {};
-                        auto rotated_pushee_vel = rotate_vec_counter_clockwise_to_see_if_negates(collision.pushee_initial_velocity,
-                                                                                                 direction_is_horizontal(pusher_direction),
-                                                                                                 total_against_rotations);
-                        momentum_change.init(block_receiving_force_index, collision.pushee_mass * pusher_contribution_percentage,
-                                             rotated_pushee_vel, direction_is_horizontal(direction_to_check),
-                                             direction_to_check, true);
-                        result.momentum_collisions.insert(&momentum_change);
+                   F32 collision_pushee_initial_vel = update_momentum_if_block_push_is_opposite_entangled(block_receiving_force, collision.pushee, push, world, collision.pushee_initial_velocity);
+
+                   BlockMomentumCollision_t momentum_change {};
+                   auto rotated_pushee_vel = rotate_vec_counter_clockwise_to_see_if_negates(collision_pushee_initial_vel,
+                                                                                            direction_is_horizontal(pusher_direction),
+                                                                                            total_against_rotations);
+                   momentum_change.init(block_receiving_force_index, collision.pushee_mass * pusher_contribution_percentage,
+                                        rotated_pushee_vel, direction_is_horizontal(direction_to_check),
+                                        direction_to_check, true);
+                   result.momentum_collisions.insert(&momentum_change);
                    // }
                }
 
