@@ -1842,7 +1842,8 @@ bool resolve_push_against_block(Block_t* block, MoveDirection_t move_direction, 
 
      MoveDirection_t final_move_direction = move_direction_from_directions(first_against_block_push_dir, second_against_block_push_dir);
 
-     bool on_ice = false;
+     bool on_ice = block_on_ice(against_block->pos, against_block->pos_delta, against_block->cut,
+                                &world->tilemap, world->interactive_qt, world->block_qt);
      bool both_on_ice = false;
 
      bool are_entangled = blocks_are_entangled(block, against_block, &world->blocks);
@@ -1854,8 +1855,7 @@ bool resolve_push_against_block(Block_t* block, MoveDirection_t move_direction, 
           }else{
                return false;
           }
-     }else if((on_ice = block_on_ice(against_block->pos, against_block->pos_delta, against_block->cut,
-                                     &world->tilemap, world->interactive_qt, world->block_qt))){
+     }else if(on_ice){
           // if the block originally pushed is not on ice, we don't push this one either
           if(!pushed_block_on_ice && !are_entangled){
                return false;
@@ -1923,6 +1923,22 @@ bool resolve_push_against_block(Block_t* block, MoveDirection_t move_direction, 
 
                     if(result){
                          auto push_result = block_push(against_block, final_move_direction, world, pushed_by_ice, force, &split_instant_momentum, nullptr, side_effects);
+                         result->againsts_pushed.merge(&push_result.horizontal_result.againsts_pushed);
+                         result->againsts_pushed.merge(&push_result.vertical_result.againsts_pushed);
+
+                         if(push_result.horizontal_result.pushed){
+                              BlockPushedAgainst_t pushed_against {};
+                              pushed_against.block = against_block;
+                              pushed_against.direction = first_against_block_push_dir;
+                              result->againsts_pushed.insert(&pushed_against);
+                         }
+
+                         if(push_result.vertical_result.pushed){
+                              BlockPushedAgainst_t pushed_against {};
+                              pushed_against.block = against_block;
+                              pushed_against.direction = second_against_block_push_dir;
+                              result->againsts_pushed.insert(&pushed_against);
+                         }
 
                          update_block_momentum_from_push(block, first_direction, from_entangler, &push_result.horizontal_result, result);
 
@@ -1952,6 +1968,8 @@ bool resolve_push_against_block(Block_t* block, MoveDirection_t move_direction, 
                          auto save_block = *against_block;
                          auto push_result = block_push(against_block, final_move_direction, world, pushed_by_ice, force, instant_momentum, nullptr, side_effects);
                          if(!side_effects) *against_block = save_block;
+                         result->againsts_pushed.merge(&push_result.horizontal_result.againsts_pushed);
+                         result->againsts_pushed.merge(&push_result.vertical_result.againsts_pushed);
 
                          bool first_successful = push_result.horizontal_result.pushed;
 
@@ -1997,6 +2015,7 @@ bool resolve_push_against_block(Block_t* block, MoveDirection_t move_direction, 
               auto save_block = *against_block;
               auto push_result = block_push(against_block, first_against_block_push_dir, world, pushed_by_ice, force, instant_momentum, nullptr, side_effects);
               if(!side_effects) *against_block = save_block;
+              result->againsts_pushed.merge(&push_result.againsts_pushed);
 
               first_successful = push_result.pushed;
 
@@ -2016,6 +2035,7 @@ bool resolve_push_against_block(Block_t* block, MoveDirection_t move_direction, 
                    auto save_block = *against_block;
                    auto push_result = block_push(against_block, second_against_block_push_dir, world, pushed_by_ice, force, instant_momentum, nullptr, side_effects);
                    if(!side_effects) *against_block = save_block;
+                   result->againsts_pushed.merge(&push_result.againsts_pushed);
 
                    second_successful = push_result.pushed;
 

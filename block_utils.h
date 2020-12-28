@@ -146,20 +146,20 @@ struct BlockMomentumPush_t{
      bool invalidated = false;
      bool no_consolidate = false;
      bool no_entangled_pushes = false;
-     S8 entangled_with_push_index = -1;
+     S8 entangled_with_push_index = -1; // index of which push caused this push via entanglement
+     bool pure_entangle = false; // the block we are pushing isn't against any other blocks, so the push just uses the forces given to it
      F32 force = 1.0f;
-     bool opposite_entangle_reversed = false;
      S16 reapply_count = 0;
+     bool executed = false;
 
      bool add_pusher(S16 index, S16 collided_with_block_count = 1, bool hit_entangler = false,
-                     S8 pusher_entangle_rotations = 0, S8 pusher_portal_rotations = 0, bool opposite_entangle_reversed_flag = false){
+                     S8 pusher_entangle_rotations = 0, S8 pusher_portal_rotations = 0){
           if(pusher_count >= MAX_BLOCK_PUSHERS) return false;
           pushers[pusher_count].index = index;
           pushers[pusher_count].collided_with_block_count = collided_with_block_count;
           pushers[pusher_count].hit_entangler = hit_entangler;
           pushers[pusher_count].entangle_rotations = pusher_entangle_rotations;
           pushers[pusher_count].portal_rotations = pusher_portal_rotations;
-          pushers[pusher_count].opposite_entangle_reversed = opposite_entangle_reversed_flag;
           pusher_count++;
           return true;
      }
@@ -206,24 +206,45 @@ struct BlockMomentumPushes_t{
      void merge(BlockMomentumPushes_t<ALTERNATE_MAX_BLOCK_PUSHES>* alternate_pushes){
           for(S16 p = 0; p < alternate_pushes->count; p++){
                BlockMomentumPush_t* alternate = alternate_pushes->pushes + p;
-               bool unique = true;
+               add(alternate);
+               // TODO: remove the unique checking
+               // bool unique = true;
 
-               if(alternate->pusher_count > 0){
-                    for(S16 i = 0; i < count; i++){
-                         BlockMomentumPush_t* check = pushes + i;
-                         if(check->pusher_count <= 0) continue;
-                         if((check->pushers[0].index == alternate->pushers[0].index &&
-                             check->pushee_index == alternate->pushee_index) ||
-                            (check->pushee_index == alternate->pushers[0].index &&
-                             check->pushers[0].index == alternate->pushee_index)){
-                              unique = false;
-                              break;
-                         }
-                    }
-               }
+               // if(alternate->pusher_count > 0){
+               //      for(S16 i = 0; i < count; i++){
+               //           BlockMomentumPush_t* check = pushes + i;
+               //           if(check->executed) continue;
+               //           if(check->pusher_count <= 0) continue;
 
-               if(unique) add(alternate);
+               //           if((check->pushers[0].index == alternate->pushers[0].index &&
+               //               check->pushee_index == alternate->pushee_index) ||
+               //              (check->pushee_index == alternate->pushers[0].index &&
+               //               check->pushers[0].index == alternate->pushee_index)){
+               //                unique = false;
+               //                break;
+               //           }
+               //      }
+               // }
+
+               // if(unique) add(alternate);
           }
+     }
+
+     bool push_already_exists(BlockMomentumPush_t* push){
+          for(S16 i = 0; i < count; i++){
+               BlockMomentumPush_t* check = pushes + i;
+               if(check->executed) continue;
+               if(check->pusher_count <= 0) continue;
+
+               if((check->pushers[0].index == push->pushers[0].index &&
+                   check->pushee_index == push->pushee_index) ||
+                  (check->pushee_index == push->pushers[0].index &&
+                   check->pushers[0].index == push->pushee_index)){
+                    return true;
+               }
+          }
+
+          return false;
      }
 
      void clear(){
