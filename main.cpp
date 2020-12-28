@@ -1903,13 +1903,6 @@ void generate_entangled_block_pushes(BlockMomentumPushes_t<128>* block_pushes, B
           if(pushee->entangle_index < 0) continue;
           if(block_push.pure_entangle) continue;
 
-          // TODO: the logic around the use of this bool could apply when only one of the pushers is entangled, not sure what the logic would be there
-          // bool entangled_with_all_pushers = true;
-          // for(S16 p = 0; p < block_push.pusher_count; p++){
-          //     Block_t* pusher = world->blocks.elements + block_push.pushers[p].index;
-          //     entangled_with_all_pushers &= blocks_are_entangled(pushee, pusher, &world->blocks);
-          // }
-
           for(S8 d = 0; d < DIRECTION_COUNT; d++){
               Direction_t direction = static_cast<Direction_t>(d);
               if(!direction_in_mask(block_push.direction_mask, direction)) continue;
@@ -1919,36 +1912,6 @@ void generate_entangled_block_pushes(BlockMomentumPushes_t<128>* block_pushes, B
 
               if(!block_pushable(pushee, push_rotated_direction, world, block_push.force)) continue;
 
-              // if(entangled_with_all_pushers &&
-              //    block_on_frictionless(pushee, &world->tilemap, world->interactive_qt, world->block_qt)){
-              //      auto total_pusher_momentum = get_block_push_pusher_momentum(&block_push, world, direction);
-              //      auto pushee_momentum = get_block_momentum(world, pushee, push_rotated_direction);
-              //      auto rotated_pushee_vel = rotate_vec_counter_clockwise_to_see_if_negates(pushee_momentum.vel, direction_is_horizontal(push_rotated_direction), block_push_rotations);
-
-                    // if the push isn't going to cause it to start moving in that direction, don't add the entangle pushes
-                   // auto elastic_result = elastic_transfer_momentum(total_pusher_momentum.mass, total_pusher_momentum.vel, pushee_momentum.mass, rotated_pushee_vel);
-                   // if(elastic_result.second_final_velocity == 0) continue;
-
-                   // block_push.opposite_entangle_reversed = ((rotated_pushee_vel < 0 && elastic_result.second_final_velocity > 0) ||
-                   //                                          (rotated_pushee_vel > 0 && elastic_result.second_final_velocity < 0));
-
-                   // S16 pushee_momentum_mass_split = pushee_momentum.mass / block_push.pusher_count;
-                   // for(S16 p = 0; p < block_push.pusher_count; p++){
-                   //      auto* push = block_push.pushers + p;
-                   //      Block_t* pusher = world->blocks.elements + push->index;
-                   //      S8 push_rotations = (push->portal_rotations + push->entangle_rotations) % DIRECTION_COUNT;
-                   //      auto rotated_direction = direction_rotate_clockwise(direction, push_rotations);
-                   //      rotated_pushee_vel = rotate_vec_counter_clockwise_to_see_if_negates(pushee_momentum.vel, direction_is_horizontal(rotated_direction), DIRECTION_COUNT - (block_push_rotations));
-                   //      auto pusher_momentum = get_block_momentum(world, pusher, rotated_direction);
-
-                        // elastic_result = elastic_transfer_momentum(pusher_momentum.mass, pusher_momentum.vel, pushee_momentum_mass_split, rotated_pushee_vel);
-
-                        // push->opposite_entangle_reversed = ((pusher_momentum.vel < 0 && elastic_result.first_final_velocity > 0) ||
-                        //                                     (pusher_momentum.vel > 0 && elastic_result.first_final_velocity < 0));
-              //      }
-              // }
-
-              // if(!block_push.opposite_entangle_reversed){
               S16 current_entangle_index = pushee->entangle_index;
               while(current_entangle_index != block_push.pushee_index && current_entangle_index >= 0){
                   Block_t* entangler = world->blocks.elements + current_entangle_index;
@@ -1994,7 +1957,6 @@ void generate_entangled_block_pushes(BlockMomentumPushes_t<128>* block_pushes, B
 
                   current_entangle_index = entangler->entangle_index;
               }
-              // }
           }
      }
 }
@@ -5889,113 +5851,6 @@ int main(int argc, char** argv){
 
                momentum_block_pushes.merge(&entangled_momentum_block_pushes);
                entangled_momentum_block_pushes.clear();
-
-               // add entangled pushes
-               // original_all_block_pushes_count = momentum_block_pushes.count;
-               // for(S16 i = 0; i < original_all_block_pushes_count; i++){
-               //      auto& block_push = momentum_block_pushes.pushes[i];
-               //      if(block_push.invalidated) continue;
-               //      if(block_push.no_entangled_pushes) continue;
-// 
-               //      // if the block being pushed is entangled, add block pushes for those
-               //      Block_t* pushee = world.blocks.elements + block_push.pushee_index;
-// 
-               //      if(pushee->entangle_index < 0) continue;
-               //      if(block_push.is_entangled()) continue;
-// 
-               //      // TODO: the logic around the use of this bool could apply when only one of the pushers is entangled, not sure what the logic would be there
-               //      bool entangled_with_all_pushers = true;
-               //      for(S16 p = 0; p < block_push.pusher_count; p++){
-               //          Block_t* pusher = world.blocks.elements + block_push.pushers[p].index;
-               //          entangled_with_all_pushers &= blocks_are_entangled(pushee, pusher, &world.blocks);
-               //      }
-// 
-               //      for(S8 d = 0; d < DIRECTION_COUNT; d++){
-               //          Direction_t direction = static_cast<Direction_t>(d);
-               //          if(!direction_in_mask(block_push.direction_mask, direction)) continue;
-// 
-               //          S8 block_push_rotations = (block_push.portal_rotations + block_push.entangle_rotations) % DIRECTION_COUNT;
-               //          Direction_t push_rotated_direction = direction_rotate_clockwise(direction, block_push_rotations);
-// 
-               //          if(!block_pushable(pushee, push_rotated_direction, &world, block_push.force)) continue;
-// 
-               //          if(entangled_with_all_pushers &&
-               //             block_on_frictionless(pushee, &world.tilemap, world.interactive_qt, world.block_qt)){
-               //               auto total_pusher_momentum = get_block_push_pusher_momentum(&block_push, &world, direction);
-               //               auto pushee_momentum = get_block_momentum(&world, pushee, push_rotated_direction);
-               //               auto rotated_pushee_vel = rotate_vec_counter_clockwise_to_see_if_negates(pushee_momentum.vel, direction_is_horizontal(push_rotated_direction), block_push_rotations);
-// 
-               //                // if the push isn't going to cause it to start moving in that direction, don't add the entangle pushes
-               //               auto elastic_result = elastic_transfer_momentum(total_pusher_momentum.mass, total_pusher_momentum.vel, pushee_momentum.mass, rotated_pushee_vel);
-               //               if(elastic_result.second_final_velocity == 0) continue;
-// 
-               //               block_push.opposite_entangle_reversed = ((rotated_pushee_vel < 0 && elastic_result.second_final_velocity > 0) ||
-               //                                                        (rotated_pushee_vel > 0 && elastic_result.second_final_velocity < 0));
-// 
-               //               S16 pushee_momentum_mass_split = pushee_momentum.mass / block_push.pusher_count;
-               //               for(S16 p = 0; p < block_push.pusher_count; p++){
-               //                    auto* push = block_push.pushers + p;
-               //                    Block_t* pusher = world.blocks.elements + push->index;
-               //                    S8 push_rotations = (push->portal_rotations + push->entangle_rotations) % DIRECTION_COUNT;
-               //                    auto rotated_direction = direction_rotate_clockwise(direction, push_rotations);
-               //                    rotated_pushee_vel = rotate_vec_counter_clockwise_to_see_if_negates(pushee_momentum.vel, direction_is_horizontal(rotated_direction), DIRECTION_COUNT - (block_push_rotations));
-               //                    auto pusher_momentum = get_block_momentum(&world, pusher, rotated_direction);
-// 
-               //                    elastic_result = elastic_transfer_momentum(pusher_momentum.mass, pusher_momentum.vel, pushee_momentum_mass_split, rotated_pushee_vel);
-// 
-               //                    push->opposite_entangle_reversed = ((pusher_momentum.vel < 0 && elastic_result.first_final_velocity > 0) ||
-               //                                                        (pusher_momentum.vel > 0 && elastic_result.first_final_velocity < 0));
-               //               }
-               //          }
-// 
-               //          if(!block_push.opposite_entangle_reversed){
-               //               S16 current_entangle_index = pushee->entangle_index;
-               //               while(current_entangle_index != block_push.pushee_index && current_entangle_index >= 0){
-               //                   Block_t* entangler = world.blocks.elements + current_entangle_index;
-               //                   Position_t entangler_pos = block_get_position(entangler);
-               //                   Vec_t entangler_pos_delta = block_get_pos_delta(entangler);
-               //                   auto entangler_cut = block_get_cut(entangler);
-               //                   S8 rotations_between_blocks = blocks_rotations_between(entangler, pushee);
-               //                   Direction_t direction_to_check = direction_rotate_clockwise(direction, rotations_between_blocks);
-// 
-               //                   auto block_against_result = block_against_other_blocks(entangler_pos + entangler_pos_delta,
-               //                                                                          entangler_cut, direction_to_check, world.block_qt,
-               //                                                                          world.interactive_qt, &world.tilemap);
-               //                   if(block_against_result.count == 0){
-               //                        BlockMomentumPush_t new_block_push = block_push;
-               //                        new_block_push.direction_mask = direction_to_direction_mask(direction);
-               //                        new_block_push.pushee_index = current_entangle_index;
-               //                        // TODO: I don't believe this line is necessary
-               //                        // new_block_push.portal_rotations = block_push.portal_rotations;
-               //                        new_block_push.entangle_rotations = rotations_between_blocks;
-               //                        new_block_push.entangled_with_push_index = i;
-               //                        new_block_push.pure_entangle = true;
-               //                        momentum_block_pushes.add(&new_block_push);
-               //                   }else{
-               //                        for(S16 a = 0; a < block_against_result.count; a++){
-               //                             auto* against = block_against_result.objects + a;
-// 
-               //                             BlockMomentumPush_t new_block_push = block_push;
-               //                             new_block_push.pusher_count = 0;
-               //                             new_block_push.add_pusher(current_entangle_index, block_against_result.count, false,
-               //                                                       rotations_between_blocks);
-               //                             new_block_push.direction_mask = direction_to_direction_mask(direction_to_check);
-               //                             new_block_push.pushee_index = against->block - world.blocks.elements;
-               //                             // TODO: I don't believe this line is necessary
-               //                             // new_block_push.portal_rotations = block_push.portal_rotations;
-               //                             // new_block_push.entangle_rotations = rotations_between_blocks;
-               //                             new_block_push.entangled_with_push_index = i;
-               //                             momentum_block_pushes.add(&new_block_push);
-               //                        }
-               //                   }
-// 
-               //                   add_entangle_pushes_for_end_of_chain_blocks_on_ice(&world, momentum_block_pushes.count - 1, &momentum_block_pushes, DIRECTION_COUNT - rotations_between_blocks);
-// 
-               //                   current_entangle_index = entangler->entangle_index;
-               //               }
-               //          }
-               //      }
-               // }
 
                generate_entangled_block_pushes(&momentum_block_pushes, &entangled_momentum_block_pushes, &world);
                if(entangled_momentum_block_pushes.count > 0){

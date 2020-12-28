@@ -1928,23 +1928,8 @@ BlockCollisionPushResult_t block_collision_push(BlockMomentumPush_t* push, World
           TransferMomentum_t instant_momentum = get_block_push_pusher_momentum(push, world, direction);
           instant_momentum.vel = rotate_vec_clockwise_to_see_if_negates(instant_momentum.vel, direction_is_horizontal(direction), total_push_rotations);
 
-          // if this is an entangled push, add the momentum given to the entangled push from the entangler
-          // if(push->is_entangled()){
-          //      for(S16 p = 0; p < push->pusher_count; p++){
-          //           auto* pusher = push->pushers + p;
-          //           F32 entangled_momentum = pusher->entangled_momentum.mass * pusher->entangled_momentum.vel;
-          //           entangled_momentum /= pusher->collided_with_block_count;
-          //           instant_momentum.vel += (entangled_momentum / instant_momentum.mass);
-          //      }
-          // }
-
           F32 total_push_momentum = instant_momentum.mass * instant_momentum.vel;
           // LOG("total push on block %d momentum: %f, mass: %d, vel: %f\n", push->pushee_index, total_push_momentum, instant_momentum.mass, instant_momentum.vel);
-
-          // TODO: we should not need this once we have momentum transfers apply to all entanglers
-          // if(push->opposite_entangle_reversed){
-          //      instant_momentum.mass *= 2;
-          // }
 
           auto push_result = block_push(pushee, push_pos, push_pos_delta, push_direction, world, true, push->force, &instant_momentum);
 
@@ -1978,8 +1963,6 @@ BlockCollisionPushResult_t block_collision_push(BlockMomentumPush_t* push, World
                if(push->pure_entangle) continue; // the entangled momentum was already applied earlier
 
                if(push->is_entangled()){
-                   // TODO: this is no longer a necessary hack
-                   // pusher = pushee;
                    local_rotations = 0;
                }
 
@@ -2004,20 +1987,6 @@ BlockCollisionPushResult_t block_collision_push(BlockMomentumPush_t* push, World
                          F32 vel = horizontal_direction ? against_block_result->block->vel.x : against_block_result->block->vel.y;
                          if(vel == 0) break;
 
-                         // TODO: Is this right ? It seems like we should really take into account how much force was applied to
-                         // determine whether it should impact the last or second to last block in the chain
-                         // if a block has already received force to respond to, we want to apply the force to the block before it in the chain
-                         // if(against_block_result->block->already_received_forceback_from_chain){
-                         //     break;
-                         // }
-
-                         // If we passed the previous check and the current block is not the block receiving the force,
-                         // then reapply the push. This is important for chains moving together working correctly.
-                         // However, I don't think this is how exactly it should work.
-                         // if(chain_results.objects[0].objects[i].block != block_receiving_force){
-                         //      result.reapply_push = true;
-                         // }
-
                          if(i == (chain_results.objects[0].count - push->reapply_count)){
                               break;
                          }
@@ -2036,11 +2005,6 @@ BlockCollisionPushResult_t block_collision_push(BlockMomentumPush_t* push, World
                     result.reapply_push = true;
                }
 
-               // if the force flows through, set the flag in the last block in the chain to mark it has received force (from this function down below)
-               // if(result.reapply_push){
-               //     block_receiving_force->already_received_forceback_from_chain = true;
-               // }
-
                S16 block_receiving_force_index = block_receiving_force - world->blocks.elements;
 
                if(push_result.collisions.count == 0 && !push_result.pushed){
@@ -2056,64 +2020,14 @@ BlockCollisionPushResult_t block_collision_push(BlockMomentumPush_t* push, World
 
                pusher_momentum.vel = update_momentum_if_block_push_is_opposite_entangled(block_receiving_force, pushee, push, world, pusher_momentum.vel);
 
-               // TODO: remove this, as it is wrong
-               // split the mass by how many blocks our pusher actually collided with
-               // pusher_momentum.mass = pusher_momentum.mass / push->pushers[p].collided_with_block_count;
-
                // we fabs() because we know the momentum is travelling in the same direction as the total momentum, it
                // just may be rotated due to a portal.
                F32 pusher_contribution_of_mass = (F32)(pusher_momentum.mass) / (F32)(push->pushers[p].collided_with_block_count);
                F32 pusher_contribution_percentage = fabs((pusher_contribution_of_mass * pusher_momentum.vel) / total_push_momentum);
                // LOG("  pusher %d contribution: %f mass: %d, vel: %f\n", push->pushers[p].index, pusher_contribution_percentage, pusher_momentum.mass, pusher_momentum.vel);
 
-               // bool transferred_momentum_back = false;
                for(S16 c = 0; c < push_result.collisions.count; c++){
                    auto& collision = push_result.collisions.objects[c];
-
-                   // if(collision.transferred_momentum_back()){
-                   //     transferred_momentum_back = true;
-
-                       // For entangled pushes just apply the momentum given by the pusher. We may not need this case when we apply entangled momentum changes.
-                   //     if(push->is_entangled()){
-                           // LOG("deal_with_push_result(): adding entangled momentum change for block %d at %f in the %s\n", block_receiving_force_index, collision.pusher_velocity, direction_is_horizontal(direction_to_check) ? "x" : "y");
-                   //         BlockMomentumCollision_t momentum_change {};
-                   //         momentum_change.init(block_receiving_force_index, collision.pusher_mass, collision.pusher_velocity, direction_is_horizontal(direction_to_check));
-                   //         result.momentum_collisions.insert(&momentum_change);
-                   //     }else{
-                           // otherwise calculate the elastic result
-                   //         if(push->pushers[p].opposite_entangle_reversed){
-                   //             collision.pushee_mass *= 2;
-                   //         }
-                           // determine if we need to negate the pushee's velocity to get it into our block receiving force's rotational space
-                   //         auto rotated_pushee_vel = rotate_vec_counter_clockwise_to_see_if_negates(collision.pushee_initial_velocity, direction_is_horizontal(pusher_direction), total_against_rotations);
-                           // LOG("  m: %d, v: %f - m: %d, v: %f\n", pusher_momentum.mass, pusher_momentum.vel, collision.pushee_mass, rotated_pushee_vel);
-                   //         auto elastic_result = elastic_transfer_momentum(pusher_momentum.mass, pusher_momentum.vel, collision.pushee_mass, rotated_pushee_vel);
-                           // LOG("deal_with_push_result(): final forceback direction %s on using momentum %d %f on block %d with momentum %d %f\n",
-                           //     direction_to_string(direction_to_check), collision.pushee_mass, rotated_pushee_vel, block_receiving_force_index, pusher_momentum.mass, pusher_momentum.vel);
-                           // LOG("  result vel: %f\n", elastic_result.first_final_velocity);
-                   //         BlockMomentumCollision_t momentum_change {};
-                   //         momentum_change.init(block_receiving_force_index, pusher_momentum.mass, elastic_result.first_final_velocity, direction_is_horizontal(direction_to_check));
-                   //         result.momentum_collisions.insert(&momentum_change);
-                   //     }
-                   // }
-
-                   // if(push->pure_entangle){
-                       // if a push is entangled, it means a block hit an entangled block to cause the push. So we
-                       // want to apply the momentum to all of it's entanglers (if it overcomes static friction
-                       // depending on the surface it is on)
-                       // LOG("adding entangled momentum change for block %d at with mass: %d at vel: %f to the %s\n",
-                       //     block_receiving_force_index, collision.pusher_mass, collision.pusher_velocity,
-                       //     direction_to_string(direction_to_check));
-                       // F32 collision_vel = collision.pusher_initial_velocity;
-                       // F32 entangled_momentum = push->pushers[p].entangled_momentum.mass * push->pushers[p].entangled_momentum.vel;
-                       // entangled_momentum /= push->pushers[p].collided_with_block_count;
-                       // collision_vel += (entangled_momentum / instant_momentum.mass);
-
-                   //     BlockMomentumCollision_t momentum_change {};
-                   //     momentum_change.init(block_receiving_force_index, collision.pusher_mass, collision.pusher_initial_velocity,
-                   //                          direction_is_horizontal(direction_to_check), direction_to_check, true);
-                   //     result.momentum_collisions.insert(&momentum_change);
-                   // }else{
                    F32 collision_pushee_initial_vel = update_momentum_if_block_push_is_opposite_entangled(block_receiving_force, collision.pushee, push, world, collision.pushee_initial_velocity);
 
                    BlockMomentumCollision_t momentum_change {};
@@ -2124,15 +2038,7 @@ BlockCollisionPushResult_t block_collision_push(BlockMomentumPush_t* push, World
                                         rotated_pushee_vel, direction_is_horizontal(direction_to_check),
                                         direction_to_check, true);
                    result.momentum_collisions.insert(&momentum_change);
-                   // }
                }
-
-               // if(!transferred_momentum_back && !push->is_entangled()){
-               //     // LOG("deal_with_push_result(): stopping block: %d in the %s\n", block_receiving_force_index, direction_is_horizontal(direction_to_check) ? "x" : "y");
-               //     BlockMomentumCollision_t momentum_change {};
-               //     momentum_change.init(block_receiving_force_index, pushee_momentum.mass, pushee_momentum.initial_velocity, direction_is_horizontal(direction_to_check));
-               //     result.momentum_collisions.insert(&momentum_change);
-               // }
           }
 
           for(S16 a = 0; a < push_result.againsts_pushed.count; a++){
@@ -2144,53 +2050,15 @@ BlockCollisionPushResult_t block_collision_push(BlockMomentumPush_t* push, World
                S16 current_entangle_index = against_pushed->block->entangle_index;
                while(current_entangle_index != block_index && current_entangle_index >= 0){
                    Block_t* entangler = world->blocks.elements + current_entangle_index;
-                   // Position_t entangler_pos = block_get_position(entangler);
-                   // Vec_t entangler_pos_delta = block_get_pos_delta(entangler);
-                   // auto entangler_cut = block_get_cut(entangler);
                    S8 rotations_between_blocks = blocks_rotations_between(entangler, pushee);
                    Direction_t entangled_direction_to_check = direction_rotate_clockwise(direction, rotations_between_blocks);
 
                    BlockMomentumPush_t new_block_push = *push;
                    new_block_push.direction_mask = direction_to_direction_mask(entangled_direction_to_check);
                    new_block_push.pushee_index = current_entangle_index;
-                   // TODO: I don't believe this line is necessary
-                   // new_block_push.portal_rotations = block_push.portal_rotations;
                    new_block_push.entangle_rotations = rotations_between_blocks;
-                   // new_block_push.entangled_with_push_index = i;
                    new_block_push.pure_entangle = true;
                    result.additional_block_pushes.add(&new_block_push);
-
-                   // auto block_against_result = block_against_other_blocks(entangler_pos + entangler_pos_delta,
-                   //                                                        entangler_cut, entangled_direction_to_check, world->block_qt,
-                   //                                                        world->interactive_qt, &world->tilemap);
-                   // if(block_against_result.count == 0){
-                   //      BlockMomentumPush_t new_block_push = *push;
-                   //      new_block_push.direction_mask = direction_to_direction_mask(entangled_direction_to_check);
-                   //      new_block_push.pushee_index = current_entangle_index;
-                   //      // TODO: I don't believe this line is necessary
-                   //      // new_block_push.portal_rotations = block_push.portal_rotations;
-                   //      new_block_push.entangle_rotations = rotations_between_blocks;
-                   //      // new_block_push.entangled_with_push_index = i;
-                   //      new_block_push.pure_entangle = true;
-                   //      result.additional_block_pushes.add(&new_block_push);
-                   // }else{
-                   //      for(S16 g = 0; g < block_against_result.count; g++){
-                   //           auto* against = block_against_result.objects + g;
-
-                   //           BlockMomentumPush_t new_block_push = *push;
-                   //           new_block_push.pusher_count = 0;
-                   //           new_block_push.add_pusher(current_entangle_index, block_against_result.count, false,
-                   //                                     rotations_between_blocks);
-                   //           new_block_push.direction_mask = direction_to_direction_mask(entangled_direction_to_check);
-                   //           new_block_push.pushee_index = against->block - world->blocks.elements;
-                   //           // TODO: I don't believe this line is necessary
-                   //           // new_block_push.portal_rotations = block_push.portal_rotations;
-                   //           // new_block_push.entangle_rotations = rotations_between_blocks;
-                   //           // new_block_push.entangled_with_push_index = i;
-                   //           new_block_push.pure_entangle = false;
-                   //           result.additional_block_pushes.add(&new_block_push);
-                   //      }
-                   // }
 
                    // TODO: add_entangle_pushes_for_end_of_chain_blocks_on_ice() should be called yo, but it isn't
                    //       visible to this module
