@@ -5544,6 +5544,7 @@ int main(int argc, char** argv){
                                               new_block->cut = final_src_cut;
                                               new_block->pos.pixel += final_src_offset;
                                               new_block->previous_mass = get_block_stack_mass(&world, new_block);
+                                              new_block->element = put_out_element(block->element);
 
                                               if(direction_is_horizontal(src_portal_dir)){
                                                    new_block->stop_on_pixel_x = closest_pixel(new_block->pos.pixel.x, new_block->pos.decimal.x);
@@ -5555,6 +5556,7 @@ int main(int argc, char** argv){
                                           block->teleport_pos.pixel += final_dst_offset;
                                           block->teleport_cut = final_dst_cut;
                                           block->teleport_split = true;
+                                          block->element = put_out_element(block->element);
 
                                           add_global_tag(TAG_BLOCK_GETS_SPLIT);
                                       }

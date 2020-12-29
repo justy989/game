@@ -74,3 +74,17 @@ const char* element_to_string(Element_t e){
 
      return "ELEMENT_UNKNOWN";
 }
+
+Element_t put_out_element(Element_t e){
+     switch(e){
+     default:
+     case ELEMENT_NONE:
+     case ELEMENT_FIRE:
+          break;
+     case ELEMENT_ICE:
+     case ELEMENT_ONLY_ICED:
+          return ELEMENT_ONLY_ICED;
+     }
+
+     return ELEMENT_NONE;
+}
