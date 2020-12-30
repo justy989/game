@@ -1850,15 +1850,28 @@ void apply_block_change(ObjectArray_t<Block_t>* blocks_array, BlockChange_t* cha
      }
 }
 
-F32 update_momentum_if_block_push_is_opposite_entangled(Block_t* a, Block_t* b, BlockMomentumPush_t* push, World_t* world, F32 original_vel){
+F32 update_momentum_if_block_push_is_opposite_entangled(Block_t* pusher, Block_t* pushee, BlockMomentumPush_t* push, Direction_t direction, World_t* world,
+                                                        F32 original_vel){
      // for opposite entangled blocks pushing against each other
      S16 push_rotations = (push->entangle_rotations + push->portal_rotations) % DIRECTION_COUNT;
-     if((blocks_are_entangled(a, b, &world->blocks) &&
-         ((blocks_rotations_between(a, b) + push_rotations) % DIRECTION_COUNT) == 2) ||
-         (a == b && push_rotations == 2)){
-          // TODO make sure they are pushing against each other..., like actually moving towards each other with momentum
+     if(blocks_are_entangled(pusher, pushee, &world->blocks) &&
+         ((blocks_rotations_between(pusher, pushee) + push_rotations) % DIRECTION_COUNT) == 2){
+          // calculate relative velocity in terms of momentum and add it to the original vel
+          Direction_t entangled_momentum_direction = direction_rotate_clockwise(direction, blocks_rotations_between(pusher, pushee));
+          auto entangled_momentum = get_block_momentum(world, pushee, entangled_momentum_direction, true);
+          F32 total_entangle_momentum = entangled_momentum.mass * entangled_momentum.vel;
+          auto block_mass = get_block_stack_mass(world, pusher);
+          F32 new_relative_vel = total_entangle_momentum / (F32)(block_mass);
+          if((new_relative_vel > 0 && original_vel < 0) ||
+             (new_relative_vel < 0 && original_vel > 0)){
+               new_relative_vel = -new_relative_vel;
+          }
+          return original_vel + new_relative_vel;
+     }else if(pusher == pushee && push_rotations == 2){
+          // since it is the same block, just double the vel, no need to do any calculations
           return original_vel * 2;
      }
+
 
      return original_vel;
 }
@@ -1888,7 +1901,8 @@ TransferMomentum_t get_push_pusher_momentum(BlockPusher_t* pusher, BlockMomentum
           if(result.vel > 0) result.vel = -result.vel;
      }
 
-     result.vel = update_momentum_if_block_push_is_opposite_entangled(pusher_block, pushee_block, push, world, result.vel);
+     result.vel = update_momentum_if_block_push_is_opposite_entangled(pusher_block, pushee_block, push, push_direction,
+                                                                      world, result.vel);
 
      return result;
 }
@@ -1931,7 +1945,8 @@ BlockCollisionPushResult_t block_collision_push(BlockMomentumPush_t* push, World
           F32 total_push_momentum = instant_momentum.mass * instant_momentum.vel;
           // LOG("total push on block %d momentum: %f, mass: %d, vel: %f\n", push->pushee_index, total_push_momentum, instant_momentum.mass, instant_momentum.vel);
 
-          auto push_result = block_push(pushee, push_pos, push_pos_delta, push_direction, world, true, push->force, &instant_momentum);
+          auto push_result = block_push(pushee, push_pos, push_pos_delta, push_direction, world, true, push->force, &instant_momentum,
+                                        nullptr, push->collided_with_block_count);
 
 #if 0
           LOG("  push result pushed %d, busy %d collisions %d\n", push_result.pushed, push_result.busy, push_result.collisions.count);
@@ -2018,7 +2033,9 @@ BlockCollisionPushResult_t block_collision_push(BlockMomentumPush_t* push, World
                // get the momentum in the current direction for the block receiving the force
                auto pusher_momentum = get_block_momentum(world, block_receiving_force, direction_opposite(direction_to_check));
 
-               pusher_momentum.vel = update_momentum_if_block_push_is_opposite_entangled(block_receiving_force, pushee, push, world, pusher_momentum.vel);
+               pusher_momentum.vel = update_momentum_if_block_push_is_opposite_entangled(block_receiving_force, pushee,
+                                                                                         push, direction,
+                                                                                         world, pusher_momentum.vel);
 
                // we fabs() because we know the momentum is travelling in the same direction as the total momentum, it
                // just may be rotated due to a portal.
@@ -2028,7 +2045,9 @@ BlockCollisionPushResult_t block_collision_push(BlockMomentumPush_t* push, World
 
                for(S16 c = 0; c < push_result.collisions.count; c++){
                    auto& collision = push_result.collisions.objects[c];
-                   F32 collision_pushee_initial_vel = update_momentum_if_block_push_is_opposite_entangled(block_receiving_force, collision.pushee, push, world, collision.pushee_initial_velocity);
+                   F32 collision_pushee_initial_vel = update_momentum_if_block_push_is_opposite_entangled(block_receiving_force,
+                                                                                                          pushee, push, direction,
+                                                                                                          world, collision.pushee_initial_velocity);
 
                    BlockMomentumCollision_t momentum_change {};
                    auto rotated_pushee_vel = rotate_vec_counter_clockwise_to_see_if_negates(collision_pushee_initial_vel,

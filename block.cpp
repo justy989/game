@@ -3,6 +3,13 @@
 #include "conversion.h"
 #include "utils.h"
 
+#include <cstring>
+
+void default_block(Block_t* block){
+     memset(block, 0, sizeof(*block));
+     block->entangle_index = -1;
+}
+
 S16 get_object_x(Block_t* block){
      if(block->teleport) return block->teleport_pos.pixel.x + (block_get_width_in_pixels(block->cut) / 2);
      return block->pos.pixel.x + (block_get_width_in_pixels(block->cut) / 2);

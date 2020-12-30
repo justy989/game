@@ -88,9 +88,14 @@ struct Block_t : public GridMotion_t{
      Vec_t pre_collision_pos_delta;
      Vec_t collision_time_ratio;
 
+     bool horizontal_momentum = false;
+     bool vertical_momentum = false;
+     Vec_t collision_momentum;
+
      bool over_pit = false;
 };
 
+void default_block(Block_t* block);
 S16 get_object_x(Block_t* block);
 S16 get_object_y(Block_t* block);
 Pixel_t block_center_pixel_offset(BlockCut_t cut);

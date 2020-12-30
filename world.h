@@ -61,17 +61,15 @@ struct BlockElasticCollision_t{
      S16 pushee_mass = 0;
      F32 pushee_initial_velocity = 0;
      F32 pushee_velocity = 0;
-     Block_t* pushee = nullptr;
 
      void init(S16 pusher_masss, F32 pusher_initial_vel, F32 pusher_vel, S16 pushee_masss, F32 pushee_initial_vel,
-               F32 pushee_vel, Block_t* pushee_block){
+               F32 pushee_vel){
           pusher_mass = pusher_masss;
           pusher_initial_velocity = pusher_initial_vel;
           pusher_velocity = pusher_vel;
           pushee_mass = pushee_masss;
           pushee_initial_velocity = pushee_initial_vel;
           pushee_velocity = pushee_vel;
-          pushee = pushee_block;
      }
 
      bool transferred_momentum_back(){return pusher_velocity != 0;}
@@ -138,19 +136,23 @@ void melt_ice(Coord_t center, S8 height, S16 radius, World_t* world, bool telepo
 
 BlockPushMoveDirectionResult_t block_push(Block_t* block, MoveDirection_t move_direction, World_t* world, bool pushed_by_ice,
                                           F32 force = 1.0f, TransferMomentum_t* instant_momentum = NULL, PushFromEntangler_t* from_entangler = NULL,
-                                          bool side_effects = false);
+                                          S16 block_contributing_momentum_to_total_blocks = 1, bool side_effects = false);
 bool block_would_push(Block_t* block, Position_t pos, Vec_t pos_delta, Direction_t direction, World_t* world,
                       bool pushed_by_ice, F32 force = 1.0f, TransferMomentum_t* instant_momentum = NULL,
-                      PushFromEntangler_t* from_entangler = NULL, bool side_effects = true, BlockPushResult_t* result = NULL);
+                      PushFromEntangler_t* from_entangler = NULL, S16 block_contributing_momentum_to_total_blocks = 1,
+                      bool side_effects = true, BlockPushResult_t* result = NULL);
 void block_do_push(Block_t* block, Position_t pos, Vec_t pos_delta, Direction_t direction, World_t* world,
                    bool pushed_by_ice, BlockPushResult_t* result, F32 force = 1.0f,
-                   TransferMomentum_t* instant_momentum = NULL, PushFromEntangler_t* from_entangler = NULL);
+                   TransferMomentum_t* instant_momentum = NULL, PushFromEntangler_t* from_entangler = NULL,
+                   S16 block_contributing_momentum_to_total_blocks = 1);
 // side_effects bool is to fake call these to see what would happen to a given block. The side effects are pushing other blocks
 BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Direction_t direction, World_t* world,
                              bool pushed_by_ice, F32 force = 1.0f, TransferMomentum_t* instant_momentum = NULL,
-                             PushFromEntangler_t* from_entangler = NULL, bool side_effects = true);
+                             PushFromEntangler_t* from_entangler = NULL,
+                             S16 block_contributing_momentum_to_total_blocks = 1, bool side_effects = true);
 BlockPushResult_t block_push(Block_t* block, Direction_t direction, World_t* world, bool pushed_by_ice, F32 force = 1.0f,
-                             TransferMomentum_t* instant_momentum = NULL, PushFromEntangler_t* from_entangler = NULL, bool side_effects = true);
+                             TransferMomentum_t* instant_momentum = NULL, PushFromEntangler_t* from_entangler = NULL,
+                             S16 block_contributing_momentum_to_total_blocks = 1, bool side_effects = true);
 bool block_pushable(Block_t* block, Direction_t direction, World_t* world, F32 force);
 bool reset_players(ObjectArray_t<Player_t>* players);
 
@@ -171,9 +173,9 @@ S16 get_block_mass_in_direction(World_t* world, Block_t* block, Direction_t dire
 
 F32 momentum_term(F32 mass, F32 vel);
 F32 momentum_term(TransferMomentum_t* transfer_momentum);
-TransferMomentum_t get_block_momentum(World_t* world, Block_t* block, Direction_t direction);
+TransferMomentum_t get_block_momentum(World_t* world, Block_t* block, Direction_t direction, bool prev = false);
 ElasticCollisionResult_t elastic_transfer_momentum(F32 mass_1, F32 vel_i_1, F32 mass_2, F32 vel_i_2);
-ElasticCollisionResult_t elastic_transfer_momentum_to_block(TransferMomentum_t* transfer_momentum, World_t* world, Block_t* block, Direction_t direction);
+ElasticCollisionResult_t elastic_transfer_momentum_to_block(TransferMomentum_t* transfer_momentum, World_t* world, Block_t* block, Direction_t direction, S16 block_contributing_momentum_to_total_blocks = 1);
 
 F32 get_block_static_friction(S16 mass);
 F32 get_block_expected_player_push_velocity(World_t* world, Block_t* block, F32 force = 1.0f);

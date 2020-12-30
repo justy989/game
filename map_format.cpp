@@ -213,14 +213,11 @@ bool load_map_from_file_v1(FILE* file, Coord_t* player_start, TileMap_t* tilemap
      // TODO: a lot of maps have -16, -16 as the first block
      for(S16 i = 0; i < block_count; i++){
           Block_t* block = block_array->elements + i;
-          *block = Block_t{};
+          default_block(block);
           block->pos.pixel = map_blocks[i].pixel;
           block->pos.z = map_blocks[i].z;
           block->rotation = map_blocks[i].rotation;
           block->element = map_blocks[i].element;
-          block->entangle_index = -1;
-          block->clone_start = Coord_t{};
-          block->clone_id = 0;
      }
 
      for(S16 i = 0; i < interactive_array->count; i++){
@@ -345,14 +342,12 @@ bool load_map_from_file_v2(FILE* file, Coord_t* player_start, TileMap_t* tilemap
      // TODO: a lot of maps have -16, -16 as the first block
      for(S16 i = 0; i < block_count; i++){
           Block_t* block = block_array->elements + i;
-          *block = Block_t{};
+          default_block(block);
           block->pos.pixel = map_blocks[i].pixel;
           block->pos.z = map_blocks[i].z;
           block->rotation = map_blocks[i].rotation;
           block->element = map_blocks[i].element;
           block->entangle_index = map_blocks[i].entangle_index;
-          block->clone_start = Coord_t{};
-          block->clone_id = 0;
      }
 
      for(S16 i = 0; i < interactive_array->count; i++){
@@ -477,15 +472,13 @@ bool load_map_from_file_v3(FILE* file, Coord_t* player_start, TileMap_t* tilemap
      // TODO: a lot of maps have -16, -16 as the first block
      for(S16 i = 0; i < block_count; i++){
           Block_t* block = block_array->elements + i;
-          *block = Block_t{};
+          default_block(block);
           block->pos.pixel = map_blocks[i].pixel;
           block->pos.z = map_blocks[i].z;
           block->rotation = map_blocks[i].rotation;
           block->element = map_blocks[i].element;
           block->entangle_index = map_blocks[i].entangle_index;
           block->cut = map_blocks[i].cut;
-          block->clone_start = Coord_t{};
-          block->clone_id = 0;
      }
 
      for(S16 i = 0; i < interactive_array->count; i++){
@@ -618,15 +611,13 @@ bool load_map_from_file_v4(FILE* file, Coord_t* player_start, TileMap_t* tilemap
      // TODO: a lot of maps have -16, -16 as the first block
      for(S16 i = 0; i < block_count; i++){
           Block_t* block = block_array->elements + i;
-          *block = Block_t{};
+          default_block(block);
           block->pos.pixel = map_blocks[i].pixel;
           block->pos.z = map_blocks[i].z;
           block->rotation = map_blocks[i].rotation;
           block->element = map_blocks[i].element;
           block->entangle_index = map_blocks[i].entangle_index;
           block->cut = map_blocks[i].cut;
-          block->clone_start = Coord_t{};
-          block->clone_id = 0;
      }
 
      for(S16 i = 0; i < interactive_array->count; i++){
@@ -759,15 +750,13 @@ bool load_map_from_file_v6(FILE* file, Coord_t* player_start, TileMap_t* tilemap
      // TODO: a lot of maps have -16, -16 as the first block
      for(S16 i = 0; i < block_count; i++){
           Block_t* block = block_array->elements + i;
-          *block = Block_t{};
+          default_block(block);
           block->pos.pixel = map_blocks[i].pixel;
           block->pos.z = map_blocks[i].z;
           block->rotation = map_blocks[i].rotation;
           block->element = map_blocks[i].element;
           block->entangle_index = map_blocks[i].entangle_index;
           block->cut = map_blocks[i].cut;
-          block->clone_start = Coord_t{};
-          block->clone_id = 0;
      }
 
      for(S16 i = 0; i < interactive_array->count; i++){
@@ -900,15 +889,13 @@ bool load_map_from_file_v7(FILE* file, Coord_t* player_start, TileMap_t* tilemap
      // TODO: a lot of maps have -16, -16 as the first block
      for(S16 i = 0; i < block_count; i++){
           Block_t* block = block_array->elements + i;
-          *block = Block_t{};
+          default_block(block);
           block->pos.pixel = map_blocks[i].pixel;
           block->pos.z = map_blocks[i].z;
           block->rotation = map_blocks[i].rotation;
           block->element = map_blocks[i].element;
           block->entangle_index = map_blocks[i].entangle_index;
           block->cut = map_blocks[i].cut;
-          block->clone_start = Coord_t{};
-          block->clone_id = 0;
      }
 
      for(S16 i = 0; i < interactive_array->count; i++){
