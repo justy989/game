@@ -2001,6 +2001,8 @@ BlockCollisionPushResult_t block_collision_push(BlockMomentumPush_t* push, World
                          bool horizontal_direction = direction_is_horizontal(new_direction_to_check);
                          F32 vel = horizontal_direction ? against_block_result->block->vel.x : against_block_result->block->vel.y;
                          if(vel == 0) break;
+                         // bool received_momentum = horizontal_direction ? against_block_result->block->horizontal_momentum : against_block_result->block->vertical_momentum;
+                         // if(!received_momentum) break;
 
                          if(i == (chain_results.objects[0].count - push->reapply_count)){
                               break;
@@ -2025,7 +2027,7 @@ BlockCollisionPushResult_t block_collision_push(BlockMomentumPush_t* push, World
                if(push_result.collisions.count == 0 && !push_result.pushed){
                    BlockMomentumCollision_t momentum_change {};
                    momentum_change.init(block_receiving_force_index, 0, 0, direction_is_horizontal(direction_to_check),
-                                        direction_to_check, push_result.pushed);
+                                        direction_to_check, false, push->pushers[p].collided_with_block_count);
                    result.momentum_collisions.insert(&momentum_change);
                    continue;
                }
@@ -2045,17 +2047,24 @@ BlockCollisionPushResult_t block_collision_push(BlockMomentumPush_t* push, World
 
                for(S16 c = 0; c < push_result.collisions.count; c++){
                    auto& collision = push_result.collisions.objects[c];
-                   F32 collision_pushee_initial_vel = update_momentum_if_block_push_is_opposite_entangled(block_receiving_force,
-                                                                                                          pushee, push, direction,
-                                                                                                          world, collision.pushee_initial_velocity);
 
                    BlockMomentumCollision_t momentum_change {};
-                   auto rotated_pushee_vel = rotate_vec_counter_clockwise_to_see_if_negates(collision_pushee_initial_vel,
+                   momentum_change.init(collision.pushee_index, collision.pusher_mass,
+                                        collision.pusher_initial_velocity, direction_is_horizontal(collision.direction_pushee_hit),
+                                        collision.direction_pushee_hit, true, push->collided_with_block_count);
+                   result.momentum_collisions.insert(&momentum_change);
+
+                   F32 initial_vel = update_momentum_if_block_push_is_opposite_entangled(block_receiving_force,
+                                                                                         pushee, push, direction,
+                                                                                         world,
+                                                                                         collision.pushee_initial_velocity);
+
+                   auto rotated_pushee_vel = rotate_vec_counter_clockwise_to_see_if_negates(initial_vel,
                                                                                             direction_is_horizontal(pusher_direction),
                                                                                             total_against_rotations);
                    momentum_change.init(block_receiving_force_index, collision.pushee_mass * pusher_contribution_percentage,
                                         rotated_pushee_vel, direction_is_horizontal(direction_to_check),
-                                        direction_to_check, true);
+                                        direction_to_check, true, push->pushers[p].collided_with_block_count);
                    result.momentum_collisions.insert(&momentum_change);
                }
           }

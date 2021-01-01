@@ -61,15 +61,19 @@ struct BlockElasticCollision_t{
      S16 pushee_mass = 0;
      F32 pushee_initial_velocity = 0;
      F32 pushee_velocity = 0;
+     S16 pushee_index = -1;
+     Direction_t direction_pushee_hit = DIRECTION_COUNT;
 
      void init(S16 pusher_masss, F32 pusher_initial_vel, F32 pusher_vel, S16 pushee_masss, F32 pushee_initial_vel,
-               F32 pushee_vel){
+               F32 pushee_vel, S16 the_pushee_index, Direction_t direction_pushee_was_hit){
           pusher_mass = pusher_masss;
           pusher_initial_velocity = pusher_initial_vel;
           pusher_velocity = pusher_vel;
           pushee_mass = pushee_masss;
           pushee_initial_velocity = pushee_initial_vel;
           pushee_velocity = pushee_vel;
+          pushee_index = the_pushee_index;
+          direction_pushee_hit = direction_pushee_was_hit;
      }
 
      bool transferred_momentum_back(){return pusher_velocity != 0;}

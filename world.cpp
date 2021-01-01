@@ -1532,29 +1532,38 @@ bool apply_push_horizontal(Block_t* block, Position_t pos, World_t* world, Direc
            auto elastic_result = elastic_transfer_momentum_to_block(instant_momentum, world, block, direction, block_contributing_momentum_to_total_blocks);
            if(collision_result_overcomes_friction(block->vel.x, elastic_result.second_final_velocity, get_block_stack_mass(world, block))){
                 add_global_tag(TAB_BLOCK_MOMENTUM_COLLISION);
-                auto instant_vel = elastic_result.second_final_velocity;
+                // auto instant_vel = elastic_result.second_final_velocity;
                 auto pushee_momentum = get_block_momentum(world, block, direction);
+
+                // don't use the current vel, but use the momentum we've gained over the frame if we have received some
+                if(block->horizontal_momentum){
+                     pushee_momentum.vel = block->collision_momentum.x / pushee_momentum.mass;
+                }
+
                 pushee_momentum.mass /= block_contributing_momentum_to_total_blocks;
                 BlockElasticCollision_t elastic_collision {};
                 elastic_collision.init(instant_momentum->mass, instant_momentum->vel, elastic_result.first_final_velocity,
-                                       pushee_momentum.mass, pushee_momentum.vel, elastic_result.second_final_velocity);
+                                       pushee_momentum.mass, pushee_momentum.vel, elastic_result.second_final_velocity,
+                                       block - world->blocks.elements, direction);
                 result->collisions.insert(&elastic_collision);
-                if(direction == DIRECTION_LEFT){
-                    if(instant_vel > 0) instant_vel = -instant_vel;
-                }else if(direction == DIRECTION_RIGHT){
-                    if(instant_vel < 0) instant_vel = -instant_vel;
-                }
 
-                block->horizontal_momentum = true;
-                block->collision_momentum.x += pushee_momentum.mass * instant_vel;
-                block->horizontal_move.sign = move_sign_from_vel(block->vel.x);
-                block->horizontal_move.state = MOVE_STATE_COASTING;
+                // if(direction == DIRECTION_LEFT){
+                //     if(instant_vel > 0) instant_vel = -instant_vel;
+                // }else if(direction == DIRECTION_RIGHT){
+                //     if(instant_vel < 0) instant_vel = -instant_vel;
+                // }
 
-                auto motion = motion_x_component(block);
-                F32 x_pos = pos_to_vec(block->pos).x;
-                block->horizontal_move.time_left = calc_coast_motion_time_left(block->cut, &motion, x_pos);
-                if(direction == DIRECTION_LEFT) block->horizontal_move.time_left = -block->horizontal_move.time_left;
-                block->stopped_by_player_horizontal = false;
+                // if our vel doesn't change, don't add more momentum
+                // if(pushee_momentum.vel == instant_vel) return true;
+
+                // block->horizontal_momentum = true;
+                // block->collision_momentum.x += pushee_momentum.mass * instant_vel;
+
+                // auto motion = motion_x_component(block);
+                // F32 x_pos = pos_to_vec(block->pos).x;
+                // block->horizontal_move.time_left = calc_coast_motion_time_left(block->cut, &motion, x_pos);
+                // if(direction == DIRECTION_LEFT) block->horizontal_move.time_left = -block->horizontal_move.time_left;
+                // block->stopped_by_player_horizontal = false;
            }else{
                 return false;
            }
@@ -1636,30 +1645,39 @@ bool apply_push_vertical(Block_t* block, Position_t pos, World_t* world, Directi
            auto elastic_result = elastic_transfer_momentum_to_block(instant_momentum, world, block, direction, block_contributing_momentum_to_total_blocks);
            if(collision_result_overcomes_friction(block->vel.y, elastic_result.second_final_velocity, get_block_stack_mass(world, block))){
                 add_global_tag(TAB_BLOCK_MOMENTUM_COLLISION);
-                auto instant_vel = elastic_result.second_final_velocity;
+                // auto instant_vel = elastic_result.second_final_velocity;
                 auto pushee_momentum = get_block_momentum(world, block, direction);
-                pushee_momentum.mass /= block_contributing_momentum_to_total_blocks;
-                BlockElasticCollision_t elastic_collision {};
-                elastic_collision.init(instant_momentum->mass, instant_momentum->vel, elastic_result.first_final_velocity,
-                                       pushee_momentum.mass, pushee_momentum.vel,
-                                       elastic_result.second_final_velocity);
-                result->collisions.insert(&elastic_collision);
-                if(direction == DIRECTION_DOWN){
-                    if(instant_vel > 0) instant_vel = -instant_vel;
-                }else if(direction == DIRECTION_UP){
-                    if(instant_vel < 0) instant_vel = -instant_vel;
+
+                // don't use the current vel, but use the momentum we've gained over the frame if we have received some
+                if(block->vertical_momentum){
+                     pushee_momentum.vel = block->collision_momentum.y / pushee_momentum.mass;
                 }
 
-                block->vertical_momentum = true;
-                block->collision_momentum.y += pushee_momentum.mass * instant_vel;
-                block->vertical_move.sign = move_sign_from_vel(block->vel.y);
-                block->vertical_move.state = MOVE_STATE_COASTING;
+                pushee_momentum.mass /= block_contributing_momentum_to_total_blocks;
 
-                auto motion = motion_y_component(block);
-                F32 y_pos = pos_to_vec(block->pos).y;
-                block->vertical_move.time_left = calc_coast_motion_time_left(block->cut, &motion, y_pos);
-                if(direction == DIRECTION_DOWN) block->vertical_move.time_left = -block->vertical_move.time_left;
-                block->stopped_by_player_vertical = false;
+                BlockElasticCollision_t elastic_collision {};
+                elastic_collision.init(instant_momentum->mass, instant_momentum->vel, elastic_result.first_final_velocity,
+                                       pushee_momentum.mass, pushee_momentum.vel, elastic_result.second_final_velocity,
+                                       block - world->blocks.elements, direction);
+                result->collisions.insert(&elastic_collision);
+
+                // if(direction == DIRECTION_DOWN){
+                //     if(instant_vel > 0) instant_vel = -instant_vel;
+                // }else if(direction == DIRECTION_UP){
+                //     if(instant_vel < 0) instant_vel = -instant_vel;
+                // }
+
+                // if our vel doesn't change, don't add more momentum
+                // if(pushee_momentum.vel == instant_vel) return true;
+
+                // block->vertical_momentum = true;
+                // block->collision_momentum.y += pushee_momentum.mass * instant_vel;
+
+                // auto motion = motion_y_component(block);
+                // F32 y_pos = pos_to_vec(block->pos).y;
+                // block->vertical_move.time_left = calc_coast_motion_time_left(block->cut, &motion, y_pos);
+                // if(direction == DIRECTION_DOWN) block->vertical_move.time_left = -block->vertical_move.time_left;
+                // block->stopped_by_player_vertical = false;
            }else{
                 return false;
            }
@@ -1741,13 +1759,13 @@ void update_block_momentum_from_push(Block_t* block, Direction_t direction, Push
 
                  // TODO: how do we handle multiple collisions transferring momentum back?
                  if(from_entangler){
-                      block->vel.x = collision.pushee_velocity;
+                      block->collision_momentum.x += collision.pushee_velocity * collision.pushee_mass;
+                      block->horizontal_momentum = true;
                       block->horizontal_move.state = MOVE_STATE_COASTING;
-                      block->horizontal_move.sign = move_sign_from_vel(block->vel.x);
+                      block->horizontal_move.sign = move_sign_from_vel(collision.pushee_velocity);
                       final_result->pushed = true;
                  }else{
                       final_result->collisions.insert(&collision);
-                      // reset_move(&block->horizontal_move);
                       final_result->pushed = false;
                  }
              }
@@ -1763,13 +1781,13 @@ void update_block_momentum_from_push(Block_t* block, Direction_t direction, Push
                  transferred_momentum_back = true;
 
                  if(from_entangler){
-                      block->vel.y = collision.pushee_velocity;
+                      block->collision_momentum.y += collision.pushee_velocity * collision.pushee_mass;
+                      block->vertical_momentum = true;
                       block->vertical_move.state = MOVE_STATE_COASTING;
-                      block->vertical_move.sign = move_sign_from_vel(block->vel.x);
+                      block->vertical_move.sign = move_sign_from_vel(collision.pushee_velocity);
                       final_result->pushed = true;
                  }else{
                       final_result->collisions.insert(&collision);
-                      // reset_move(&block->vertical_move);
                       final_result->pushed = false;
                  }
              }
@@ -1857,9 +1875,10 @@ bool resolve_push_against_block(Block_t* block, MoveDirection_t move_direction, 
 
      MoveDirection_t final_move_direction = move_direction_from_directions(first_against_block_push_dir, second_against_block_push_dir);
 
+     // TODO: should this be block_on_frictionless() ?
      bool on_ice = block_on_ice(against_block->pos, against_block->pos_delta, against_block->cut,
                                 &world->tilemap, world->interactive_qt, world->block_qt);
-     bool both_on_ice = false;
+     bool both_on_ice = (on_ice && pushed_block_on_ice);
 
      bool are_entangled = blocks_are_entangled(block, against_block, &world->blocks);
 
@@ -1876,29 +1895,37 @@ bool resolve_push_against_block(Block_t* block, MoveDirection_t move_direction, 
                return false;
           }
 
-          if(pushed_block_on_ice) both_on_ice = true;
-
           if(pushed_by_ice && instant_momentum){
                // check if we are able to move or if we transfer our force to the block
                F32 block_against_dir_vel = 0;
+
+               Vec_t against_block_vel = against_block->vel;
+               if(against_block->horizontal_momentum){
+                    auto mass = get_block_stack_mass(world, against_block);
+                    against_block_vel.x = mass / against_block->collision_momentum.x;
+               }
+               if(against_block->vertical_momentum){
+                    auto mass = get_block_stack_mass(world, against_block);
+                    against_block_vel.y = mass / against_block->collision_momentum.y;
+               }
 
                switch(first_against_block_push_dir){
                default:
                     break;
                case DIRECTION_LEFT:
-                    *transfers_force = (against_block->vel.x > instant_momentum->vel);
+                    *transfers_force = (against_block_vel.x > instant_momentum->vel);
                     block_against_dir_vel = block->vel.x;
                     break;
                case DIRECTION_UP:
-                    *transfers_force = (against_block->vel.y < instant_momentum->vel);
+                    *transfers_force = (against_block_vel.y < instant_momentum->vel);
                     block_against_dir_vel = block->vel.y;
                     break;
                case DIRECTION_RIGHT:
-                    *transfers_force = (against_block->vel.x < instant_momentum->vel);
+                    *transfers_force = (against_block_vel.x < instant_momentum->vel);
                     block_against_dir_vel = block->vel.x;
                     break;
                case DIRECTION_DOWN:
-                    *transfers_force = (against_block->vel.y > instant_momentum->vel);
+                    *transfers_force = (against_block_vel.y > instant_momentum->vel);
                     block_against_dir_vel = block->vel.y;
                     break;
                }
@@ -1907,19 +1934,19 @@ bool resolve_push_against_block(Block_t* block, MoveDirection_t move_direction, 
                default:
                     break;
                case DIRECTION_LEFT:
-                    *transfers_force = (against_block->vel.x > instant_momentum->vel);
+                    *transfers_force = (against_block_vel.x > instant_momentum->vel);
                     block_against_dir_vel = block->vel.x;
                     break;
                case DIRECTION_UP:
-                    *transfers_force = (against_block->vel.y < instant_momentum->vel);
+                    *transfers_force = (against_block_vel.y < instant_momentum->vel);
                     block_against_dir_vel = block->vel.y;
                     break;
                case DIRECTION_RIGHT:
-                    *transfers_force = (against_block->vel.x < instant_momentum->vel);
+                    *transfers_force = (against_block_vel.x < instant_momentum->vel);
                     block_against_dir_vel = block->vel.x;
                     break;
                case DIRECTION_DOWN:
-                    *transfers_force = (against_block->vel.y > instant_momentum->vel);
+                    *transfers_force = (against_block_vel.y > instant_momentum->vel);
                     block_against_dir_vel = block->vel.y;
                     break;
                }
@@ -1938,7 +1965,8 @@ bool resolve_push_against_block(Block_t* block, MoveDirection_t move_direction, 
 
                     if(result){
                          auto push_result = block_push(against_block, final_move_direction, world, pushed_by_ice, force,
-                                                       &split_instant_momentum, nullptr, block_contributing_momentum_to_total_blocks, side_effects);
+                                                       &split_instant_momentum, nullptr, block_contributing_momentum_to_total_blocks,
+                                                       side_effects);
                          result->againsts_pushed.merge(&push_result.horizontal_result.againsts_pushed);
                          result->againsts_pushed.merge(&push_result.vertical_result.againsts_pushed);
 
@@ -1983,7 +2011,8 @@ bool resolve_push_against_block(Block_t* block, MoveDirection_t move_direction, 
                     }else{
                          auto save_block = *against_block;
                          auto push_result = block_push(against_block, final_move_direction, world, pushed_by_ice, force,
-                                                       instant_momentum, nullptr, block_contributing_momentum_to_total_blocks, side_effects);
+                                                       instant_momentum, nullptr, block_contributing_momentum_to_total_blocks,
+                                                       side_effects);
                          if(!side_effects) *against_block = save_block;
                          result->againsts_pushed.merge(&push_result.horizontal_result.againsts_pushed);
                          result->againsts_pushed.merge(&push_result.vertical_result.againsts_pushed);
@@ -2102,25 +2131,14 @@ bool is_block_against_solid_centroid(Block_t* block, Direction_t direction, F32 
 
 bool block_would_push(Block_t* block, Position_t pos, Vec_t pos_delta, Direction_t direction, World_t* world,
                       bool pushed_by_ice, F32 force, TransferMomentum_t* instant_momentum,
-                      PushFromEntangler_t* from_entangler, S16 block_contributing_momentum_to_total_blocks, bool side_effects, BlockPushResult_t* result)
+                      PushFromEntangler_t* from_entangler, S16 block_contributing_momentum_to_total_blocks,
+                      bool side_effects, BlockPushResult_t* result)
 {
      auto against_result = block_against_other_blocks(pos + pos_delta, block->cut, direction, world->block_qt, world->interactive_qt,
                                                       &world->tilemap);
      bool pushed_block_on_frictionless = block_on_frictionless(pos, pos_delta, block->cut, &world->tilemap, world->interactive_qt, world->block_qt);
 
-     F32 block_push_vel = 0;
-     F32 save_block_push_vel = 0;
-
-     if(direction_is_horizontal(direction)){
-          block_push_vel = block->vel.x;
-          save_block_push_vel = block->vel.x;
-     }else{
-          block_push_vel = block->vel.y;
-          save_block_push_vel = block->vel.y;
-     }
-
      bool transfers_force = false;
-
      {
           // TODO: we have returns in this loop, how do we handle them?
           MoveDirection_t move_direction = move_direction_from_directions(direction, DIRECTION_COUNT);
@@ -2128,7 +2146,8 @@ bool block_would_push(Block_t* block, Position_t pos, Vec_t pos_delta, Direction
           for(S16 i = 0; i < against_result.count; i++){
                if(!resolve_push_against_block(block, move_direction, pushed_by_ice, pushed_block_on_frictionless, force,
                                               instant_momentum, from_entangler, against_result.objects + i, against_result.count,
-                                              world, block_contributing_momentum_to_total_blocks, side_effects, result, &transfers_force)){
+                                              world, block_contributing_momentum_to_total_blocks, side_effects,
+                                              result, &transfers_force)){
                     return false;
                }
           }
@@ -2369,7 +2388,8 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
 
      BlockPushResult_t result {};
      if(!block_would_push(block, pos, pos_delta, direction, world, pushed_by_ice, force, instant_momentum,
-                          from_entangler, block_contributing_momentum_to_total_blocks, side_effects, &result)){
+                          from_entangler, block_contributing_momentum_to_total_blocks, side_effects,
+                          &result)){
           return result;
      }
 

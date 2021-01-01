@@ -2012,7 +2012,6 @@ void consolidate_block_pushes(BlockMomentumPushes_t<128>* block_pushes, BlockMom
                     auto* pusher = check_push->pushers + p;
                     if(pusher->index == push->pushee_index){
                          push->collided_with_block_count++;
-                         LOG("we out here\n");
                     }
                }
           }
@@ -2128,86 +2127,79 @@ void apply_momentum_collisions(BlockMomentumCollisions_t* momentum_collisions, W
 
           F32 x_momentum = 0;
           F32 y_momentum = 0;
-          F32 x_vel = 0;
-          F32 y_vel = 0;
           S32 x_mass = 0;
           S32 y_mass = 0;
           bool stop_x = false;
           bool stop_y = false;
 
-          // gather all the mass and momentum we are colliding with in each axis
+          Direction_t horizontal_move_direction = block_axis_move(block, true);
+          Direction_t vertical_move_direction = block_axis_move(block, true);
+          auto horizontal_pusher_momentum = get_block_momentum(world, block, horizontal_move_direction);
+          auto vertical_pusher_momentum = get_block_momentum(world, block, vertical_move_direction);
+
+          // do an elastic collision for each elastic tranfer and build up the amount of momentum/mass we need to collide against
           for(S16 c = 0; c < momentum_collisions->count; c++){
                auto& block_change = momentum_collisions->objects[c];
                if(block_change.block_index != i) continue;
                if(block_change.x){
                     if(block_change.momentum_transfer){
+                         S16 mass = horizontal_pusher_momentum.mass / block_change.split_mass_between_blocks;
+                         auto elastic_result = elastic_transfer_momentum(mass, horizontal_pusher_momentum.vel, block_change.mass, block_change.vel);
+                         x_momentum += (F32)(mass) * elastic_result.first_final_velocity;
                          x_mass += block_change.mass;
-                         x_momentum += (F32)(block_change.mass) * block_change.vel;
                     }else{
                          stop_x = true;
                     }
                }else{
                     if(block_change.momentum_transfer){
+                         S16 mass = vertical_pusher_momentum.mass / block_change.split_mass_between_blocks;
+                         auto elastic_result = elastic_transfer_momentum(mass, vertical_pusher_momentum.vel, block_change.mass, block_change.vel);
+                         y_momentum += (F32)(mass) * elastic_result.first_final_velocity;
                          y_mass += block_change.mass;
-                         y_momentum += (F32)(block_change.mass) * block_change.vel;
                     }else{
                          stop_y = true;
                     }
                }
           }
 
-          // figure out the velocities and calculate the final elastic result from the total momentum we hit
+          // calculate the velocity based on the momentum we have calculated based on our collisions
           if(stop_x){
+               block->accel.x = 0;
                block->vel.x = 0;
                block->collision_momentum.x = 0;
                block->horizontal_momentum = false;
+               block->horizontal_move.state = MOVE_STATE_IDLING;
+               block->horizontal_move.sign = MOVE_SIGN_ZERO;
+               block->horizontal_move.time_left = 0;
           }else if(x_mass > 0){
-               x_vel = x_momentum / (F32)(x_mass);
-               Direction_t move_direction = block_axis_move(block, true);
-               if(move_direction != DIRECTION_COUNT){
-                    auto pusher_momentum = get_block_momentum(world, block, move_direction);
-                    auto elastic_result = elastic_transfer_momentum(pusher_momentum.mass, pusher_momentum.vel, x_mass, x_vel);
-                    block->collision_momentum.x += pusher_momentum.mass * elastic_result.first_final_velocity;
-                    block->horizontal_momentum = true;
-               }
+               F32 x_vel = x_momentum / (F32)(x_mass);
+               block->collision_momentum.x += horizontal_pusher_momentum.mass * x_vel;
+               block->horizontal_momentum = true;
           }
 
           if(stop_y){
+               block->accel.y = 0;
                block->vel.y = 0;
                block->collision_momentum.y = 0;
                block->vertical_momentum = false;
+               block->vertical_move.state = MOVE_STATE_IDLING;
+               block->vertical_move.sign = MOVE_SIGN_ZERO;
+               block->vertical_move.time_left = 0;
           }else if(y_mass > 0){
-               y_vel = y_momentum / (F32)(y_mass);
-               Direction_t move_direction = block_axis_move(block, false);
-               if(move_direction != DIRECTION_COUNT){
-                    auto pusher_momentum = get_block_momentum(world, block, move_direction);
-                    auto elastic_result = elastic_transfer_momentum(pusher_momentum.mass, pusher_momentum.vel, y_mass, y_vel);
-                    block->collision_momentum.y += pusher_momentum.mass * elastic_result.first_final_velocity;
-                    block->vertical_momentum = true;
-               }
+               F32 y_vel = y_momentum / (F32)(y_mass);
+               block->collision_momentum.y += vertical_pusher_momentum.mass * y_vel;
+               block->vertical_momentum = true;
           }
+     }
 
-          // update velocity based on accumulated momentum throughout the frame
+     for(S16 i = 0; i < world->blocks.count; i++){
+          auto* block = world->blocks.elements + i;
           if(block->horizontal_momentum){
                S16 mass = get_block_stack_mass(world, block);
                block->vel.x = block->collision_momentum.x / mass;
                block->collision_momentum.x = 0;
                block->horizontal_momentum = false;
-          }
 
-          if(block->vertical_momentum){
-               S16 mass = get_block_stack_mass(world, block);
-               block->vel.y = block->collision_momentum.y / mass;
-               block->collision_momentum.y = 0;
-               block->vertical_momentum = false;
-          }
-     }
-
-     // set coasting or idling based on new velocity
-     for(S16 c = 0; c < momentum_collisions->count; c++){
-          auto& block_change = momentum_collisions->objects[c];
-          auto* block = world->blocks.elements + block_change.block_index;
-          if(block_change.x){
                if(block->vel.x == 0){
                     block->horizontal_move.state = MOVE_STATE_IDLING;
                     block->horizontal_move.sign = MOVE_SIGN_ZERO;
@@ -2217,7 +2209,14 @@ void apply_momentum_collisions(BlockMomentumCollisions_t* momentum_collisions, W
                     block->accel.x = 0;
                }
                block->horizontal_move.time_left = 0;
-          }else{
+          }
+
+          if(block->vertical_momentum){
+               S16 mass = get_block_stack_mass(world, block);
+               block->vel.y = block->collision_momentum.y / mass;
+               block->collision_momentum.y = 0;
+               block->vertical_momentum = false;
+
                if(block->vel.y == 0){
                     block->vertical_move.state = MOVE_STATE_IDLING;
                     block->vertical_move.sign = MOVE_SIGN_ZERO;
