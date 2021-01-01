@@ -1533,7 +1533,7 @@ bool apply_push_horizontal(Block_t* block, Position_t pos, World_t* world, Direc
            pushee_momentum.mass /= block_contributing_momentum_to_total_blocks;
 
            // don't use the current vel, but use the momentum we've gained over the frame if we have received some
-           if(block->horizontal_momentum){
+           if(block->horizontal_momentum != BLOCK_MOMENTUM_NONE){
                 pushee_momentum.vel = block->collision_momentum.x / pushee_momentum.mass;
            }
 
@@ -1562,8 +1562,7 @@ bool apply_push_horizontal(Block_t* block, Position_t pos, World_t* world, Direc
                 // LOG("giving block %ld: %f momentum (%f != %f)\n", block - world->blocks.elements, pushee_momentum.mass * instant_vel,
                 //     pushee_momentum.vel, instant_vel);
 
-                block->horizontal_momentum = true;
-                block->collision_momentum.x += pushee_momentum.mass * instant_vel;
+                block_add_horizontal_momentum(block, pushee_momentum.mass * instant_vel);
 
                 auto motion = motion_x_component(block);
                 F32 x_pos = pos_to_vec(block->pos).x;
@@ -1652,7 +1651,7 @@ bool apply_push_vertical(Block_t* block, Position_t pos, World_t* world, Directi
            pushee_momentum.mass /= block_contributing_momentum_to_total_blocks;
 
            // don't use the current vel, but use the momentum we've gained over the frame if we have received some
-           if(block->vertical_momentum){
+           if(block->vertical_momentum != BLOCK_MOMENTUM_NONE){
                 pushee_momentum.vel = block->collision_momentum.y / pushee_momentum.mass;
            }
 
@@ -1677,8 +1676,7 @@ bool apply_push_vertical(Block_t* block, Position_t pos, World_t* world, Directi
                     if(instant_vel < 0) instant_vel = -instant_vel;
                 }
 
-                block->vertical_momentum = true;
-                block->collision_momentum.y += pushee_momentum.mass * instant_vel;
+                block_add_vertical_momentum(block, pushee_momentum.mass * instant_vel);
 
                 auto motion = motion_y_component(block);
                 F32 y_pos = pos_to_vec(block->pos).y;
@@ -1766,10 +1764,9 @@ void update_block_momentum_from_push(Block_t* block, Direction_t direction, Push
 
                  // TODO: how do we handle multiple collisions transferring momentum back?
                  if(from_entangler){
-                      block->collision_momentum.x += collision.pushee_velocity * collision.pushee_mass;
-                      block->horizontal_momentum = true;
-                      block->horizontal_move.state = MOVE_STATE_COASTING;
-                      block->horizontal_move.sign = move_sign_from_vel(collision.pushee_velocity);
+                      block_add_horizontal_momentum(block, collision.pushee_velocity * collision.pushee_mass);
+                      // block->horizontal_move.state = MOVE_STATE_COASTING;
+                      // block->horizontal_move.sign = move_sign_from_vel(collision.pushee_velocity);
                       final_result->pushed = true;
                  }else{
                       final_result->collisions.insert(&collision);
@@ -1788,10 +1785,7 @@ void update_block_momentum_from_push(Block_t* block, Direction_t direction, Push
                  transferred_momentum_back = true;
 
                  if(from_entangler){
-                      block->collision_momentum.y += collision.pushee_velocity * collision.pushee_mass;
-                      block->vertical_momentum = true;
-                      block->vertical_move.state = MOVE_STATE_COASTING;
-                      block->vertical_move.sign = move_sign_from_vel(collision.pushee_velocity);
+                      block_add_vertical_momentum(block, collision.pushee_velocity * collision.pushee_mass);
                       final_result->pushed = true;
                  }else{
                       final_result->collisions.insert(&collision);
@@ -1907,11 +1901,11 @@ bool resolve_push_against_block(Block_t* block, MoveDirection_t move_direction, 
                F32 block_against_dir_vel = 0;
 
                Vec_t against_block_vel = against_block->vel;
-               if(against_block->horizontal_momentum){
+               if(against_block->horizontal_momentum != BLOCK_MOMENTUM_NONE){
                     auto mass = get_block_stack_mass(world, against_block);
                     against_block_vel.x = mass / against_block->collision_momentum.x;
                }
-               if(against_block->vertical_momentum){
+               if(against_block->vertical_momentum != BLOCK_MOMENTUM_NONE){
                     auto mass = get_block_stack_mass(world, against_block);
                     against_block_vel.y = mass / against_block->collision_momentum.y;
                }
