@@ -2027,7 +2027,7 @@ BlockCollisionPushResult_t block_collision_push(BlockMomentumPush_t* push, World
                if(push_result.collisions.count == 0 && !push_result.pushed){
                    BlockMomentumCollision_t momentum_change {};
                    momentum_change.init(block_receiving_force_index, 0, 0, direction_is_horizontal(direction_to_check),
-                                        direction_to_check, false, push->pushers[p].collided_with_block_count);
+                                        direction_to_check, -1, false, push->pushers[p].collided_with_block_count);
                    result.momentum_collisions.insert(&momentum_change);
                    continue;
                }
@@ -2048,12 +2048,6 @@ BlockCollisionPushResult_t block_collision_push(BlockMomentumPush_t* push, World
                for(S16 c = 0; c < push_result.collisions.count; c++){
                    auto& collision = push_result.collisions.objects[c];
 
-                   BlockMomentumCollision_t momentum_change {};
-                   momentum_change.init(collision.pushee_index, collision.pusher_mass,
-                                        collision.pusher_initial_velocity, direction_is_horizontal(collision.direction_pushee_hit),
-                                        collision.direction_pushee_hit, true, push->collided_with_block_count);
-                   result.momentum_collisions.insert(&momentum_change);
-
                    F32 initial_vel = update_momentum_if_block_push_is_opposite_entangled(block_receiving_force,
                                                                                          pushee, push, direction,
                                                                                          world,
@@ -2062,9 +2056,12 @@ BlockCollisionPushResult_t block_collision_push(BlockMomentumPush_t* push, World
                    auto rotated_pushee_vel = rotate_vec_counter_clockwise_to_see_if_negates(initial_vel,
                                                                                             direction_is_horizontal(pusher_direction),
                                                                                             total_against_rotations);
+
+                   BlockMomentumCollision_t momentum_change {};
                    momentum_change.init(block_receiving_force_index, collision.pushee_mass * pusher_contribution_percentage,
                                         rotated_pushee_vel, direction_is_horizontal(direction_to_check),
-                                        direction_to_check, true, push->pushers[p].collided_with_block_count);
+                                        direction_to_check, collision.pushee_index,
+                                        true, push->pushers[p].collided_with_block_count);
                    result.momentum_collisions.insert(&momentum_change);
                }
           }

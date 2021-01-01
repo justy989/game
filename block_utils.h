@@ -350,17 +350,19 @@ struct BlockMomentumCollision_t{
      F32 vel = 0;
      bool x = false;
      Direction_t from = DIRECTION_COUNT;
+     S16 from_block = -1;
      bool momentum_transfer = false; // whether or not the momentum collision happened. if the push is not successful,
                                      // that means the chain was probably against a wall or player
      S16 split_mass_between_blocks = 1;
 
-     void init(S16 block_id, S16 masss, F32 velocity, bool is_x, Direction_t is_from, bool momentum_was_transferred,
-               S16 has_split_mass_between_blocks){
+     void init(S16 block_id, S16 masss, F32 velocity, bool is_x, Direction_t is_from, S16 from_block_id,
+               bool momentum_was_transferred, S16 has_split_mass_between_blocks){
           block_index = block_id;
           mass = masss;
           vel = velocity;
           x = is_x;
           from = is_from;
+          from_block = from_block_id;
           momentum_transfer = momentum_was_transferred;
           split_mass_between_blocks = has_split_mass_between_blocks;
      }

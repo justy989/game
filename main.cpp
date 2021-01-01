@@ -2074,17 +2074,50 @@ void execute_block_pushes(BlockMomentumPushes_t<128>* block_pushes, World_t* wor
                   for(S16 p = 0; p < check_block_push.pusher_count; p++){
                       auto& check_pusher = check_block_push.pushers[p];
 
-                      if(check_pusher.index != momentum_collision.block_index) continue;
                       if(check_pusher.hit_entangler) continue;
                       if(block_pushes_are_the_same_collision(block_pushes, i, j, check_pusher.index)) continue;
+                      if(check_pusher.index != momentum_collision.block_index){
+                           if(check_pusher.index == momentum_collision.from_block){
+                                auto* from_block = world->blocks.elements + momentum_collision.from_block;
 
+                                Direction_t horizontal_momentum_dir = DIRECTION_COUNT;
+                                Direction_t vertical_momentum_dir = DIRECTION_COUNT;
+
+                                if(from_block->horizontal_momentum){
+                                     if(from_block->collision_momentum.x > 0){
+                                          horizontal_momentum_dir = DIRECTION_RIGHT;
+                                     }else if(from_block->collision_momentum.x < 0){
+                                          horizontal_momentum_dir = DIRECTION_LEFT;
+                                     }
+                                }
+
+                                if(from_block->vertical_momentum){
+                                     if(from_block->collision_momentum.y > 0){
+                                          vertical_momentum_dir = DIRECTION_UP;
+                                     }else if(from_block->collision_momentum.y < 0){
+                                          vertical_momentum_dir = DIRECTION_DOWN;
+                                     }
+                                }
+
+                                if(direction_in_mask(check_block_push.direction_mask, direction_opposite(horizontal_momentum_dir)) ||
+                                   direction_in_mask(check_block_push.direction_mask, direction_opposite(vertical_momentum_dir))){
+                                     check_block_push.remove_pusher(p);
+                                     p--;
+                                }
+                           }else{
+                                continue;
+                           }
+                      }
+
+                      // TODO: just because one direction is in the mask, doesn't mean we should kill the whole push...
+                      //       We really should simplify and get rid of the direction mask stuff and just create multiple
+                      //       pushes.
                       if(direction_in_mask(check_block_push.direction_mask, direction_opposite(momentum_collision.from))){
                           check_block_push.remove_pusher(p);
                           p--;
                       }
                   }
               }
-
           }
 
           momentum_collisions->merge(&result.momentum_collisions);
@@ -2125,15 +2158,11 @@ void apply_momentum_collisions(BlockMomentumCollisions_t* momentum_collisions, W
      for(S16 i = 0; i < world->blocks.count; i++){
           auto* block = world->blocks.elements + i;
 
-          F32 x_momentum = 0;
-          F32 y_momentum = 0;
-          S32 x_mass = 0;
-          S32 y_mass = 0;
           bool stop_x = false;
           bool stop_y = false;
 
           Direction_t horizontal_move_direction = block_axis_move(block, true);
-          Direction_t vertical_move_direction = block_axis_move(block, true);
+          Direction_t vertical_move_direction = block_axis_move(block, false);
           auto horizontal_pusher_momentum = get_block_momentum(world, block, horizontal_move_direction);
           auto vertical_pusher_momentum = get_block_momentum(world, block, vertical_move_direction);
 
@@ -2145,8 +2174,8 @@ void apply_momentum_collisions(BlockMomentumCollisions_t* momentum_collisions, W
                     if(block_change.momentum_transfer){
                          S16 mass = horizontal_pusher_momentum.mass / block_change.split_mass_between_blocks;
                          auto elastic_result = elastic_transfer_momentum(mass, horizontal_pusher_momentum.vel, block_change.mass, block_change.vel);
-                         x_momentum += (F32)(mass) * elastic_result.first_final_velocity;
-                         x_mass += block_change.mass;
+                         block->collision_momentum.x += (F32)(mass) * elastic_result.first_final_velocity;
+                         block->horizontal_momentum = true;
                     }else{
                          stop_x = true;
                     }
@@ -2154,8 +2183,8 @@ void apply_momentum_collisions(BlockMomentumCollisions_t* momentum_collisions, W
                     if(block_change.momentum_transfer){
                          S16 mass = vertical_pusher_momentum.mass / block_change.split_mass_between_blocks;
                          auto elastic_result = elastic_transfer_momentum(mass, vertical_pusher_momentum.vel, block_change.mass, block_change.vel);
-                         y_momentum += (F32)(mass) * elastic_result.first_final_velocity;
-                         y_mass += block_change.mass;
+                         block->collision_momentum.y += (F32)(mass) * elastic_result.first_final_velocity;
+                         block->vertical_momentum = true;
                     }else{
                          stop_y = true;
                     }
@@ -2171,10 +2200,6 @@ void apply_momentum_collisions(BlockMomentumCollisions_t* momentum_collisions, W
                block->horizontal_move.state = MOVE_STATE_IDLING;
                block->horizontal_move.sign = MOVE_SIGN_ZERO;
                block->horizontal_move.time_left = 0;
-          }else if(x_mass > 0){
-               F32 x_vel = x_momentum / (F32)(x_mass);
-               block->collision_momentum.x += horizontal_pusher_momentum.mass * x_vel;
-               block->horizontal_momentum = true;
           }
 
           if(stop_y){
@@ -2185,10 +2210,6 @@ void apply_momentum_collisions(BlockMomentumCollisions_t* momentum_collisions, W
                block->vertical_move.state = MOVE_STATE_IDLING;
                block->vertical_move.sign = MOVE_SIGN_ZERO;
                block->vertical_move.time_left = 0;
-          }else if(y_mass > 0){
-               F32 y_vel = y_momentum / (F32)(y_mass);
-               block->collision_momentum.y += vertical_pusher_momentum.mass * y_vel;
-               block->vertical_momentum = true;
           }
      }
 
@@ -2197,6 +2218,7 @@ void apply_momentum_collisions(BlockMomentumCollisions_t* momentum_collisions, W
           if(block->horizontal_momentum){
                S16 mass = get_block_stack_mass(world, block);
                block->vel.x = block->collision_momentum.x / mass;
+               // LOG("setting block %d vel to %f based on total momentum %f\n", i, block->vel.x, block->collision_momentum.x);
                block->collision_momentum.x = 0;
                block->horizontal_momentum = false;
 

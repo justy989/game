@@ -1529,41 +1529,47 @@ bool apply_push_horizontal(Block_t* block, Position_t pos, World_t* world, Direc
 
       auto original_move_state = block->horizontal_move.state;
       if(pushed_by_ice){
-           auto elastic_result = elastic_transfer_momentum_to_block(instant_momentum, world, block, direction, block_contributing_momentum_to_total_blocks);
+           auto pushee_momentum = get_block_momentum(world, block, direction);
+           pushee_momentum.mass /= block_contributing_momentum_to_total_blocks;
+
+           // don't use the current vel, but use the momentum we've gained over the frame if we have received some
+           if(block->horizontal_momentum){
+                pushee_momentum.vel = block->collision_momentum.x / pushee_momentum.mass;
+           }
+
+           auto elastic_result = elastic_transfer_momentum(instant_momentum->mass, instant_momentum->vel, pushee_momentum.mass, pushee_momentum.vel);
+           // auto elastic_result = elastic_transfer_momentum_to_block(instant_momentum, world, block, direction, block_contributing_momentum_to_total_blocks);
            if(collision_result_overcomes_friction(block->vel.x, elastic_result.second_final_velocity, get_block_stack_mass(world, block))){
                 add_global_tag(TAB_BLOCK_MOMENTUM_COLLISION);
-                // auto instant_vel = elastic_result.second_final_velocity;
-                auto pushee_momentum = get_block_momentum(world, block, direction);
+                auto instant_vel = elastic_result.second_final_velocity;
+                // auto pushee_momentum = get_block_momentum(world, block, direction);
 
-                // don't use the current vel, but use the momentum we've gained over the frame if we have received some
-                if(block->horizontal_momentum){
-                     pushee_momentum.vel = block->collision_momentum.x / pushee_momentum.mass;
-                }
-
-                pushee_momentum.mass /= block_contributing_momentum_to_total_blocks;
                 BlockElasticCollision_t elastic_collision {};
                 elastic_collision.init(instant_momentum->mass, instant_momentum->vel, elastic_result.first_final_velocity,
                                        pushee_momentum.mass, pushee_momentum.vel, elastic_result.second_final_velocity,
                                        block - world->blocks.elements, direction);
                 result->collisions.insert(&elastic_collision);
 
-                // if(direction == DIRECTION_LEFT){
-                //     if(instant_vel > 0) instant_vel = -instant_vel;
-                // }else if(direction == DIRECTION_RIGHT){
-                //     if(instant_vel < 0) instant_vel = -instant_vel;
-                // }
-
                 // if our vel doesn't change, don't add more momentum
-                // if(pushee_momentum.vel == instant_vel) return true;
+                if(fabs(pushee_momentum.vel - instant_vel) < FLT_EPSILON) return true;
 
-                // block->horizontal_momentum = true;
-                // block->collision_momentum.x += pushee_momentum.mass * instant_vel;
+                if(direction == DIRECTION_LEFT){
+                    if(instant_vel > 0) instant_vel = -instant_vel;
+                }else if(direction == DIRECTION_RIGHT){
+                    if(instant_vel < 0) instant_vel = -instant_vel;
+                }
 
-                // auto motion = motion_x_component(block);
-                // F32 x_pos = pos_to_vec(block->pos).x;
-                // block->horizontal_move.time_left = calc_coast_motion_time_left(block->cut, &motion, x_pos);
-                // if(direction == DIRECTION_LEFT) block->horizontal_move.time_left = -block->horizontal_move.time_left;
-                // block->stopped_by_player_horizontal = false;
+                // LOG("giving block %ld: %f momentum (%f != %f)\n", block - world->blocks.elements, pushee_momentum.mass * instant_vel,
+                //     pushee_momentum.vel, instant_vel);
+
+                block->horizontal_momentum = true;
+                block->collision_momentum.x += pushee_momentum.mass * instant_vel;
+
+                auto motion = motion_x_component(block);
+                F32 x_pos = pos_to_vec(block->pos).x;
+                block->horizontal_move.time_left = calc_coast_motion_time_left(block->cut, &motion, x_pos);
+                if(direction == DIRECTION_LEFT) block->horizontal_move.time_left = -block->horizontal_move.time_left;
+                block->stopped_by_player_horizontal = false;
            }else{
                 return false;
            }
@@ -1642,18 +1648,19 @@ bool apply_push_vertical(Block_t* block, Position_t pos, World_t* world, Directi
 
       auto original_move_state = block->vertical_move.state;
       if(pushed_by_ice){
-           auto elastic_result = elastic_transfer_momentum_to_block(instant_momentum, world, block, direction, block_contributing_momentum_to_total_blocks);
+           auto pushee_momentum = get_block_momentum(world, block, direction);
+           pushee_momentum.mass /= block_contributing_momentum_to_total_blocks;
+
+           // don't use the current vel, but use the momentum we've gained over the frame if we have received some
+           if(block->vertical_momentum){
+                pushee_momentum.vel = block->collision_momentum.y / pushee_momentum.mass;
+           }
+
+           auto elastic_result = elastic_transfer_momentum(instant_momentum->mass, instant_momentum->vel, pushee_momentum.mass, pushee_momentum.vel);
+           // auto elastic_result = elastic_transfer_momentum_to_block(instant_momentum, world, block, direction, block_contributing_momentum_to_total_blocks);
            if(collision_result_overcomes_friction(block->vel.y, elastic_result.second_final_velocity, get_block_stack_mass(world, block))){
                 add_global_tag(TAB_BLOCK_MOMENTUM_COLLISION);
-                // auto instant_vel = elastic_result.second_final_velocity;
-                auto pushee_momentum = get_block_momentum(world, block, direction);
-
-                // don't use the current vel, but use the momentum we've gained over the frame if we have received some
-                if(block->vertical_momentum){
-                     pushee_momentum.vel = block->collision_momentum.y / pushee_momentum.mass;
-                }
-
-                pushee_momentum.mass /= block_contributing_momentum_to_total_blocks;
+                auto instant_vel = elastic_result.second_final_velocity;
 
                 BlockElasticCollision_t elastic_collision {};
                 elastic_collision.init(instant_momentum->mass, instant_momentum->vel, elastic_result.first_final_velocity,
@@ -1661,23 +1668,23 @@ bool apply_push_vertical(Block_t* block, Position_t pos, World_t* world, Directi
                                        block - world->blocks.elements, direction);
                 result->collisions.insert(&elastic_collision);
 
-                // if(direction == DIRECTION_DOWN){
-                //     if(instant_vel > 0) instant_vel = -instant_vel;
-                // }else if(direction == DIRECTION_UP){
-                //     if(instant_vel < 0) instant_vel = -instant_vel;
-                // }
-
                 // if our vel doesn't change, don't add more momentum
-                // if(pushee_momentum.vel == instant_vel) return true;
+                if(pushee_momentum.vel == instant_vel) return true;
 
-                // block->vertical_momentum = true;
-                // block->collision_momentum.y += pushee_momentum.mass * instant_vel;
+                if(direction == DIRECTION_DOWN){
+                    if(instant_vel > 0) instant_vel = -instant_vel;
+                }else if(direction == DIRECTION_UP){
+                    if(instant_vel < 0) instant_vel = -instant_vel;
+                }
 
-                // auto motion = motion_y_component(block);
-                // F32 y_pos = pos_to_vec(block->pos).y;
-                // block->vertical_move.time_left = calc_coast_motion_time_left(block->cut, &motion, y_pos);
-                // if(direction == DIRECTION_DOWN) block->vertical_move.time_left = -block->vertical_move.time_left;
-                // block->stopped_by_player_vertical = false;
+                block->vertical_momentum = true;
+                block->collision_momentum.y += pushee_momentum.mass * instant_vel;
+
+                auto motion = motion_y_component(block);
+                F32 y_pos = pos_to_vec(block->pos).y;
+                block->vertical_move.time_left = calc_coast_motion_time_left(block->cut, &motion, y_pos);
+                if(direction == DIRECTION_DOWN) block->vertical_move.time_left = -block->vertical_move.time_left;
+                block->stopped_by_player_vertical = false;
            }else{
                 return false;
            }
