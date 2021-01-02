@@ -2068,25 +2068,25 @@ void execute_block_pushes(BlockMomentumPushes_t<128>* block_pushes, World_t* wor
                   if(i <= check_block_push.entangled_with_push_index) continue;
               }
 
-              for(S16 m = 0; m < result.momentum_collisions.count; m++){
-                  auto& momentum_collision = result.momentum_collisions.objects[m];
+              // for(S16 m = 0; m < result.momentum_collisions.count; m++){
+              //     auto& momentum_collision = result.momentum_collisions.objects[m];
 
-                  for(S16 p = 0; p < check_block_push.pusher_count; p++){
-                      auto& check_pusher = check_block_push.pushers[p];
+              //     for(S16 p = 0; p < check_block_push.pusher_count; p++){
+              //         auto& check_pusher = check_block_push.pushers[p];
 
-                      if(check_pusher.index != momentum_collision.block_index) continue;
-                      if(check_pusher.hit_entangler) continue;
-                      if(block_pushes_are_the_same_collision(block_pushes, i, j, check_pusher.index)) continue;
+              //         if(check_pusher.index != momentum_collision.block_index) continue;
+              //         if(check_pusher.hit_entangler) continue;
+              //         if(block_pushes_are_the_same_collision(block_pushes, i, j, check_pusher.index)) continue;
 
-                      // TODO: just because one direction is in the mask, doesn't mean we should kill the whole push...
-                      //       We really should simplify and get rid of the direction mask stuff and just create multiple
-                      //       pushes.
-                      if(direction_in_mask(check_block_push.direction_mask, direction_opposite(momentum_collision.from))){
-                          check_block_push.remove_pusher(p);
-                          p--;
-                      }
-                  }
-              }
+              //         // TODO: just because one direction is in the mask, doesn't mean we should kill the whole push...
+              //         //       We really should simplify and get rid of the direction mask stuff and just create multiple
+              //         //       pushes.
+              //         if(direction_in_mask(check_block_push.direction_mask, direction_opposite(momentum_collision.from))){
+              //             check_block_push.remove_pusher(p);
+              //             p--;
+              //         }
+              //     }
+              // }
           }
 
           momentum_collisions->merge(&result.momentum_collisions);
@@ -2124,39 +2124,40 @@ void execute_block_pushes(BlockMomentumPushes_t<128>* block_pushes, World_t* wor
 }
 
 void apply_momentum_collisions(BlockMomentumCollisions_t* momentum_collisions, World_t* world){
-     for(S16 i = 0; i < world->blocks.count; i++){
-          auto* block = world->blocks.elements + i;
+     (void)(momentum_collisions);
+     // for(S16 i = 0; i < world->blocks.count; i++){
+     //      auto* block = world->blocks.elements + i;
 
-          Direction_t horizontal_move_direction = block_axis_move(block, true);
-          Direction_t vertical_move_direction = block_axis_move(block, false);
-          auto horizontal_pusher_momentum = get_block_momentum(world, block, horizontal_move_direction);
-          auto vertical_pusher_momentum = get_block_momentum(world, block, vertical_move_direction);
+     //      Direction_t horizontal_move_direction = block_axis_move(block, true);
+     //      Direction_t vertical_move_direction = block_axis_move(block, false);
+     //      auto horizontal_pusher_momentum = get_block_momentum(world, block, horizontal_move_direction);
+     //      auto vertical_pusher_momentum = get_block_momentum(world, block, vertical_move_direction);
 
-          // do an elastic collision for each elastic tranfer and build up the amount of momentum/mass we need to collide against
-          for(S16 c = 0; c < momentum_collisions->count; c++){
-               auto& block_change = momentum_collisions->objects[c];
-               if(block_change.block_index != i) continue;
-               if(block_change.x){
-                    if(block_change.momentum_transfer){
-                         S16 mass = horizontal_pusher_momentum.mass / block_change.split_mass_between_blocks;
-                         auto elastic_result = elastic_transfer_momentum(mass, horizontal_pusher_momentum.vel, block_change.mass, block_change.vel);
-                         block->collision_momentum.x += (F32)(mass) * elastic_result.first_final_velocity;
-                         block->horizontal_momentum = BLOCK_MOMENTUM_SUM;
-                    }else{
-                         block->horizontal_momentum = BLOCK_MOMENTUM_STOP;
-                    }
-               }else{
-                    if(block_change.momentum_transfer){
-                         S16 mass = vertical_pusher_momentum.mass / block_change.split_mass_between_blocks;
-                         auto elastic_result = elastic_transfer_momentum(mass, vertical_pusher_momentum.vel, block_change.mass, block_change.vel);
-                         block->collision_momentum.y += (F32)(mass) * elastic_result.first_final_velocity;
-                         block->vertical_momentum = BLOCK_MOMENTUM_SUM;
-                    }else{
-                         block->vertical_momentum = BLOCK_MOMENTUM_STOP;
-                    }
-               }
-          }
-     }
+     //      // do an elastic collision for each elastic tranfer and build up the amount of momentum/mass we need to collide against
+     //      for(S16 c = 0; c < momentum_collisions->count; c++){
+     //           auto& block_change = momentum_collisions->objects[c];
+     //           if(block_change.block_index != i) continue;
+     //           if(block_change.x){
+     //                if(block_change.momentum_transfer){
+     //                     S16 mass = horizontal_pusher_momentum.mass / block_change.split_mass_between_blocks;
+     //                     auto elastic_result = elastic_transfer_momentum(mass, horizontal_pusher_momentum.vel, block_change.mass, block_change.vel);
+     //                     block->collision_momentum.x += (F32)(mass) * elastic_result.first_final_velocity;
+     //                     block->horizontal_momentum = BLOCK_MOMENTUM_SUM;
+     //                }else{
+     //                     block->horizontal_momentum = BLOCK_MOMENTUM_STOP;
+     //                }
+     //           }else{
+     //                if(block_change.momentum_transfer){
+     //                     S16 mass = vertical_pusher_momentum.mass / block_change.split_mass_between_blocks;
+     //                     auto elastic_result = elastic_transfer_momentum(mass, vertical_pusher_momentum.vel, block_change.mass, block_change.vel);
+     //                     block->collision_momentum.y += (F32)(mass) * elastic_result.first_final_velocity;
+     //                     block->vertical_momentum = BLOCK_MOMENTUM_SUM;
+     //                }else{
+     //                     block->vertical_momentum = BLOCK_MOMENTUM_STOP;
+     //                }
+     //           }
+     //      }
+     // }
 
      for(S16 i = 0; i < world->blocks.count; i++){
           auto* block = world->blocks.elements + i;
@@ -2189,6 +2190,7 @@ void apply_momentum_collisions(BlockMomentumCollisions_t* momentum_collisions, W
           if(block->vertical_momentum == BLOCK_MOMENTUM_SUM){
                S16 mass = get_block_stack_mass(world, block);
                block->vel.y = block->collision_momentum.y / mass;
+               // LOG("setting block %d vel to %f based on total momentum %f\n", i, block->vel.y, block->collision_momentum.y);
                block->collision_momentum.y = 0;
                block->vertical_momentum = BLOCK_MOMENTUM_NONE;
 

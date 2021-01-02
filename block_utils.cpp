@@ -1987,11 +1987,39 @@ BlockCollisionPushResult_t block_collision_push(BlockMomentumPush_t* push, World
                auto pusher_direction = direction_opposite(direction_to_check);
                auto block_receiving_force = pusher;
 
+               // go forward in the chain (towards the block we pushed) finding blocks that are going in the same direction as the chain, because we want those to
+               // receive the force before the pusher
+               Direction_t forward_chain_direction_to_check = pusher_direction;
+               auto chain_results = find_block_chain(block_receiving_force, forward_chain_direction_to_check, world->block_qt, world->interactive_qt, &world->tilemap, 0, nullptr);
                // TODO: handle across multiple chains
-               auto chain_results = find_block_chain(pusher, direction_to_check, world->block_qt, world->interactive_qt, &world->tilemap, 0, nullptr);
                if(chain_results.count > 0 && chain_results.objects[0].count > 0){
                     assert(push->reapply_count <= chain_results.objects[0].count);
-                    for(S16 i  = 0; i < chain_results.objects[0].count; i++){
+                    // skip the first block, which is our pusher, and do not go all the way to the end of the chain,
+                    // because that block is the one we applied our push to
+                    for(S16 i = 1; i < (chain_results.objects[0].count - 1); i++){
+                         auto* against_block_result = chain_results.objects[0].objects + i;
+                         auto new_direction_to_check = direction_rotate_clockwise(forward_chain_direction_to_check,
+                                                                                  against_block_result->rotations_through_portal);
+
+                         // use the previous block if this one's velocity is no longer moving towards the stack
+                         // do not use current frame's momentum like the next loop uses because we want to only go forward for blocks
+                         // causing the collisions
+                         Direction_t against_block_move_dir = block_axis_move(against_block_result->block, direction_is_horizontal(forward_chain_direction_to_check));
+                         if(against_block_move_dir != forward_chain_direction_to_check){
+                              break;
+                         }
+
+                         block_receiving_force = against_block_result->block;
+                         forward_chain_direction_to_check = new_direction_to_check;
+                    }
+               }
+
+               // search backward in the chain to figure out which block absorbs the momentum kickback
+               chain_results = find_block_chain(block_receiving_force, direction_to_check, world->block_qt, world->interactive_qt, &world->tilemap, 0, nullptr);
+               // TODO: handle across multiple chains
+               if(chain_results.count > 0 && chain_results.objects[0].count > 0){
+                    assert(push->reapply_count <= chain_results.objects[0].count);
+                    for(S16 i = 0; i < chain_results.objects[0].count; i++){
                          auto* against_block_result = chain_results.objects[0].objects + i;
 
                          // if the relevant vel is 0, then the most recent connected block is the one that can absorb the energy of the collision
@@ -2001,10 +2029,11 @@ BlockCollisionPushResult_t block_collision_push(BlockMomentumPush_t* push, World
                          bool horizontal_direction = direction_is_horizontal(new_direction_to_check);
                          F32 vel = horizontal_direction ? against_block_result->block->vel.x : against_block_result->block->vel.y;
                          if(vel == 0) break;
-                         // bool received_momentum = horizontal_direction ? against_block_result->block->horizontal_momentum : against_block_result->block->vertical_momentum;
-                         // if(!received_momentum) break;
 
-                         if(i == (chain_results.objects[0].count - push->reapply_count)){
+                         // use the previous block if this one's momentum is no longer moving towards the stack
+                         Vec_t against_block_vel = get_block_momentum_vel(world, against_block_result->block);
+                         DirectionMask_t against_block_move_mask = vec_direction_mask(against_block_vel);
+                         if(!direction_in_mask(against_block_move_mask, direction_opposite(direction_to_check))){
                               break;
                          }
 
@@ -2015,20 +2044,12 @@ BlockCollisionPushResult_t block_collision_push(BlockMomentumPush_t* push, World
                     }
                }
 
-               // when a chain of blocks is moving together, the end of the chain's pushes will be invalidated as they
-               // absorb transferred momentum back, so we keep applying the front block's momentum as the push until it
-               // is the one that takes the transferred momentum
-               if(block_receiving_force != pusher){
-                    result.reapply_push = true;
-               }
-
-               S16 block_receiving_force_index = block_receiving_force - world->blocks.elements;
-
                if(push_result.collisions.count == 0 && !push_result.pushed){
-                   BlockMomentumCollision_t momentum_change {};
-                   momentum_change.init(block_receiving_force_index, 0, 0, direction_is_horizontal(direction_to_check),
-                                        direction_to_check, -1, false, push->pushers[p].collided_with_block_count);
-                   result.momentum_collisions.insert(&momentum_change);
+                   if(direction_is_horizontal(direction_to_check)){
+                        block_receiving_force->horizontal_momentum = BLOCK_MOMENTUM_STOP;
+                   }else{
+                        block_receiving_force->vertical_momentum = BLOCK_MOMENTUM_STOP;
+                   }
                    continue;
                }
 
@@ -2057,12 +2078,19 @@ BlockCollisionPushResult_t block_collision_push(BlockMomentumPush_t* push, World
                                                                                             direction_is_horizontal(pusher_direction),
                                                                                             total_against_rotations);
 
-                   BlockMomentumCollision_t momentum_change {};
-                   momentum_change.init(block_receiving_force_index, collision.pushee_mass * pusher_contribution_percentage,
-                                        rotated_pushee_vel, direction_is_horizontal(direction_to_check),
-                                        direction_to_check, collision.pushee_index,
-                                        true, push->pushers[p].collided_with_block_count);
-                   result.momentum_collisions.insert(&momentum_change);
+                   S16 mass = pusher_momentum.mass / push->pushers[p].collided_with_block_count;
+                   auto elastic_result = elastic_transfer_momentum(mass, pusher_momentum.vel,
+                                                                   collision.pushee_mass * pusher_contribution_percentage,
+                                                                   rotated_pushee_vel);
+
+                   // if our vel doesn't change, don't add more momentum
+                   if(fabs(pusher_momentum.vel - elastic_result.first_final_velocity) >= FLT_EPSILON){
+                        if(direction_is_horizontal(direction_to_check)){
+                             block_add_horizontal_momentum(block_receiving_force, (F32)(mass) * elastic_result.first_final_velocity);
+                        }else{
+                             block_add_vertical_momentum(block_receiving_force, (F32)(mass) * elastic_result.first_final_velocity);
+                        }
+                   }
                }
           }
 

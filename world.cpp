@@ -1532,17 +1532,10 @@ bool apply_push_horizontal(Block_t* block, Position_t pos, World_t* world, Direc
            auto pushee_momentum = get_block_momentum(world, block, direction);
            pushee_momentum.mass /= block_contributing_momentum_to_total_blocks;
 
-           // don't use the current vel, but use the momentum we've gained over the frame if we have received some
-           if(block->horizontal_momentum != BLOCK_MOMENTUM_NONE){
-                pushee_momentum.vel = block->collision_momentum.x / pushee_momentum.mass;
-           }
-
            auto elastic_result = elastic_transfer_momentum(instant_momentum->mass, instant_momentum->vel, pushee_momentum.mass, pushee_momentum.vel);
-           // auto elastic_result = elastic_transfer_momentum_to_block(instant_momentum, world, block, direction, block_contributing_momentum_to_total_blocks);
            if(collision_result_overcomes_friction(block->vel.x, elastic_result.second_final_velocity, get_block_stack_mass(world, block))){
                 add_global_tag(TAB_BLOCK_MOMENTUM_COLLISION);
                 auto instant_vel = elastic_result.second_final_velocity;
-                // auto pushee_momentum = get_block_momentum(world, block, direction);
 
                 BlockElasticCollision_t elastic_collision {};
                 elastic_collision.init(instant_momentum->mass, instant_momentum->vel, elastic_result.first_final_velocity,
@@ -1550,17 +1543,13 @@ bool apply_push_horizontal(Block_t* block, Position_t pos, World_t* world, Direc
                                        block - world->blocks.elements, direction);
                 result->collisions.insert(&elastic_collision);
 
-                // if our vel doesn't change, don't add more momentum
-                if(fabs(pushee_momentum.vel - instant_vel) < FLT_EPSILON) return true;
-
                 if(direction == DIRECTION_LEFT){
                     if(instant_vel > 0) instant_vel = -instant_vel;
                 }else if(direction == DIRECTION_RIGHT){
                     if(instant_vel < 0) instant_vel = -instant_vel;
                 }
 
-                // LOG("giving block %ld: %f momentum (%f != %f)\n", block - world->blocks.elements, pushee_momentum.mass * instant_vel,
-                //     pushee_momentum.vel, instant_vel);
+                // LOG("giving block %ld: %f momentum\n", block - world->blocks.elements, pushee_momentum.mass * instant_vel);
 
                 block_add_horizontal_momentum(block, pushee_momentum.mass * instant_vel);
 
@@ -1650,13 +1639,7 @@ bool apply_push_vertical(Block_t* block, Position_t pos, World_t* world, Directi
            auto pushee_momentum = get_block_momentum(world, block, direction);
            pushee_momentum.mass /= block_contributing_momentum_to_total_blocks;
 
-           // don't use the current vel, but use the momentum we've gained over the frame if we have received some
-           if(block->vertical_momentum != BLOCK_MOMENTUM_NONE){
-                pushee_momentum.vel = block->collision_momentum.y / pushee_momentum.mass;
-           }
-
            auto elastic_result = elastic_transfer_momentum(instant_momentum->mass, instant_momentum->vel, pushee_momentum.mass, pushee_momentum.vel);
-           // auto elastic_result = elastic_transfer_momentum_to_block(instant_momentum, world, block, direction, block_contributing_momentum_to_total_blocks);
            if(collision_result_overcomes_friction(block->vel.y, elastic_result.second_final_velocity, get_block_stack_mass(world, block))){
                 add_global_tag(TAB_BLOCK_MOMENTUM_COLLISION);
                 auto instant_vel = elastic_result.second_final_velocity;
@@ -1667,14 +1650,13 @@ bool apply_push_vertical(Block_t* block, Position_t pos, World_t* world, Directi
                                        block - world->blocks.elements, direction);
                 result->collisions.insert(&elastic_collision);
 
-                // if our vel doesn't change, don't add more momentum
-                if(pushee_momentum.vel == instant_vel) return true;
-
                 if(direction == DIRECTION_DOWN){
                     if(instant_vel > 0) instant_vel = -instant_vel;
                 }else if(direction == DIRECTION_UP){
                     if(instant_vel < 0) instant_vel = -instant_vel;
                 }
+
+                // LOG("giving block %ld: %f momentum\n", block - world->blocks.elements, pushee_momentum.mass * instant_vel);
 
                 block_add_vertical_momentum(block, pushee_momentum.mass * instant_vel);
 
@@ -1900,15 +1882,7 @@ bool resolve_push_against_block(Block_t* block, MoveDirection_t move_direction, 
                // check if we are able to move or if we transfer our force to the block
                F32 block_against_dir_vel = 0;
 
-               Vec_t against_block_vel = against_block->vel;
-               if(against_block->horizontal_momentum != BLOCK_MOMENTUM_NONE){
-                    auto mass = get_block_stack_mass(world, against_block);
-                    against_block_vel.x = mass / against_block->collision_momentum.x;
-               }
-               if(against_block->vertical_momentum != BLOCK_MOMENTUM_NONE){
-                    auto mass = get_block_stack_mass(world, against_block);
-                    against_block_vel.y = mass / against_block->collision_momentum.y;
-               }
+               Vec_t against_block_vel = get_block_momentum_vel(world, against_block);
 
                switch(first_against_block_push_dir){
                default:
@@ -3090,4 +3064,23 @@ PushFromEntangler_t build_push_from_entangler(Block_t* block, Direction_t push_d
      }
      from_entangler.cut = block->cut;
      return from_entangler;
+}
+
+Vec_t get_block_momentum_vel(World_t* world, Block_t* block){
+     Vec_t block_vel = block->vel;
+
+     if(block->horizontal_momentum == BLOCK_MOMENTUM_SUM){
+          auto mass = get_block_stack_mass(world, block);
+          block_vel.x = block->collision_momentum.x / mass;
+     }else if(block->horizontal_momentum == BLOCK_MOMENTUM_STOP){
+          block_vel.x = 0;
+     }
+     if(block->vertical_momentum == BLOCK_MOMENTUM_SUM){
+          auto mass = get_block_stack_mass(world, block);
+          block_vel.y = block->collision_momentum.y / mass;
+     }else if(block->vertical_momentum == BLOCK_MOMENTUM_STOP){
+          block_vel.y = 0;
+     }
+
+     return block_vel;
 }
