@@ -133,6 +133,7 @@ struct BlockPusher_t{
      S8 entangle_rotations = 0;
      S8 portal_rotations = 0;
      bool opposite_entangle_reversed = false;
+     S16 momentum_kicked_back_in_shared_push_block_index = -1;
 };
 
 struct BlockMomentumPush_t{

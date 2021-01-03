@@ -2064,9 +2064,9 @@ void execute_block_pushes(BlockMomentumPushes_t<128>* block_pushes, World_t* wor
               }
 
               // if the entangled push has already been executed, then we can't invalidate it
-              if(check_block_push.is_entangled()){
-                  if(i <= check_block_push.entangled_with_push_index) continue;
-              }
+              // if(check_block_push.is_entangled()){
+              //     if(i <= check_block_push.entangled_with_push_index) continue;
+              // }
 
               // for(S16 m = 0; m < result.momentum_collisions.count; m++){
               //     auto& momentum_collision = result.momentum_collisions.objects[m];
@@ -2087,6 +2087,22 @@ void execute_block_pushes(BlockMomentumPushes_t<128>* block_pushes, World_t* wor
               //         }
               //     }
               // }
+
+              for(S16 p = 0; p < block_push.pusher_count; p++){
+                   auto* pusher = block_push.pushers + p;
+                   if(pusher->momentum_kicked_back_in_shared_push_block_index < 0) continue;
+
+                   // TODO: should this check for mathing rotations and entangled rotations too ?
+                   if(check_block_push.direction_mask != block_push.direction_mask) continue;
+
+                   for(S16 cp = 0; cp < check_block_push.pusher_count; cp++){
+                        auto* check_pusher = check_block_push.pushers + cp;
+                        if(pusher->index == check_pusher->index){
+                             check_pusher->momentum_kicked_back_in_shared_push_block_index =
+                             pusher->momentum_kicked_back_in_shared_push_block_index;
+                        }
+                   }
+              }
           }
 
           momentum_collisions->merge(&result.momentum_collisions);

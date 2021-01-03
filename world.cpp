@@ -1549,7 +1549,7 @@ bool apply_push_horizontal(Block_t* block, Position_t pos, World_t* world, Direc
                     if(instant_vel < 0) instant_vel = -instant_vel;
                 }
 
-                // LOG("giving block %ld: %f momentum\n", block - world->blocks.elements, pushee_momentum.mass * instant_vel);
+                // LOG("giving block %ld: %f horizontal impact momentum\n", block - world->blocks.elements, pushee_momentum.mass * instant_vel);
 
                 block_add_horizontal_momentum(block, pushee_momentum.mass * instant_vel);
 
@@ -1656,7 +1656,7 @@ bool apply_push_vertical(Block_t* block, Position_t pos, World_t* world, Directi
                     if(instant_vel < 0) instant_vel = -instant_vel;
                 }
 
-                // LOG("giving block %ld: %f momentum\n", block - world->blocks.elements, pushee_momentum.mass * instant_vel);
+                // LOG("giving block %ld: %f vertical impact momentum\n", block - world->blocks.elements, pushee_momentum.mass * instant_vel);
 
                 block_add_vertical_momentum(block, pushee_momentum.mass * instant_vel);
 
