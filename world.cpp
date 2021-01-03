@@ -1856,6 +1856,21 @@ bool resolve_push_against_block(Block_t* block, MoveDirection_t move_direction, 
      Direction_t first_against_block_push_dir = direction_rotate_clockwise(first_direction, against->rotations_through_portal);
      Direction_t second_against_block_push_dir = direction_rotate_clockwise(second_direction, against->rotations_through_portal);
 
+     TransferMomentum_t first_rotated_instant_momentum = {};
+     TransferMomentum_t second_rotated_instant_momentum = {};
+
+     if(instant_momentum){
+          second_rotated_instant_momentum = *instant_momentum;
+          first_rotated_instant_momentum = *instant_momentum;
+          first_rotated_instant_momentum.vel = rotate_vec_counter_clockwise_to_see_if_negates(first_rotated_instant_momentum.vel,
+                                                                                              direction_is_horizontal(first_against_block_push_dir),
+                                                                                              against->rotations_through_portal);
+
+          second_rotated_instant_momentum.vel = rotate_vec_counter_clockwise_to_see_if_negates(first_rotated_instant_momentum.vel,
+                                                                                              direction_is_horizontal(second_against_block_push_dir),
+                                                                                              against->rotations_through_portal);
+     }
+
      MoveDirection_t final_move_direction = move_direction_from_directions(first_against_block_push_dir, second_against_block_push_dir);
 
      // TODO: should this be block_on_frictionless() ?
@@ -1888,19 +1903,19 @@ bool resolve_push_against_block(Block_t* block, MoveDirection_t move_direction, 
                default:
                     break;
                case DIRECTION_LEFT:
-                    *transfers_force = (against_block_vel.x > instant_momentum->vel);
+                    *transfers_force = (against_block_vel.x > first_rotated_instant_momentum.vel);
                     block_against_dir_vel = block->vel.x;
                     break;
                case DIRECTION_UP:
-                    *transfers_force = (against_block_vel.y < instant_momentum->vel);
+                    *transfers_force = (against_block_vel.y < first_rotated_instant_momentum.vel);
                     block_against_dir_vel = block->vel.y;
                     break;
                case DIRECTION_RIGHT:
-                    *transfers_force = (against_block_vel.x < instant_momentum->vel);
+                    *transfers_force = (against_block_vel.x < first_rotated_instant_momentum.vel);
                     block_against_dir_vel = block->vel.x;
                     break;
                case DIRECTION_DOWN:
-                    *transfers_force = (against_block_vel.y > instant_momentum->vel);
+                    *transfers_force = (against_block_vel.y > first_rotated_instant_momentum.vel);
                     block_against_dir_vel = block->vel.y;
                     break;
                }
@@ -1909,25 +1924,25 @@ bool resolve_push_against_block(Block_t* block, MoveDirection_t move_direction, 
                default:
                     break;
                case DIRECTION_LEFT:
-                    *transfers_force = (against_block_vel.x > instant_momentum->vel);
+                    *transfers_force = (against_block_vel.x > second_rotated_instant_momentum.vel);
                     block_against_dir_vel = block->vel.x;
                     break;
                case DIRECTION_UP:
-                    *transfers_force = (against_block_vel.y < instant_momentum->vel);
+                    *transfers_force = (against_block_vel.y < second_rotated_instant_momentum.vel);
                     block_against_dir_vel = block->vel.y;
                     break;
                case DIRECTION_RIGHT:
-                    *transfers_force = (against_block_vel.x < instant_momentum->vel);
+                    *transfers_force = (against_block_vel.x < second_rotated_instant_momentum.vel);
                     block_against_dir_vel = block->vel.x;
                     break;
                case DIRECTION_DOWN:
-                    *transfers_force = (against_block_vel.y > instant_momentum->vel);
+                    *transfers_force = (against_block_vel.y > second_rotated_instant_momentum.vel);
                     block_against_dir_vel = block->vel.y;
                     break;
                }
 
                if(*transfers_force){
-                    auto split_instant_momentum = *instant_momentum;
+                    auto split_instant_momentum = first_rotated_instant_momentum;
                     split_instant_momentum.mass /= against_count;
 
                     // check if the momentum transfer overcomes static friction
@@ -1939,6 +1954,7 @@ bool resolve_push_against_block(Block_t* block, MoveDirection_t move_direction, 
                     }
 
                     if(result){
+                         // TODO: we need to handle multiple direction momentums that we calculated
                          auto push_result = block_push(against_block, final_move_direction, world, pushed_by_ice, force,
                                                        &split_instant_momentum, nullptr, block_contributing_momentum_to_total_blocks,
                                                        side_effects);
