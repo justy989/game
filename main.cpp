@@ -405,9 +405,10 @@ void log_block_push(BlockMomentumPush_t* block_push)
     direction_mask_to_string(block_push->direction_mask, direction_mask_string, direction_mask_string_size);
     direction_mask_to_string(rot_direction_mask, rot_direction_mask_string, direction_mask_string_size);
 
-    LOG(" block push: direction_mask %s, portal_rot %d, entangle_rot %d, rot direction_mask: %s, entangled: %d, collided with: %d, invalidated %d\n",
+    LOG(" block push: direction_mask %s, portal_rot %d, entangle_rot %d, rot direction_mask: %s, entangled: %d, pure: %d, momentum: %f, collided with: %d, invalidated %d\n",
         direction_mask_string, block_push->portal_rotations, block_push->entangle_rotations, rot_direction_mask_string,
-        block_push->entangled_with_push_index, block_push->collided_with_block_count, block_push->invalidated);
+        block_push->entangled_with_push_index, block_push->pure_entangle, block_push->entangled_momentum,
+        block_push->collided_with_block_count, block_push->invalidated);
 
     LOG("  pushee %d, pushers (%d)\n", block_push->pushee_index, block_push->pusher_count);
     for(S8 p = 0; p < block_push->pusher_count; p++){
@@ -1778,6 +1779,8 @@ void add_entangle_pushes_for_end_of_chain_blocks_on_ice(World_t* world, S16 push
           Direction_t direction = static_cast<Direction_t>(d);
           if(!direction_in_mask(rotated_direction_mask, direction)) continue;
 
+          auto block_push_momentum = get_block_push_pusher_momentum(push, world, direction);
+
           auto chain_result = find_block_chain(pushee, direction, world->block_qt, world->interactive_qt, &world->tilemap);
 
           if(chain_result.count > 0){
@@ -1816,12 +1819,20 @@ void add_entangle_pushes_for_end_of_chain_blocks_on_ice(World_t* world, S16 push
 
                     BlockMomentumPush_t new_block_push = *push;
                     S8 rotations_between_blocks = blocks_rotations_between(chain_block, end_block);
+                    Direction_t entangled_direction = direction_rotate_clockwise(direction, rotations_between_blocks);
+
+                    auto rotated_momentum_vel = rotate_vec_counter_clockwise_to_see_if_negates(block_push_momentum.vel,
+                                                                                               direction_is_horizontal(entangled_direction),
+                                                                                               rotations_between_blocks);
+                    F32 entangled_momentum = (F32)(block_push_momentum.mass) * rotated_momentum_vel;
+
                     new_block_push.direction_mask = direction_to_direction_mask(direction);
                     new_block_push.pushee_index = get_block_index(world, chain_block);
                     new_block_push.portal_rotations = push->portal_rotations;
                     new_block_push.entangle_rotations = rotations_between_blocks;
                     new_block_push.pusher_rotations = pusher_rotations;
                     new_block_push.entangled_with_push_index = push_index;
+                    new_block_push.entangled_momentum = entangled_momentum;
                     new_block_push.pure_entangle = true;
                     new_block_push.no_consolidate = true;
                     new_block_push.no_entangled_pushes = false;
@@ -1860,12 +1871,20 @@ void add_entangle_pushes_for_end_of_chain_blocks_on_ice(World_t* world, S16 push
                     if(!already_added){
                          BlockMomentumPush_t new_block_push = *push;
                          S8 rotations_between_blocks = blocks_rotations_between(entangler, end_block);
+                         Direction_t entangled_direction = direction_rotate_clockwise(direction, rotations_between_blocks);
+
+                         auto rotated_momentum_vel = rotate_vec_counter_clockwise_to_see_if_negates(block_push_momentum.vel,
+                                                                                                    direction_is_horizontal(entangled_direction),
+                                                                                                    rotations_between_blocks);
+                         F32 entangled_momentum = (F32)(block_push_momentum.mass) * rotated_momentum_vel;
+
                          new_block_push.direction_mask = direction_to_direction_mask(direction);
                          new_block_push.pushee_index = current_entangle_index;
                          new_block_push.portal_rotations = push->portal_rotations;
                          new_block_push.entangle_rotations = rotations_between_blocks;
                          new_block_push.pusher_rotations = pusher_rotations;
                          new_block_push.entangled_with_push_index = push_index;
+                         new_block_push.entangled_momentum = entangled_momentum;
                          new_block_push.pure_entangle = true;
                          new_block_push.no_consolidate = true;
                          new_block_push.no_entangled_pushes = false;
@@ -1907,6 +1926,13 @@ void generate_entangled_block_pushes(BlockMomentumPushes_t<128>* block_pushes, B
               Direction_t direction = static_cast<Direction_t>(d);
               if(!direction_in_mask(block_push.direction_mask, direction)) continue;
 
+              auto block_push_momentum = get_block_push_pusher_momentum(&block_push, world, direction);
+
+              // if the push is already entangled, pass along the momentum
+              if(block_push.entangled_with_push_index >= 0){
+                   block_push_momentum.vel = block_push.entangled_momentum / (F32)(block_push_momentum.mass);
+              }
+
               S8 block_push_rotations = (block_push.portal_rotations + block_push.entangle_rotations) % DIRECTION_COUNT;
               Direction_t push_rotated_direction = direction_rotate_clockwise(direction, block_push_rotations);
 
@@ -1925,6 +1951,10 @@ void generate_entangled_block_pushes(BlockMomentumPushes_t<128>* block_pushes, B
                   auto block_against_result = block_against_other_blocks(entangler_pos + entangler_pos_delta,
                                                                          entangler_cut, direction_to_check, world->block_qt,
                                                                          world->interactive_qt, &world->tilemap);
+                  auto rotated_momentum_vel = rotate_vec_counter_clockwise_to_see_if_negates(block_push_momentum.vel,
+                                                                                             direction_is_horizontal(direction_to_check),
+                                                                                             total_rotations);
+                  F32 entangled_momentum = (F32)(block_push_momentum.mass) * rotated_momentum_vel;
                   if(block_against_result.count == 0){
                        BlockMomentumPush_t new_block_push = block_push;
                        new_block_push.direction_mask = direction_to_direction_mask(direction);
@@ -1933,6 +1963,7 @@ void generate_entangled_block_pushes(BlockMomentumPushes_t<128>* block_pushes, B
                        new_block_push.entangle_rotations = rotations_between_blocks;
                        new_block_push.entangled_with_push_index = i;
                        new_block_push.pure_entangle = true;
+                       new_block_push.entangled_momentum = entangled_momentum;
                        new_block_pushes->add(&new_block_push);
                   }else{
                        for(S16 a = 0; a < block_against_result.count; a++){
@@ -1947,6 +1978,7 @@ void generate_entangled_block_pushes(BlockMomentumPushes_t<128>* block_pushes, B
                             new_block_push.entangle_rotations = 0;
                             new_block_push.entangled_with_push_index = i;
                             new_block_push.pure_entangle = false;
+                            new_block_push.entangled_momentum = entangled_momentum;
                             new_block_pushes->add(&new_block_push);
                        }
                   }
@@ -2028,40 +2060,46 @@ void execute_block_pushes(BlockMomentumPushes_t<128>* block_pushes, World_t* wor
           auto result = block_collision_push(&block_push, world);
           block_push.executed = true;
 
-          // any momentum changes that stops or changes a blocks momentum, means that block could not have pushed anything, so invalidate it's pushes
+          // some post processing for each push
           for(S16 j = i + 1; j < block_pushes->count; j++){
               auto& check_block_push = block_pushes->pushes[j];
 
-              // pass along the momentum from the push to any pushes that are entangled with it
-              if(check_block_push.entangled_with_push_index == i && block_push.reapply_count == 0 &&
-                 !check_block_push.pure_entangle){
-                   for(S16 d = 0; d < DIRECTION_COUNT; d++){
-                        Direction_t direction = (Direction_t)(d);
-                        if(!direction_in_mask(block_push.direction_mask, direction)) continue;
-                        auto entangled_momentum = get_block_push_pusher_momentum(&block_push, world, direction);
-                        for(S16 p = 0; p < check_block_push.pusher_count; p++){
-                             auto* pusher = check_block_push.pushers + p;
-                             auto* block = world->blocks.elements + pusher->index;
+              // detect opposite entangled pushes
+              // if(check_block_push.entangled_with_push_index == i){
+              //      for(S16 d = 0; d < DIRECTION_COUNT; d++){
+              //           Direction_t direction = (Direction_t)(d);
+              //           if(!direction_in_mask(block_push.direction_mask, direction)) continue;
+              //           auto entangled_momentum = get_block_push_pusher_momentum(&block_push, world, direction);
+              //           for(S16 p = 0; p < check_block_push.pusher_count; p++){
+              //                auto* pusher = check_block_push.pushers + p;
+              //                // auto* block = world->blocks.elements + pusher->index;
 
-                             S8 total_rotations = pusher->portal_rotations + pusher->entangle_rotations;
-                             Direction_t entangled_direction = direction_rotate_clockwise(direction, total_rotations);
-                             auto rotated_momentum_vel = rotate_vec_counter_clockwise_to_see_if_negates(entangled_momentum.vel,
-                                                                                                        direction_is_horizontal(entangled_direction),
-                                                                                                        total_rotations);
+              //                if(pusher->index != check_block_push.pushee_index) continue;
 
-                             S16 pusher_mass = get_block_stack_mass(world, block);
-                             F32 total_entangled_momentum = entangled_momentum.mass * rotated_momentum_vel;
-                             total_entangled_momentum /= pusher->collided_with_block_count;
-                             F32 additional_entangled_vel = total_entangled_momentum / (F32)(pusher_mass);
+              //                auto* block_receiving_momentum = world->blocks.elements + block_push.pushee_index;
 
-                             if(direction_is_horizontal(entangled_direction)){
-                                  block->vel.x += additional_entangled_vel;
-                             }else{
-                                  block->vel.y += additional_entangled_vel;
-                             }
-                        }
-                   }
-              }
+              //                S8 total_rotations = pusher->portal_rotations + pusher->entangle_rotations;
+              //                Direction_t entangled_direction = direction_rotate_clockwise(direction, total_rotations);
+              //                auto rotated_momentum_vel = rotate_vec_counter_clockwise_to_see_if_negates(entangled_momentum.vel,
+              //                                                                                           direction_is_horizontal(entangled_direction),
+              //                                                                                           total_rotations);
+
+              //                // TODO: remove commented out lines here
+              //                // S16 pusher_mass = get_block_stack_mass(world, block);
+              //                F32 total_entangled_momentum = entangled_momentum.mass * rotated_momentum_vel;
+              //                total_entangled_momentum /= pusher->collided_with_block_count;
+              //                // F32 additional_entangled_vel = total_entangled_momentum / (F32)(pusher_mass);
+
+              //                if(direction_is_horizontal(entangled_direction)){
+              //                     LOG("giving block %d: %f horizontal entangled momentum\n", block_push.pushee_index, total_entangled_momentum);
+              //                     block_add_horizontal_momentum(block_receiving_momentum, total_entangled_momentum);
+              //                }else{
+              //                     LOG("giving block %d: %f vertical entangled momentum\n", block_push.pushee_index, total_entangled_momentum);
+              //                     block_add_vertical_momentum(block_receiving_momentum, total_entangled_momentum);
+              //                }
+              //           }
+              //      }
+              // }
 
               // if the entangled push has already been executed, then we can't invalidate it
               // if(check_block_push.is_entangled()){
@@ -2088,6 +2126,7 @@ void execute_block_pushes(BlockMomentumPushes_t<128>* block_pushes, World_t* wor
               //     }
               // }
 
+              // for pushes from the same block, kick the momentum back to the same block in subsequent pushes
               for(S16 p = 0; p < block_push.pusher_count; p++){
                    auto* pusher = block_push.pushers + p;
                    if(pusher->momentum_kicked_back_in_shared_push_block_index < 0) continue;
@@ -2810,8 +2849,8 @@ int main(int argc, char** argv){
      S16 first_map_number = 0;
      S16 first_frame = 0;
      S16 fail_count = 0;
-     int window_width = 800;
-     int window_height = 800;
+     int window_width = 1000;
+     int window_height = 1000;
      int window_x = SDL_WINDOWPOS_CENTERED;
      int window_y = SDL_WINDOWPOS_CENTERED;
 

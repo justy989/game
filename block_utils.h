@@ -148,6 +148,7 @@ struct BlockMomentumPush_t{
      bool no_consolidate = false;
      bool no_entangled_pushes = false;
      S8 entangled_with_push_index = -1; // index of which push caused this push via entanglement
+     F32 entangled_momentum = 0;
      bool pure_entangle = false; // the block we are pushing isn't against any other blocks, so the push just uses the forces given to it
      F32 force = 1.0f;
      S16 reapply_count = 0;
@@ -469,3 +470,4 @@ FindBlocksThroughPortalResult_t find_blocks_through_portals(Coord_t coord, TileM
 // LOL
 BlockChainsResult_t find_block_chain(Block_t* block, Direction_t direction, QuadTreeNode_t<Block_t>* block_qt,
                                      QuadTreeNode_t<Interactive_t>* interactive_qt, TileMap_t* tilemap, S8 rotations = 0, BlockChain_t* my_chain = NULL);
+TransferMomentum_t get_block_push_pusher_momentum(BlockMomentumPush_t* push, World_t* world, Direction_t push_direction);

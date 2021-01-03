@@ -2367,8 +2367,9 @@ BlockPushResult_t block_push(Block_t* block, Position_t pos, Vec_t pos_delta, Di
                              bool pushed_by_ice, F32 force, TransferMomentum_t* instant_momentum,
                              PushFromEntangler_t* from_entangler, S16 block_contributing_momentum_to_total_blocks,
                              bool side_effects){
-     // LOG("block_push() %d -> %s with force %f by ice: %d side effects: %d\n", get_block_index(world, block),
-     //     direction_to_string(direction), force, pushed_by_ice, side_effects);
+     // LOG("block_push() %d -> %s with force %f colliding with blocks: %d, by ice: %d side effects: %d\n",
+     //     get_block_index(world, block), direction_to_string(direction), force,
+     //     block_contributing_momentum_to_total_blocks, pushed_by_ice, side_effects);
      // if(instant_momentum){
      //     LOG(" instant momentum %d, %f\n", instant_momentum->mass, instant_momentum->vel);
      // }
