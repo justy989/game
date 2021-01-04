@@ -1797,6 +1797,7 @@ void add_entangle_pushes_for_end_of_chain_blocks_on_ice(World_t* world, S16 push
                if(!block_on_frictionless(against_pos, against_pos_delta, end_block->cut, &world->tilemap,
                                          world->interactive_qt, world->block_qt)) continue;
 
+               // TODO: handle rotating directions based on directions between blocks
                S16 current_entangle_index = end_block->entangle_index;
                while(current_entangle_index != end_index && current_entangle_index >= 0){
                     Block_t* entangler = world->blocks.elements + current_entangle_index;
@@ -6103,12 +6104,6 @@ int main(int argc, char** argv){
                               push_result = block_push(block_to_push, player_block_push->direction, &world, false,
                                                        player_block_push->allowed_to_push.mass_ratio, nullptr,
                                                        nullptr, 1, false);
-                         }
-
-                         if(!push_result.pushed || push_result.busy){
-                              if(player && !player_block_push->is_entangled()){
-                                   player->push_time = 0.0f;
-                              }
                          }
 
                          player_block_push->performed = true;
