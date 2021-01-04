@@ -38,92 +38,6 @@ struct BlockInsideBlockResult_t{
 
 using BlockInsideOthersResult_t = StaticObjectArray_t<BlockInsideBlockResult_t, MAX_BLOCK_INSIDE_OTHERS_COUNT>;
 
-enum BlockChangeType_t : S8{
-     BLOCK_CHANGE_TYPE_POS_DELTA_X,
-     BLOCK_CHANGE_TYPE_POS_DELTA_Y,
-     BLOCK_CHANGE_TYPE_VEL_X,
-     BLOCK_CHANGE_TYPE_VEL_Y,
-     BLOCK_CHANGE_TYPE_ACCEL_X,
-     BLOCK_CHANGE_TYPE_ACCEL_Y,
-     BLOCK_CHANGE_TYPE_HORIZONTAL_MOVE_STATE,
-     BLOCK_CHANGE_TYPE_HORIZONTAL_MOVE_SIGN,
-     BLOCK_CHANGE_TYPE_HORIZONTAL_MOVE_TIME_LEFT,
-     BLOCK_CHANGE_TYPE_VERTICAL_MOVE_STATE,
-     BLOCK_CHANGE_TYPE_VERTICAL_MOVE_SIGN,
-     BLOCK_CHANGE_TYPE_VERTICAL_MOVE_TIME_LEFT,
-     BLOCK_CHANGE_TYPE_STOP_ON_PIXEL_X,
-     BLOCK_CHANGE_TYPE_STOP_ON_PIXEL_Y,
-};
-
-struct BlockChange_t{
-     S16 block_index;
-     BlockChangeType_t type;
-
-     union{
-          S16 integer;
-          F32 decimal;
-          MoveState_t move_state;
-          MoveSign_t move_sign;
-     };
-};
-
-#define MAX_BLOCK_CHANGES 32
-
-struct BlockChanges_t{
-     BlockChange_t changes[MAX_BLOCK_CHANGES];
-     S16 count = 0;
-
-     bool add(BlockChange_t* change){
-          if(count < MAX_BLOCK_CHANGES){
-               changes[count] = *change;
-               count++;
-               return true;
-          }
-
-          return false;
-     }
-
-     bool add(S16 block_index, BlockChangeType_t type, S16 integer){
-          BlockChange_t change;
-          change.type = type;
-          change.block_index = block_index;
-          change.integer = integer;
-          return add(&change);
-     }
-
-     bool add(S16 block_index, BlockChangeType_t type, F32 decimal){
-          BlockChange_t change;
-          change.type = type;
-          change.block_index = block_index;
-          change.decimal = decimal;
-          return add(&change);
-     }
-
-     bool add(S16 block_index, BlockChangeType_t type, MoveState_t move_state){
-          BlockChange_t change;
-          change.type = type;
-          change.block_index = block_index;
-          change.move_state = move_state;
-          return add(&change);
-     }
-
-     bool add(S16 block_index, BlockChangeType_t type, MoveSign_t move_sign){
-          BlockChange_t change;
-          change.type = type;
-          change.block_index = block_index;
-          change.move_sign = move_sign;
-          return add(&change);
-     }
-
-     void merge(BlockChanges_t* block_changes){
-          for(S16 i = 0; i < block_changes->count; i++){
-               add(block_changes->changes + i);
-          }
-     }
-
-     void clear(){count = 0;}
-};
-
 #define MAX_BLOCK_PUSHERS 4
 
 struct BlockPusher_t{
@@ -346,6 +260,8 @@ struct BlockChainEntry_t{
 using BlockChain_t = StaticObjectArray_t<BlockChainEntry_t, MAX_BLOCKS_IN_CHAIN>;
 using BlockChainsResult_t = StaticObjectArray_t<BlockChain_t, MAX_BLOCKS_AGAINST_BLOCK>;
 
+#define MAX_BLOCK_COLLISIONS 32
+
 struct BlockMomentumCollision_t{
      S16 block_index = -1;
      S16 mass = 0;
@@ -370,7 +286,7 @@ struct BlockMomentumCollision_t{
      }
 };
 
-using BlockMomentumCollisions_t = StaticObjectArray_t<BlockMomentumCollision_t, MAX_BLOCK_CHANGES>;
+using BlockMomentumCollisions_t = StaticObjectArray_t<BlockMomentumCollision_t, MAX_BLOCK_COLLISIONS>;
 
 #define MAX_BLOCK_PUSHES 128
 
@@ -461,7 +377,6 @@ void push_entangled_block(Block_t* block, World_t* world, Direction_t push_dir, 
 bool blocks_are_entangled(Block_t* a, Block_t* b, ObjectArray_t<Block_t>* blocks_array);
 bool blocks_are_entangled(S16 a_index, S16 b_index, ObjectArray_t<Block_t>* blocks_array);
 
-void apply_block_change(ObjectArray_t<Block_t>* blocks_array, BlockChange_t* change);
 TransferMomentum_t get_block_push_pusher_momentum(BlockMomentumPush_t* push, World_t* world, Direction_t push_direction);
 BlockCollisionPushResult_t block_collision_push(BlockMomentumPush_t* push, World_t* world);
 

@@ -1801,82 +1801,6 @@ BlockMomentumPushes_t<MAX_BLOCK_PUSHES> push_entangled_block_pushes(Block_t* blo
      return result;
 }
 
-void apply_block_change(ObjectArray_t<Block_t>* blocks_array, BlockChange_t* change){
-     auto block = blocks_array->elements + change->block_index;
-
-     switch(change->type){
-     case BLOCK_CHANGE_TYPE_POS_DELTA_X:
-          block->pos_delta.x = change->decimal;
-          break;
-     case BLOCK_CHANGE_TYPE_POS_DELTA_Y:
-          block->pos_delta.y = change->decimal;
-          break;
-     case BLOCK_CHANGE_TYPE_VEL_X:
-          block->vel.x = change->decimal;
-          break;
-     case BLOCK_CHANGE_TYPE_VEL_Y:
-          block->vel.y = change->decimal;
-          break;
-     case BLOCK_CHANGE_TYPE_ACCEL_X:
-          block->accel.x = change->decimal;
-          break;
-     case BLOCK_CHANGE_TYPE_ACCEL_Y:
-          block->accel.y = change->decimal;
-          break;
-     case BLOCK_CHANGE_TYPE_HORIZONTAL_MOVE_STATE:
-          block->horizontal_move.state = change->move_state;
-          break;
-     case BLOCK_CHANGE_TYPE_HORIZONTAL_MOVE_SIGN:
-          block->horizontal_move.sign = change->move_sign;
-          break;
-     case BLOCK_CHANGE_TYPE_HORIZONTAL_MOVE_TIME_LEFT:
-          block->horizontal_move.time_left = change->decimal;
-          break;
-     case BLOCK_CHANGE_TYPE_VERTICAL_MOVE_STATE:
-          block->vertical_move.state = change->move_state;
-          break;
-     case BLOCK_CHANGE_TYPE_VERTICAL_MOVE_SIGN:
-          block->vertical_move.sign = change->move_sign;
-          break;
-     case BLOCK_CHANGE_TYPE_VERTICAL_MOVE_TIME_LEFT:
-          block->vertical_move.time_left = change->decimal;
-          break;
-     case BLOCK_CHANGE_TYPE_STOP_ON_PIXEL_X:
-          block->stop_on_pixel_x = change->integer;
-          break;
-     case BLOCK_CHANGE_TYPE_STOP_ON_PIXEL_Y:
-          block->stop_on_pixel_y = change->integer;
-          break;
-     }
-}
-
-// TODO: remove this function
-F32 update_momentum_if_block_push_is_opposite_entangled(Block_t* pusher, Block_t* pushee, BlockMomentumPush_t* push, Direction_t direction, World_t* world,
-                                                        F32 original_vel){
-     // for opposite entangled blocks pushing against each other
-     S16 push_rotations = (push->entangle_rotations + push->portal_rotations) % DIRECTION_COUNT;
-     if(blocks_are_entangled(pusher, pushee, &world->blocks) &&
-         ((blocks_rotations_between(pusher, pushee) + push_rotations) % DIRECTION_COUNT) == 2){
-          // calculate relative velocity in terms of momentum and add it to the original vel
-          Direction_t entangled_momentum_direction = direction_rotate_clockwise(direction, blocks_rotations_between(pusher, pushee));
-          auto entangled_momentum = get_block_momentum(world, pushee, entangled_momentum_direction, true);
-          F32 total_entangle_momentum = entangled_momentum.mass * entangled_momentum.vel;
-          auto block_mass = get_block_stack_mass(world, pusher);
-          F32 new_relative_vel = total_entangle_momentum / (F32)(block_mass);
-          if((new_relative_vel > 0 && original_vel < 0) ||
-             (new_relative_vel < 0 && original_vel > 0)){
-               new_relative_vel = -new_relative_vel;
-          }
-          return original_vel + new_relative_vel;
-     }else if(pusher == pushee && push_rotations == 2){
-          // since it is the same block, just double the vel, no need to do any calculations
-          return original_vel * 2;
-     }
-
-
-     return original_vel;
-}
-
 TransferMomentum_t get_push_pusher_momentum(BlockPusher_t* pusher, BlockMomentumPush_t* push, Direction_t push_direction,
                                             World_t* world){
      TransferMomentum_t result;
@@ -1910,9 +1834,6 @@ TransferMomentum_t get_push_pusher_momentum(BlockPusher_t* pusher, BlockMomentum
                if(result.vel > 0) result.vel = -result.vel;
           }
      }
-
-     // result.vel = update_momentum_if_block_push_is_opposite_entangled(pusher_block, pushee_block, push, push_direction,
-     //                                                                  world, result.vel);
 
      return result;
 }
@@ -2094,10 +2015,6 @@ BlockCollisionPushResult_t block_collision_push(BlockMomentumPush_t* push, World
                // get the momentum in the current direction for the block receiving the force
                TransferMomentum_t block_receiving_force_momentum = {};
 
-               // block_receiving_force_momentum.vel = update_momentum_if_block_push_is_opposite_entangled(block_receiving_force, pushee,
-               //                                                                           push, direction,
-               //                                                                           world, block_receiving_force_momentum.vel);
-
                if(block_receiving_force == pusher && push->entangled_with_push_index >= 0){
                     block_receiving_force_momentum = get_push_pusher_momentum(push->pushers + p, push, push_direction, world);
                }else{
@@ -2118,11 +2035,6 @@ BlockCollisionPushResult_t block_collision_push(BlockMomentumPush_t* push, World
                       push->pushee_index == collision.pushee_index){
                         continue;
                    }
-
-                   // F32 initial_vel = update_momentum_if_block_push_is_opposite_entangled(block_receiving_force,
-                   //                                                                       pushee, push, direction,
-                   //                                                                       world,
-                   //                                                                       collision.pushee_initial_velocity);
 
                    Direction_t intial_kickback_direction = direction_opposite(collision.direction_pushee_hit);
                    S8 rotations_in_push = direction_rotations_between(intial_kickback_direction, direction_to_check);
