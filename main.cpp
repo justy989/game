@@ -5,8 +5,6 @@ http://www.simonstalenhag.se/
 -Grant Sanderson 3blue1brown
 -Shane Hendrixson
 
-USE deal_with_push_result() FOR RESULTS OF push_entangled_block() CALLS INSIDE OF block_collision_push()
-
 TODO:
 Entanglement Puzzles:
 - entangle puzzle where there is a line of pressure plates against the wall with a line of popups on the other side that would
@@ -389,7 +387,7 @@ void reset_texture(GLuint* texture, Raw_t* raw){
     }
 }
 
-void log_block_pusher(BlockPusher_t* pusher){
+void log_block_pusher(BlockMomentumPusher_t* pusher){
     LOG("   pusher %d, collided_with %d, hit_entangler: %d, entangle rot: %d, portal rot: %d, momenumt kick back to block %d\n",
         pusher->index, pusher->collided_with_block_count, pusher->hit_entangler, pusher->entangle_rotations, pusher->portal_rotations,
         pusher->momentum_kicked_back_in_shared_push_block_index);
@@ -2022,128 +2020,6 @@ void consolidate_block_pushes(BlockMomentumPushes_t<128>* block_pushes, BlockMom
                          push->collided_with_block_count++;
                     }
                }
-          }
-     }
-}
-
-void execute_block_pushes(BlockMomentumPushes_t<128>* block_pushes, World_t* world){
-     S16 simultaneous_block_pushes = 0;
-
-     for(S16 i = 0; i < block_pushes->count; i++){
-          auto& block_push = block_pushes->pushes[i];
-          if(block_push.invalidated) continue;
-
-          auto result = block_collision_push(&block_push, world);
-          block_push.executed = true;
-
-          // some post processing for each push
-          for(S16 j = i + 1; j < block_pushes->count; j++){
-              auto& check_block_push = block_pushes->pushes[j];
-
-              // for pushes from the same block, kick the momentum back to the same block in subsequent pushes
-              for(S16 p = 0; p < block_push.pusher_count; p++){
-                   auto* pusher = block_push.pushers + p;
-                   if(pusher->momentum_kicked_back_in_shared_push_block_index < 0) continue;
-
-                   // TODO: should this check for mathing rotations and entangled rotations too ?
-                   if(check_block_push.direction_mask != block_push.direction_mask) continue;
-
-                   for(S16 cp = 0; cp < check_block_push.pusher_count; cp++){
-                        auto* check_pusher = check_block_push.pushers + cp;
-                        if(pusher->index == check_pusher->index){
-                             if(check_pusher->index == check_block_push.pushee_index){
-                                  check_pusher->momentum_kicked_back_in_shared_push_block_index =
-                                  block_push.pushee_index;
-                             }else{
-                                  check_pusher->momentum_kicked_back_in_shared_push_block_index =
-                                  pusher->momentum_kicked_back_in_shared_push_block_index;
-                             }
-                        }
-                   }
-              }
-          }
-
-          if(result.additional_block_pushes.count){
-              block_pushes->merge(&result.additional_block_pushes);
-              // log_block_pushes(result.additional_block_pushes);
-              // TODO: reconsolidate? probably not
-          }
-
-          // TODO: I don't think getting the max collided with block count is right fore determining
-          // the cancellable block pushes
-          S16 max_collided_with_block_count = 0;
-          for(S16 p = 0; p < block_push.pusher_count; p++){
-               if(block_push.pushers[p].collided_with_block_count > max_collided_with_block_count){
-                    max_collided_with_block_count = block_push.pushers[p].collided_with_block_count;
-               }
-          }
-
-          // for simultaneous pushes, skip ahead because they should not be cancelled
-          S16 cancellable_block_pushes = i + 1;
-          if(simultaneous_block_pushes > 0){
-               simultaneous_block_pushes--;
-               cancellable_block_pushes += simultaneous_block_pushes;
-          }else if(max_collided_with_block_count > 1){
-               simultaneous_block_pushes = max_collided_with_block_count - 1;
-               cancellable_block_pushes += simultaneous_block_pushes;
-          }
-     }
-}
-
-void apply_momentum_collisions(World_t* world){
-     // update each block's velocities based on the momentum they've received this frame
-     for(S16 i = 0; i < world->blocks.count; i++){
-          auto* block = world->blocks.elements + i;
-          if(block->horizontal_momentum == BLOCK_MOMENTUM_SUM){
-               S16 mass = get_block_stack_mass(world, block);
-               block->vel.x = block->collision_momentum.x / mass;
-               // LOG("setting block %d vel to %f based on total momentum %f\n", i, block->vel.x, block->collision_momentum.x);
-               block->collision_momentum.x = 0;
-               block->horizontal_momentum = BLOCK_MOMENTUM_NONE;
-
-               if(block->vel.x == 0){
-                    block->horizontal_move.state = MOVE_STATE_IDLING;
-                    block->horizontal_move.sign = MOVE_SIGN_ZERO;
-               }else{
-                    block->horizontal_move.state = MOVE_STATE_COASTING;
-                    block->horizontal_move.sign = move_sign_from_vel(block->vel.x);
-                    block->accel.x = 0;
-               }
-               block->horizontal_move.time_left = 0;
-          }else if(block->horizontal_momentum == BLOCK_MOMENTUM_STOP){
-               block->accel.x = 0;
-               block->vel.x = 0;
-               block->collision_momentum.x = 0;
-               block->horizontal_momentum = BLOCK_MOMENTUM_NONE;
-               block->horizontal_move.state = MOVE_STATE_IDLING;
-               block->horizontal_move.sign = MOVE_SIGN_ZERO;
-               block->horizontal_move.time_left = 0;
-          }
-
-          if(block->vertical_momentum == BLOCK_MOMENTUM_SUM){
-               S16 mass = get_block_stack_mass(world, block);
-               block->vel.y = block->collision_momentum.y / mass;
-               // LOG("setting block %d vel to %f based on total momentum %f\n", i, block->vel.y, block->collision_momentum.y);
-               block->collision_momentum.y = 0;
-               block->vertical_momentum = BLOCK_MOMENTUM_NONE;
-
-               if(block->vel.y == 0){
-                    block->vertical_move.state = MOVE_STATE_IDLING;
-                    block->vertical_move.sign = MOVE_SIGN_ZERO;
-               }else{
-                    block->vertical_move.state = MOVE_STATE_COASTING;
-                    block->vertical_move.sign = move_sign_from_vel(block->vel.y);
-                    block->accel.y = 0;
-               }
-               block->vertical_move.time_left = 0;
-          }else if(block->vertical_momentum == BLOCK_MOMENTUM_STOP){
-               block->accel.y = 0;
-               block->vel.y = 0;
-               block->collision_momentum.y = 0;
-               block->vertical_momentum = BLOCK_MOMENTUM_NONE;
-               block->vertical_move.state = MOVE_STATE_IDLING;
-               block->vertical_move.sign = MOVE_SIGN_ZERO;
-               block->vertical_move.time_left = 0;
           }
      }
 }
@@ -5824,10 +5700,106 @@ int main(int argc, char** argv){
 #if 0
                     log_block_pushes(consolidated_momentum_block_pushes);
 #endif
+                    // execute block pushes
+                    for(S16 i = 0; i < consolidated_momentum_block_pushes.count; i++){
+                         auto& block_push = consolidated_momentum_block_pushes.pushes[i];
+                         if(block_push.invalidated) continue;
 
-                    execute_block_pushes(&consolidated_momentum_block_pushes, &world);
+                         auto result = block_collision_push(&block_push, &world);
+                         block_push.executed = true;
 
-                    apply_momentum_collisions(&world);
+                         // some post processing for each push
+                         for(S16 j = i + 1; j < consolidated_momentum_block_pushes.count; j++){
+                             auto& check_block_push = consolidated_momentum_block_pushes.pushes[j];
+
+                             // for pushes from the same block, kick the momentum back to the same block in subsequent pushes
+                             for(S16 p = 0; p < block_push.pusher_count; p++){
+                                  auto* pusher = block_push.pushers + p;
+                                  if(pusher->momentum_kicked_back_in_shared_push_block_index < 0) continue;
+
+                                  // TODO: should this check for mathing rotations and entangled rotations too ?
+                                  if(check_block_push.direction_mask != block_push.direction_mask) continue;
+
+                                  for(S16 cp = 0; cp < check_block_push.pusher_count; cp++){
+                                       auto* check_pusher = check_block_push.pushers + cp;
+                                       if(pusher->index == check_pusher->index){
+                                            // if opposite entangled blocks are colliding, make the second push use the pushee of the
+                                            // first push for where the resulting momentum goes
+                                            if(check_pusher->index == check_block_push.pushee_index){
+                                                 check_pusher->momentum_kicked_back_in_shared_push_block_index =
+                                                 block_push.pushee_index;
+                                            }else{
+                                                 // otherwise, these pushes just happen at the same time, this is the main purpose of this loop
+                                                 check_pusher->momentum_kicked_back_in_shared_push_block_index =
+                                                 pusher->momentum_kicked_back_in_shared_push_block_index;
+                                            }
+                                       }
+                                  }
+                             }
+                         }
+
+                         if(result.additional_block_pushes.count){
+                             consolidated_momentum_block_pushes.merge(&result.additional_block_pushes);
+                             // log_block_pushes(result.additional_block_pushes);
+                             // TODO: reconsolidate? probably not
+                         }
+                    }
+
+                    // update each block's velocities based on the momentum they've received this frame
+                    for(S16 i = 0; i < world.blocks.count; i++){
+                         auto* block = world.blocks.elements + i;
+                         if(block->horizontal_momentum == BLOCK_MOMENTUM_SUM){
+                              S16 mass = get_block_stack_mass(&world, block);
+                              block->vel.x = block->collision_momentum.x / mass;
+                              // LOG("setting block %d vel to %f based on total momentum %f\n", i, block->vel.x, block->collision_momentum.x);
+                              block->collision_momentum.x = 0;
+                              block->horizontal_momentum = BLOCK_MOMENTUM_NONE;
+
+                              if(block->vel.x == 0){
+                                   block->horizontal_move.state = MOVE_STATE_IDLING;
+                                   block->horizontal_move.sign = MOVE_SIGN_ZERO;
+                              }else{
+                                   block->horizontal_move.state = MOVE_STATE_COASTING;
+                                   block->horizontal_move.sign = move_sign_from_vel(block->vel.x);
+                                   block->accel.x = 0;
+                              }
+                              block->horizontal_move.time_left = 0;
+                         }else if(block->horizontal_momentum == BLOCK_MOMENTUM_STOP){
+                              block->accel.x = 0;
+                              block->vel.x = 0;
+                              block->collision_momentum.x = 0;
+                              block->horizontal_momentum = BLOCK_MOMENTUM_NONE;
+                              block->horizontal_move.state = MOVE_STATE_IDLING;
+                              block->horizontal_move.sign = MOVE_SIGN_ZERO;
+                              block->horizontal_move.time_left = 0;
+                         }
+
+                         if(block->vertical_momentum == BLOCK_MOMENTUM_SUM){
+                              S16 mass = get_block_stack_mass(&world, block);
+                              block->vel.y = block->collision_momentum.y / mass;
+                              // LOG("setting block %d vel to %f based on total momentum %f\n", i, block->vel.y, block->collision_momentum.y);
+                              block->collision_momentum.y = 0;
+                              block->vertical_momentum = BLOCK_MOMENTUM_NONE;
+
+                              if(block->vel.y == 0){
+                                   block->vertical_move.state = MOVE_STATE_IDLING;
+                                   block->vertical_move.sign = MOVE_SIGN_ZERO;
+                              }else{
+                                   block->vertical_move.state = MOVE_STATE_COASTING;
+                                   block->vertical_move.sign = move_sign_from_vel(block->vel.y);
+                                   block->accel.y = 0;
+                              }
+                              block->vertical_move.time_left = 0;
+                         }else if(block->vertical_momentum == BLOCK_MOMENTUM_STOP){
+                              block->accel.y = 0;
+                              block->vel.y = 0;
+                              block->collision_momentum.y = 0;
+                              block->vertical_momentum = BLOCK_MOMENTUM_NONE;
+                              block->vertical_move.state = MOVE_STATE_IDLING;
+                              block->vertical_move.sign = MOVE_SIGN_ZERO;
+                              block->vertical_move.time_left = 0;
+                         }
+                    }
                }
 
                // finalize positions

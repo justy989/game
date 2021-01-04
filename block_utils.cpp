@@ -1126,51 +1126,6 @@ void handle_block_on_block_action_vertical(Position_t block_pos, Vec_t block_pos
      }
 }
 
-// TODO: remove these functions beceause they aren't used anymore
-void handle_blocks_colliding_moving_in_the_same_direction_horizontal(CheckBlockCollisionResult_t* result, Block_t* last_block_in_chain,
-                                                                     S8 rotations_between_last_in_chain){
-     if(result->vel.x == 0){
-         result->stop_horizontally();
-     }else{
-         bool stopped_by_player = false;
-         F32 accel = 0;
-         if(rotations_between_last_in_chain % 2 == 0){
-             stopped_by_player = last_block_in_chain->stopped_by_player_horizontal;
-             accel = last_block_in_chain->accel.x;
-         }else{
-             stopped_by_player = last_block_in_chain->stopped_by_player_vertical;
-             accel = last_block_in_chain->accel.y;
-         }
-         if(stopped_by_player){
-             result->stopped_by_player_horizontal = stopped_by_player;
-             result->horizontal_move.state = MOVE_STATE_STOPPING;
-             result->accel.x = accel;
-         }
-     }
-}
-
-void handle_blocks_colliding_moving_in_the_same_direction_vertical(CheckBlockCollisionResult_t* result, Block_t* last_block_in_chain,
-                                                                   S8 rotations_between_last_in_chain){
-     if(result->vel.y == 0){
-         result->stop_horizontally();
-     }else{
-         bool stopped_by_player = false;
-         F32 accel = 0;
-         if(rotations_between_last_in_chain % 2 == 0){
-             stopped_by_player = last_block_in_chain->stopped_by_player_vertical;
-             accel = last_block_in_chain->accel.y;
-         }else{
-             stopped_by_player = last_block_in_chain->stopped_by_player_horizontal;
-             accel = last_block_in_chain->accel.x;
-         }
-         if(stopped_by_player){
-             result->stopped_by_player_horizontal = stopped_by_player;
-             result->horizontal_move.state = MOVE_STATE_STOPPING;
-             result->accel.y = accel;
-         }
-     }
-}
-
 CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t block_pos, Vec_t block_pos_delta, Vec_t block_vel,
                                                                     Vec_t block_accel, BlockCut_t cut, S16 block_stop_on_pixel_x,
                                                                     S16 block_stop_on_pixel_y, Move_t block_horizontal_move,
@@ -1345,7 +1300,6 @@ CheckBlockCollisionResult_t check_block_collision_with_other_blocks(Position_t b
                BlockCut_t inside_block_cut = block_get_cut(inside_entry->block);
 
                // check if they are on a frictionless surface before
-               // TODO: create a single function block_on_frictionless(), use it in all the places we do this
                bool a_on_frictionless = block_on_frictionless(block_pos, result.pos_delta, cut, &world->tilemap, world->interactive_qt, world->block_qt);
                bool b_on_frictionless = block_on_frictionless(inside_block_pos, inside_block_pos_delta,
                                                               inside_block_cut, &world->tilemap, world->interactive_qt, world->block_qt);
@@ -1690,122 +1644,10 @@ Interactive_t* block_is_teleporting(Block_t* block, QuadTreeNode_t<Interactive_t
      return nullptr;
 }
 
-void push_entangled_block(Block_t* block, World_t* world, Direction_t push_dir, bool pushed_by_ice, F32 force, TransferMomentum_t* instant_momentum){
-     if(block->entangle_index < 0 || block->entangle_index >= world->blocks.count) return;
-
-     PushFromEntangler_t from_entangler = build_push_from_entangler(block, push_dir, force);
-
-     S16 block_mass = block_get_mass(block);
-     S16 block_index = block - world->blocks.elements;
-     S16 entangle_index = block->entangle_index;
-     while(entangle_index != block_index && entangle_index >= 0){
-          Block_t* entangled_block = world->blocks.elements + entangle_index;
-          bool held_down = block_held_down_by_another_block(entangled_block, world->block_qt, world->interactive_qt, &world->tilemap).held();
-          bool on_frictionless = block_on_frictionless(entangled_block, &world->tilemap, world->interactive_qt, world->block_qt);
-          if(!held_down || on_frictionless){
-               auto rotations_between = direction_rotations_between(static_cast<Direction_t>(entangled_block->rotation), static_cast<Direction_t>(block->rotation));
-               Direction_t rotated_dir = direction_rotate_clockwise(push_dir, rotations_between);
-
-               S16 entangled_block_mass = block_get_mass(entangled_block);
-               F32 mass_ratio = (F32)(block_mass) / (F32)(entangled_block_mass);
-
-               if(instant_momentum){
-                    auto rotated_instant_momentum = *instant_momentum;
-
-                    switch(rotated_dir){
-                    default:
-                         break;
-                    case DIRECTION_LEFT:
-                         if(rotated_instant_momentum.vel > 0) rotated_instant_momentum.vel = -rotated_instant_momentum.vel;
-                         break;
-                    case DIRECTION_RIGHT:
-                         if(rotated_instant_momentum.vel < 0) rotated_instant_momentum.vel = -rotated_instant_momentum.vel;
-                         break;
-                    case DIRECTION_DOWN:
-                         if(rotated_instant_momentum.vel > 0) rotated_instant_momentum.vel = -rotated_instant_momentum.vel;
-                         break;
-                    case DIRECTION_UP:
-                         if(rotated_instant_momentum.vel < 0) rotated_instant_momentum.vel = -rotated_instant_momentum.vel;
-                         break;
-                    }
-
-                    auto allowed_result = allowed_to_push(world, entangled_block, rotated_dir, mass_ratio, &rotated_instant_momentum);
-                    if(allowed_result.push){
-                         block_push(entangled_block, rotated_dir, world, pushed_by_ice, force * mass_ratio * allowed_result.mass_ratio, &rotated_instant_momentum, &from_entangler);
-                    }
-               }else{
-                    auto allowed_result = allowed_to_push(world, entangled_block, rotated_dir, mass_ratio);
-                    if(allowed_result.push){
-                         block_push(entangled_block, rotated_dir, world, pushed_by_ice, force * mass_ratio * allowed_result.mass_ratio, nullptr, &from_entangler);
-                    }
-               }
-          }
-          entangle_index = entangled_block->entangle_index;
-     }
-}
-
-BlockMomentumPushes_t<MAX_BLOCK_PUSHES> push_entangled_block_pushes(Block_t* block, World_t* world, Direction_t push_dir, Block_t* pusher, S16 collided_with_block_count, TransferMomentum_t* instant_momentum){
-     BlockMomentumPushes_t<MAX_BLOCK_PUSHES> result;
-     if(block->entangle_index < 0) return result;
-
-     S16 block_mass = block_get_mass(block);
-     S16 block_index = block - world->blocks.elements;
-     S16 entangle_index = block->entangle_index;
-     while(entangle_index != block_index && entangle_index >= 0){
-          Block_t* entangled_block = world->blocks.elements + entangle_index;
-          bool held_down = block_held_down_by_another_block(entangled_block, world->block_qt, world->interactive_qt, &world->tilemap).held();
-          bool on_frictionless = block_on_frictionless(entangled_block, &world->tilemap, world->interactive_qt, world->block_qt);
-          if(!held_down || on_frictionless){
-               auto rotations_between = direction_rotations_between(static_cast<Direction_t>(entangled_block->rotation), static_cast<Direction_t>(block->rotation));
-               Direction_t rotated_dir = direction_rotate_clockwise(push_dir, rotations_between);
-
-               auto rotated_instant_momentum = *instant_momentum;
-
-               switch(rotated_dir){
-               default:
-                    break;
-               case DIRECTION_LEFT:
-                    if(rotated_instant_momentum.vel > 0) rotated_instant_momentum.vel = -rotated_instant_momentum.vel;
-                    break;
-               case DIRECTION_RIGHT:
-                    if(rotated_instant_momentum.vel < 0) rotated_instant_momentum.vel = -rotated_instant_momentum.vel;
-                    break;
-               case DIRECTION_DOWN:
-                    if(rotated_instant_momentum.vel > 0) rotated_instant_momentum.vel = -rotated_instant_momentum.vel;
-                    break;
-               case DIRECTION_UP:
-                    if(rotated_instant_momentum.vel < 0) rotated_instant_momentum.vel = -rotated_instant_momentum.vel;
-                    break;
-               }
-
-               S16 entangled_block_mass = block_get_mass(entangled_block);
-               F32 mass_ratio = (F32)(block_mass) / (F32)(entangled_block_mass);
-
-               auto allowed_result = allowed_to_push(world, entangled_block, rotated_dir, mass_ratio, &rotated_instant_momentum);
-               if(allowed_result.push){
-                    BlockMomentumPush_t push;
-                    push.add_pusher(get_block_index(world, pusher), collided_with_block_count);
-                    push.pushee_index = get_block_index(world, entangled_block);
-                    push.direction_mask = direction_to_direction_mask(rotated_dir);
-                    push.force = mass_ratio;
-                    push.portal_rotations = 0;
-                    // TODO: this is not correct, we need to calculate the correct index, I'm not sure how at the moment
-                    push.entangled_with_push_index = 0;
-                    result.add(&push);
-               }
-          }
-
-          entangle_index = entangled_block->entangle_index;
-     }
-
-     return result;
-}
-
-TransferMomentum_t get_push_pusher_momentum(BlockPusher_t* pusher, BlockMomentumPush_t* push, Direction_t push_direction,
+TransferMomentum_t get_push_pusher_momentum(BlockMomentumPusher_t* pusher, BlockMomentumPush_t* push, Direction_t push_direction,
                                             World_t* world){
      TransferMomentum_t result;
 
-     // auto* pushee_block = world->blocks.elements + push->pushee_index;
      auto* pusher_block = world->blocks.elements + pusher->index;
      S16 pusher_mass = get_block_stack_mass(world, pusher_block);
      assert(pusher->collided_with_block_count != 0);
@@ -2069,32 +1911,6 @@ BlockCollisionPushResult_t block_collision_push(BlockMomentumPush_t* push, World
                     push->pushers[p].momentum_kicked_back_in_shared_push_block_index = block_receiving_force - world->blocks.elements;
                }
           }
-
-          // for(S16 a = 0; a < push_result.againsts_pushed.count; a++){
-          //      auto* against_pushed = push_result.againsts_pushed.objects + a;
-          //      if(against_pushed->block->entangle_index < 0) continue;
-
-          //      // TODO: compress this code
-          //      S16 block_index = against_pushed->block - world->blocks.elements;
-          //      S16 current_entangle_index = against_pushed->block->entangle_index;
-          //      while(current_entangle_index != block_index && current_entangle_index >= 0){
-          //          Block_t* entangler = world->blocks.elements + current_entangle_index;
-          //          S8 rotations_between_blocks = blocks_rotations_between(entangler, pushee);
-          //          Direction_t entangled_direction_to_check = direction_rotate_clockwise(direction, rotations_between_blocks);
-
-          //          BlockMomentumPush_t new_block_push = *push;
-          //          new_block_push.direction_mask = direction_to_direction_mask(entangled_direction_to_check);
-          //          new_block_push.pushee_index = current_entangle_index;
-          //          new_block_push.entangle_rotations = rotations_between_blocks;
-          //          new_block_push.pure_entangle = true;
-          //          result.additional_block_pushes.add(&new_block_push);
-
-          //          // TODO: add_entangle_pushes_for_end_of_chain_blocks_on_ice() should be called yo, but it isn't
-          //          //       visible to this module
-
-          //          current_entangle_index = entangler->entangle_index;
-          //      }
-          // }
      }
 
      return result;

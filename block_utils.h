@@ -40,7 +40,7 @@ using BlockInsideOthersResult_t = StaticObjectArray_t<BlockInsideBlockResult_t, 
 
 #define MAX_BLOCK_PUSHERS 4
 
-struct BlockPusher_t{
+struct BlockMomentumPusher_t{
      S16 index = 0;
      S16 collided_with_block_count = 1;
      bool hit_entangler = false; // TODO: can we remove this field ?
@@ -51,7 +51,7 @@ struct BlockPusher_t{
 };
 
 struct BlockMomentumPush_t{
-     BlockPusher_t pushers[MAX_BLOCK_PUSHERS];
+     BlockMomentumPusher_t pushers[MAX_BLOCK_PUSHERS];
      S8 pusher_count = 0;
      S16 pushee_index = -1;
      DirectionMask_t direction_mask = DIRECTION_MASK_NONE;
