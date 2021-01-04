@@ -428,20 +428,6 @@ void log_block_pushes(BlockMomentumPushes_t<128>& block_pushes)
     }
 }
 
-void log_momentum_collisions(BlockMomentumCollisions_t* momentum_collisions){
-     if(momentum_collisions->count > 0){
-          LOG("momentum collisions: %d\n", momentum_collisions->count);
-     }
-     for(S16 c = 0; c < momentum_collisions->count; c++){
-          auto& block_change = momentum_collisions->objects[c];
-          if(block_change.momentum_transfer){
-               LOG("  block %d m: %d, v: %f in %s\n", block_change.block_index, block_change.mass, block_change.vel, block_change.x ? "x" : "y");
-          }else{
-               LOG("  block %d unsuccessful push in %s\n", block_change.block_index, block_change.x ? "x" : "y");
-          }
-     }
-}
-
 void log_collision_result(CheckBlockCollisionResult_t* collision, World_t* world){
      Block_t* block = world->blocks.elements + collision->block_index;
      LOG("  col: %d, block: %d, collided with blocks: %d, reduced pd: %.10f, %.10f to %.10f, %.10f\n",
@@ -2040,7 +2026,7 @@ void consolidate_block_pushes(BlockMomentumPushes_t<128>* block_pushes, BlockMom
      }
 }
 
-void execute_block_pushes(BlockMomentumPushes_t<128>* block_pushes, World_t* world, BlockMomentumCollisions_t* momentum_collisions){
+void execute_block_pushes(BlockMomentumPushes_t<128>* block_pushes, World_t* world){
      S16 simultaneous_block_pushes = 0;
 
      for(S16 i = 0; i < block_pushes->count; i++){
@@ -2053,68 +2039,6 @@ void execute_block_pushes(BlockMomentumPushes_t<128>* block_pushes, World_t* wor
           // some post processing for each push
           for(S16 j = i + 1; j < block_pushes->count; j++){
               auto& check_block_push = block_pushes->pushes[j];
-
-              // detect opposite entangled pushes
-              // if(check_block_push.entangled_with_push_index == i){
-              //      for(S16 d = 0; d < DIRECTION_COUNT; d++){
-              //           Direction_t direction = (Direction_t)(d);
-              //           if(!direction_in_mask(block_push.direction_mask, direction)) continue;
-              //           auto entangled_momentum = get_block_push_pusher_momentum(&block_push, world, direction);
-              //           for(S16 p = 0; p < check_block_push.pusher_count; p++){
-              //                auto* pusher = check_block_push.pushers + p;
-              //                // auto* block = world->blocks.elements + pusher->index;
-
-              //                if(pusher->index != check_block_push.pushee_index) continue;
-
-              //                auto* block_receiving_momentum = world->blocks.elements + block_push.pushee_index;
-
-              //                S8 total_rotations = pusher->portal_rotations + pusher->entangle_rotations;
-              //                Direction_t entangled_direction = direction_rotate_clockwise(direction, total_rotations);
-              //                auto rotated_momentum_vel = rotate_vec_counter_clockwise_to_see_if_negates(entangled_momentum.vel,
-              //                                                                                           direction_is_horizontal(entangled_direction),
-              //                                                                                           total_rotations);
-
-              //                // TODO: remove commented out lines here
-              //                // S16 pusher_mass = get_block_stack_mass(world, block);
-              //                F32 total_entangled_momentum = entangled_momentum.mass * rotated_momentum_vel;
-              //                total_entangled_momentum /= pusher->collided_with_block_count;
-              //                // F32 additional_entangled_vel = total_entangled_momentum / (F32)(pusher_mass);
-
-              //                if(direction_is_horizontal(entangled_direction)){
-              //                     LOG("giving block %d: %f horizontal entangled momentum\n", block_push.pushee_index, total_entangled_momentum);
-              //                     block_add_horizontal_momentum(block_receiving_momentum, total_entangled_momentum);
-              //                }else{
-              //                     LOG("giving block %d: %f vertical entangled momentum\n", block_push.pushee_index, total_entangled_momentum);
-              //                     block_add_vertical_momentum(block_receiving_momentum, total_entangled_momentum);
-              //                }
-              //           }
-              //      }
-              // }
-
-              // if the entangled push has already been executed, then we can't invalidate it
-              // if(check_block_push.is_entangled()){
-              //     if(i <= check_block_push.entangled_with_push_index) continue;
-              // }
-
-              // for(S16 m = 0; m < result.momentum_collisions.count; m++){
-              //     auto& momentum_collision = result.momentum_collisions.objects[m];
-
-              //     for(S16 p = 0; p < check_block_push.pusher_count; p++){
-              //         auto& check_pusher = check_block_push.pushers[p];
-
-              //         if(check_pusher.index != momentum_collision.block_index) continue;
-              //         if(check_pusher.hit_entangler) continue;
-              //         if(block_pushes_are_the_same_collision(block_pushes, i, j, check_pusher.index)) continue;
-
-              //         // TODO: just because one direction is in the mask, doesn't mean we should kill the whole push...
-              //         //       We really should simplify and get rid of the direction mask stuff and just create multiple
-              //         //       pushes.
-              //         if(direction_in_mask(check_block_push.direction_mask, direction_opposite(momentum_collision.from))){
-              //             check_block_push.remove_pusher(p);
-              //             p--;
-              //         }
-              //     }
-              // }
 
               // for pushes from the same block, kick the momentum back to the same block in subsequent pushes
               for(S16 p = 0; p < block_push.pusher_count; p++){
@@ -2138,8 +2062,6 @@ void execute_block_pushes(BlockMomentumPushes_t<128>* block_pushes, World_t* wor
                    }
               }
           }
-
-          momentum_collisions->merge(&result.momentum_collisions);
 
           if(result.additional_block_pushes.count){
               block_pushes->merge(&result.additional_block_pushes);
@@ -2165,50 +2087,11 @@ void execute_block_pushes(BlockMomentumPushes_t<128>* block_pushes, World_t* wor
                simultaneous_block_pushes = max_collided_with_block_count - 1;
                cancellable_block_pushes += simultaneous_block_pushes;
           }
-
-          if(result.reapply_push){
-              i--;
-              block_push.reapply_count++;
-          }
      }
 }
 
-void apply_momentum_collisions(BlockMomentumCollisions_t* momentum_collisions, World_t* world){
-     (void)(momentum_collisions);
-     // for(S16 i = 0; i < world->blocks.count; i++){
-     //      auto* block = world->blocks.elements + i;
-
-     //      Direction_t horizontal_move_direction = block_axis_move(block, true);
-     //      Direction_t vertical_move_direction = block_axis_move(block, false);
-     //      auto horizontal_pusher_momentum = get_block_momentum(world, block, horizontal_move_direction);
-     //      auto vertical_pusher_momentum = get_block_momentum(world, block, vertical_move_direction);
-
-     //      // do an elastic collision for each elastic tranfer and build up the amount of momentum/mass we need to collide against
-     //      for(S16 c = 0; c < momentum_collisions->count; c++){
-     //           auto& block_change = momentum_collisions->objects[c];
-     //           if(block_change.block_index != i) continue;
-     //           if(block_change.x){
-     //                if(block_change.momentum_transfer){
-     //                     S16 mass = horizontal_pusher_momentum.mass / block_change.split_mass_between_blocks;
-     //                     auto elastic_result = elastic_transfer_momentum(mass, horizontal_pusher_momentum.vel, block_change.mass, block_change.vel);
-     //                     block->collision_momentum.x += (F32)(mass) * elastic_result.first_final_velocity;
-     //                     block->horizontal_momentum = BLOCK_MOMENTUM_SUM;
-     //                }else{
-     //                     block->horizontal_momentum = BLOCK_MOMENTUM_STOP;
-     //                }
-     //           }else{
-     //                if(block_change.momentum_transfer){
-     //                     S16 mass = vertical_pusher_momentum.mass / block_change.split_mass_between_blocks;
-     //                     auto elastic_result = elastic_transfer_momentum(mass, vertical_pusher_momentum.vel, block_change.mass, block_change.vel);
-     //                     block->collision_momentum.y += (F32)(mass) * elastic_result.first_final_velocity;
-     //                     block->vertical_momentum = BLOCK_MOMENTUM_SUM;
-     //                }else{
-     //                     block->vertical_momentum = BLOCK_MOMENTUM_STOP;
-     //                }
-     //           }
-     //      }
-     // }
-
+void apply_momentum_collisions(World_t* world){
+     // update each block's velocities based on the momentum they've received this frame
      for(S16 i = 0; i < world->blocks.count; i++){
           auto* block = world->blocks.elements + i;
           if(block->horizontal_momentum == BLOCK_MOMENTUM_SUM){
@@ -5936,22 +5819,15 @@ int main(int argc, char** argv){
 
                // pass to cause pushes to happen
                {
-                    BlockMomentumCollisions_t momentum_collisions;
-
                     consolidate_block_pushes(&momentum_block_pushes, &consolidated_momentum_block_pushes);
 
 #if 0
                     log_block_pushes(consolidated_momentum_block_pushes);
 #endif
 
-                    execute_block_pushes(&consolidated_momentum_block_pushes, &world, &momentum_collisions);
+                    execute_block_pushes(&consolidated_momentum_block_pushes, &world);
 
-#if 0
-                    log_momentum_collisions(&momentum_collisions);
-#endif
-
-                    // TODO: Loop over momentum changes and build a list of blocks for us to loop over here
-                    apply_momentum_collisions(&momentum_collisions, &world);
+                    apply_momentum_collisions(&world);
                }
 
                // finalize positions

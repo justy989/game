@@ -1922,7 +1922,6 @@ BlockCollisionPushResult_t block_collision_push(BlockMomentumPush_t* push, World
                auto chain_results = find_block_chain(block_receiving_force, forward_chain_direction_to_check, world->block_qt, world->interactive_qt, &world->tilemap, 0, nullptr);
                // TODO: handle across multiple chains
                if(chain_results.count > 0 && chain_results.objects[0].count > 0){
-                    assert(push->reapply_count <= chain_results.objects[0].count);
                     // skip the first block, which is our pusher, and do not go all the way to the end of the chain,
                     // because that block is the one we applied our push to
                     // LOG("searching %s (forward) started at block %ld seeing chain %d blocks long\n", direction_to_string(forward_chain_direction_to_check),
@@ -1962,7 +1961,6 @@ BlockCollisionPushResult_t block_collision_push(BlockMomentumPush_t* push, World
                chain_results = find_block_chain(block_receiving_force, direction_to_check, world->block_qt, world->interactive_qt, &world->tilemap, 0, nullptr);
                // TODO: handle across multiple chains
                if(chain_results.count > 0 && chain_results.objects[0].count > 0){
-                    assert(push->reapply_count <= chain_results.objects[0].count);
                     // LOG("searching %s (backward) started at block %ld seeing chain %d blocks long\n", direction_to_string(direction_to_check),
                     //     block_receiving_force - world->blocks.elements, chain_results.objects[0].count);
                     for(S16 i = 0; i < chain_results.objects[0].count; i++){

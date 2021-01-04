@@ -65,7 +65,6 @@ struct BlockMomentumPush_t{
      F32 entangled_momentum = 0;
      bool pure_entangle = false; // the block we are pushing isn't against any other blocks, so the push just uses the forces given to it
      F32 force = 1.0f;
-     S16 reapply_count = 0;
      bool executed = false;
      S16 collided_with_block_count = 1;
 
@@ -286,14 +285,10 @@ struct BlockMomentumCollision_t{
      }
 };
 
-using BlockMomentumCollisions_t = StaticObjectArray_t<BlockMomentumCollision_t, MAX_BLOCK_COLLISIONS>;
-
 #define MAX_BLOCK_PUSHES 128
 
 struct BlockCollisionPushResult_t{
      BlockMomentumPushes_t<MAX_BLOCK_PUSHES> additional_block_pushes;
-     BlockMomentumCollisions_t momentum_collisions;
-     bool reapply_push = false;
 };
 
 struct BlockThroughPortal_t{
