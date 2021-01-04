@@ -129,10 +129,10 @@ struct BlockChanges_t{
 struct BlockPusher_t{
      S16 index = 0;
      S16 collided_with_block_count = 1;
-     bool hit_entangler = false;
+     bool hit_entangler = false; // TODO: can we remove this field ?
      S8 entangle_rotations = 0;
      S8 portal_rotations = 0;
-     bool opposite_entangle_reversed = false;
+     bool opposite_entangle_reversed = false; // TODO: remove this field
      S16 momentum_kicked_back_in_shared_push_block_index = -1;
 };
 

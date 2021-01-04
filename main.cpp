@@ -390,7 +390,9 @@ void reset_texture(GLuint* texture, Raw_t* raw){
 }
 
 void log_block_pusher(BlockPusher_t* pusher){
-    LOG("   pusher %d, collided_with %d, hit_entangler: %d\n", pusher->index, pusher->collided_with_block_count, pusher->hit_entangler);
+    LOG("   pusher %d, collided_with %d, hit_entangler: %d, entangle rot: %d, portal rot: %d, momenumt kick back to block %d\n",
+        pusher->index, pusher->collided_with_block_count, pusher->hit_entangler, pusher->entangle_rotations, pusher->portal_rotations,
+        pusher->momentum_kicked_back_in_shared_push_block_index);
 }
 
 void log_block_push(BlockMomentumPush_t* block_push)
@@ -1951,10 +1953,6 @@ void generate_entangled_block_pushes(BlockMomentumPushes_t<128>* block_pushes, B
                   auto block_against_result = block_against_other_blocks(entangler_pos + entangler_pos_delta,
                                                                          entangler_cut, direction_to_check, world->block_qt,
                                                                          world->interactive_qt, &world->tilemap);
-                  auto rotated_momentum_vel = rotate_vec_counter_clockwise_to_see_if_negates(block_push_momentum.vel,
-                                                                                             direction_is_horizontal(direction_to_check),
-                                                                                             total_rotations);
-                  F32 entangled_momentum = (F32)(block_push_momentum.mass) * rotated_momentum_vel;
                   if(block_against_result.count == 0){
                        BlockMomentumPush_t new_block_push = block_push;
                        new_block_push.direction_mask = direction_to_direction_mask(direction);
@@ -1963,9 +1961,14 @@ void generate_entangled_block_pushes(BlockMomentumPushes_t<128>* block_pushes, B
                        new_block_push.entangle_rotations = rotations_between_blocks;
                        new_block_push.entangled_with_push_index = i;
                        new_block_push.pure_entangle = true;
-                       new_block_push.entangled_momentum = entangled_momentum;
+                       new_block_push.entangled_momentum = (F32)(block_push_momentum.mass) * block_push_momentum.vel;
                        new_block_pushes->add(&new_block_push);
                   }else{
+                       auto rotated_momentum_vel = rotate_vec_counter_clockwise_to_see_if_negates(block_push_momentum.vel,
+                                                                                                  direction_is_horizontal(direction_to_check),
+                                                                                                  total_rotations);
+                       F32 entangled_momentum = (F32)(block_push_momentum.mass) * rotated_momentum_vel;
+
                        for(S16 a = 0; a < block_against_result.count; a++){
                             auto* against = block_against_result.objects + a;
 
@@ -2033,7 +2036,7 @@ void consolidate_block_pushes(BlockMomentumPushes_t<128>* block_pushes, BlockMom
      for(S16 i = 0; i < consolidated_block_pushes->count; i++){
           auto* push = consolidated_block_pushes->pushes + i;
 
-          for(S16 j = 0; j < consolidated_block_pushes->count; j++){
+          for(S16 j = i + 1; j < consolidated_block_pushes->count; j++){
                auto* check_push = consolidated_block_pushes->pushes + j;
 
                // TODO: we should probably consolidate pushes to not be a direction mask, this simplifies this logic
@@ -2042,7 +2045,7 @@ void consolidate_block_pushes(BlockMomentumPushes_t<128>* block_pushes, BlockMom
 
                for(S16 p = 0; p < check_push->pusher_count; p++){
                     auto* pusher = check_push->pushers + p;
-                    if(pusher->index == push->pushee_index){
+                    if(pusher->index == push->pushee_index){ // the second part of the condition is when blocks push themselves
                          push->collided_with_block_count++;
                     }
                }
@@ -2137,8 +2140,13 @@ void execute_block_pushes(BlockMomentumPushes_t<128>* block_pushes, World_t* wor
                    for(S16 cp = 0; cp < check_block_push.pusher_count; cp++){
                         auto* check_pusher = check_block_push.pushers + cp;
                         if(pusher->index == check_pusher->index){
-                             check_pusher->momentum_kicked_back_in_shared_push_block_index =
-                             pusher->momentum_kicked_back_in_shared_push_block_index;
+                             if(check_pusher->index == check_block_push.pushee_index){
+                                  check_pusher->momentum_kicked_back_in_shared_push_block_index =
+                                  block_push.pushee_index;
+                             }else{
+                                  check_pusher->momentum_kicked_back_in_shared_push_block_index =
+                                  pusher->momentum_kicked_back_in_shared_push_block_index;
+                             }
                         }
                    }
               }
