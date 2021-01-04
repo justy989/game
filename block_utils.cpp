@@ -2160,31 +2160,31 @@ BlockCollisionPushResult_t block_collision_push(BlockMomentumPush_t* push, World
                }
           }
 
-          for(S16 a = 0; a < push_result.againsts_pushed.count; a++){
-               auto* against_pushed = push_result.againsts_pushed.objects + a;
-               if(against_pushed->block->entangle_index < 0) continue;
+          // for(S16 a = 0; a < push_result.againsts_pushed.count; a++){
+          //      auto* against_pushed = push_result.againsts_pushed.objects + a;
+          //      if(against_pushed->block->entangle_index < 0) continue;
 
-               // TODO: compress this code
-               S16 block_index = against_pushed->block - world->blocks.elements;
-               S16 current_entangle_index = against_pushed->block->entangle_index;
-               while(current_entangle_index != block_index && current_entangle_index >= 0){
-                   Block_t* entangler = world->blocks.elements + current_entangle_index;
-                   S8 rotations_between_blocks = blocks_rotations_between(entangler, pushee);
-                   Direction_t entangled_direction_to_check = direction_rotate_clockwise(direction, rotations_between_blocks);
+          //      // TODO: compress this code
+          //      S16 block_index = against_pushed->block - world->blocks.elements;
+          //      S16 current_entangle_index = against_pushed->block->entangle_index;
+          //      while(current_entangle_index != block_index && current_entangle_index >= 0){
+          //          Block_t* entangler = world->blocks.elements + current_entangle_index;
+          //          S8 rotations_between_blocks = blocks_rotations_between(entangler, pushee);
+          //          Direction_t entangled_direction_to_check = direction_rotate_clockwise(direction, rotations_between_blocks);
 
-                   BlockMomentumPush_t new_block_push = *push;
-                   new_block_push.direction_mask = direction_to_direction_mask(entangled_direction_to_check);
-                   new_block_push.pushee_index = current_entangle_index;
-                   new_block_push.entangle_rotations = rotations_between_blocks;
-                   new_block_push.pure_entangle = true;
-                   result.additional_block_pushes.add(&new_block_push);
+          //          BlockMomentumPush_t new_block_push = *push;
+          //          new_block_push.direction_mask = direction_to_direction_mask(entangled_direction_to_check);
+          //          new_block_push.pushee_index = current_entangle_index;
+          //          new_block_push.entangle_rotations = rotations_between_blocks;
+          //          new_block_push.pure_entangle = true;
+          //          result.additional_block_pushes.add(&new_block_push);
 
-                   // TODO: add_entangle_pushes_for_end_of_chain_blocks_on_ice() should be called yo, but it isn't
-                   //       visible to this module
+          //          // TODO: add_entangle_pushes_for_end_of_chain_blocks_on_ice() should be called yo, but it isn't
+          //          //       visible to this module
 
-                   current_entangle_index = entangler->entangle_index;
-               }
-          }
+          //          current_entangle_index = entangler->entangle_index;
+          //      }
+          // }
      }
 
      return result;
