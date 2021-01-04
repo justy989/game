@@ -21,3 +21,4 @@ S16 rect_area(Rect_t a);
 S16 rect_intersecting_area(Rect_t a, Rect_t b);
 
 bool rect_completely_in_rect(Rect_t a, Rect_t b);
+bool operator==(Rect_t a, Rect_t b);

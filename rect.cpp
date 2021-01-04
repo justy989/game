@@ -94,3 +94,8 @@ bool rect_completely_in_rect(Rect_t a, Rect_t b){
             a.bottom >= b.bottom && a.bottom <= b.top &&
             a.top >= b.bottom && a.top <= b.top);
 }
+
+bool operator==(Rect_t a, Rect_t b){
+     return (a.left == b.left && a.right == b.right &&
+             a.bottom == b.bottom && a.top == b.top);
+}

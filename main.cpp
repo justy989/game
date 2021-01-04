@@ -1396,8 +1396,7 @@ DoBlockCollisionResults_t do_block_collision(World_t* world, Block_t* block, S16
 
      // this instance of last_block_pushed is to keep the pushing smooth and not have it stop at the tile boundaries
      if(block != block_pushed &&
-        !block_on_ice(block_pos, block_pos_delta, block_cut, &world->tilemap, world->interactive_qt, world->block_qt) &&
-        !block_on_air(block, &world->tilemap, world->interactive_qt, world->block_qt)){
+        !block_on_frictionless(block_pos, block_pos_delta, block_cut, &world->tilemap, world->interactive_qt, world->block_qt)){
           if(block_pushed && blocks_are_entangled(block_pushed, block, &world->blocks)){
                Block_t* entangled_block = block_pushed;
 
@@ -3872,16 +3871,6 @@ int main(int argc, char** argv){
 
                reset_tilemap_light(&world);
 
-               // update time related interactives
-               for(S16 i = 0; i < world.interactives.count; i++){
-                    Interactive_t* interactive = world.interactives.elements + i;
-                    if(interactive->type == INTERACTIVE_TYPE_POPUP){
-                         lift_update(&interactive->popup.lift, POPUP_TICK_DELAY, dt, 1, POPUP_MAX_LIFT_TICKS);
-                    }else if(interactive->type == INTERACTIVE_TYPE_DOOR){
-                         lift_update(&interactive->door.lift, POPUP_TICK_DELAY, dt, 0, DOOR_MAX_HEIGHT);
-                    }
-               }
-
                // update arrows
                for(S16 i = 0; i < ARROW_ARRAY_MAX; i++){
                     Arrow_t* arrow = world.arrows.arrows + i;
@@ -4362,46 +4351,6 @@ int main(int argc, char** argv){
                     player->pos_delta_save = player->pos_delta;
                }
 
-               // check for being held up
-               for(S16 i = 0; i < world.players.count; i++){
-                    auto player = world.players.elements + i;
-
-                    Coord_t player_previous_coord = pos_to_coord(player->pos);
-
-                    // drop the player if they are above 0 and not held up by anything. This also contains logic for following a block
-                    Interactive_t* interactive = quad_tree_interactive_find_at(world.interactive_qt, player_previous_coord);
-                    if(interactive){
-                         if(interactive->type == INTERACTIVE_TYPE_POPUP){
-                              if(interactive->popup.lift.ticks == player->pos.z + 1){
-                                    hold_players(&world.players);
-                              }else if(interactive->coord == player_previous_coord && interactive->popup.lift.ticks == player->pos.z + 2){
-                                    raise_players(&world.players);
-                                    add_global_tag(TAB_POPUP_RAISES_PLAYER);
-                              }
-                         }
-                    }
-
-                    if(!player->held_up){
-                         auto result = player_in_block_rect(player, &world.tilemap, world.interactive_qt, world.block_qt);
-                         for(S8 e = 0; e < result.entries.count; e++){
-                              auto& entry = result.entries.objects[e];
-                              if(entry.block_pos.z == player->pos.z - HEIGHT_INTERVAL){
-                                   hold_players(&world.players);
-                              }else if((entry.block_pos.z - 1) == player->pos.z - HEIGHT_INTERVAL){
-                                   raise_players(&world.players);
-                              }
-                         }
-                    }
-               }
-
-               // fall pass
-               for(S16 i = 0; i < world.players.count; i++){
-                    auto player = world.players.elements + i;
-                    if(!player->held_up && player->pos.z > 0){
-                         player->pos.z--;
-                    }
-               }
-
                // override portals knowing whether or not they have blocks inside
                for(S16 i = 0; i < world.interactives.count; i++){
                     Interactive_t* interactive = world.interactives.elements + i;
@@ -4485,79 +4434,6 @@ int main(int argc, char** argv){
                     block->teleport_split = false;
                }
 
-               // TODO: for these next 2 passes, do we need to care about teleport position? Probably just the next loop?
-               for(S16 i = 0; i < world.blocks.count; i++){
-                    auto block = world.blocks.elements + i;
-
-                    auto result = block_held_up_by_another_block(block, world.block_qt, world.interactive_qt, &world.tilemap);
-                    if(result.held()){
-                         block->held_up |= BLOCK_HELD_BY_SOLID;
-                    }
-
-                    // TODO: should we care about the decimal component of the position ?
-                    Coord_t rect_coords[4];
-                    bool pushed_up = false;
-                    auto final_pos = block->pos + block->pos_delta;
-                    Pixel_t final_pixel = final_pos.pixel;
-
-                    // check if we pass over a grid aligned pixel, then use that one if so for both axis
-                    auto check_x_pixel = passes_over_grid_pixel(block->pos.pixel.x, final_pos.pixel.x);
-                    if(check_x_pixel >= 0) final_pixel.x = check_x_pixel;
-                    auto check_y_pixel = passes_over_grid_pixel(block->pos.pixel.y, final_pos.pixel.y);
-                    if(check_y_pixel >= 0) final_pixel.y = check_y_pixel;
-
-                    auto block_rect = block_get_inclusive_rect(final_pixel, block->cut);
-                    get_rect_coords(block_rect, rect_coords);
-                    for(S8 c = 0; c < 4; c++){
-                         auto* interactive = quad_tree_interactive_find_at(world.interactive_qt, rect_coords[c]);
-                         if(interactive){
-                              // TODO: it is not kewl to use block_get_inclusive_rect to get a rect for the interactive, we have
-                              // functions for this in utils
-                              auto interactive_rect = block_get_inclusive_rect(coord_to_pixel(rect_coords[c]), block->cut);
-                              if(!rect_in_rect(block_rect, interactive_rect)) continue;
-
-                              if(interactive->type == INTERACTIVE_TYPE_POPUP){
-                                   if(!pushed_up && (block->pos.z == interactive->popup.lift.ticks - 2)){
-                                        raise_above_blocks(&world, block);
-
-                                        block->pos.z++;
-                                        add_global_tag(TAB_POPUP_RAISES_BLOCK);
-                                        block->held_up |= BLOCK_HELD_BY_SOLID;
-
-                                        raise_entangled_blocks(&world, block);
-
-                                        pushed_up = true;
-                                   }else if(!block->held_up && block->pos.z == (interactive->popup.lift.ticks - 1)){
-                                        block->held_up |= BLOCK_HELD_BY_SOLID;
-                                   }
-                              }
-                         }
-                    }
-
-                    // if a block is inside a portal, set a flag for that portal and any connected portals
-                    for(S16 c = 0; c < 4; c++){
-                         Interactive_t* interactive = quad_tree_interactive_find_at(world.interactive_qt, rect_coords[c]);
-                         if(!is_active_portal(interactive)) continue;
-                         interactive->portal.has_block_inside = true;
-
-                         PortalExit_t portal_exits = find_portal_exits(rect_coords[c], &world.tilemap, world.interactive_qt, false);
-
-                         for(S8 d = 0; d < DIRECTION_COUNT; d++){
-                              auto portal_exit = portal_exits.directions + d;
-
-                              for(S8 p = 0; p < portal_exit->count; p++){
-                                  auto portal_coord = portal_exit->coords[p];
-                                  if(portal_coord == rect_coords[c]) continue;
-
-                                  Interactive_t* through_portal_interactive = quad_tree_interactive_find_at(world.interactive_qt, portal_coord);
-                                  if(!through_portal_interactive) continue;
-                                  if(through_portal_interactive->type != INTERACTIVE_TYPE_PORTAL) continue;
-                                  through_portal_interactive->portal.has_block_inside = true;
-                              }
-                         }
-                    }
-               }
-
                // pass to detect if blocks are in a pit or just held up by the floor
                for(S16 i = 0; i < world.blocks.count; i++){
                     auto block = world.blocks.elements + i;
@@ -4587,40 +4463,6 @@ int main(int argc, char** argv){
                          if(!block->over_pit && !block->held_up && block->pos.z == 0){
                               block->held_up |= BLOCK_HELD_BY_FLOOR;
                          }
-                    }
-               }
-
-               for(S16 i = 0; i < world.blocks.count; i++){
-                    auto block = world.blocks.elements + i;
-
-                    if(block->entangle_index >= 0){
-                         S16 entangle_index = block->entangle_index;
-                         while(entangle_index != i && entangle_index >= 0){
-                              auto entangled_block = world.blocks.elements + entangle_index;
-                              if(entangled_block->held_up & BLOCK_HELD_BY_SOLID ||
-                                 entangled_block->held_up & BLOCK_HELD_BY_FLOOR){
-                                   block->held_up |= BLOCK_HELD_BY_ENTANGLE;
-                                   break;
-                              }
-                              entangle_index = entangled_block->entangle_index;
-                         }
-                    }
-
-                    if(!block->held_up){
-                         if(block->pos.z <= -HEIGHT_INTERVAL) continue;
-
-                         if(block->over_pit){
-                              add_global_tag(TAG_BLOCK_FALLS_IN_PIT);
-                         }
-
-                         block->fall_time -= dt;
-                         if(block->fall_time < 0){
-                              block->fall_time = FALL_TIME;
-                              block->pos.z--;
-                              block->fall_time = 0;
-                         }
-                    }else if(block->held_up == BLOCK_HELD_BY_ENTANGLE){
-                         add_global_tag(TAG_ENTANGLED_BLOCK_FLOATS);
                     }
                }
 
@@ -4754,6 +4596,56 @@ int main(int argc, char** argv){
                     }
                }
 
+               // update time related interactives
+               for(S16 i = 0; i < world.interactives.count; i++){
+                    Interactive_t* interactive = world.interactives.elements + i;
+                    if(interactive->type == INTERACTIVE_TYPE_POPUP){
+                         lift_update(&interactive->popup.lift, POPUP_TICK_DELAY, dt, 1, POPUP_MAX_LIFT_TICKS);
+                    }else if(interactive->type == INTERACTIVE_TYPE_DOOR){
+                         lift_update(&interactive->door.lift, POPUP_TICK_DELAY, dt, 0, DOOR_MAX_HEIGHT);
+                    }
+               }
+
+               // check for the player being held up
+               for(S16 i = 0; i < world.players.count; i++){
+                    auto player = world.players.elements + i;
+
+                    Coord_t player_previous_coord = pos_to_coord(player->pos);
+
+                    // drop the player if they are above 0 and not held up by anything. This also contains logic for following a block
+                    Interactive_t* interactive = quad_tree_interactive_find_at(world.interactive_qt, player_previous_coord);
+                    if(interactive){
+                         if(interactive->type == INTERACTIVE_TYPE_POPUP){
+                              if(interactive->popup.lift.ticks == player->pos.z + 1){
+                                    hold_players(&world.players);
+                              }else if(interactive->coord == player_previous_coord && interactive->popup.lift.ticks == player->pos.z + 2){
+                                    raise_players(&world.players);
+                                    add_global_tag(TAB_POPUP_RAISES_PLAYER);
+                              }
+                         }
+                    }
+
+                    if(!player->held_up){
+                         auto result = player_in_block_rect(player, &world.tilemap, world.interactive_qt, world.block_qt);
+                         for(S8 e = 0; e < result.entries.count; e++){
+                              auto& entry = result.entries.objects[e];
+                              if(entry.block_pos.z == player->pos.z - HEIGHT_INTERVAL){
+                                   hold_players(&world.players);
+                              }else if((entry.block_pos.z - 1) == player->pos.z - HEIGHT_INTERVAL){
+                                   raise_players(&world.players);
+                              }
+                         }
+                    }
+               }
+
+               // player falls if not held up and above the groun
+               for(S16 i = 0; i < world.players.count; i++){
+                    auto player = world.players.elements + i;
+                    if(!player->held_up && player->pos.z > 0){
+                         player->pos.z--;
+                    }
+               }
+
                for(S16 i = 0; i < world.blocks.count; i++){
                     Block_t* block = world.blocks.elements + i;
 
@@ -4795,6 +4687,187 @@ int main(int argc, char** argv){
                     update_motion_grid_aligned(block->cut, &block->vertical_move, &y_component,
                                                coasting_vertically, dt,
                                                block->pos.pixel.y, block->pos.decimal.y, mass);
+               }
+
+               // TODO: for these next 2 passes, do we need to care about teleport position? Probably just the next loop?
+               // determine whether or not we are going to be lifted/held up by a popup and if the block is inside a portal (for future slicing)
+               for(S16 i = 0; i < world.blocks.count; i++){
+                    auto block = world.blocks.elements + i;
+
+                    auto result = block_held_up_by_another_block(block, world.block_qt, world.interactive_qt, &world.tilemap);
+                    if(result.held()){
+                         block->held_up |= BLOCK_HELD_BY_SOLID;
+                    }
+
+                    // TODO: should we care about the decimal component of the position ?
+                    Coord_t rect_coords[4];
+                    bool pushed_up = false;
+                    auto block_pos = block_get_position(block);
+                    auto block_pos_delta = block_get_pos_delta(block);
+                    auto final_pos = block_pos + block_pos_delta;
+
+                    // TODO: compress, this logic may be helpful elsewhere ?
+                    if(block->stop_on_pixel_x){
+                         final_pos.pixel.x = block->stop_on_pixel_x;
+                         final_pos.decimal.x = 0;
+                    }
+                    if(block->stop_on_pixel_y){
+                         final_pos.pixel.y = block->stop_on_pixel_y;
+                         final_pos.decimal.y = 0;
+                    }
+
+                    Pixel_t passes_grid_pixel = final_pos.pixel;
+
+                    // check if we pass over a grid aligned pixel, then use that one if so for both axis
+                    auto check_x_pixel = passes_over_grid_pixel(block->pos.pixel.x, final_pos.pixel.x);
+                    if(check_x_pixel >= 0) passes_grid_pixel.x = check_x_pixel;
+                    auto check_y_pixel = passes_over_grid_pixel(block->pos.pixel.y, final_pos.pixel.y);
+                    if(check_y_pixel >= 0) passes_grid_pixel.y = check_y_pixel;
+
+                    // we assume we are passing over an empty grid cell unless we can find a popup for us
+                    bool passes_over_empty_grid_cell = true;
+                    if(block->pos.z > 0){
+                         auto block_rect = block_get_exclusive_rect(passes_grid_pixel, block->cut);
+                         get_rect_coords(block_rect, rect_coords);
+                         for(S8 c = 0; c < 4; c++){
+                              auto* interactive = quad_tree_interactive_find_at(world.interactive_qt, rect_coords[c]);
+                              if(interactive && interactive->type == INTERACTIVE_TYPE_POPUP){
+                                   auto interactive_rect = block_get_inclusive_rect(coord_to_pixel(rect_coords[c]), block->cut);
+                                   Pixel_t interactive_pixel = coord_to_pixel(rect_coords[c]);
+                                   Quad_t interactive_quad{0, 0, TILE_SIZE_IN_PIXELS * PIXEL_SIZE, TILE_SIZE_IN_PIXELS * PIXEL_SIZE};
+                                   Pixel_t relative_final_pos = passes_grid_pixel - interactive_pixel;
+                                   Vec_t relative_final_pos_vec = pixel_to_vec(relative_final_pos);
+                                   Quad_t block_quad{relative_final_pos_vec.x, relative_final_pos_vec.y,
+                                                     relative_final_pos_vec.x + block_get_width_in_pixels(block) * PIXEL_SIZE,
+                                                     relative_final_pos_vec.y + block_get_height_in_pixels(block) * PIXEL_SIZE};
+                                   if(!quad_in_quad_high_range_exclusive(&interactive_quad, &block_quad).inside){
+                                        if(interactive_rect == block_get_inclusive_rect(passes_grid_pixel, block->cut)){
+                                             // pass
+                                        }else{
+                                             continue;
+                                        }
+                                   }
+
+                                   if(block->pos.z == (interactive->popup.lift.ticks - 2) ||
+                                      block->pos.z == (interactive->popup.lift.ticks - 1)){
+                                        passes_over_empty_grid_cell = false;
+                                   }
+                              }
+                         }
+                    }else{
+                         passes_over_empty_grid_cell = false;
+                    }
+
+                    if(!passes_over_empty_grid_cell){
+                         auto block_rect = block_get_exclusive_rect(final_pos.pixel, block->cut);
+                         get_rect_coords(block_rect, rect_coords);
+                         for(S8 c = 0; c < 4; c++){
+                              auto* interactive = quad_tree_interactive_find_at(world.interactive_qt, rect_coords[c]);
+                              if(interactive && interactive->type == INTERACTIVE_TYPE_POPUP){
+                                   auto interactive_rect = block_get_inclusive_rect(coord_to_pixel(rect_coords[c]), block->cut);
+
+                                   Pixel_t interactive_pixel = coord_to_pixel(rect_coords[c]);
+                                   Quad_t interactive_quad{0, 0, TILE_SIZE_IN_PIXELS * PIXEL_SIZE, TILE_SIZE_IN_PIXELS * PIXEL_SIZE};
+                                   Position_t relative_final_pos = final_pos - interactive_pixel;
+                                   Vec_t relative_final_pos_vec = pos_to_vec(relative_final_pos);
+                                   Quad_t final_block_quad{relative_final_pos_vec.x, relative_final_pos_vec.y,
+                                                           relative_final_pos_vec.x + block_get_width_in_pixels(block) * PIXEL_SIZE,
+                                                           relative_final_pos_vec.y + block_get_height_in_pixels(block) * PIXEL_SIZE};
+                                   if(!quad_in_quad_high_range_exclusive(&interactive_quad, &final_block_quad).inside){
+                                        if(interactive_rect == block_get_inclusive_rect(final_pos.pixel, block->cut)){
+                                             // pass
+                                        }else{
+                                             continue;
+                                        }
+                                   }
+
+                                   // build a quad for our block's starting position. Don't allow us to get lifted if we are moving onto an
+                                   // already lifted popup
+                                   Position_t relative_starting_pos = block_pos - interactive_pixel;
+                                   Vec_t relative_starting_pos_vec = pos_to_vec(relative_starting_pos);
+                                   Quad_t starting_block_quad{relative_starting_pos_vec.x, relative_starting_pos_vec.y,
+                                                              relative_starting_pos_vec.x + block_get_width_in_pixels(block) * PIXEL_SIZE,
+                                                              relative_starting_pos_vec.y + block_get_height_in_pixels(block) * PIXEL_SIZE};
+
+                                   if(!pushed_up && (block->pos.z == interactive->popup.lift.ticks - 2) &&
+                                      (quad_in_quad_high_range_exclusive(&interactive_quad, &starting_block_quad).inside ||
+                                      interactive_rect == block_get_inclusive_rect(block_pos.pixel, block->cut))){
+                                        raise_above_blocks(&world, block);
+
+                                        block->pos.z++;
+                                        add_global_tag(TAB_POPUP_RAISES_BLOCK);
+                                        block->held_up |= BLOCK_HELD_BY_SOLID;
+
+                                        raise_entangled_blocks(&world, block);
+
+                                        pushed_up = true;
+                                   }else if(!block->held_up && block->pos.z == (interactive->popup.lift.ticks - 1)){
+                                        block->held_up |= BLOCK_HELD_BY_SOLID;
+                                   }
+                              }
+                         }
+                    }
+
+                    // if a block is inside a portal, set a flag for that portal and any connected portals
+                    auto block_rect = block_get_inclusive_rect(passes_grid_pixel, block->cut);
+                    get_rect_coords(block_rect, rect_coords);
+                    for(S16 c = 0; c < 4; c++){
+                         Interactive_t* interactive = quad_tree_interactive_find_at(world.interactive_qt, rect_coords[c]);
+                         if(!is_active_portal(interactive)) continue;
+                         interactive->portal.has_block_inside = true;
+
+                         PortalExit_t portal_exits = find_portal_exits(rect_coords[c], &world.tilemap, world.interactive_qt, false);
+
+                         for(S8 d = 0; d < DIRECTION_COUNT; d++){
+                              auto portal_exit = portal_exits.directions + d;
+
+                              for(S8 p = 0; p < portal_exit->count; p++){
+                                  auto portal_coord = portal_exit->coords[p];
+                                  if(portal_coord == rect_coords[c]) continue;
+
+                                  Interactive_t* through_portal_interactive = quad_tree_interactive_find_at(world.interactive_qt, portal_coord);
+                                  if(!through_portal_interactive) continue;
+                                  if(through_portal_interactive->type != INTERACTIVE_TYPE_PORTAL) continue;
+                                  through_portal_interactive->portal.has_block_inside = true;
+                              }
+                         }
+                    }
+               }
+
+
+               // have the block fall if it is not held up
+               for(S16 i = 0; i < world.blocks.count; i++){
+                    auto block = world.blocks.elements + i;
+
+                    if(block->entangle_index >= 0){
+                         S16 entangle_index = block->entangle_index;
+                         while(entangle_index != i && entangle_index >= 0){
+                              auto entangled_block = world.blocks.elements + entangle_index;
+                              if(entangled_block->held_up & BLOCK_HELD_BY_SOLID ||
+                                 entangled_block->held_up & BLOCK_HELD_BY_FLOOR){
+                                   block->held_up |= BLOCK_HELD_BY_ENTANGLE;
+                                   break;
+                              }
+                              entangle_index = entangled_block->entangle_index;
+                         }
+                    }
+
+                    if(!block->held_up){
+                         if(block->pos.z <= -HEIGHT_INTERVAL) continue;
+
+                         if(block->over_pit){
+                              add_global_tag(TAG_BLOCK_FALLS_IN_PIT);
+                         }
+
+                         block->fall_time -= dt;
+                         if(block->fall_time < 0){
+                              block->fall_time = FALL_TIME;
+                              block->pos.z--;
+                              block->fall_time = 0;
+                         }
+                    }else if(block->held_up == BLOCK_HELD_BY_ENTANGLE){
+                         add_global_tag(TAG_ENTANGLED_BLOCK_FLOATS);
+                    }
                }
 
                for(S16 i = 0; i < world.blocks.count; i++){

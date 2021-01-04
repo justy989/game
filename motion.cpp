@@ -407,7 +407,6 @@ void update_motion_grid_aligned(BlockCut_t cut, Move_t* move, MotionComponent_t*
 
                    S16 lower_dim = block_get_lowest_dimension(cut);
 
-
                    motion->ref->stop_on_pixel = closest_grid_center_pixel(lower_dim, pos_pixel);
 
                    Position_t stop_on_pos {};
