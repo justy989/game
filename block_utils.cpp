@@ -1836,7 +1836,7 @@ BlockCollisionPushResult_t block_collision_push(BlockMomentumPush_t* push, World
                          // LOG("  updating block receiving force to be %ld\n", block_receiving_force - world->blocks.elements);
                     }
                // }else{
-               //      LOG("empty chain to search %s (backwards) from block %ld\n", direction_to_string(direction_to_check), block_receiving_force - world->blocks.elements);
+                    // LOG("empty chain to search %s (backwards) from block %ld\n", direction_to_string(direction_to_check), block_receiving_force - world->blocks.elements);
                }
 
                S16 block_receiving_force_index = get_block_index(world, block_receiving_force);
@@ -1898,10 +1898,10 @@ BlockCollisionPushResult_t block_collision_push(BlockMomentumPush_t* push, World
                    if(fabs(block_receiving_force_momentum.vel - elastic_result.first_final_velocity) >= FLT_EPSILON){
                         if(direction_is_horizontal(direction_to_check)){
                              // LOG("giving block %d: %f horizontal kickback momentum\n", block_receiving_force_index, (F32)(mass) * elastic_result.first_final_velocity);
-                             block_add_horizontal_momentum(block_receiving_force, (F32)(mass) * elastic_result.first_final_velocity);
+                             block_add_horizontal_momentum(block_receiving_force, BLOCK_MOMENTUM_TYPE_KICKBACK, (F32)(mass) * elastic_result.first_final_velocity);
                         }else{
                              // LOG("giving block %d: %f vertical kickback momentum\n", block_receiving_force_index, (F32)(mass) * elastic_result.first_final_velocity);
-                             block_add_vertical_momentum(block_receiving_force, (F32)(mass) * elastic_result.first_final_velocity);
+                             block_add_vertical_momentum(block_receiving_force, BLOCK_MOMENTUM_TYPE_KICKBACK, (F32)(mass) * elastic_result.first_final_velocity);
                         }
                    }
                }

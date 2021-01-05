@@ -1551,7 +1551,7 @@ bool apply_push_horizontal(Block_t* block, Position_t pos, World_t* world, Direc
 
                 // LOG("giving block %ld: %f horizontal impact momentum\n", block - world->blocks.elements, pushee_momentum.mass * instant_vel);
 
-                block_add_horizontal_momentum(block, pushee_momentum.mass * instant_vel);
+                block_add_horizontal_momentum(block, BLOCK_MOMENTUM_TYPE_IMPACT, pushee_momentum.mass * instant_vel);
 
                 auto motion = motion_x_component(block);
                 F32 x_pos = pos_to_vec(block->pos).x;
@@ -1658,7 +1658,7 @@ bool apply_push_vertical(Block_t* block, Position_t pos, World_t* world, Directi
 
                 // LOG("giving block %ld: %f vertical impact momentum\n", block - world->blocks.elements, pushee_momentum.mass * instant_vel);
 
-                block_add_vertical_momentum(block, pushee_momentum.mass * instant_vel);
+                block_add_vertical_momentum(block, BLOCK_MOMENTUM_TYPE_IMPACT, pushee_momentum.mass * instant_vel);
 
                 auto motion = motion_y_component(block);
                 F32 y_pos = pos_to_vec(block->pos).y;
@@ -1746,7 +1746,7 @@ void update_block_momentum_from_push(Block_t* block, Direction_t direction, Push
 
                  // TODO: how do we handle multiple collisions transferring momentum back?
                  if(from_entangler){
-                      block_add_horizontal_momentum(block, collision.pushee_velocity * collision.pushee_mass);
+                      block_add_horizontal_momentum(block, BLOCK_MOMENTUM_TYPE_IMPACT, collision.pushee_velocity * collision.pushee_mass);
                       // block->horizontal_move.state = MOVE_STATE_COASTING;
                       // block->horizontal_move.sign = move_sign_from_vel(collision.pushee_velocity);
                       final_result->pushed = true;
@@ -1767,7 +1767,7 @@ void update_block_momentum_from_push(Block_t* block, Direction_t direction, Push
                  transferred_momentum_back = true;
 
                  if(from_entangler){
-                      block_add_vertical_momentum(block, collision.pushee_velocity * collision.pushee_mass);
+                      block_add_vertical_momentum(block, BLOCK_MOMENTUM_TYPE_IMPACT, collision.pushee_velocity * collision.pushee_mass);
                       final_result->pushed = true;
                  }else{
                       final_result->collisions.insert(&collision);
@@ -3088,13 +3088,13 @@ Vec_t get_block_momentum_vel(World_t* world, Block_t* block){
 
      if(block->horizontal_momentum == BLOCK_MOMENTUM_SUM){
           auto mass = get_block_stack_mass(world, block);
-          block_vel.x = block->collision_momentum.x / mass;
+          block_vel.x = (block->impact_momentum.x + block->kickback_momentum.x) / mass;
      }else if(block->horizontal_momentum == BLOCK_MOMENTUM_STOP){
           block_vel.x = 0;
      }
      if(block->vertical_momentum == BLOCK_MOMENTUM_SUM){
           auto mass = get_block_stack_mass(world, block);
-          block_vel.y = block->collision_momentum.y / mass;
+          block_vel.y = (block->impact_momentum.y + block->kickback_momentum.y) / mass;
      }else if(block->vertical_momentum == BLOCK_MOMENTUM_STOP){
           block_vel.y = 0;
      }

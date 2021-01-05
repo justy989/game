@@ -374,18 +374,26 @@ const char* block_corner_to_string(BlockCorner_t corner){
      return "BLOCK_CORNER_UNKNOWN";
 }
 
-void block_add_horizontal_momentum(Block_t* block, F32 momentum){
+void block_add_horizontal_momentum(Block_t* block, BlockMomentumType_t type, F32 momentum){
      if(block->horizontal_momentum == BLOCK_MOMENTUM_NONE){
           block->horizontal_momentum = BLOCK_MOMENTUM_SUM;
      }
 
-     block->collision_momentum.x += momentum;
+     if(type == BLOCK_MOMENTUM_TYPE_IMPACT){
+          block->impact_momentum.x += momentum;
+     }else if(type == BLOCK_MOMENTUM_TYPE_KICKBACK){
+          block->kickback_momentum.x += momentum;
+     }
 }
 
-void block_add_vertical_momentum(Block_t* block, F32 momentum){
+void block_add_vertical_momentum(Block_t* block, BlockMomentumType_t type, F32 momentum){
      if(block->vertical_momentum == BLOCK_MOMENTUM_NONE){
           block->vertical_momentum = BLOCK_MOMENTUM_SUM;
      }
 
-     block->collision_momentum.y += momentum;
+     if(type == BLOCK_MOMENTUM_TYPE_IMPACT){
+          block->impact_momentum.y += momentum;
+     }else if(type == BLOCK_MOMENTUM_TYPE_KICKBACK){
+          block->kickback_momentum.y += momentum;
+     }
 }

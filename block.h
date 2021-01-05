@@ -39,6 +39,11 @@ enum BlockMomentum_t{
      BLOCK_MOMENTUM_STOP
 };
 
+enum BlockMomentumType_t{
+     BLOCK_MOMENTUM_TYPE_IMPACT,
+     BLOCK_MOMENTUM_TYPE_KICKBACK,
+};
+
 struct TransferMomentum_t{
      S16 mass;
      F32 vel;
@@ -96,7 +101,8 @@ struct Block_t : public GridMotion_t{
 
      BlockMomentum_t horizontal_momentum = BLOCK_MOMENTUM_NONE;
      BlockMomentum_t vertical_momentum = BLOCK_MOMENTUM_NONE;
-     Vec_t collision_momentum;
+     Vec_t impact_momentum;
+     Vec_t kickback_momentum;
 
      bool over_pit = false;
 };
@@ -162,8 +168,8 @@ Direction_t block_axis_move(Block_t* block, bool x);
 
 const char* block_corner_to_string(BlockCorner_t corner);
 
-void block_add_horizontal_momentum(Block_t* block, F32 momentum);
-void block_add_vertical_momentum(Block_t* block, F32 momentum);
+void block_add_horizontal_momentum(Block_t* block, BlockMomentumType_t type, F32 momentum);
+void block_add_vertical_momentum(Block_t* block, BlockMomentumType_t type, F32 momentum);
 
 #define MAX_BLOCKS_IN_LIST 128
 

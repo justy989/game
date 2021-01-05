@@ -18,7 +18,6 @@ Puzzle Ideas:
   to be pushed through
 
 Current bugs:
-- when 2 opposite entangled blocks clap a block in the middle on ice, the block in the middle shouldn't move but it does...
 - a block travelling diagonally at a wall will stop on both axis' against the wall because of the collision
 - player is able to get into a block sometimes when standing on a popup that is going down and pushing a block that has fallen off of it
 - blocks moving fast enough can also cause the player to get inside
@@ -2591,6 +2590,32 @@ void add_entangled_player_block_pushes(ObjectArray_t<PlayerBlockPush_t>* player_
      }
      *block_to_push = save_block;
 }
+
+bool this_block_has_already_pushed_others(BlockMomentumPushes_t<128>* block_pushes, S16 block_pushes_executed,
+                                          BlockMomentumPush_t* push_to_check, BlockMomentumPusher_t* pusher_to_check){
+     // if we find pushes going the opposite way or pushers going the same
+     // way that have already happened, then we cannot invalidate the push
+     if(pusher_to_check->collided_with_block_count > 1){
+          for(S16 p = 0; p <= block_pushes_executed; p++){
+               auto* already_pushed_push = block_pushes->pushes + p;
+               if(already_pushed_push->pushee_index == pusher_to_check->index &&
+                  already_pushed_push->direction_mask == direction_mask_opposite(push_to_check->direction_mask)){
+                    return false;
+               }
+
+               if(already_pushed_push->direction_mask == push_to_check->direction_mask){
+                    for(S16 a = 0; a < already_pushed_push->pusher_count; a++){
+                         auto* already_pusher = already_pushed_push->pushers + a;
+                         if(already_pusher->index == pusher_to_check->index){
+                              return false;
+                         }
+                    }
+               }
+          }
+     }
+     return true;
+}
+
 
 int main(int argc, char** argv){
      const char* load_map_filepath = nullptr;
@@ -5810,7 +5835,42 @@ int main(int argc, char** argv){
                                             }
                                        }
                                   }
-                             }
+                              }
+
+                              // invalidate any pushes that have been given opposite impact momentum (specifically not kickback)
+                              for(S16 p = 0; p < check_block_push.pusher_count; p++){
+                                  auto* pusher = check_block_push.pushers + p;
+
+                                  if(pusher->index == check_block_push.pushee_index) continue;
+                                  if(pusher->momentum_kicked_back_in_shared_push_block_index >= 0) continue;
+
+                                  auto* pusher_block = world.blocks.elements + pusher->index;
+
+                                  for(S16 d = 0; d < DIRECTION_COUNT; d++){
+                                       Direction_t direction = static_cast<Direction_t>(d);
+                                       if(!direction_in_mask(check_block_push.direction_mask, direction)) continue;
+
+                                       if(direction_is_horizontal(direction)){
+                                            auto horizontal_momentum_dir = vec_direction(Vec_t{pusher_block->impact_momentum.x, 0});
+                                            if(horizontal_momentum_dir == direction_opposite(direction)){
+                                                 if(this_block_has_already_pushed_others(&consolidated_momentum_block_pushes, i,
+                                                                                         &check_block_push, pusher)){
+                                                      check_block_push.remove_pusher(p);
+                                                      p--;
+                                                 }
+                                            }
+                                       }else{
+                                            auto vertical_momentum_dir = vec_direction(Vec_t{0, pusher_block->impact_momentum.y});
+                                            if(vertical_momentum_dir == direction_opposite(direction)){
+                                                 if(this_block_has_already_pushed_others(&consolidated_momentum_block_pushes, i,
+                                                                                         &check_block_push, pusher)){
+                                                      check_block_push.remove_pusher(p);
+                                                      p--;
+                                                 }
+                                            }
+                                       }
+                                  }
+                              }
                          }
 
                          if(result.additional_block_pushes.count){
@@ -5825,9 +5885,11 @@ int main(int argc, char** argv){
                          auto* block = world.blocks.elements + i;
                          if(block->horizontal_momentum == BLOCK_MOMENTUM_SUM){
                               S16 mass = get_block_stack_mass(&world, block);
-                              block->vel.x = block->collision_momentum.x / mass;
+                              F32 collision_momentum = block->impact_momentum.x + block->kickback_momentum.x;
+                              block->vel.x = collision_momentum / mass;
                               // LOG("setting block %d vel to %f based on total momentum %f\n", i, block->vel.x, block->collision_momentum.x);
-                              block->collision_momentum.x = 0;
+                              block->impact_momentum.x = 0;
+                              block->kickback_momentum.x = 0;
                               block->horizontal_momentum = BLOCK_MOMENTUM_NONE;
 
                               if(block->vel.x == 0){
@@ -5842,7 +5904,8 @@ int main(int argc, char** argv){
                          }else if(block->horizontal_momentum == BLOCK_MOMENTUM_STOP){
                               block->accel.x = 0;
                               block->vel.x = 0;
-                              block->collision_momentum.x = 0;
+                              block->impact_momentum.x = 0;
+                              block->kickback_momentum.x = 0;
                               block->horizontal_momentum = BLOCK_MOMENTUM_NONE;
                               block->horizontal_move.state = MOVE_STATE_IDLING;
                               block->horizontal_move.sign = MOVE_SIGN_ZERO;
@@ -5851,9 +5914,11 @@ int main(int argc, char** argv){
 
                          if(block->vertical_momentum == BLOCK_MOMENTUM_SUM){
                               S16 mass = get_block_stack_mass(&world, block);
-                              block->vel.y = block->collision_momentum.y / mass;
+                              F32 collision_momentum = block->impact_momentum.y + block->kickback_momentum.y;
+                              block->vel.y = collision_momentum / mass;
                               // LOG("setting block %d vel to %f based on total momentum %f\n", i, block->vel.y, block->collision_momentum.y);
-                              block->collision_momentum.y = 0;
+                              block->impact_momentum.y = 0;
+                              block->kickback_momentum.y = 0;
                               block->vertical_momentum = BLOCK_MOMENTUM_NONE;
 
                               if(block->vel.y == 0){
@@ -5868,7 +5933,8 @@ int main(int argc, char** argv){
                          }else if(block->vertical_momentum == BLOCK_MOMENTUM_STOP){
                               block->accel.y = 0;
                               block->vel.y = 0;
-                              block->collision_momentum.y = 0;
+                              block->impact_momentum.y = 0;
+                              block->kickback_momentum.y = 0;
                               block->vertical_momentum = BLOCK_MOMENTUM_NONE;
                               block->vertical_move.state = MOVE_STATE_IDLING;
                               block->vertical_move.sign = MOVE_SIGN_ZERO;
