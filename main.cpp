@@ -18,6 +18,7 @@ Puzzle Ideas:
   to be pushed through
 
 Current bugs:
+- when 2 opposite entangled blocks clap a block in the middle on ice, the block in the middle shouldn't move but it does...
 - a block travelling diagonally at a wall will stop on both axis' against the wall because of the collision
 - player is able to get into a block sometimes when standing on a popup that is going down and pushing a block that has fallen off of it
 - blocks moving fast enough can also cause the player to get inside
