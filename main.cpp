@@ -1744,7 +1744,7 @@ bool block_pushes_are_the_same_collision(BlockMomentumPushes_t<128>* block_pushe
 }
 
 void add_entangle_pushes_for_end_of_chain_blocks_on_ice(World_t* world, S16 push_index, BlockMomentumPushes_t<128>* block_pushes,
-                                                        BlockMomentumPushes_t<128>* new_block_pushes, S16 pusher_rotations = 0){
+                                                        BlockMomentumPushes_t<128>* new_block_pushes){
      BlockMomentumPush_t* push = block_pushes->pushes + push_index;
 
      Block_t* pushee = world->blocks.elements + push->pushee_index;
@@ -1845,7 +1845,6 @@ void add_entangle_pushes_for_end_of_chain_blocks_on_ice(World_t* world, S16 push
                          new_block_push.pushee_index = get_block_index(world, entangled_chain_block);
                          new_block_push.portal_rotations = push->portal_rotations;
                          new_block_push.entangle_rotations = rotations_between_blocks;
-                         new_block_push.pusher_rotations = pusher_rotations;
                          new_block_push.entangled_with_push_index = push_index;
                          new_block_push.entangled_momentum = entangled_momentum;
                          new_block_push.pure_entangle = true;
@@ -1899,7 +1898,7 @@ void generate_entangled_block_pushes(BlockMomentumPushes_t<128>* block_pushes, B
           S8 block_push_rotations = (block_push.portal_rotations + block_push.entangle_rotations) % DIRECTION_COUNT;
           Direction_t push_rotated_direction = direction_rotate_clockwise(block_push.direction, block_push_rotations);
 
-          if(!block_pushable(pushee, push_rotated_direction, world, block_push.force)) continue;
+          if(!block_pushable(pushee, push_rotated_direction, world, 1.0f)) continue;
 
           S16 current_entangle_index = pushee->entangle_index;
           while(current_entangle_index != block_push.pushee_index && current_entangle_index >= 0){
@@ -1948,8 +1947,7 @@ void generate_entangled_block_pushes(BlockMomentumPushes_t<128>* block_pushes, B
               }
 
               add_entangle_pushes_for_end_of_chain_blocks_on_ice(world, block_pushes->count - 1, block_pushes,
-                                                                 new_block_pushes,
-                                                                 DIRECTION_COUNT - rotations_between_blocks);
+                                                                 new_block_pushes);
 
               current_entangle_index = entangler->entangle_index;
           }

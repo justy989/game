@@ -1661,7 +1661,7 @@ TransferMomentum_t get_push_pusher_momentum(BlockMomentumPusher_t* pusher, Block
                                                                       push->portal_rotations);
      }else{
           S8 total_rotations = (push->portal_rotations + push->entangle_rotations) % DIRECTION_COUNT;
-          Vec_t rotated_pusher_vel = vec_rotate_quadrants_clockwise(pusher_block->vel, (total_rotations + push->pusher_rotations) % DIRECTION_COUNT);
+          Vec_t rotated_pusher_vel = vec_rotate_quadrants_clockwise(pusher_block->vel, total_rotations % DIRECTION_COUNT);
           Direction_t rotated_dir = direction_rotate_clockwise(push_direction, total_rotations);
 
           if(direction_is_horizontal(rotated_dir)){
@@ -1715,7 +1715,7 @@ BlockCollisionPushResult_t block_collision_push(BlockMomentumPush_t* push, World
      F32 total_push_momentum = instant_momentum.mass * instant_momentum.vel;
      // LOG("total push on block %d momentum: %f, mass: %d, vel: %f\n", push->pushee_index, total_push_momentum, instant_momentum.mass, instant_momentum.vel);
 
-     auto push_result = block_push(pushee, push_pos, push_pos_delta, push_direction, world, true, push->force, &instant_momentum,
+     auto push_result = block_push(pushee, push_pos, push_pos_delta, push_direction, world, true, 1.0f, &instant_momentum,
                                    nullptr, push->collided_with_block_count);
 
 #if 0

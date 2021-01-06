@@ -57,14 +57,12 @@ struct BlockMomentumPush_t{
      Direction_t direction = DIRECTION_COUNT;
      S8 portal_rotations = 0;
      S8 entangle_rotations = 0;
-     S8 pusher_rotations = 0; // TODO: investigate whether or not we can kill this
      bool invalidated = false;
      bool no_consolidate = false;
      bool no_entangled_pushes = false;
      S8 entangled_with_push_index = -1; // index of which push caused this push via entanglement
      F32 entangled_momentum = 0;
      bool pure_entangle = false; // the block we are pushing isn't against any other blocks, so the push just uses the forces given to it
-     F32 force = 1.0f; // TODO: investigate whether or not we can kill this
      bool executed = false;
      S16 collided_with_block_count = 1;
 
