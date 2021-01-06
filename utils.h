@@ -67,3 +67,6 @@ bool direction_in_vec(Vec_t vec, Direction_t direction);
 F32 get_block_normal_pushed_velocity(BlockCut_t cut, S16 mass, F32 force = 1.0);
 F32 rotate_vec_clockwise_to_see_if_negates(F32 value, bool x, S8 rotations);
 F32 rotate_vec_counter_clockwise_to_see_if_negates(F32 value, bool x, S8 rotations);
+
+S16 get_boundary_from_coord(Coord_t coord, Direction_t direction);
+Pixel_t get_corner_pixel_from_pos(Position_t pos, DirectionMask_t from_center);

@@ -2973,3 +2973,163 @@ Vec_t get_block_momentum_vel(World_t* world, Block_t* block){
 
      return block_vel;
 }
+
+Pixel_t block_pos_in_solid_boundary(Position_t pos, BlockCut_t cut, Direction_t horizontal_direction, Direction_t vertical_direction, World_t* world){
+     Coord_t bottom_left_coord = pixel_to_coord(pos.pixel);
+     Coord_t bottom_right_coord = pixel_to_coord(block_bottom_right_pixel(pos.pixel, cut));
+     Coord_t top_left_coord = pixel_to_coord(block_top_left_pixel(pos.pixel, cut));
+     Coord_t top_right_coord = pixel_to_coord(block_top_right_pixel(pos.pixel, cut));
+
+     if(tilemap_is_solid(&world->tilemap, bottom_left_coord)){
+          return Pixel_t{get_boundary_from_coord(bottom_left_coord, horizontal_direction), get_boundary_from_coord(bottom_left_coord, vertical_direction)};
+     }
+
+     if(tilemap_is_solid(&world->tilemap, bottom_right_coord)){
+          return Pixel_t{get_boundary_from_coord(bottom_right_coord, horizontal_direction), get_boundary_from_coord(bottom_right_coord, vertical_direction)};
+     }
+
+     if(tilemap_is_solid(&world->tilemap, top_left_coord)){
+          return Pixel_t{get_boundary_from_coord(top_left_coord, horizontal_direction), get_boundary_from_coord(top_left_coord, vertical_direction)};
+     }
+
+     if(tilemap_is_solid(&world->tilemap, top_right_coord)){
+          return Pixel_t{get_boundary_from_coord(top_right_coord, horizontal_direction), get_boundary_from_coord(top_right_coord, vertical_direction)};
+     }
+
+     Interactive_t* interactive = quad_tree_interactive_solid_at(world->interactive_qt, &world->tilemap, bottom_left_coord, pos.z);
+     if(interactive){
+          return Pixel_t{get_boundary_from_coord(bottom_left_coord, horizontal_direction), get_boundary_from_coord(bottom_left_coord, vertical_direction)};
+     }
+
+     interactive = quad_tree_interactive_solid_at(world->interactive_qt, &world->tilemap, bottom_right_coord, pos.z);
+     if(interactive){
+          return Pixel_t{get_boundary_from_coord(bottom_right_coord, horizontal_direction), get_boundary_from_coord(bottom_right_coord, vertical_direction)};
+     }
+
+     interactive = quad_tree_interactive_solid_at(world->interactive_qt, &world->tilemap, top_left_coord, pos.z);
+     if(interactive){
+          return Pixel_t{get_boundary_from_coord(top_left_coord, horizontal_direction), get_boundary_from_coord(top_left_coord, vertical_direction)};
+     }
+
+     interactive = quad_tree_interactive_solid_at(world->interactive_qt, &world->tilemap, top_right_coord, pos.z);
+     if(interactive){
+          return Pixel_t{get_boundary_from_coord(top_right_coord, horizontal_direction), get_boundary_from_coord(top_right_coord, vertical_direction)};
+     }
+
+     return Pixel_t {-1, -1};
+}
+
+void set_against_blocks_coasting_from_player(Block_t* block, Direction_t direction, World_t* world){
+     auto block_pos = block_get_final_position(block);
+
+     auto against_result = block_against_other_blocks(block_pos,
+                                                      block_get_cut(block),
+                                                      direction, world->block_qt, world->interactive_qt, &world->tilemap);
+
+     for(S16 a = 0; a < against_result.count; a++){
+         auto* against_other = against_result.objects + a;
+         Direction_t against_direction = direction_rotate_clockwise(direction, against_other->rotations_through_portal);
+
+         if(direction_is_horizontal(against_direction)){
+             against_other->block->coast_horizontal = BLOCK_COAST_PLAYER;
+         }else{
+             against_other->block->coast_vertical = BLOCK_COAST_PLAYER;
+         }
+
+         set_against_blocks_coasting_from_player(against_other->block, against_direction, world);
+     }
+}
+
+bool find_and_update_connected_teleported_block(Block_t* block, Direction_t direction, World_t* world){
+     Position_t block_pos = block_get_position(block);
+     Vec_t block_pos_delta_vec = block_get_pos_delta(block);
+     Vec_t block_vel_vec = block_get_vel(block);
+     auto block_cut = block_get_cut(block);
+
+     auto against_result = block_against_other_blocks(block_pos + block_pos_delta_vec,
+                                                      block_cut, direction, world->block_qt,
+                                                      world->interactive_qt, &world->tilemap, false);
+
+     F32 block_vel = 0;
+     F32 block_pos_delta = 0;
+
+     if(direction_is_horizontal(direction)){
+         block_vel = block_vel_vec.x;
+         block_pos_delta = block_pos_delta_vec.x;
+     }else{
+         block_vel = block_vel_vec.y;
+         block_pos_delta = block_pos_delta_vec.y;
+     }
+
+     for(S16 a = 0; a < against_result.count; a++){
+         auto* against_other = against_result.objects + a;
+
+         if(!against_other->through_portal && !block->teleport) continue;
+
+         Vec_t against_block_vel_vec = block_get_vel(against_other->block);
+         Vec_t against_block_pos_delta_vec = block_get_pos_delta(against_other->block);
+
+         Vec_t rotated_against_vel = vec_rotate_quadrants_counter_clockwise(against_block_vel_vec, against_other->rotations_through_portal);
+         Vec_t rotated_against_pos_delta = vec_rotate_quadrants_counter_clockwise(against_block_pos_delta_vec, against_other->rotations_through_portal);
+
+         F32 against_block_vel = 0;
+         F32 against_block_pos_delta = 0;
+
+         if(direction_is_horizontal(direction)){
+             against_block_vel = rotated_against_vel.x;
+             against_block_pos_delta = rotated_against_pos_delta.x;
+         }else{
+             against_block_vel = rotated_against_vel.y;
+             against_block_pos_delta = rotated_against_pos_delta.y;
+         }
+
+         if(block_vel != against_block_vel || block_pos_delta != against_block_pos_delta) continue;
+
+         block->connected_teleport.block_index = get_block_index(world, against_other->block);
+         block->connected_teleport.direction = direction;
+         return true;
+     }
+
+     return false;
+}
+
+PlayerInBlockRectResult_t player_in_block_rect(Player_t* player, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt, QuadTreeNode_t<Block_t>* block_qt){
+     PlayerInBlockRectResult_t result;
+
+     auto player_pos = player->teleport ? player->teleport_pos + player->teleport_pos_delta : player->pos + player->pos_delta;
+
+     auto player_coord = pos_to_coord(player_pos);
+     Rect_t search_rect = rect_surrounding_adjacent_coords(player_coord);
+
+     S16 block_count = 0;
+     Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
+
+     quad_tree_find_in(block_qt, search_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
+     for(S16 b = 0; b < block_count; b++){
+         auto block_pos = block_get_final_position(blocks[b]);
+         auto block_rect = block_get_inclusive_rect(block_pos.pixel, block_get_cut(blocks[b]));
+         if(pixel_in_rect(player->pos.pixel, block_rect)){
+              PlayerInBlockRectResult_t::Entry_t entry;
+              entry.block = blocks[b];
+              entry.block_pos = block_pos;
+              entry.portal_rotations = 0;
+              result.entries.insert(&entry);
+         }
+     }
+
+     auto found_blocks = find_blocks_through_portals(player_coord, tilemap, interactive_qt, block_qt);
+     for(S16 i = 0; i < found_blocks.count; i++){
+         auto* found_block = found_blocks.objects + i;
+
+         auto block_rect = block_get_inclusive_rect(found_block->position.pixel, found_block->rotated_cut);
+         if(pixel_in_rect(player->pos.pixel, block_rect)){
+              PlayerInBlockRectResult_t::Entry_t entry;
+              entry.block = found_block->block;
+              entry.block_pos = found_block->position;
+              entry.portal_rotations = found_block->portal_rotations;
+              result.entries.insert(&entry);
+         }
+     }
+
+     return result;
+}

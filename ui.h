@@ -2,6 +2,7 @@
 
 #include "defines.h"
 #include "vec.h"
+#include "quad.h"
 #include "tags.h"
 
 #ifdef __linux

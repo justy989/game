@@ -2189,3 +2189,37 @@ void raise_entangled_blocks(World_t* world, Block_t* block){
           }
      }
 }
+
+bool block_pushes_are_the_same_collision(BlockMomentumPushes_t<128>* block_pushes, S16 start_index, S16 end_index, S16 block_index){
+     if(start_index < 0 || start_index > block_pushes->count) return false;
+     if(end_index < 0 || end_index > block_pushes->count) return false;
+     if(start_index > end_index) return false;
+
+     auto& start_push = block_pushes->pushes[start_index];
+     auto& end_push = block_pushes->pushes[end_index];
+
+     S16 start_push_count = 0;
+     S16 end_push_count = 0;
+
+     bool found_index = false;
+     for(S16 i = 0; i < start_push.pusher_count; i++){
+         auto& pusher = start_push.pushers[i];
+         if(pusher.index != block_index) continue;
+         found_index = true;
+         start_push_count = pusher.collided_with_block_count;
+     }
+     if(!found_index) return false;
+
+     found_index = false;
+     for(S16 i = 0; i < end_push.pusher_count; i++){
+         auto& pusher = end_push.pushers[i];
+         if(pusher.index != block_index) continue;
+         found_index = true;
+         end_push_count = pusher.collided_with_block_count;
+     }
+     if(!found_index) return false;
+
+     return (start_push_count > 1 && end_push_count > 1 && start_push_count == end_push_count &&
+             start_push.direction == end_push.direction);
+}
+

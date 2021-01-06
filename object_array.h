@@ -2,6 +2,7 @@
 
 #include <stdlib.h>
 
+#include "types.h"
 #include "log.h"
 
 template <typename T>

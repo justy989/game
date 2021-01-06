@@ -116,6 +116,18 @@ struct LogMapNumberResult_t{
     char* filepath = NULL;
 };
 
+#define MAX_PLAYER_IN_BLOCK_RECT_RESULTS 16
+
+struct PlayerInBlockRectResult_t{
+     struct Entry_t{
+          Block_t* block = nullptr;
+          Position_t block_pos;
+          S8 portal_rotations = 0;
+     };
+
+     StaticObjectArray_t<Entry_t, MAX_PLAYER_IN_BLOCK_RECT_RESULTS> entries;
+};
+
 void sort_blocks_by_ascending_height(Block_t** blocks, S16 block_count);
 void sort_blocks_by_descending_height(Block_t** blocks, S16 block_count);
 
@@ -187,3 +199,9 @@ Vec_t get_block_momentum_vel(World_t* world, Block_t* block);
 
 AllowedToPushResult_t allowed_to_push(World_t* world, Block_t* block, Direction_t direction, F32 force = 1.0f, TransferMomentum_t* instant_momentum = NULL);
 PushFromEntangler_t build_push_from_entangler(Block_t* block, Direction_t push_dir, F32 force);
+
+Pixel_t block_pos_in_solid_boundary(Position_t pos, BlockCut_t cut, Direction_t horizontal_direction, Direction_t vertical_direction, World_t* world);
+void set_against_blocks_coasting_from_player(Block_t* block, Direction_t direction, World_t* world);
+bool find_and_update_connected_teleported_block(Block_t* block, Direction_t direction, World_t* world);
+
+PlayerInBlockRectResult_t player_in_block_rect(Player_t* player, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt, QuadTreeNode_t<Block_t>* block_qt);

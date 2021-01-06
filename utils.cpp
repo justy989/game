@@ -5,6 +5,8 @@
 #include "block.h"
 #include "block_utils.h"
 
+#include <float.h>
+
 Direction_t direction_between(Coord_t a, Coord_t b){
      if(a == b) return DIRECTION_COUNT;
 
@@ -601,4 +603,35 @@ F32 rotate_vec_clockwise_to_see_if_negates(F32 value, bool x, S8 rotations){
      Vec_t v = single_elem_vector(value, x);
      Vec_t rotated = vec_rotate_quadrants_clockwise(v, rotations);
      return get_single_element(rotated);
+}
+
+S16 get_boundary_from_coord(Coord_t coord, Direction_t direction){
+     Pixel_t pixel = coord_to_pixel(coord);
+
+     // the values are opposite of what you would expect because this is about colliding from the direction specified
+     switch(direction){
+     default:
+          break;
+     case DIRECTION_RIGHT:
+          return pixel.x;
+     case DIRECTION_LEFT:
+          return pixel.x + TILE_SIZE_IN_PIXELS;
+     case DIRECTION_UP:
+          return pixel.y;
+     case DIRECTION_DOWN:
+          return pixel.y + TILE_SIZE_IN_PIXELS;
+     }
+
+     return -1;
+}
+
+Pixel_t get_corner_pixel_from_pos(Position_t pos, DirectionMask_t from_center){
+     Pixel_t result = pos.pixel;
+     if(from_center & DIRECTION_MASK_UP){
+          if(pos.decimal.y > FLT_EPSILON) result.y++;
+     }
+     if(from_center & DIRECTION_MASK_RIGHT){
+          if(pos.decimal.x > FLT_EPSILON) result.x++;
+     }
+     return result;
 }

@@ -386,3 +386,5 @@ void copy_block_collision_results(Block_t* block, CheckBlockCollisionResult_t* r
 
 void raise_above_blocks(World_t* world, Block_t* block);
 void raise_entangled_blocks(World_t* world, Block_t* block);
+
+bool block_pushes_are_the_same_collision(BlockMomentumPushes_t<128>* block_pushes, S16 start_index, S16 end_index, S16 block_index);

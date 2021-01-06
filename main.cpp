@@ -107,28 +107,23 @@ build the entangled pushes before the loop and then when invalidating, we need t
 #include <dirent.h>
 
 #include "log.h"
-#include "direction.h"
+#include "centroid.h"
 #include "demo.h"
 #include "conversion.h"
 #include "portal_exit.h"
-#include "utils.h"
+#include "player_block_push.h"
 #include "map_format.h"
 #include "draw.h"
 #include "block_collisions.h"
 #include "collision.h"
-#include "world.h"
 #include "editor.h"
 #include "utils.h"
 #include "tags.h"
-
-#define THUMBNAIL_DIMENSION 128
+#include "thumbnail.h"
 
 #define CHECKBOX_START_OFFSET_X (4.0f * PIXEL_SIZE)
 #define CHECKBOX_START_OFFSET_Y (2.0f * PIXEL_SIZE)
 #define CHECKBOX_INTERVAL (CHECKBOX_DIMENSION + 2.0f * PIXEL_SIZE)
-
-#define CHECKBOX_THUMBNAIL_SPLIT 0.45f
-#define THUMBNAILS_PER_ROW 4
 
 enum GameMode_t{
      GAME_MODE_PLAYING,
@@ -136,16 +131,10 @@ enum GameMode_t{
      GAME_MODE_LEVEL_SELECT,
 };
 
-#define MAX_PLAYER_IN_BLOCK_RECT_RESULTS 16
-
-struct PlayerInBlockRectResult_t{
-     struct Entry_t{
-          Block_t* block = nullptr;
-          Position_t block_pos;
-          S8 portal_rotations = 0;
-     };
-
-     StaticObjectArray_t<Entry_t, MAX_PLAYER_IN_BLOCK_RECT_RESULTS> entries;
+enum StopOnBoundary_t{
+    DO_NOT_STOP_ON_BOUNDARY,
+    STOP_ON_BOUNDARY_TRACKING_START,
+    STOP_ON_BOUNDARY_IGNORING_START,
 };
 
 struct DoBlockCollisionResults_t{
@@ -161,28 +150,6 @@ struct FindMapResult_t{
 struct FindAllMapsResult_t{
      FindMapResult_t* entries = NULL;
      U32 count = 0;
-};
-
-struct PlayerBlockPush_t{
-     S16 player_index = 0;
-     Direction_t direction = DIRECTION_COUNT;
-     U32 block_index = 0;
-     AllowedToPushResult_t allowed_to_push;
-     PushFromEntangler_t push_from_entangler = {};
-     S16 entangled_push_index = -1; // -1 sentinal that it isn't entangled
-     bool performed = false;
-
-     bool is_entangled(){return entangled_push_index >= 0;}
-};
-
-struct RestoreBlock_t{
-     Block_t block;
-     S16 index = -1;
-};
-
-struct CentroidStart_t{
-     Coord_t coord;
-     Direction_t direction;
 };
 
 LogMapNumberResult_t load_map_number_map(S16 map_number, World_t* world, Undo_t* undo,
@@ -244,6 +211,20 @@ void log_collision_result(CheckBlockCollisionResult_t* collision, World_t* world
      }
 }
 
+void draw_input_on_hud(char c, Vec_t pos, bool down){
+     char text[2];
+     text[1] = 0;
+     text[0] = c;
+
+     glColor3f(0.0f, 0.0f, 0.0f);
+     draw_text(text, pos + Vec_t{0.002f, -0.002f});
+
+     if(down){
+          glColor3f(1.0f, 1.0f, 1.0f);
+          draw_text(text, pos);
+     }
+}
+
 void build_move_actions_from_player(PlayerAction_t* player_action, Player_t* player, bool* move_actions, S8 move_action_count){
      assert(move_action_count == DIRECTION_COUNT);
      memset(move_actions, 0, sizeof(*move_actions) * move_action_count);
@@ -257,53 +238,6 @@ void build_move_actions_from_player(PlayerAction_t* player_action, Player_t* pla
           }
      }
 }
-
-PlayerInBlockRectResult_t player_in_block_rect(Player_t* player, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt, QuadTreeNode_t<Block_t>* block_qt){
-     PlayerInBlockRectResult_t result;
-
-     auto player_pos = player->teleport ? player->teleport_pos + player->teleport_pos_delta : player->pos + player->pos_delta;
-
-     auto player_coord = pos_to_coord(player_pos);
-     Rect_t search_rect = rect_surrounding_adjacent_coords(player_coord);
-
-     S16 block_count = 0;
-     Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
-
-     quad_tree_find_in(block_qt, search_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
-     for(S16 b = 0; b < block_count; b++){
-         auto block_pos = block_get_final_position(blocks[b]);
-         auto block_rect = block_get_inclusive_rect(block_pos.pixel, block_get_cut(blocks[b]));
-         if(pixel_in_rect(player->pos.pixel, block_rect)){
-              PlayerInBlockRectResult_t::Entry_t entry;
-              entry.block = blocks[b];
-              entry.block_pos = block_pos;
-              entry.portal_rotations = 0;
-              result.entries.insert(&entry);
-         }
-     }
-
-     auto found_blocks = find_blocks_through_portals(player_coord, tilemap, interactive_qt, block_qt);
-     for(S16 i = 0; i < found_blocks.count; i++){
-         auto* found_block = found_blocks.objects + i;
-
-         auto block_rect = block_get_inclusive_rect(found_block->position.pixel, found_block->rotated_cut);
-         if(pixel_in_rect(player->pos.pixel, block_rect)){
-              PlayerInBlockRectResult_t::Entry_t entry;
-              entry.block = found_block->block;
-              entry.block_pos = found_block->position;
-              entry.portal_rotations = found_block->portal_rotations;
-              result.entries.insert(&entry);
-         }
-     }
-
-     return result;
-}
-
-enum StopOnBoundary_t{
-    DO_NOT_STOP_ON_BOUNDARY,
-    STOP_ON_BOUNDARY_TRACKING_START,
-    STOP_ON_BOUNDARY_IGNORING_START,
-};
 
 void update_stop_on_boundry_while_player_coasting(Direction_t move_dir, DirectionMask_t vel_mask, StopOnBoundary_t* stop_on_boundary_x, StopOnBoundary_t* stop_on_boundary_y){
      switch(move_dir){
@@ -688,72 +622,6 @@ void generate_pushes_from_collision(World_t* world, CheckBlockCollisionResult_t*
      }
 }
 
-S16 get_boundary_from_coord(Coord_t coord, Direction_t direction){
-     Pixel_t pixel = coord_to_pixel(coord);
-
-     // the values are opposite of what you would expect because this is about colliding from the direction specified
-     switch(direction){
-     default:
-          break;
-     case DIRECTION_RIGHT:
-          return pixel.x;
-     case DIRECTION_LEFT:
-          return pixel.x + TILE_SIZE_IN_PIXELS;
-     case DIRECTION_UP:
-          return pixel.y;
-     case DIRECTION_DOWN:
-          return pixel.y + TILE_SIZE_IN_PIXELS;
-     }
-
-     return -1;
-}
-
-Pixel_t block_pos_in_solid_boundary(Position_t pos, BlockCut_t cut, Direction_t horizontal_direction, Direction_t vertical_direction, World_t* world){
-     Coord_t bottom_left_coord = pixel_to_coord(pos.pixel);
-     Coord_t bottom_right_coord = pixel_to_coord(block_bottom_right_pixel(pos.pixel, cut));
-     Coord_t top_left_coord = pixel_to_coord(block_top_left_pixel(pos.pixel, cut));
-     Coord_t top_right_coord = pixel_to_coord(block_top_right_pixel(pos.pixel, cut));
-
-     if(tilemap_is_solid(&world->tilemap, bottom_left_coord)){
-          return Pixel_t{get_boundary_from_coord(bottom_left_coord, horizontal_direction), get_boundary_from_coord(bottom_left_coord, vertical_direction)};
-     }
-
-     if(tilemap_is_solid(&world->tilemap, bottom_right_coord)){
-          return Pixel_t{get_boundary_from_coord(bottom_right_coord, horizontal_direction), get_boundary_from_coord(bottom_right_coord, vertical_direction)};
-     }
-
-     if(tilemap_is_solid(&world->tilemap, top_left_coord)){
-          return Pixel_t{get_boundary_from_coord(top_left_coord, horizontal_direction), get_boundary_from_coord(top_left_coord, vertical_direction)};
-     }
-
-     if(tilemap_is_solid(&world->tilemap, top_right_coord)){
-          return Pixel_t{get_boundary_from_coord(top_right_coord, horizontal_direction), get_boundary_from_coord(top_right_coord, vertical_direction)};
-     }
-
-     Interactive_t* interactive = quad_tree_interactive_solid_at(world->interactive_qt, &world->tilemap, bottom_left_coord, pos.z);
-     if(interactive){
-          return Pixel_t{get_boundary_from_coord(bottom_left_coord, horizontal_direction), get_boundary_from_coord(bottom_left_coord, vertical_direction)};
-     }
-
-     interactive = quad_tree_interactive_solid_at(world->interactive_qt, &world->tilemap, bottom_right_coord, pos.z);
-     if(interactive){
-          return Pixel_t{get_boundary_from_coord(bottom_right_coord, horizontal_direction), get_boundary_from_coord(bottom_right_coord, vertical_direction)};
-     }
-
-     interactive = quad_tree_interactive_solid_at(world->interactive_qt, &world->tilemap, top_left_coord, pos.z);
-     if(interactive){
-          return Pixel_t{get_boundary_from_coord(top_left_coord, horizontal_direction), get_boundary_from_coord(top_left_coord, vertical_direction)};
-     }
-
-     interactive = quad_tree_interactive_solid_at(world->interactive_qt, &world->tilemap, top_right_coord, pos.z);
-     if(interactive){
-          return Pixel_t{get_boundary_from_coord(top_right_coord, horizontal_direction), get_boundary_from_coord(top_right_coord, vertical_direction)};
-     }
-
-     return Pixel_t {-1, -1};
-}
-
-
 DoBlockCollisionResults_t do_block_collision(World_t* world, Block_t* block, S16 update_blocks_count){
      DoBlockCollisionResults_t result;
      result.update_blocks_count = update_blocks_count;
@@ -1078,64 +946,6 @@ DoBlockCollisionResults_t do_block_collision(World_t* world, Block_t* block, S16
      return result;
 }
 
-void draw_input_on_hud(char c, Vec_t pos, bool down){
-     char text[2];
-     text[1] = 0;
-     text[0] = c;
-
-     glColor3f(0.0f, 0.0f, 0.0f);
-     draw_text(text, pos + Vec_t{0.002f, -0.002f});
-
-     if(down){
-          glColor3f(1.0f, 1.0f, 1.0f);
-          draw_text(text, pos);
-     }
-}
-
-Pixel_t get_corner_pixel_from_pos(Position_t pos, DirectionMask_t from_center){
-     Pixel_t result = pos.pixel;
-     if(from_center & DIRECTION_MASK_UP){
-          if(pos.decimal.y > FLT_EPSILON) result.y++;
-     }
-     if(from_center & DIRECTION_MASK_RIGHT){
-          if(pos.decimal.x > FLT_EPSILON) result.x++;
-     }
-     return result;
-}
-
-bool block_pushes_are_the_same_collision(BlockMomentumPushes_t<128>* block_pushes, S16 start_index, S16 end_index, S16 block_index){
-     if(start_index < 0 || start_index > block_pushes->count) return false;
-     if(end_index < 0 || end_index > block_pushes->count) return false;
-     if(start_index > end_index) return false;
-
-     auto& start_push = block_pushes->pushes[start_index];
-     auto& end_push = block_pushes->pushes[end_index];
-
-     S16 start_push_count = 0;
-     S16 end_push_count = 0;
-
-     bool found_index = false;
-     for(S16 i = 0; i < start_push.pusher_count; i++){
-         auto& pusher = start_push.pushers[i];
-         if(pusher.index != block_index) continue;
-         found_index = true;
-         start_push_count = pusher.collided_with_block_count;
-     }
-     if(!found_index) return false;
-
-     found_index = false;
-     for(S16 i = 0; i < end_push.pusher_count; i++){
-         auto& pusher = end_push.pushers[i];
-         if(pusher.index != block_index) continue;
-         found_index = true;
-         end_push_count = pusher.collided_with_block_count;
-     }
-     if(!found_index) return false;
-
-     return (start_push_count > 1 && end_push_count > 1 && start_push_count == end_push_count &&
-             start_push.direction == end_push.direction);
-}
-
 void add_entangle_pushes_for_end_of_chain_blocks_on_ice(World_t* world, S16 push_index, BlockMomentumPushes_t<128>* block_pushes,
                                                         BlockMomentumPushes_t<128>* new_block_pushes){
      BlockMomentumPush_t* push = block_pushes->pushes + push_index;
@@ -1418,75 +1228,6 @@ void restart_demo(World_t* world, TileMap_t* demo_starting_tilemap, ObjectArray_
      *frame_count = 0;
 }
 
-void set_against_blocks_coasting_from_player(Block_t* block, Direction_t direction, World_t* world){
-     auto block_pos = block_get_final_position(block);
-
-     auto against_result = block_against_other_blocks(block_pos,
-                                                      block_get_cut(block),
-                                                      direction, world->block_qt, world->interactive_qt, &world->tilemap);
-
-     for(S16 a = 0; a < against_result.count; a++){
-         auto* against_other = against_result.objects + a;
-         Direction_t against_direction = direction_rotate_clockwise(direction, against_other->rotations_through_portal);
-
-         if(direction_is_horizontal(against_direction)){
-             against_other->block->coast_horizontal = BLOCK_COAST_PLAYER;
-         }else{
-             against_other->block->coast_vertical = BLOCK_COAST_PLAYER;
-         }
-
-         set_against_blocks_coasting_from_player(against_other->block, against_direction, world);
-     }
-}
-
-Raw_t create_thumbnail_bitmap(){
-    Raw_t raw;
-
-    U32 pixel_size = THUMBNAIL_DIMENSION * THUMBNAIL_DIMENSION * 3;
-    raw.byte_count = sizeof(BitmapFileHeader_t) + sizeof(BitmapInfoHeader_t) + pixel_size;
-    U32 pixel_offset = sizeof(BitmapFileHeader_t) + sizeof(BitmapInfoHeader_t);
-
-    raw.bytes = (U8*)malloc(raw.byte_count);
-    if(!raw.bytes) return raw;
-
-    BitmapFileHeader_t* file_header = (BitmapFileHeader_t*)(raw.bytes);
-    BitmapInfoHeader_t* info_header = (BitmapInfoHeader_t*)(raw.bytes + sizeof(BitmapFileHeader_t));
-
-    file_header->file_type[0] = 'B';
-    file_header->file_type[1] = 'M';
-    file_header->file_size = pixel_size + pixel_offset;
-    file_header->bitmap_offset = pixel_offset;
-
-    info_header->size = BITMAP_SUPPORTED_SIZE;
-    info_header->width = THUMBNAIL_DIMENSION;
-    info_header->height = THUMBNAIL_DIMENSION;
-    info_header->planes = 1;
-    info_header->bit_count = 24;
-    info_header->compression = 0;
-    info_header->size_image = pixel_size;
-    info_header->x_pels_per_meter = 2835;
-    info_header->y_pels_per_meter = 2835;
-    info_header->clr_used = 0;
-    info_header->clr_important = 0;
-
-    BitmapPixel_t* pixel = (BitmapPixel_t*)(raw.bytes + pixel_offset);
-
-    for(U32 y = 0; y < THUMBNAIL_DIMENSION; y++){
-        for(U32 x = 0; x < THUMBNAIL_DIMENSION; x++){
-            glReadPixels(x, y, 1, 1, GL_RGB, GL_UNSIGNED_BYTE, pixel);
-
-            // swap red and blue
-            U8 tmp = pixel->red;
-            pixel->red = pixel->blue;
-            pixel->blue = tmp;
-
-            pixel++;
-        }
-    }
-
-    return raw;
-}
-
 int get_numbered_map(const char* path){
     char number_str[4];
     memset(number_str, 0, 4);
@@ -1547,430 +1288,6 @@ FindAllMapsResult_t find_all_maps(){
      return result;
 }
 
-int map_thumbnail_comparor(const void* a, const void* b){
-     MapThumbnail_t* thumbnail_a = (MapThumbnail_t*)a;
-     MapThumbnail_t* thumbnail_b = (MapThumbnail_t*)b;
-
-     return thumbnail_a->map_number > thumbnail_b->map_number;
-}
-
-S16 filter_thumbnails(ObjectArray_t<Checkbox_t>* tag_checkboxes, ObjectArray_t<MapThumbnail_t>* map_thumbnails){
-     const F32 thumbnail_row_start_x = CHECKBOX_THUMBNAIL_SPLIT;
-     F32 current_thumbnail_x = thumbnail_row_start_x;
-     F32 current_thumbnail_y = TEXT_CHAR_HEIGHT + PIXEL_SIZE;
-
-     bool none_checked = true;
-     for(S16 c = 0; c < tag_checkboxes->count; c++){
-          auto* checkbox = tag_checkboxes->elements + c + 1;
-          if(checkbox->checked){
-               none_checked = false;
-               break;
-          }
-     }
-
-     if(none_checked){
-          for(S16 m = 0; m < map_thumbnails->count; m++){
-               auto* map_thumbnail = map_thumbnails->elements + m;
-               map_thumbnail->pos.x = current_thumbnail_x;
-               map_thumbnail->pos.y = current_thumbnail_y;
-
-               current_thumbnail_x += THUMBNAIL_UI_DIMENSION;
-               if((m + 1) % THUMBNAILS_PER_ROW == 0){
-                    current_thumbnail_x = thumbnail_row_start_x;
-                    current_thumbnail_y += THUMBNAIL_UI_DIMENSION;
-               }
-          }
-
-          // account for integer division truncation
-          return map_thumbnails->count + THUMBNAILS_PER_ROW;
-     }
-
-     bool exclusive = tag_checkboxes->elements[0].checked;
-
-     S16 match_index = 1;
-     for(S16 m = 0; m < map_thumbnails->count; m++){
-          auto* map_thumbnail = map_thumbnails->elements + m;
-
-          bool matches = false;
-
-          if(exclusive){
-               matches = true;
-               for(S16 c = 0; c < TAG_COUNT; c++){
-                    auto* checkbox = tag_checkboxes->elements + c + 1;
-                    if(checkbox->checked){
-                         if(!map_thumbnail->tags[c]){
-                              matches = false;
-                              break;
-                         }
-                    }
-               }
-          }else{
-               for(S16 c = 0; c < TAG_COUNT; c++){
-                    auto* checkbox = tag_checkboxes->elements + c + 1;
-                    if(checkbox->checked && map_thumbnail->tags[c]){
-                         matches = true;
-                         break;
-                    }
-               }
-          }
-
-          if(matches){
-               map_thumbnail->pos.x = current_thumbnail_x;
-               map_thumbnail->pos.y = current_thumbnail_y;
-
-               current_thumbnail_x += THUMBNAIL_UI_DIMENSION;
-               if(match_index % THUMBNAILS_PER_ROW == 0){
-                    current_thumbnail_x = thumbnail_row_start_x;
-                    current_thumbnail_y += THUMBNAIL_UI_DIMENSION;
-               }
-               match_index++;
-          }else{
-               map_thumbnail->pos.x = -THUMBNAIL_UI_DIMENSION;
-               map_thumbnail->pos.y = -THUMBNAIL_UI_DIMENSION;
-          }
-     }
-
-     return ((match_index - 1) + THUMBNAILS_PER_ROW);
-}
-
-Coord_t find_centroid(CentroidStart_t a, CentroidStart_t b){
-     // find the missing corners of the rectangle
-     Coord_t rect_corner_a;
-     rect_corner_a.x = a.coord.x;
-     rect_corner_a.y = b.coord.y;
-
-     Coord_t rect_corner_b;
-     rect_corner_b.x = b.coord.x;
-     rect_corner_b.y = a.coord.y;
-
-     // find the formula for the diagonals that cross of those corners
-     // y = mx + b where m = 1 and -1
-
-     // b1 = y - mx
-     // b2 = y + mx
-
-     S16 a_b_one = rect_corner_a.y - rect_corner_a.x;
-     S16 a_b_two = rect_corner_a.y + rect_corner_a.x;
-
-     S16 b_b_one = rect_corner_b.y - rect_corner_b.x;
-     S16 b_b_two = rect_corner_b.y + rect_corner_b.x;
-
-     // find the intersection of our 2 formulas
-     // ay = max + ab
-     // by = mbx + bb
-
-     // 1x + ab1 = -1x + bb2
-     // 2x = bb2 - ab1
-     // x = (bb2 - ab1) / 2
-
-     // there are 2 intersections, calculate them both
-     Coord_t first_option {};
-     first_option.x = (b_b_two - a_b_one) / 2;
-     first_option.y = first_option.x + a_b_one;
-
-     // -1x + ab2 = 1x + bb2
-     // 2x = ab2 - bb1
-     // x = (ab2 - bb1) / 2
-
-     Coord_t second_option {};
-     second_option.x = (a_b_two - b_b_one) / 2;
-     second_option.y = -second_option.x + a_b_two;
-
-     DirectionMask_t a_mask = coord_direction_mask_between(a.coord, first_option);
-     DirectionMask_t b_mask = coord_direction_mask_between(b.coord, first_option);
-
-     // find the intersection that they are both facing towards or away from
-     bool a_facing = direction_in_mask(a_mask, a.direction);
-     bool b_facing = direction_in_mask(b_mask, b.direction);
-
-     bool a_facing_away = direction_in_mask(a_mask, direction_opposite(a.direction));
-     bool b_facing_away = direction_in_mask(b_mask, direction_opposite(b.direction));
-
-     char a_m[128];
-     char b_m[128];
-     direction_mask_to_string(a_mask, a_m, 128);
-     direction_mask_to_string(b_mask, b_m, 128);
-
-     if((a_facing && b_facing) || (a_facing_away && b_facing_away)){
-          return first_option;
-     }
-
-     a_mask = coord_direction_mask_between(a.coord, second_option);
-     b_mask = coord_direction_mask_between(b.coord, second_option);
-
-     a_facing = direction_in_mask(a_mask, a.direction);
-     b_facing = direction_in_mask(b_mask, b.direction);
-
-     a_facing_away = direction_in_mask(a_mask, direction_opposite(a.direction));
-     b_facing_away = direction_in_mask(b_mask, direction_opposite(b.direction));
-
-     direction_mask_to_string(a_mask, a_m, 128);
-     direction_mask_to_string(b_mask, b_m, 128);
-
-     if((a_facing && b_facing) || (a_facing_away && b_facing_away)){
-          return second_option;
-     }
-
-     // if we still haven't found it, check if we are on the same level as any of them
-     bool a_on_same_level = false;
-     bool b_on_same_level = false;
-
-     if(direction_is_horizontal(a.direction)){
-          a_on_same_level = (a.coord.x == first_option.x);
-     }else{
-          a_on_same_level = (a.coord.y == first_option.y);
-     }
-
-     if(direction_is_horizontal(b.direction)){
-          b_on_same_level = (b.coord.x == first_option.x);
-     }else{
-          b_on_same_level = (b.coord.y == first_option.y);
-     }
-
-     if(a_on_same_level && b_on_same_level) return first_option;
-
-     if(direction_is_horizontal(a.direction)){
-          a_on_same_level = (a.coord.x == second_option.x);
-     }else{
-          a_on_same_level = (a.coord.y == second_option.y);
-     }
-
-     if(direction_is_horizontal(b.direction)){
-          b_on_same_level = (b.coord.x == second_option.x);
-     }else{
-          b_on_same_level = (b.coord.y == second_option.y);
-     }
-
-     if(a_on_same_level && b_on_same_level) return second_option;
-
-     return Coord_t{-1, -1};
-}
-
-bool find_and_update_connected_teleported_block(Block_t* block, Direction_t direction, World_t* world){
-     Position_t block_pos = block_get_position(block);
-     Vec_t block_pos_delta_vec = block_get_pos_delta(block);
-     Vec_t block_vel_vec = block_get_vel(block);
-     auto block_cut = block_get_cut(block);
-
-     auto against_result = block_against_other_blocks(block_pos + block_pos_delta_vec,
-                                                      block_cut, direction, world->block_qt,
-                                                      world->interactive_qt, &world->tilemap, false);
-
-     F32 block_vel = 0;
-     F32 block_pos_delta = 0;
-
-     if(direction_is_horizontal(direction)){
-         block_vel = block_vel_vec.x;
-         block_pos_delta = block_pos_delta_vec.x;
-     }else{
-         block_vel = block_vel_vec.y;
-         block_pos_delta = block_pos_delta_vec.y;
-     }
-
-     for(S16 a = 0; a < against_result.count; a++){
-         auto* against_other = against_result.objects + a;
-
-         if(!against_other->through_portal && !block->teleport) continue;
-
-         Vec_t against_block_vel_vec = block_get_vel(against_other->block);
-         Vec_t against_block_pos_delta_vec = block_get_pos_delta(against_other->block);
-
-         Vec_t rotated_against_vel = vec_rotate_quadrants_counter_clockwise(against_block_vel_vec, against_other->rotations_through_portal);
-         Vec_t rotated_against_pos_delta = vec_rotate_quadrants_counter_clockwise(against_block_pos_delta_vec, against_other->rotations_through_portal);
-
-         F32 against_block_vel = 0;
-         F32 against_block_pos_delta = 0;
-
-         if(direction_is_horizontal(direction)){
-             against_block_vel = rotated_against_vel.x;
-             against_block_pos_delta = rotated_against_pos_delta.x;
-         }else{
-             against_block_vel = rotated_against_vel.y;
-             against_block_pos_delta = rotated_against_pos_delta.y;
-         }
-
-         if(block_vel != against_block_vel || block_pos_delta != against_block_pos_delta) continue;
-
-         block->connected_teleport.block_index = get_block_index(world, against_other->block);
-         block->connected_teleport.direction = direction;
-         return true;
-     }
-
-     return false;
-}
-
-bool player_block_push_add_ordered_physical_reqs(PlayerBlockPush_t* player_block_push, ObjectArray_t<PlayerBlockPush_t>* player_block_pushes,
-                                                 World_t* world, ObjectArray_t<PlayerBlockPush_t*>* ordered_player_block_pushes,
-                                                 ObjectArray_t<RestoreBlock_t>* restore_blocks){
-     auto* block = world->blocks.elements + player_block_push->block_index;
-     auto block_pos = block_get_position(block);
-     auto block_pos_delta = block_get_pos_delta(block);
-     auto block_cut = block_get_cut(block);
-     Direction_t push_direction = DIRECTION_COUNT;
-
-     auto* against_block = block_against_another_block(block_pos + block_pos_delta, block_cut, player_block_push->direction, world->block_qt,
-                                                 world->interactive_qt, &world->tilemap, &push_direction);
-     if(against_block){
-          U32 against_block_index = against_block - world->blocks.elements;
-          for(S16 i = 0; i < player_block_pushes->count; i++){
-               auto* itr = player_block_pushes->elements + i;
-               if(itr->block_index == against_block_index &&
-                  itr->direction == player_block_push->direction){
-                    if(!player_block_push_add_ordered_physical_reqs(itr, player_block_pushes, world, ordered_player_block_pushes, restore_blocks)){
-                         return false;
-                    }
-               }
-          }
-     }
-
-     RestoreBlock_t restore_block {};
-     restore_block.block = *block;
-     restore_block.index = player_block_push->block_index;
-
-     bool would_push = false;
-     if(player_block_push->is_entangled()){
-          would_push = block_would_push(block, block_pos, block_pos_delta, player_block_push->direction, world, false,
-                                        player_block_push->allowed_to_push.mass_ratio, nullptr,
-                                        &player_block_push->push_from_entangler, 1, false);
-          if(would_push){
-               BlockPushResult_t result {};
-               block_do_push(block, block_pos, block_pos_delta, player_block_push->direction, world, false,
-                             &result, player_block_push->allowed_to_push.mass_ratio, nullptr,
-                             &player_block_push->push_from_entangler);
-          }
-     }else{
-          would_push = block_would_push(block, block_pos, block_pos_delta, player_block_push->direction, world, false,
-                                        player_block_push->allowed_to_push.mass_ratio, nullptr, nullptr, 1, false);
-          if(would_push){
-               BlockPushResult_t result {};
-               block_do_push(block, block_pos, block_pos_delta, player_block_push->direction, world, false,
-                             &result, player_block_push->allowed_to_push.mass_ratio, nullptr, nullptr);
-          }
-     }
-
-     if(would_push || against_block == nullptr){
-          if(resize(ordered_player_block_pushes, ordered_player_block_pushes->count + 1)){
-               auto* ordered_player_block_push = ordered_player_block_pushes->elements + (ordered_player_block_pushes->count - 1);
-               *ordered_player_block_push = player_block_push;
-          }else{
-               LOG("ran out of memory trying to allocate %d ordered block pushes\n", ordered_player_block_pushes->count + 1);
-          }
-
-          if(resize(restore_blocks, restore_blocks->count + 1)){
-               auto* new_restore_block = restore_blocks->elements + (restore_blocks->count - 1);
-               *new_restore_block = restore_block;
-          }else{
-               LOG("ran out of memory trying to allocate %d restore blocks\n", restore_blocks->count + 1);
-          }
-     }
-     return would_push;
-}
-
-bool player_block_push_add_ordered_entangled_reqs(PlayerBlockPush_t* player_block_push,
-                                                  ObjectArray_t<PlayerBlockPush_t>* player_block_pushes,
-                                                  World_t* world, ObjectArray_t<PlayerBlockPush_t*>* ordered_player_block_pushes,
-                                                  ObjectArray_t<RestoreBlock_t>* restore_blocks){
-     if(player_block_push->is_entangled()){
-          auto* entangled_player_block_push = player_block_pushes->elements + player_block_push->entangled_push_index;
-          if(!player_block_push_add_ordered_physical_reqs(entangled_player_block_push, player_block_pushes, world,
-                                                          ordered_player_block_pushes, restore_blocks)){
-               return false;
-          }
-     }
-
-     return true;
-}
-
-void add_entangled_player_block_pushes(ObjectArray_t<PlayerBlockPush_t>* player_block_pushes,
-                                       Block_t* block_to_push, Direction_t push_direction,
-                                       AllowedToPushResult_t* allowed_to_push_result, S16 player_index,
-                                       S16 entangled_push_index, World_t* world);
-
-void add_pushes_for_against_results(BlockPushResult_t* push_result, ObjectArray_t<PlayerBlockPush_t>* player_block_pushes,
-                                    S16 player_index, AllowedToPushResult_t* allowed_to_push_result, World_t* world){
-     for(S16 a = 0; a < push_result->againsts_pushed.count; a++){
-          if(!resize(player_block_pushes, player_block_pushes->count + 1)){
-               LOG("%d: Ran out of memory trying to do player %d block pushes...\n", __LINE__, player_block_pushes->count + 1);
-          }else{
-               S16 against_entangled_push_index = (player_block_pushes->count - 1);
-               auto* player_block_push = player_block_pushes->elements + against_entangled_push_index;
-               player_block_push->performed = false;
-               player_block_push->entangled_push_index = -1;
-               player_block_push->player_index = player_index;
-               player_block_push->block_index = push_result->againsts_pushed.objects[a].block - world->blocks.elements;
-               player_block_push->direction = push_result->againsts_pushed.objects[a].direction;
-               player_block_push->allowed_to_push = *allowed_to_push_result;
-
-               add_entangled_player_block_pushes(player_block_pushes, push_result->againsts_pushed.objects[a].block,
-                                                 push_result->againsts_pushed.objects[a].direction, allowed_to_push_result,
-                                                 player_index, against_entangled_push_index, world);
-          }
-     }
-}
-
-void add_entangled_player_block_pushes(ObjectArray_t<PlayerBlockPush_t>* player_block_pushes,
-                                       Block_t* block_to_push, Direction_t push_direction,
-                                       AllowedToPushResult_t* allowed_to_push_result, S16 player_index,
-                                       S16 entangled_push_index, World_t* world){
-     Block_t save_block = *block_to_push;
-     auto push_result = block_push(block_to_push, push_direction, world, false, allowed_to_push_result->mass_ratio, nullptr, nullptr, 1, false);
-     add_pushes_for_against_results(&push_result, player_block_pushes, player_index, allowed_to_push_result, world);
-     if(!push_result.busy){
-          if(!push_result.pushed){
-               // if we didn't push, pretend we did so we still add the entangle pushes, we will still undo this later
-               BlockPushResult_t result {};
-               block_do_push(block_to_push, block_to_push->pos, block_to_push->pos_delta, push_direction, world, false, &result,
-                             allowed_to_push_result->mass_ratio, nullptr, nullptr);
-          }
-
-          PushFromEntangler_t from_entangler = build_push_from_entangler(block_to_push, push_direction, allowed_to_push_result->mass_ratio);
-
-          S16 block_mass = block_get_mass(block_to_push);
-          S16 original_block_index = block_to_push - world->blocks.elements;
-          S16 entangle_index = block_to_push->entangle_index;
-          while(entangle_index != (S16)(original_block_index) && entangle_index >= 0){
-               Block_t* entangled_block = world->blocks.elements + entangle_index;
-               bool held_down = block_held_down_by_another_block(entangled_block, world->block_qt, world->interactive_qt, &world->tilemap).held();
-               bool on_frictionless = block_on_frictionless(entangled_block, &world->tilemap, world->interactive_qt, world->block_qt);
-               if(!held_down || on_frictionless){
-                    auto rotations_between = direction_rotations_between((Direction_t)(entangled_block->rotation), (Direction_t)(block_to_push->rotation));
-                    Direction_t rotated_dir = direction_rotate_clockwise(push_direction, rotations_between);
-
-                    S16 entangled_block_mass = block_get_mass(entangled_block);
-                    F32 entangled_mass_ratio = (F32)(block_mass) / (F32)(entangled_block_mass);
-
-                    auto entangle_allowed_result = allowed_to_push(world, entangled_block, rotated_dir, entangled_mass_ratio);
-                    if(entangle_allowed_result.push){
-                         if(!resize(player_block_pushes, player_block_pushes->count + 1)){
-                              LOG("%d: Ran out of memory trying to do player %d block pushes...\n", __LINE__, player_block_pushes->count + 1);
-                         }else{
-                              // update entangled allowed result mass ratio because that is the force we are going to be using for our push
-                              entangle_allowed_result.mass_ratio = allowed_to_push_result->mass_ratio * entangled_mass_ratio * entangle_allowed_result.mass_ratio;
-
-                              auto* player_block_push = player_block_pushes->elements + (player_block_pushes->count - 1);
-                              player_block_push->performed = false;
-                              player_block_push->entangled_push_index = entangled_push_index;
-                              player_block_push->player_index = player_index;
-                              player_block_push->block_index = entangled_block - world->blocks.elements;
-                              player_block_push->direction = rotated_dir;
-                              player_block_push->allowed_to_push = entangle_allowed_result;
-                              player_block_push->push_from_entangler = from_entangler;
-
-                              Block_t save_entangled_block = *entangled_block;
-                              auto entangled_push_result = block_push(entangled_block, rotated_dir, world, false, entangle_allowed_result.mass_ratio, nullptr, nullptr, 1, false);
-                              if(entangled_push_result.pushed){
-                                   add_pushes_for_against_results(&entangled_push_result, player_block_pushes, -1, &entangle_allowed_result, world);
-                              }
-                              *entangled_block = save_entangled_block;
-                         }
-                    }
-               }
-               entangle_index = entangled_block->entangle_index;
-          }
-     }
-     *block_to_push = save_block;
-}
-
 bool this_block_has_already_pushed_others(BlockMomentumPushes_t<128>* block_pushes, S16 block_pushes_executed,
                                           BlockMomentumPush_t* push_to_check, BlockMomentumPusher_t* pusher_to_check){
      // if we find pushes going the opposite way or pushers going the same
@@ -1995,7 +1312,6 @@ bool this_block_has_already_pushed_others(BlockMomentumPushes_t<128>* block_push
      }
      return true;
 }
-
 
 int main(int argc, char** argv){
      const char* load_map_filepath = nullptr;
