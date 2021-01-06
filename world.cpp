@@ -1450,6 +1450,54 @@ void melt_ice(Coord_t center, S8 height, S16 radius, World_t* world, bool telepo
      impact_ice(center, height, radius, world, teleported, false);
 }
 
+void update_light_and_ice_detectors(Interactive_t* interactive, World_t* world){
+     switch(interactive->type){
+     default:
+          break;
+     case INTERACTIVE_TYPE_LIGHT_DETECTOR:
+     {
+          Tile_t* tile = tilemap_get_tile(&world->tilemap, interactive->coord);
+          Rect_t coord_rect = rect_surrounding_adjacent_coords(interactive->coord);
+
+          S16 block_count = 0;
+          Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
+          quad_tree_find_in(world->block_qt, coord_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
+
+          Block_t* block = nullptr;
+          for(S16 b = 0; b < block_count; b++){
+               // blocks on the coordinate and on the ground block light
+               if(block_get_coord(blocks[b]) == interactive->coord && blocks[b]->pos.z == 0){
+                    block = blocks[b];
+                    break;
+               }
+          }
+
+          if(interactive->detector.on && (tile->light < LIGHT_DETECTOR_THRESHOLD || block)){
+               activate(world, interactive->coord);
+               interactive->detector.on = false;
+          }else if(!interactive->detector.on && tile->light >= LIGHT_DETECTOR_THRESHOLD && !block){
+               activate(world, interactive->coord);
+               interactive->detector.on = true;
+          }
+          break;
+     }
+     case INTERACTIVE_TYPE_ICE_DETECTOR:
+     {
+          Tile_t* tile = tilemap_get_tile(&world->tilemap, interactive->coord);
+          if(tile){
+               if(interactive->detector.on && !tile_is_iced(tile)){
+                    activate(world, interactive->coord);
+                    interactive->detector.on = false;
+               }else if(!interactive->detector.on && tile_is_iced(tile)){
+                    activate(world, interactive->coord);
+                    interactive->detector.on = true;
+               }
+          }
+          break;
+     }
+     }
+}
+
 BlockPushMoveDirectionResult_t block_push(Block_t* block, MoveDirection_t move_direction, World_t* world, bool pushed_by_ice,
                                           F32 force, TransferMomentum_t* instant_momentum, PushFromEntangler_t* from_entangler,
                                           S16 block_contributing_momentum_to_total_blocks, bool side_effects){
@@ -2570,182 +2618,6 @@ void describe_coord(Coord_t coord, World_t* world){
                describe_player(world, player);
           }
      }
-}
-
-#define LOG_MISMATCH(name, fmt_spec, chk, act)\
-     {                                                                                                                     \
-          char mismatch_fmt_string[128];                                                                                   \
-          snprintf(mismatch_fmt_string, 128, "mismatched '%s' value. demo '%s', actual '%s'\n", name, fmt_spec, fmt_spec); \
-          LOG(mismatch_fmt_string, chk, act);                                                                              \
-          test_passed = false;                                                                                             \
-     }
-
-bool test_map_end_state(World_t* world, Demo_t* demo){
-     bool test_passed = true;
-
-     TileMap_t check_tilemap = {};
-     ObjectArray_t<Block_t> check_block_array = {};
-     ObjectArray_t<Interactive_t> check_interactives = {};
-     Coord_t check_player_start;
-
-#define NAME_LEN 64
-     char name[NAME_LEN];
-
-     if(!load_map_from_file(demo->file, &check_player_start, &check_tilemap, &check_block_array, &check_interactives, demo->filepath)){
-          LOG("failed to load map state from end of file\n");
-          return false;
-     }
-
-     if(check_tilemap.width != world->tilemap.width){
-          LOG_MISMATCH("tilemap width", "%d", check_tilemap.width, world->tilemap.width);
-     }else if(check_tilemap.height != world->tilemap.height){
-          LOG_MISMATCH("tilemap height", "%d", check_tilemap.height, world->tilemap.height);
-     }else{
-          for(S16 j = 0; j < check_tilemap.height; j++){
-               for(S16 i = 0; i < check_tilemap.width; i++){
-                    if(check_tilemap.tiles[j][i].flags != world->tilemap.tiles[j][i].flags){
-                         snprintf(name, NAME_LEN, "tile %d, %d flags", i, j);
-                         LOG_MISMATCH(name, "%d", check_tilemap.tiles[j][i].flags, world->tilemap.tiles[j][i].flags);
-                    }
-               }
-          }
-     }
-
-     S16 check_player_pixel_count = 0;
-     Pixel_t* check_player_pixels = nullptr;
-
-     switch(demo->version){
-     default:
-          break;
-     case 1:
-          check_player_pixel_count = 1;
-          check_player_pixels = (Pixel_t*)(malloc(sizeof(*check_player_pixels)));
-          break;
-     case 2:
-          fread(&check_player_pixel_count, sizeof(check_player_pixel_count), 1, demo->file);
-          check_player_pixels = (Pixel_t*)(malloc(sizeof(*check_player_pixels) * check_player_pixel_count));
-          break;
-     }
-
-     for(S16 i = 0; i < check_player_pixel_count; i++){
-          fread(check_player_pixels + i, sizeof(check_player_pixels[i]), 1, demo->file);
-     }
-
-     for(S16 i = 0; i < world->players.count; i++){
-          Player_t* player = world->players.elements + i;
-
-          if(check_player_pixels[i].x != player->pos.pixel.x){
-               LOG_MISMATCH("player pixel x", "%d", check_player_pixels[i].x, player->pos.pixel.x);
-          }
-
-          if(check_player_pixels[i].y != player->pos.pixel.y){
-               LOG_MISMATCH("player pixel y", "%d", check_player_pixels[i].y, player->pos.pixel.y);
-          }
-     }
-
-     free(check_player_pixels);
-
-     if(check_block_array.count != world->blocks.count){
-          LOG_MISMATCH("block count", "%d", check_block_array.count, world->blocks.count);
-     }else{
-          for(S16 i = 0; i < check_block_array.count; i++){
-               // TODO: consider checking other things
-               Block_t* check_block = check_block_array.elements + i;
-               Block_t* block = world->blocks.elements + i;
-               if(check_block->pos.pixel.x != block->pos.pixel.x){
-                    snprintf(name, NAME_LEN, "block %d pos x", i);
-                    LOG_MISMATCH(name, "%d", check_block->pos.pixel.x, block->pos.pixel.x);
-               }
-
-               if(check_block->pos.pixel.y != block->pos.pixel.y){
-                    snprintf(name, NAME_LEN, "block %d pos y", i);
-                    LOG_MISMATCH(name, "%d", check_block->pos.pixel.y, block->pos.pixel.y);
-               }
-
-               if(check_block->pos.z != block->pos.z){
-                    snprintf(name, NAME_LEN, "block %d pos z", i);
-                    LOG_MISMATCH(name, "%d", check_block->pos.z, block->pos.z);
-               }
-
-               if(check_block->element != block->element){
-                    snprintf(name, NAME_LEN, "block %d element", i);
-                    LOG_MISMATCH(name, "%d", check_block->element, block->element);
-               }
-
-               if(check_block->entangle_index != block->entangle_index){
-                    snprintf(name, NAME_LEN, "block %d entangle_index", i);
-                    LOG_MISMATCH(name, "%d", check_block->entangle_index, block->entangle_index);
-               }
-          }
-     }
-
-     if(check_interactives.count != world->interactives.count){
-          LOG_MISMATCH("interactive count", "%d", check_interactives.count, world->interactives.count);
-     }else{
-          for(S16 i = 0; i < check_interactives.count; i++){
-               // TODO: consider checking other things
-               Interactive_t* check_interactive = check_interactives.elements + i;
-               Interactive_t* interactive = world->interactives.elements + i;
-
-               if(check_interactive->type != interactive->type){
-                    LOG_MISMATCH("interactive type", "%d", check_interactive->type, interactive->type);
-               }else{
-                    switch(check_interactive->type){
-                    default:
-                         break;
-                    case INTERACTIVE_TYPE_PRESSURE_PLATE:
-                         if(check_interactive->pressure_plate.down != interactive->pressure_plate.down){
-                              snprintf(name, NAME_LEN, "interactive at %d, %d pressure plate down",
-                                       interactive->coord.x, interactive->coord.y);
-                              LOG_MISMATCH(name, "%d", check_interactive->pressure_plate.down,
-                                           interactive->pressure_plate.down);
-                         }
-                         break;
-                    case INTERACTIVE_TYPE_ICE_DETECTOR:
-                    case INTERACTIVE_TYPE_LIGHT_DETECTOR:
-                         if(check_interactive->detector.on != interactive->detector.on){
-                              snprintf(name, NAME_LEN, "interactive at %d, %d detector on",
-                                       interactive->coord.x, interactive->coord.y);
-                              LOG_MISMATCH(name, "%d", check_interactive->detector.on,
-                                           interactive->detector.on);
-                         }
-                         break;
-                    case INTERACTIVE_TYPE_POPUP:
-                         if(check_interactive->popup.iced != interactive->popup.iced){
-                              snprintf(name, NAME_LEN, "interactive at %d, %d popup iced",
-                                       interactive->coord.x, interactive->coord.y);
-                              LOG_MISMATCH(name, "%d", check_interactive->popup.iced,
-                                           interactive->popup.iced);
-                         }
-                         if(check_interactive->popup.lift.up != interactive->popup.lift.up){
-                              snprintf(name, NAME_LEN, "interactive at %d, %d popup lift up",
-                                       interactive->coord.x, interactive->coord.y);
-                              LOG_MISMATCH(name, "%d", check_interactive->popup.lift.up,
-                                           interactive->popup.lift.up);
-                         }
-                         break;
-                    case INTERACTIVE_TYPE_DOOR:
-                         if(check_interactive->door.lift.up != interactive->door.lift.up){
-                              snprintf(name, NAME_LEN, "interactive at %d, %d door lift up",
-                                       interactive->coord.x, interactive->coord.y);
-                              LOG_MISMATCH(name, "%d", check_interactive->door.lift.up,
-                                           interactive->door.lift.up);
-                         }
-                         break;
-                    case INTERACTIVE_TYPE_PORTAL:
-                         if(check_interactive->portal.on != interactive->portal.on){
-                              snprintf(name, NAME_LEN, "interactive at %d, %d portal on",
-                                       interactive->coord.x, interactive->coord.y);
-                              LOG_MISMATCH(name, "%d", check_interactive->portal.on,
-                                           interactive->portal.on);
-                         }
-                         break;
-                    }
-               }
-          }
-     }
-
-     return test_passed;
 }
 
 S16 get_block_index(World_t* world, Block_t* block){

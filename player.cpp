@@ -60,3 +60,19 @@ Position_t get_player_adjacent_position(Player_t* player, Direction_t direction)
 
      return result;
 }
+
+void raise_players(ObjectArray_t<Player_t>* players){
+     for(S16 i = 0; i < players->count; i++){
+          players->elements[i].pos.z++;
+          players->elements[i].held_up = true;
+
+          // gettin raised makes it hard to push stuff
+          players->elements[i].push_time = 0.0f;
+     }
+}
+
+void hold_players(ObjectArray_t<Player_t>* players){
+     for(S16 i = 0; i < players->count; i++){
+          players->elements[i].held_up = true;
+     }
+}

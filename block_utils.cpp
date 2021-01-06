@@ -2067,3 +2067,125 @@ bool block_on_frictionless(Position_t pos, Vec_t pos_delta, BlockCut_t cut, Tile
 bool block_on_frictionless(Block_t* block, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt, QuadTreeNode_t<Block_t>* block_qt){
      return block_on_frictionless(block_get_position(block), block_get_pos_delta(block), block_get_cut(block), tilemap, interactive_qt, block_qt);
 }
+
+CheckBlockCollisionResult_t check_block_collision(World_t* world, Block_t* block){
+     if(block->teleport){
+          if(block->teleport_pos_delta.x != 0.0f || block->teleport_pos_delta.y != 0.0f){
+               return check_block_collision_with_other_blocks(block->teleport_pos,
+                                                              block->teleport_pos_delta,
+                                                              block->teleport_vel,
+                                                              block->teleport_accel,
+                                                              block->teleport_cut,
+                                                              block->stop_on_pixel_x,
+                                                              block->stop_on_pixel_y,
+                                                              block->teleport_horizontal_move,
+                                                              block->teleport_vertical_move,
+                                                              block->stopped_by_player_horizontal,
+                                                              block->stopped_by_player_vertical,
+                                                              get_block_index(world, block),
+                                                              block->clone_start.x > 0,
+                                                              world);
+          }
+     }else{
+          if(block->pos_delta.x != 0.0f || block->pos_delta.y != 0.0f){
+               return check_block_collision_with_other_blocks(block->pos,
+                                                              block->pos_delta,
+                                                              block->vel,
+                                                              block->accel,
+                                                              block->cut,
+                                                              block->stop_on_pixel_x,
+                                                              block->stop_on_pixel_y,
+                                                              block->horizontal_move,
+                                                              block->vertical_move,
+                                                              block->stopped_by_player_horizontal,
+                                                              block->stopped_by_player_vertical,
+                                                              get_block_index(world, block),
+                                                              block->clone_start.x > 0,
+                                                              world);
+          }
+     }
+
+     return CheckBlockCollisionResult_t{};
+}
+
+void stop_block_colliding_in_dir(Block_t* block, Direction_t move_dir_to_stop){
+     switch(move_dir_to_stop){
+     default:
+          break;
+     case DIRECTION_LEFT:
+     case DIRECTION_RIGHT:
+     {
+          block->stop_on_pixel_x = closest_pixel(block->pos.pixel.x, block->pos.decimal.x);
+
+          Position_t final_stop_pos = pixel_pos(Pixel_t{block->stop_on_pixel_x, 0});
+          Vec_t pos_delta = pos_to_vec(final_stop_pos - block->pos);
+
+          block->pos_delta.x = pos_delta.x;
+          block->vel.x = 0;
+          block->accel.x = 0;
+
+          reset_move(&block->horizontal_move);
+          break;
+     }
+     case DIRECTION_UP:
+     case DIRECTION_DOWN:
+     {
+          block->stop_on_pixel_y = closest_pixel(block->pos.pixel.y, block->pos.decimal.y);
+
+          Position_t final_stop_pos = pixel_pos(Pixel_t{0, block->stop_on_pixel_y});
+          Vec_t pos_delta = pos_to_vec(final_stop_pos - block->pos);
+
+          block->pos_delta.y = pos_delta.y;
+          block->vel.y = 0;
+          block->accel.y = 0;
+
+          block->stop_on_pixel_y = 0;
+
+          reset_move(&block->vertical_move);
+          break;
+     }
+     }
+}
+
+void copy_block_collision_results(Block_t* block, CheckBlockCollisionResult_t* result){
+     block->pos_delta = result->pos_delta;
+     block->vel = result->vel;
+     block->accel = result->accel;
+
+     block->stop_on_pixel_x = result->stop_on_pixel_x;
+     block->stop_on_pixel_y = result->stop_on_pixel_y;
+
+     block->started_on_pixel_x = 0;
+     block->started_on_pixel_y = 0;
+
+     block->horizontal_move = result->horizontal_move;
+     block->vertical_move = result->vertical_move;
+
+     block->stopped_by_player_horizontal = result->stopped_by_player_horizontal;
+     block->stopped_by_player_vertical = result->stopped_by_player_vertical;
+}
+
+void raise_above_blocks(World_t* world, Block_t* block){
+     auto result = block_held_down_by_another_block(block, world->block_qt, world->interactive_qt, &world->tilemap);
+     for(S16 i = 0; i < result.count; i++){
+          Block_t* above_block = result.blocks_held[i].block;
+          raise_above_blocks(world, above_block);
+          above_block->pos.z++;
+          above_block->held_up = BLOCK_HELD_BY_SOLID;
+          raise_entangled_blocks(world, above_block);
+     }
+}
+
+void raise_entangled_blocks(World_t* world, Block_t* block){
+     if(block->entangle_index >= 0){
+          S16 block_index = get_block_index(world, block);
+          S16 entangle_index = block->entangle_index;
+          while(entangle_index != block_index && entangle_index >= 0){
+               auto entangled_block = world->blocks.elements + entangle_index;
+               raise_above_blocks(world, entangled_block);
+               entangled_block->pos.z++;
+               entangled_block->held_up = BLOCK_HELD_BY_ENTANGLE;
+               entangle_index = entangled_block->entangle_index;
+          }
+     }
+}

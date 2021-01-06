@@ -1,6 +1,8 @@
 #include "demo.h"
+#include "map_format.h"
 
 #include <stdlib.h>
+#include <string.h>
 
 struct DemoEntryNode_t{
      DemoEntry_t entry;
@@ -209,4 +211,220 @@ void player_action_perform(PlayerAction_t* player_action, ObjectArray_t<Player_t
           DemoEntry_t demo_entry {frame_count, player_action_type};
           fwrite(&demo_entry, sizeof(demo_entry), 1, demo_file);
      }
+}
+
+FILE* load_demo_number(S32 map_number, const char** demo_filepath){
+     char filepath[64] = {};
+     snprintf(filepath, 64, "content/%03d.bd", map_number);
+     *demo_filepath = strdup(filepath);
+     return fopen(*demo_filepath, "rb");
+}
+
+void cache_for_demo_seek(World_t* world, TileMap_t* demo_starting_tilemap, ObjectArray_t<Block_t>* demo_starting_blocks,
+                         ObjectArray_t<Interactive_t>* demo_starting_interactives){
+     deep_copy(&world->tilemap, demo_starting_tilemap);
+     deep_copy(&world->blocks, demo_starting_blocks);
+     deep_copy(&world->interactives, demo_starting_interactives);
+}
+
+void fetch_cache_for_demo_seek(World_t* world, TileMap_t* demo_starting_tilemap, ObjectArray_t<Block_t>* demo_starting_blocks,
+                               ObjectArray_t<Interactive_t>* demo_starting_interactives){
+     deep_copy(demo_starting_tilemap, &world->tilemap);
+     deep_copy(demo_starting_blocks, &world->blocks);
+     deep_copy(demo_starting_interactives, &world->interactives);
+}
+
+bool load_map_number_demo(Demo_t* demo, S16 map_number, S64* frame_count){
+     if(demo->file) fclose(demo->file);
+     demo->file = load_demo_number(map_number, &demo->filepath);
+     if(!demo->file){
+          LOG("missing map %d corresponding demo.\n", map_number);
+          return false;
+     }
+
+     free(demo->entries.entries);
+     demo->entry_index = 0;
+     fread(&demo->version, sizeof(demo->version), 1, demo->file);
+     demo->entries = demo_entries_get(demo->file);
+     *frame_count = 0;
+     demo->last_frame = demo->entries.entries[demo->entries.count - 1].frame;
+     LOG("testing demo %s: version %d with %" PRId64 " actions across %" PRId64 " frames\n", demo->filepath,
+         demo->version, demo->entries.count, demo->last_frame);
+     return true;
+}
+
+#define LOG_MISMATCH(name, fmt_spec, chk, act)\
+     {                                                                                                                     \
+          char mismatch_fmt_string[128];                                                                                   \
+          snprintf(mismatch_fmt_string, 128, "mismatched '%s' value. demo '%s', actual '%s'\n", name, fmt_spec, fmt_spec); \
+          LOG(mismatch_fmt_string, chk, act);                                                                              \
+          test_passed = false;                                                                                             \
+     }
+
+bool test_map_end_state(World_t* world, Demo_t* demo){
+     bool test_passed = true;
+
+     TileMap_t check_tilemap = {};
+     ObjectArray_t<Block_t> check_block_array = {};
+     ObjectArray_t<Interactive_t> check_interactives = {};
+     Coord_t check_player_start;
+
+#define NAME_LEN 64
+     char name[NAME_LEN];
+
+     if(!load_map_from_file(demo->file, &check_player_start, &check_tilemap, &check_block_array, &check_interactives, demo->filepath)){
+          LOG("failed to load map state from end of file\n");
+          return false;
+     }
+
+     if(check_tilemap.width != world->tilemap.width){
+          LOG_MISMATCH("tilemap width", "%d", check_tilemap.width, world->tilemap.width);
+     }else if(check_tilemap.height != world->tilemap.height){
+          LOG_MISMATCH("tilemap height", "%d", check_tilemap.height, world->tilemap.height);
+     }else{
+          for(S16 j = 0; j < check_tilemap.height; j++){
+               for(S16 i = 0; i < check_tilemap.width; i++){
+                    if(check_tilemap.tiles[j][i].flags != world->tilemap.tiles[j][i].flags){
+                         snprintf(name, NAME_LEN, "tile %d, %d flags", i, j);
+                         LOG_MISMATCH(name, "%d", check_tilemap.tiles[j][i].flags, world->tilemap.tiles[j][i].flags);
+                    }
+               }
+          }
+     }
+
+     S16 check_player_pixel_count = 0;
+     Pixel_t* check_player_pixels = nullptr;
+
+     switch(demo->version){
+     default:
+          break;
+     case 1:
+          check_player_pixel_count = 1;
+          check_player_pixels = (Pixel_t*)(malloc(sizeof(*check_player_pixels)));
+          break;
+     case 2:
+          fread(&check_player_pixel_count, sizeof(check_player_pixel_count), 1, demo->file);
+          check_player_pixels = (Pixel_t*)(malloc(sizeof(*check_player_pixels) * check_player_pixel_count));
+          break;
+     }
+
+     for(S16 i = 0; i < check_player_pixel_count; i++){
+          fread(check_player_pixels + i, sizeof(check_player_pixels[i]), 1, demo->file);
+     }
+
+     for(S16 i = 0; i < world->players.count; i++){
+          Player_t* player = world->players.elements + i;
+
+          if(check_player_pixels[i].x != player->pos.pixel.x){
+               LOG_MISMATCH("player pixel x", "%d", check_player_pixels[i].x, player->pos.pixel.x);
+          }
+
+          if(check_player_pixels[i].y != player->pos.pixel.y){
+               LOG_MISMATCH("player pixel y", "%d", check_player_pixels[i].y, player->pos.pixel.y);
+          }
+     }
+
+     free(check_player_pixels);
+
+     if(check_block_array.count != world->blocks.count){
+          LOG_MISMATCH("block count", "%d", check_block_array.count, world->blocks.count);
+     }else{
+          for(S16 i = 0; i < check_block_array.count; i++){
+               // TODO: consider checking other things
+               Block_t* check_block = check_block_array.elements + i;
+               Block_t* block = world->blocks.elements + i;
+               if(check_block->pos.pixel.x != block->pos.pixel.x){
+                    snprintf(name, NAME_LEN, "block %d pos x", i);
+                    LOG_MISMATCH(name, "%d", check_block->pos.pixel.x, block->pos.pixel.x);
+               }
+
+               if(check_block->pos.pixel.y != block->pos.pixel.y){
+                    snprintf(name, NAME_LEN, "block %d pos y", i);
+                    LOG_MISMATCH(name, "%d", check_block->pos.pixel.y, block->pos.pixel.y);
+               }
+
+               if(check_block->pos.z != block->pos.z){
+                    snprintf(name, NAME_LEN, "block %d pos z", i);
+                    LOG_MISMATCH(name, "%d", check_block->pos.z, block->pos.z);
+               }
+
+               if(check_block->element != block->element){
+                    snprintf(name, NAME_LEN, "block %d element", i);
+                    LOG_MISMATCH(name, "%d", check_block->element, block->element);
+               }
+
+               if(check_block->entangle_index != block->entangle_index){
+                    snprintf(name, NAME_LEN, "block %d entangle_index", i);
+                    LOG_MISMATCH(name, "%d", check_block->entangle_index, block->entangle_index);
+               }
+          }
+     }
+
+     if(check_interactives.count != world->interactives.count){
+          LOG_MISMATCH("interactive count", "%d", check_interactives.count, world->interactives.count);
+     }else{
+          for(S16 i = 0; i < check_interactives.count; i++){
+               // TODO: consider checking other things
+               Interactive_t* check_interactive = check_interactives.elements + i;
+               Interactive_t* interactive = world->interactives.elements + i;
+
+               if(check_interactive->type != interactive->type){
+                    LOG_MISMATCH("interactive type", "%d", check_interactive->type, interactive->type);
+               }else{
+                    switch(check_interactive->type){
+                    default:
+                         break;
+                    case INTERACTIVE_TYPE_PRESSURE_PLATE:
+                         if(check_interactive->pressure_plate.down != interactive->pressure_plate.down){
+                              snprintf(name, NAME_LEN, "interactive at %d, %d pressure plate down",
+                                       interactive->coord.x, interactive->coord.y);
+                              LOG_MISMATCH(name, "%d", check_interactive->pressure_plate.down,
+                                           interactive->pressure_plate.down);
+                         }
+                         break;
+                    case INTERACTIVE_TYPE_ICE_DETECTOR:
+                    case INTERACTIVE_TYPE_LIGHT_DETECTOR:
+                         if(check_interactive->detector.on != interactive->detector.on){
+                              snprintf(name, NAME_LEN, "interactive at %d, %d detector on",
+                                       interactive->coord.x, interactive->coord.y);
+                              LOG_MISMATCH(name, "%d", check_interactive->detector.on,
+                                           interactive->detector.on);
+                         }
+                         break;
+                    case INTERACTIVE_TYPE_POPUP:
+                         if(check_interactive->popup.iced != interactive->popup.iced){
+                              snprintf(name, NAME_LEN, "interactive at %d, %d popup iced",
+                                       interactive->coord.x, interactive->coord.y);
+                              LOG_MISMATCH(name, "%d", check_interactive->popup.iced,
+                                           interactive->popup.iced);
+                         }
+                         if(check_interactive->popup.lift.up != interactive->popup.lift.up){
+                              snprintf(name, NAME_LEN, "interactive at %d, %d popup lift up",
+                                       interactive->coord.x, interactive->coord.y);
+                              LOG_MISMATCH(name, "%d", check_interactive->popup.lift.up,
+                                           interactive->popup.lift.up);
+                         }
+                         break;
+                    case INTERACTIVE_TYPE_DOOR:
+                         if(check_interactive->door.lift.up != interactive->door.lift.up){
+                              snprintf(name, NAME_LEN, "interactive at %d, %d door lift up",
+                                       interactive->coord.x, interactive->coord.y);
+                              LOG_MISMATCH(name, "%d", check_interactive->door.lift.up,
+                                           interactive->door.lift.up);
+                         }
+                         break;
+                    case INTERACTIVE_TYPE_PORTAL:
+                         if(check_interactive->portal.on != interactive->portal.on){
+                              snprintf(name, NAME_LEN, "interactive at %d, %d portal on",
+                                       interactive->coord.x, interactive->coord.y);
+                              LOG_MISMATCH(name, "%d", check_interactive->portal.on,
+                                           interactive->portal.on);
+                         }
+                         break;
+                    }
+               }
+          }
+     }
+
+     return test_passed;
 }

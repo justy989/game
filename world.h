@@ -7,7 +7,6 @@
 #include "arrow.h"
 #include "quad_tree.h"
 #include "undo.h"
-#include "demo.h"
 #include "raw.h"
 #include "camera.h"
 #include "static_object_array.h"
@@ -138,6 +137,8 @@ void illuminate(Coord_t coord, U8 value, World_t* world, Coord_t from_portal = C
 void spread_ice(Coord_t center, S8 height, S16 radius, World_t* world, bool teleported = false);
 void melt_ice(Coord_t center, S8 height, S16 radius, World_t* world, bool teleported = false);
 
+void update_light_and_ice_detectors(Interactive_t* interactive, World_t* world);
+
 BlockPushMoveDirectionResult_t block_push(Block_t* block, MoveDirection_t move_direction, World_t* world, bool pushed_by_ice,
                                           F32 force = 1.0f, TransferMomentum_t* instant_momentum = NULL, PushFromEntangler_t* from_entangler = NULL,
                                           S16 block_contributing_momentum_to_total_blocks = 1, bool side_effects = false);
@@ -163,7 +164,6 @@ bool reset_players(ObjectArray_t<Player_t>* players);
 void describe_player(World_t* world, Player_t* player);
 void describe_block(World_t* world, Block_t* block);
 void describe_coord(Coord_t coord, World_t* world);
-bool test_map_end_state(World_t* world, Demo_t* demo);
 
 S16 get_block_index(World_t* world, Block_t* block);
 bool setup_default_room(World_t* world);

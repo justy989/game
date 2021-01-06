@@ -1,7 +1,6 @@
 #pragma once
 
-#include "player.h"
-#include "object_array.h"
+#include "world.h"
 
 #include <stdio.h>
 
@@ -68,3 +67,12 @@ bool demo_play_frame(Demo_t* demo, PlayerAction_t* player_action, ObjectArray_t<
 
 void player_action_perform(PlayerAction_t* player_action, ObjectArray_t<Player_t>* players, PlayerActionType_t player_action_type,
                            DemoMode_t demo_mode, FILE* demo_file, S64 frame_count);
+
+FILE* load_demo_number(S32 map_number, const char** demo_filepath);
+void cache_for_demo_seek(World_t* world, TileMap_t* demo_starting_tilemap, ObjectArray_t<Block_t>* demo_starting_blocks,
+                         ObjectArray_t<Interactive_t>* demo_starting_interactives);
+void fetch_cache_for_demo_seek(World_t* world, TileMap_t* demo_starting_tilemap, ObjectArray_t<Block_t>* demo_starting_blocks,
+                               ObjectArray_t<Interactive_t>* demo_starting_interactives);
+bool load_map_number_demo(Demo_t* demo, S16 map_number, S64* frame_count);
+
+bool test_map_end_state(World_t* world, Demo_t* demo);

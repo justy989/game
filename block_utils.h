@@ -378,3 +378,11 @@ FindBlocksThroughPortalResult_t find_blocks_through_portals(Coord_t coord, TileM
 BlockChainsResult_t find_block_chain(Block_t* block, Direction_t direction, QuadTreeNode_t<Block_t>* block_qt,
                                      QuadTreeNode_t<Interactive_t>* interactive_qt, TileMap_t* tilemap, S8 rotations = 0, BlockChain_t* my_chain = NULL);
 TransferMomentum_t get_block_push_pusher_momentum(BlockMomentumPush_t* push, World_t* world, Direction_t push_direction);
+
+CheckBlockCollisionResult_t check_block_collision(World_t* world, Block_t* block);
+
+void stop_block_colliding_in_dir(Block_t* block, Direction_t move_dir_to_stop);
+void copy_block_collision_results(Block_t* block, CheckBlockCollisionResult_t* result);
+
+void raise_above_blocks(World_t* world, Block_t* block);
+void raise_entangled_blocks(World_t* world, Block_t* block);
