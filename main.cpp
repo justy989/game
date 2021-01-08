@@ -18,6 +18,7 @@ Puzzle Ideas:
   to be pushed through
 
 Current bugs:
+- When a stack of 2 blocks falls off of a popup onto the ground, the top block is offset from the bottom block a little
 - a block travelling diagonally at a wall will stop on both axis' against the wall because of the collision
 - player is able to get into a block sometimes when standing on a popup that is going down and pushing a block that has fallen off of it
 - blocks moving fast enough can also cause the player to get inside
@@ -421,7 +422,7 @@ void generate_pushes_from_collision(World_t* world, CheckBlockCollisionResult_t*
                     Position_t last_block_in_chain_final_pos = block_get_final_position(last_block_in_chain);
                     auto last_block_in_chain_cut = block_get_cut(last_block_in_chain);
                     auto chain_against_result = block_against_other_blocks(last_block_in_chain_final_pos, last_block_in_chain_cut,
-                                                                     against_direction, world->block_qt, world->interactive_qt, &world->tilemap);
+                                                                           against_direction, world->block_qt, world->interactive_qt, &world->tilemap);
                     if(chain_against_result.count > 0){
                          last_block_in_chain = chain_against_result.objects[0].block;
                          against_direction = direction_rotate_clockwise(against_direction, chain_against_result.objects[0].rotations_through_portal);
@@ -496,6 +497,53 @@ void generate_pushes_from_collision(World_t* world, CheckBlockCollisionResult_t*
                          }
                     } break;
                     }
+               }else{
+                    // detecting the case at the end of a block chain slowing down (due to the end being stopped by friction or the player) and 
+                    switch(direction){
+                    default:
+                        break;
+                    case DIRECTION_LEFT:
+                    {
+                         if(block->vel.x == 0 &&
+                            collided_block->vel.x > 0 &&
+                            block->horizontal_move.state == MOVE_STATE_IDLING){
+                              block_stop_horizontally(collided_block);
+                              collided_block->stop_on_pixel_x = closest_pixel(collided_block->pos.pixel.x, collided_block->pos.decimal.x);
+                              should_push = false;
+                         }
+                    } break;
+                    case DIRECTION_RIGHT:
+                    {
+                         if(block->vel.x == 0 &&
+                            collided_block->vel.x < 0 &&
+                            block->horizontal_move.state == MOVE_STATE_IDLING){
+                              block_stop_horizontally(collided_block);
+                              collided_block->stop_on_pixel_x = closest_pixel(collided_block->pos.pixel.x, collided_block->pos.decimal.x);
+                              should_push = false;
+                         }
+                    } break;
+                    case DIRECTION_DOWN:
+                    {
+                         if(block->vel.y == 0 &&
+                            collided_block->vel.y > 0 &&
+                            block->vertical_move.state == MOVE_STATE_IDLING){
+                              block_stop_vertically(collided_block);
+                              collided_block->stop_on_pixel_y = closest_pixel(collided_block->pos.pixel.y, collided_block->pos.decimal.y);
+                              should_push = false;
+                         }
+                    } break;
+                    case DIRECTION_UP:
+                    {
+                         if(block->vel.y == 0 &&
+                            collided_block->vel.y < 0 &&
+                            block->vertical_move.state == MOVE_STATE_IDLING){
+                              block_stop_vertically(collided_block);
+                              collided_block->stop_on_pixel_y = closest_pixel(collided_block->pos.pixel.y, collided_block->pos.decimal.y);
+                              should_push = false;
+                         }
+                    } break;
+                    }
+
                }
           }else{
                auto against = block_diagonally_against_block(block->pos + block->pos_delta, block_cut, collided_with_block->direction_mask, &world->tilemap,
