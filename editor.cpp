@@ -541,16 +541,29 @@ void coord_clear(Coord_t coord, TileMap_t* tilemap, ObjectArray_t<Interactive_t>
           }
 
           if(block_index >= 0){
-               auto* block = block_array->elements + block_index;
-               if(block->entangle_index >= 0){
-                    S16 entangle_index = block->entangle_index;
-                    while(entangle_index != block_index && entangle_index != -1){
-                         Block_t* entangled_block = block_array->elements + entangle_index;
-                         entangle_index = entangled_block->entangle_index;
-                         entangled_block->entangle_index = -1;
+               // if the block is entangled, clear the entangle index on any blocks it was linked with
+               {
+                    auto* block = block_array->elements + block_index;
+                    if(block->entangle_index >= 0){
+                         S16 entangle_index = block->entangle_index;
+                         while(entangle_index != block_index && entangle_index != -1){
+                              Block_t* entangled_block = block_array->elements + entangle_index;
+                              entangle_index = entangled_block->entangle_index;
+                              entangled_block->entangle_index = -1;
+                         }
                     }
                }
                remove(block_array, block_index);
+
+               // a remove means the last element is put into the slot we removed, so any blocks at that index, if
+               // they are entangled, tell their entangler what the new index is
+               S16 previous_last_index = block_array->count;
+               for(S16 i = 0; i < block_array->count; i++){
+                    auto* block = block_array->elements + i;
+                    if(block->entangle_index == previous_last_index){
+                         block->entangle_index = block_index;
+                    }
+               }
           }
      }while(found_block);
 }
