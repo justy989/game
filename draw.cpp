@@ -699,7 +699,7 @@ void draw_world_row_solids(S16 y, S16 x_start, S16 x_end, TileMap_t* tilemap, Qu
           draw_block(block, final_pos, 0);
 
           if(block->entangle_index >= 0){
-               U32 tint_index = -1;
+               S32 tint_index = -1;
                for(S16 t = 0; t < entangle_tints->block_to_tint_index.count; t++){
                     auto* converter = entangle_tints->block_to_tint_index.elements + t;
                     if(converter->block == block){
