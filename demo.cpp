@@ -267,12 +267,14 @@ bool test_map_end_state(World_t* world, Demo_t* demo){
      TileMap_t check_tilemap = {};
      ObjectArray_t<Block_t> check_block_array = {};
      ObjectArray_t<Interactive_t> check_interactives = {};
+     ObjectArray_t<Rect_t> check_rooms = {};
      Coord_t check_player_start;
 
 #define NAME_LEN 64
      char name[NAME_LEN];
 
-     if(!load_map_from_file(demo->file, &check_player_start, &check_tilemap, &check_block_array, &check_interactives, demo->filepath)){
+     if(!load_map_from_file(demo->file, &check_player_start, &check_tilemap, &check_block_array, &check_interactives,
+                            &check_rooms, demo->filepath)){
           LOG("failed to load map state from end of file\n");
           return false;
      }

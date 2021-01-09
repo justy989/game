@@ -11,7 +11,8 @@
 
 // version 4 is just the addition of the thumbnail
 // version 7 adds the iced flag to the pit
-#define MAP_VERSION 7
+// version 8 adds rooms
+#define MAP_VERSION 8
 
 #pragma pack(push, 1)
 struct MapTileV1_t{
@@ -116,16 +117,16 @@ struct MapInteractiveV3_t{
 #pragma pack(pop)
 
 bool save_map_to_file(FILE* file, Coord_t player_start, const TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array,
-                      ObjectArray_t<Interactive_t>* interactive_array, bool* tags, Raw_t* thumbnail);
+                      ObjectArray_t<Interactive_t>* interactive_array, ObjectArray_t<Rect_t>* room_array, bool* tags, Raw_t* thumbnail);
 
 bool save_map(const char* filepath, Coord_t player_start, const TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array,
-              ObjectArray_t<Interactive_t>* interactive_array, bool* tags, Raw_t* thumbnail);
+              ObjectArray_t<Interactive_t>* interactive_array, ObjectArray_t<Rect_t>* room_array, bool* tags, Raw_t* thumbnail);
 
 bool load_map_from_file(FILE* file, Coord_t* player_start, TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array,
-                        ObjectArray_t<Interactive_t>* interactive_array, const char* filepath);
+                        ObjectArray_t<Interactive_t>* interactive_array, ObjectArray_t<Rect_t>* room_array, const char* filepath);
 
 bool load_map(const char* filepath, Coord_t* player_start, TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array,
-              ObjectArray_t<Interactive_t>* interactive_array);
+              ObjectArray_t<Interactive_t>* interactive_array, ObjectArray_t<Rect_t>* room_array);
 
 bool load_map_thumbnail(const char* filepath, Raw_t* thumbnail);
 bool load_map_tags(const char* filepath, bool* tags);

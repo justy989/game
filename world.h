@@ -16,12 +16,16 @@ struct World_t{
      ObjectArray_t<Player_t> players = {};
      ObjectArray_t<Block_t> blocks = {};
      ObjectArray_t<Interactive_t> interactives = {};
+     ObjectArray_t<Rect_t> rooms = {};
      ArrowArray_t arrows = {};
 
      QuadTreeNode_t<Interactive_t>* interactive_qt = NULL;
      QuadTreeNode_t<Block_t>* block_qt = NULL;
 
+     // TODO: do we still need this ?
      S32 clone_instance = 0;
+
+     S16 current_room = -1;
 };
 
 #define MAX_TELEPORT_POSITION_RESULTS 4

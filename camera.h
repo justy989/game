@@ -3,6 +3,7 @@
 #include "position.h"
 #include "tile.h"
 #include "quad.h"
+#include "rect.h"
 
 struct Camera_t{
      Position_t pos;
@@ -15,6 +16,7 @@ struct Camera_t{
 
      Position_t bottom_left();
      void center_on_tilemap(TileMap_t* tilemap);
+     void center_on_room(Rect_t* rect);
 
      Vec_t normalized_to_world(Vec_t v);
 };

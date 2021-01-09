@@ -1616,8 +1616,11 @@ int main(int argc, char** argv){
      ObjectArray_t<RestoreBlock_t> restore_blocks {};
      memset(&restore_blocks, 0, sizeof(restore_blocks));
 
+     memset(&world.rooms, 0, sizeof(world.rooms));
+
      if(load_map_filepath){
-          if(!load_map(load_map_filepath, &player_start, &world.tilemap, &world.blocks, &world.interactives)){
+          if(!load_map(load_map_filepath, &player_start, &world.tilemap, &world.blocks, &world.interactives,
+                       &world.rooms)){
                return 1;
           }
 
@@ -1737,6 +1740,13 @@ int main(int argc, char** argv){
           visible_map_thumbnail_count = filter_thumbnails(&tag_checkboxes, &map_thumbnails);
      }
 
+     // TODO: remove this, it is just for getting things going
+     {
+          init(&world.rooms, 2);
+          world.rooms.elements[0] = Rect_t{1, 1, 5, 5};
+          world.rooms.elements[1] = Rect_t{3, 8, 8, 11};
+     }
+
      F32 dt = 0.0f;
 
      auto last_time = std::chrono::system_clock::now();
@@ -1780,14 +1790,18 @@ int main(int argc, char** argv){
                     if(update_tags){
                          World_t a_whole_new_world {};
                          bool* updated_tags = get_global_tags();
-                         if(load_map(map_number_filepath, &player_start, &a_whole_new_world.tilemap, &a_whole_new_world.blocks, &a_whole_new_world.interactives)){
+                         if(load_map(map_number_filepath, &player_start, &a_whole_new_world.tilemap,
+                                     &a_whole_new_world.blocks, &a_whole_new_world.interactives,
+                                     &a_whole_new_world.rooms)){
                               Raw_t* thumbnail_ptr = NULL;
 
                               Raw_t raw_thumbnail {};
                               if(load_map_thumbnail(map_number_filepath, &raw_thumbnail)){
                                    thumbnail_ptr = &raw_thumbnail;
                               }
-                              save_map(map_number_filepath, player_start, &a_whole_new_world.tilemap, &a_whole_new_world.blocks, &a_whole_new_world.interactives, updated_tags, thumbnail_ptr);
+                              save_map(map_number_filepath, player_start, &a_whole_new_world.tilemap,
+                                       &a_whole_new_world.blocks, &a_whole_new_world.interactives,
+                                       &a_whole_new_world.rooms, updated_tags, thumbnail_ptr);
                               if(thumbnail_ptr){
                                    free(raw_thumbnail.bytes);
                               }
@@ -1862,6 +1876,11 @@ int main(int argc, char** argv){
                          }
                          break;
                     }
+                    case SDL_SCANCODE_F2:
+                         if(game_mode == GAME_MODE_EDITOR){
+                              editor.mode = EDITOR_MODE_ROOM_SELECTION;
+                         }
+                         break;
                     case SDL_SCANCODE_F4:
                          game_mode = GAME_MODE_PLAYING;
                          break;
@@ -2095,7 +2114,8 @@ int main(int argc, char** argv){
                               glBindFramebuffer(GL_FRAMEBUFFER, render_framebuffer);
                               char filepath[64];
                               snprintf(filepath, 64, "content/%03d.bm", map_number);
-                              save_map(filepath, player_start, &world.tilemap, &world.blocks, &world.interactives, current_map_tags, thumbnail_ptr);
+                              save_map(filepath, player_start, &world.tilemap, &world.blocks, &world.interactives,
+                                       &world.rooms, current_map_tags, thumbnail_ptr);
                               if(thumbnail.bytes) free(thumbnail.bytes);
                          }
                          break;
@@ -2436,13 +2456,33 @@ int main(int argc, char** argv){
                                         world.block_qt = quad_tree_build(&world.blocks);
                                    }
                               } break;
+                              case EDITOR_MODE_ROOM_SELECTION:
+                              {
+                                   bool inside_room = false;
+                                   for(S16 i = 0; i < world.rooms.count; i++){
+                                        auto* room = world.rooms.elements + i;
+                                        if(coord_in_rect(mouse_select_world_coord(mouse_screen, &camera), *room)){
+                                             inside_room = true;
+                                             break;
+                                        }
+                                   }
+
+                                   if(inside_room){
+                                        break;
+                                   }
+
+                                   editor.mode = EDITOR_MODE_ROOM_CREATION;
+                                   editor.selection_start = mouse_select_world_coord(mouse_screen, &camera);
+                                   editor.selection_end = editor.selection_start;
+                              } break;
                               }
                               break;
                          case GAME_MODE_LEVEL_SELECT:
                               if(hovered_map_thumbnail_path){
                                    clear_global_tags();
                                    if(load_map(map_thumbnails.elements[hovered_map_thumbnail_index].map_filepath,
-                                               &player_start, &world.tilemap, &world.blocks, &world.interactives)){
+                                               &player_start, &world.tilemap, &world.blocks, &world.interactives,
+                                               &world.rooms)){
                                         load_map_tags(map_thumbnails.elements[hovered_map_thumbnail_index].map_filepath, current_map_tags);
                                         reset_map(player_start, &world, &undo, &camera);
                                         game_mode = GAME_MODE_PLAYING;
@@ -2493,6 +2533,16 @@ int main(int argc, char** argv){
                                         for(S16 i = selection_bounds.left; i <= selection_bounds.right; i++){
                                              Coord_t coord {i, j};
                                              coord_clear(coord, &world.tilemap, &world.interactives, world.interactive_qt, &world.blocks);
+                                        }
+                                   }
+                              } break;
+                              case EDITOR_MODE_ROOM_SELECTION:
+                              {
+                                   for(S16 i = 0; i < world.rooms.count; i++){
+                                        auto* room = world.rooms.elements + i;
+                                        if(coord_in_rect(mouse_select_world_coord(mouse_screen, &camera), *room)){
+                                             remove(&world.rooms, i);
+                                             i--;
                                         }
                                    }
                               } break;
@@ -2588,6 +2638,19 @@ int main(int argc, char** argv){
 
                                    editor.mode = EDITOR_MODE_SELECTION_MANIPULATION;
                               } break;
+                              case EDITOR_MODE_ROOM_CREATION:
+                              {
+                                   editor.selection_end = mouse_select_world_coord(mouse_screen, &camera);
+                                   editor.mode = EDITOR_MODE_ROOM_SELECTION;
+
+                                   sort_selection(&editor);
+
+                                   S16 new_index = world.rooms.count;
+                                   if(!resize(&world.rooms, world.rooms.count + 1)) break;
+
+                                   world.rooms.elements[new_index] = Rect_t{editor.selection_start.x, editor.selection_start.y,
+                                                                            editor.selection_end.x, editor.selection_end.y};
+                              } break;
                               }
                          }
                          break;
@@ -2603,6 +2666,7 @@ int main(int argc, char** argv){
                          default:
                               break;
                          case EDITOR_MODE_CREATE_SELECTION:
+                         case EDITOR_MODE_ROOM_CREATION:
                               if(editor.selection_start.x >= 0 && editor.selection_start.y >= 0){
                                    editor.selection_end = pos_to_coord(mouse_world + camera.bottom_left());
                               }
@@ -5464,7 +5528,7 @@ int main(int argc, char** argv){
 
           if(game_mode == GAME_MODE_EDITOR){
                // player start
-               draw_selection(player_start, player_start, &camera, 0.0f, 1.0f, 0.0f);
+               draw_selection(player_start, player_start, &camera, 0.0f, 1.0f, 1.0f);
 
                for(S16 i = 0; i < world.blocks.count; i++){
                     Block_t* block = world.blocks.elements + i;
@@ -5570,7 +5634,8 @@ int main(int argc, char** argv){
           player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_END_DEMO, record_demo.mode, record_demo.file, frame_count);
 
           // save map and player position
-          save_map_to_file(record_demo.file, player_start, &world.tilemap, &world.blocks, &world.interactives, NULL, NULL);
+          save_map_to_file(record_demo.file, player_start, &world.tilemap, &world.blocks, &world.interactives,
+                           &world.rooms, NULL, NULL);
 
           switch(record_demo.version){
           default:

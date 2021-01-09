@@ -1045,6 +1045,18 @@ void draw_editor(Editor_t* editor, World_t* world, Camera_t* camera, Vec_t mouse
           Coord_t max_coord {selection_bounds.right, selection_bounds.top};
           draw_selection(min_coord, max_coord, camera, 1.0f, 0.0f, 0.0f);
      } break;
+     case EDITOR_MODE_ROOM_SELECTION:
+     case EDITOR_MODE_ROOM_CREATION:
+     {
+          for(S16 i = 0; i < world->rooms.count; i++){
+               auto* room = world->rooms.elements + i;
+               draw_selection(Coord_t{room->left, room->bottom}, Coord_t{room->right, room->top}, camera, 1.0f, 0.0f, 0.0f);
+          }
+
+          if(editor->mode == EDITOR_MODE_ROOM_CREATION){
+               draw_selection(editor->selection_start, editor->selection_end, camera, 0.0f, 1.0f, 0.0f);
+          }
+     } break;
      }
 
      if(editor->mode){

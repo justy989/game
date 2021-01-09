@@ -8,11 +8,18 @@ Position_t Camera_t::bottom_left(){
 }
 
 void Camera_t::center_on_tilemap(TileMap_t* tilemap){
-     pos = pixel_to_pos(Pixel_t{(S16)(tilemap->width * TILE_SIZE_IN_PIXELS / 2),
-                                (S16)(tilemap->height * TILE_SIZE_IN_PIXELS / 2)});
+     Rect_t map_rect {0, 0, tilemap->width, tilemap->height};
+     center_on_room(&map_rect);
+}
+
+void Camera_t::center_on_room(Rect_t* rect){
+     S16 rect_width = rect->right - rect->left;
+     S16 rect_height = rect->top - rect->bottom;
+     pos = pixel_to_pos(Pixel_t{(S16)(rect_width * TILE_SIZE_IN_PIXELS / 2),
+                                (S16)(rect_height * TILE_SIZE_IN_PIXELS / 2)});
 
      // We keep the view dimensions a square so it doesn't get stretched for now
-     S16 bigger_dimension = tilemap->width > tilemap->height ? tilemap->width : tilemap->height;
+     S16 bigger_dimension = rect_width > rect_height ? rect_width : rect_height;
      view_dimension = (F32)(bigger_dimension) / (F32)(ROOM_TILE_SIZE);
 
      view_pos = pos - Vec_t{0.5f, 0.5f};
@@ -25,8 +32,8 @@ void Camera_t::center_on_tilemap(TileMap_t* tilemap){
      view.bottom = lower_offset;
      view.top = view.bottom + view_dimension;
 
-     center_offset.x = (tilemap->width % 2 != 0) ? 0 : HALF_TILE_SIZE;
-     center_offset.y = (tilemap->height % 2 != 0) ? 0 : HALF_TILE_SIZE;
+     center_offset.x = (rect_width % 2 != 0) ? 0 : HALF_TILE_SIZE;
+     center_offset.y = (rect_height % 2 != 0) ? 0 : HALF_TILE_SIZE;
 }
 
 Vec_t Camera_t::normalized_to_world(Vec_t v){
