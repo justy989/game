@@ -61,10 +61,15 @@ Position_t Camera_t::normalized_to_world(Vec_t v){
 }
 
 void Camera_t::move_towards_target(F32 t){
-     view.left = lerp(initial_view.left, target_view.left, t);
-     view.bottom = lerp(initial_view.bottom, target_view.bottom, t);
-     view.right = lerp(initial_view.right, target_view.right, t);
-     view.top = lerp(initial_view.top, target_view.top, t);
+     if(t >= 1.0f){
+          view = target_view;
+          offset = target_offset;
+     }else{
+          view.left = lerp(initial_view.left, target_view.left, t);
+          view.bottom = lerp(initial_view.bottom, target_view.bottom, t);
+          view.right = lerp(initial_view.right, target_view.right, t);
+          view.top = lerp(initial_view.top, target_view.top, t);
 
-     offset = interp_position(&initial_offset, &target_offset, t, t);
+          offset = interp_position(&initial_offset, &target_offset, t, t);
+     }
 }

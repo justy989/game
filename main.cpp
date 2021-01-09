@@ -1395,6 +1395,61 @@ void update_camera(Camera_t* camera, World_t* world, bool init = false){
      }
 }
 
+void add_editor_stamps_for_selection(Editor_t* editor, World_t* world){
+     S16 stamp_count = (S16)((((editor->selection_end.x - editor->selection_start.x) + 1) *
+                              ((editor->selection_end.y - editor->selection_start.y) + 1)) * 2);
+     init(&editor->selection, stamp_count);
+     S16 stamp_index = 0;
+     for(S16 j = editor->selection_start.y; j <= editor->selection_end.y; j++){
+          for(S16 i = editor->selection_start.x; i <= editor->selection_end.x; i++){
+               Coord_t coord = {i, j};
+               Coord_t offset = coord - editor->selection_start;
+
+               // tile id
+               Tile_t* tile = tilemap_get_tile(&world->tilemap, coord);
+               editor->selection.elements[stamp_index].type = STAMP_TYPE_TILE_ID;
+               editor->selection.elements[stamp_index].tile_id = tile->id;
+               editor->selection.elements[stamp_index].offset = offset;
+               stamp_index++;
+
+               // tile flags
+               editor->selection.elements[stamp_index].type = STAMP_TYPE_TILE_FLAGS;
+               editor->selection.elements[stamp_index].tile_flags = tile->flags;
+               editor->selection.elements[stamp_index].offset = offset;
+               stamp_index++;
+
+               // interactive
+               auto* interactive = quad_tree_interactive_find_at(world->interactive_qt, coord);
+               if(interactive){
+                    resize(&editor->selection, editor->selection.count + (S16)(1));
+                    auto* stamp = editor->selection.elements + (editor->selection.count - 1);
+                    stamp->type = STAMP_TYPE_INTERACTIVE;
+                    stamp->interactive = *interactive;
+                    stamp->offset = offset;
+               }
+
+               Rect_t coord_rect = rect_surrounding_coord(coord);
+               S16 block_count = 0;
+               Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
+               quad_tree_find_in(world->block_qt, coord_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
+
+               for(S16 b = 0; b < block_count; b++){
+                    auto* block = blocks[b];
+                    if(pos_to_coord(block->pos) == coord){
+                         resize(&editor->selection, editor->selection.count + (S16)(1));
+                         auto* stamp = editor->selection.elements + (editor->selection.count - 1);
+                         stamp->type = STAMP_TYPE_BLOCK;
+                         stamp->block.rotation = block->rotation;
+                         stamp->block.element = block->element;
+                         stamp->offset = offset;
+                         stamp->block.z = block->pos.z;
+                         stamp->block.cut = block->cut;
+                    }
+               }
+          }
+     }
+}
+
 int main(int argc, char** argv){
      const char* load_map_filepath = nullptr;
      bool test = false;
@@ -1649,8 +1704,6 @@ int main(int argc, char** argv){
      memset(&ordered_player_block_pushes, 0, sizeof(ordered_player_block_pushes));
      ObjectArray_t<RestoreBlock_t> restore_blocks {};
      memset(&restore_blocks, 0, sizeof(restore_blocks));
-
-     memset(&world.rooms, 0, sizeof(world.rooms));
 
      if(load_map_filepath){
           if(!load_map(load_map_filepath, &player_start, &world.tilemap, &world.blocks, &world.interactives,
@@ -2577,6 +2630,29 @@ int main(int argc, char** argv){
                                    }
                               } break;
                               }
+                         }else if(game_mode == GAME_MODE_LEVEL_SELECT){
+                              if(hovered_map_thumbnail_path){
+                                   World_t temporary_world {};
+                                   Coord_t temporary_player_start {};
+                                   if(load_map(map_thumbnails.elements[hovered_map_thumbnail_index].map_filepath,
+                                               &temporary_player_start, &temporary_world.tilemap, &temporary_world.blocks,
+                                               &temporary_world.interactives, &temporary_world.rooms)){
+                                        temporary_world.interactive_qt = quad_tree_build(&temporary_world.interactives);
+                                        temporary_world.block_qt = quad_tree_build(&temporary_world.blocks);
+
+                                        editor.selection_start = Coord_t{0, 0};
+                                        editor.selection_end = Coord_t{(S16)(temporary_world.tilemap.width - 1), (S16)(temporary_world.tilemap.height - 1)};
+                                        destroy(&editor.selection);
+                                        add_editor_stamps_for_selection(&editor, &temporary_world);
+                                        game_mode = GAME_MODE_EDITOR;
+                                        editor.mode = EDITOR_MODE_SELECTION_MANIPULATION;
+
+                                        destroy(&temporary_world.tilemap);
+                                        destroy(&temporary_world.interactives);
+                                        destroy(&temporary_world.blocks);
+                                        destroy(&temporary_world.rooms);
+                                   }
+                              }
                          }
                          break;
                     }
@@ -2618,53 +2694,7 @@ int main(int argc, char** argv){
 
                                    destroy(&editor.selection);
 
-                                   S16 stamp_count = (S16)((((editor.selection_end.x - editor.selection_start.x) + 1) *
-                                                            ((editor.selection_end.y - editor.selection_start.y) + 1)) * 2);
-                                   init(&editor.selection, stamp_count);
-                                   S16 stamp_index = 0;
-                                   for(S16 j = editor.selection_start.y; j <= editor.selection_end.y; j++){
-                                        for(S16 i = editor.selection_start.x; i <= editor.selection_end.x; i++){
-                                             Coord_t coord = {i, j};
-                                             Coord_t offset = coord - editor.selection_start;
-
-                                             // tile id
-                                             Tile_t* tile = tilemap_get_tile(&world.tilemap, coord);
-                                             editor.selection.elements[stamp_index].type = STAMP_TYPE_TILE_ID;
-                                             editor.selection.elements[stamp_index].tile_id = tile->id;
-                                             editor.selection.elements[stamp_index].offset = offset;
-                                             stamp_index++;
-
-                                             // tile flags
-                                             editor.selection.elements[stamp_index].type = STAMP_TYPE_TILE_FLAGS;
-                                             editor.selection.elements[stamp_index].tile_flags = tile->flags;
-                                             editor.selection.elements[stamp_index].offset = offset;
-                                             stamp_index++;
-
-                                             // interactive
-                                             auto* interactive = quad_tree_interactive_find_at(world.interactive_qt, coord);
-                                             if(interactive){
-                                                  resize(&editor.selection, editor.selection.count + (S16)(1));
-                                                  auto* stamp = editor.selection.elements + (editor.selection.count - 1);
-                                                  stamp->type = STAMP_TYPE_INTERACTIVE;
-                                                  stamp->interactive = *interactive;
-                                                  stamp->offset = offset;
-                                             }
-
-                                             for(S16 b = 0; b < world.blocks.count; b++){
-                                                  auto* block = world.blocks.elements + b;
-                                                  if(pos_to_coord(block->pos) == coord){
-                                                       resize(&editor.selection, editor.selection.count + (S16)(1));
-                                                       auto* stamp = editor.selection.elements + (editor.selection.count - 1);
-                                                       stamp->type = STAMP_TYPE_BLOCK;
-                                                       stamp->block.rotation = block->rotation;
-                                                       stamp->block.element = block->element;
-                                                       stamp->offset = offset;
-                                                       stamp->block.z = block->pos.z;
-                                                       stamp->block.cut = block->cut;
-                                                  }
-                                             }
-                                        }
-                                   }
+                                   add_editor_stamps_for_selection(&editor, &world);
 
                                    editor.mode = EDITOR_MODE_SELECTION_MANIPULATION;
                               } break;
