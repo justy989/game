@@ -1361,7 +1361,7 @@ bool this_block_has_already_pushed_others(BlockMomentumPushes_t<128>* block_push
      return true;
 }
 
-void update_camera(Camera_t* camera, World_t* world){
+void update_camera(Camera_t* camera, World_t* world, bool init = false){
      if(world->players.count <= 0) return;
      Coord_t player_coord = pos_to_coord(world->players.elements[0].pos);
 
@@ -1388,7 +1388,7 @@ void update_camera(Camera_t* camera, World_t* world){
           world->current_room = room_index;
      }
 
-     if(world->room_transition < 1.0f){
+     if(world->room_transition < 1.0f || init){
           world->room_transition += 0.01f;
           if(world->room_transition > 1.0f) world->room_transition = 1.0f;
           camera->move_towards_target(world->room_transition);
@@ -1773,6 +1773,9 @@ int main(int argc, char** argv){
 
           visible_map_thumbnail_count = filter_thumbnails(&tag_checkboxes, &map_thumbnails);
      }
+
+     world.room_transition = 1.0f;
+     update_camera(&camera, &world, true);
 
      F32 dt = 0.0f;
 
