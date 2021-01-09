@@ -45,6 +45,9 @@ void undo_history_add(UndoHistory_t* undo_history, UndoDiffType_t type, S32 inde
      case UNDO_DIFF_TYPE_INTERACTIVE_REMOVE:
           // NOTE: no need to add any more data
           break;
+     case UNDO_DIFF_TYPE_MAP_RESIZE:
+          undo_history->current = (char*)(undo_history->current) + sizeof(UndoMapResize_t);
+          break;
      }
 
      ASSERT_BELOW_HISTORY_SIZE(undo_history);
@@ -72,6 +75,49 @@ bool init(Undo_t* undo, U32 history_size, S16 map_width, S16 map_height, S16 blo
      if(!init(&undo->interactives, interactive_count)) return false;
      if(!init(&undo->history, history_size)) return false;
 
+     return true;
+}
+
+bool undo_resize_width(Undo_t* undo, S16 new_width){
+     // loop over each row and resize it
+     for(S16 i = 0; i < undo->height; i++){
+          undo->tile_flags[i] = (U16*)realloc(undo->tile_flags[i], (size_t)(new_width) * sizeof(*undo->tile_flags[i]));
+          if(!undo->tile_flags[i]){
+               LOG("%s(): failed to realloc() tile flags for a map resize of %d\n", __FUNCTION__, new_width);
+               return false;
+          }
+     }
+
+     // if we grew, initialize the new elements to 0 (does realloc() already do this?)
+     if(undo->width < new_width){
+          for(S16 h = 0; h < undo->height; h++){
+               for(S16 t = undo->width; t < new_width; t++){
+                    undo->tile_flags[h][t] = 0;
+               }
+          }
+     }
+     undo->width = new_width;
+     return true;
+}
+
+bool undo_resize_height(Undo_t* undo, S16 new_height){
+     undo->tile_flags = (U16**)realloc(undo->tile_flags, (size_t)(new_height) * sizeof(*undo->tile_flags));
+     if(!undo->tile_flags){
+          LOG("%s(): failed to realloc() tile flags for a map resize of %d\n", __FUNCTION__, new_height);
+          return false;
+     }
+
+     // if we grew, initialize the new rows to empty rows
+     if(undo->height < new_height){
+          for(S16 i = undo->height; i < new_height; i++){
+               undo->tile_flags[i] = (U16*)calloc((size_t)(undo->width), sizeof(*undo->tile_flags[i]));
+               if(!undo->tile_flags[i]){
+                    LOG("%s(): failed to calloc() new tile flag rows for a map resize of %d\n", __FUNCTION__, new_height);
+                    return false;
+               }
+          }
+     }
+     undo->height = new_height;
      return true;
 }
 
@@ -170,6 +216,17 @@ void undo_commit(Undo_t* undo, ObjectArray_t<Player_t>* players, TileMap_t* tile
           }
      }
 
+     S16 old_undo_width = undo->width;
+     S16 old_undo_height = undo->height;
+
+     if(old_undo_width != tilemap->width){
+          undo_resize_width(undo, tilemap->width);
+     }
+
+     if(old_undo_height != tilemap->height){
+          undo_resize_height(undo, tilemap->height);
+     }
+
      // TODO: compress this, interactives, and blocks doin the same damn thing
      // check for differences between player count in previous state and new state
      S16 min_player_count = players->count;
@@ -236,6 +293,9 @@ void undo_commit(Undo_t* undo, ObjectArray_t<Player_t>* players, TileMap_t* tile
                }
           }
      }
+
+     // TODO: save diff for tiles that we remove when we shrink the map. this is tricky because we've already resized
+     //       undo at this point, maybe we'll need to rethink that
 
      // check for differences between block count in previous state and new state
      S16 min_block_count = blocks->count;
@@ -354,6 +414,27 @@ void undo_commit(Undo_t* undo, ObjectArray_t<Player_t>* players, TileMap_t* tile
                undo_history_add(&undo->history, UNDO_DIFF_TYPE_INTERACTIVE, i);
                diff_count++;
           }
+     }
+
+     // save the map resize diffs for last because they need to be the first to run if we revert
+     if(old_undo_width != tilemap->width){
+          auto* undo_map_resize_entry = (UndoMapResize_t*)(undo->history.current);
+          undo_map_resize_entry->horizontal = true;
+          undo_map_resize_entry->old_dimension = old_undo_width;
+          undo_map_resize_entry->new_dimension = tilemap->width;
+
+          undo_history_add(&undo->history, UNDO_DIFF_TYPE_MAP_RESIZE, 0);
+          diff_count++;
+     }
+
+     if(old_undo_height != tilemap->height){
+          auto* undo_map_resize_entry = (UndoMapResize_t*)(undo->history.current);
+          undo_map_resize_entry->horizontal = false;
+          undo_map_resize_entry->old_dimension = old_undo_height;
+          undo_map_resize_entry->new_dimension = tilemap->height;
+
+          undo_history_add(&undo->history, UNDO_DIFF_TYPE_MAP_RESIZE, 0);
+          diff_count++;
      }
 
      // finally, write number of diffs
@@ -486,6 +567,46 @@ void undo_revert(Undo_t* undo, ObjectArray_t<Player_t>* players, TileMap_t* tile
           case UNDO_DIFF_TYPE_PLAYER_REMOVE:
           {
                remove(players, (S16)(diff_header->index));
+          } break;
+          case UNDO_DIFF_TYPE_MAP_RESIZE:
+          {
+               ptr -= sizeof(UndoMapResize_t);
+               auto* map_resize = (UndoMapResize_t*)(ptr);
+
+               // map_resize->old_dimension;
+               // map_resize->new_dimension;
+
+               TileMap_t map_copy = {};
+               deep_copy(tilemap, &map_copy);
+               destroy(tilemap);
+
+               if(map_resize->horizontal){
+                    init(tilemap, map_resize->old_dimension, map_copy.height);
+
+                    S16 lower_width = map_copy.width > map_resize->old_dimension ? map_resize->old_dimension : map_copy.width;
+
+                    for(S16 h = 0; h < map_copy.height; h++){
+                         for(S16 w = 0; w < lower_width; w++){
+                              tilemap->tiles[h][w] = map_copy.tiles[h][w];
+                         }
+                    }
+
+                    destroy(&map_copy);
+                    undo_resize_width(undo, map_resize->old_dimension);
+               }else{
+                    init(tilemap, map_copy.width, map_resize->old_dimension);
+
+                    S16 lower_height = map_copy.height > map_resize->old_dimension ? map_resize->old_dimension : map_copy.height;
+
+                    for(S16 h = 0; h < lower_height; h++){
+                         for(S16 w = 0; w < map_copy.width; w++){
+                              tilemap->tiles[h][w] = map_copy.tiles[h][w];
+                         }
+                    }
+
+                    destroy(&map_copy);
+                    undo_resize_height(undo, map_resize->old_dimension);
+               }
           } break;
           }
      }

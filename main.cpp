@@ -1868,6 +1868,7 @@ int main(int argc, char** argv){
                     case SDL_SCANCODE_F5:
                          if(game_mode == GAME_MODE_EDITOR){
                               if(world.tilemap.width <= 1) break;
+                              undo_commit(&undo, &world.players, &world.tilemap, &world.blocks, &world.interactives);
 
                               TileMap_t map_copy = {};
                               deep_copy(&world.tilemap, &map_copy);
@@ -1892,6 +1893,8 @@ int main(int argc, char** argv){
                          break;
                     case SDL_SCANCODE_F6:
                          if(game_mode == GAME_MODE_EDITOR){
+                              undo_commit(&undo, &world.players, &world.tilemap, &world.blocks, &world.interactives);
+
                               TileMap_t map_copy = {};
                               deep_copy(&world.tilemap, &map_copy);
 
@@ -1911,6 +1914,7 @@ int main(int argc, char** argv){
                     case SDL_SCANCODE_F7:
                          if(game_mode == GAME_MODE_EDITOR){
                               if(world.tilemap.height <= 1) break;
+                              undo_commit(&undo, &world.players, &world.tilemap, &world.blocks, &world.interactives);
 
                               TileMap_t map_copy = {};
                               deep_copy(&world.tilemap, &map_copy);
@@ -1935,6 +1939,7 @@ int main(int argc, char** argv){
                          break;
                     case SDL_SCANCODE_F8:
                          if(game_mode == GAME_MODE_EDITOR){
+                              undo_commit(&undo, &world.players, &world.tilemap, &world.blocks, &world.interactives);
                               TileMap_t map_copy = {};
                               deep_copy(&world.tilemap, &map_copy);
 
@@ -2967,6 +2972,7 @@ int main(int argc, char** argv){
                          quad_tree_free(world.block_qt);
                          world.block_qt = quad_tree_build(&world.blocks);
                          player_action.undo = false;
+                         camera.center_on_tilemap(&world.tilemap);
                     }
 
                     if(player->has_bow && player_action.shoot && player->bow_draw_time < PLAYER_BOW_DRAW_DELAY){

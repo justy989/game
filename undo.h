@@ -27,6 +27,12 @@ struct UndoPlayer_t{
      U8 rotation;
 };
 
+struct UndoMapResize_t{
+     bool horizontal;
+     S16 old_dimension;
+     S16 new_dimension;
+};
+
 enum UndoDiffType_t : U8{
      UNDO_DIFF_TYPE_PLAYER,
      UNDO_DIFF_TYPE_TILE_FLAGS,
@@ -38,6 +44,7 @@ enum UndoDiffType_t : U8{
      UNDO_DIFF_TYPE_INTERACTIVE_REMOVE,
      UNDO_DIFF_TYPE_PLAYER_INSERT,
      UNDO_DIFF_TYPE_PLAYER_REMOVE,
+     UNDO_DIFF_TYPE_MAP_RESIZE,
 };
 
 struct UndoDiffHeader_t{
@@ -66,6 +73,8 @@ bool init(UndoHistory_t* undo_history, U32 history_size);
 void destroy(UndoHistory_t* undo_history);
 void undo_history_add(UndoHistory_t* undo_history, UndoDiffType_t type, S32 index);
 bool init(Undo_t* undo, U32 history_size, S16 map_width, S16 map_height, S16 block_count, S16 interactive_count);
+bool undo_resize_width(Undo_t* undo, S16 new_width);
+bool undo_resize_height(Undo_t* undo, S16 new_height);
 void destroy(Undo_t* undo);
 void undo_snapshot(Undo_t* undo, ObjectArray_t<Player_t>* players, TileMap_t* tilemap, ObjectArray_t<Block_t>* blocks,
                    ObjectArray_t<Interactive_t>* interactives);
