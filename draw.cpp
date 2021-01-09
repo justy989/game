@@ -469,8 +469,8 @@ void draw_selection(Coord_t selection_start, Coord_t selection_end, Camera_t* ca
      if(selection_start.x > selection_end.x) SWAP(selection_start.x, selection_end.x);
      if(selection_start.y > selection_end.y) SWAP(selection_start.y, selection_end.y);
 
-     Position_t start_location = coord_to_pos(selection_start) + camera->world_offset;
-     Position_t end_location = coord_to_pos(selection_end) + camera->world_offset;
+     Position_t start_location = coord_to_pos(selection_start) + camera->offset;
+     Position_t end_location = coord_to_pos(selection_end) + camera->offset;
      Vec_t start_vec = pos_to_vec(start_location);
      Vec_t end_vec = pos_to_vec(end_location);
 
@@ -488,14 +488,14 @@ void draw_selection(Coord_t selection_start, Coord_t selection_end, Camera_t* ca
      glOrtho(0.0f, 1.0f, 0.0f, 1.0f, 0.0, 1.0);
 }
 
-Vec_t draw_player(Player_t* player, Vec_t camera, Coord_t source_coord, Coord_t destination_coord, S8 portal_rotations){
-     Vec_t pos_vec = pos_to_vec(player->pos) + camera;
+Vec_t draw_player(Player_t* player, Position_t camera, Coord_t source_coord, Coord_t destination_coord, S8 portal_rotations){
+     Vec_t pos_vec = pos_to_vec(player->pos + camera);
      if(destination_coord.x >= 0){
           Position_t destination_pos = coord_to_pos_at_tile_center(destination_coord);
           Position_t source_pos = coord_to_pos_at_tile_center(source_coord);
           Position_t center_delta = player->pos - source_pos;
           center_delta = position_rotate_quadrants_clockwise(center_delta, portal_rotations);
-          pos_vec = pos_to_vec(destination_pos + center_delta) + camera;
+          pos_vec = pos_to_vec(destination_pos + center_delta + camera);
      }
 
      S8 player_frame_y = direction_rotate_clockwise(player->face, portal_rotations);
@@ -590,7 +590,7 @@ void draw_flats(Vec_t pos, Tile_t* tile, Interactive_t* interactive, U8 portal_r
      if(tile_is_iced(tile)) draw_ice(pos);
 }
 
-void draw_portal_blocks(Block_t** blocks, S16 block_count, Coord_t source_coord, Coord_t destination_coord, S8 portal_rotations, Vec_t camera) {
+void draw_portal_blocks(Block_t** blocks, S16 block_count, Coord_t source_coord, Coord_t destination_coord, S8 portal_rotations, Position_t camera) {
      for(S16 i = 0; i < block_count; i++){
           Block_t* block = blocks[i];
           Position_t draw_pos = block->pos;
@@ -612,7 +612,7 @@ void draw_portal_blocks(Block_t** blocks, S16 block_count, Coord_t source_coord,
 }
 
 void draw_portal_players(ObjectArray_t<Player_t>* players, Rect_t region, Coord_t source_coord, Coord_t destination_coord,
-                         S8 portal_rotations, Vec_t camera){
+                         S8 portal_rotations, Position_t camera){
      for(S16 i = 0; i < players->count; i++){
           Player_t* player = players->elements + i;
           if(!pixel_in_rect(player->pos.pixel, region)) continue;
@@ -622,8 +622,8 @@ void draw_portal_players(ObjectArray_t<Player_t>* players, Rect_t region, Coord_
 }
 
 void draw_world_row_flats(S16 y, S16 x_start, S16 x_end, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt,
-                          Vec_t camera){
-     auto draw_pos = Vec_t{(float)(x_start) * TILE_SIZE, (float)(y) * TILE_SIZE} + camera;
+                          Position_t camera){
+     auto draw_pos = pos_to_vec(coord_to_pos(Coord_t{x_start, y}) + camera);
      auto save_draw_pos = draw_pos;
 
      // flat layer
@@ -653,7 +653,7 @@ void draw_world_row_flats(S16 y, S16 x_start, S16 x_end, TileMap_t* tilemap, Qua
 }
 
 void draw_solid_interactive(Coord_t src_coord, Coord_t dst_coord, TileMap_t* tilemap,
-                            QuadTreeNode_t<Interactive_t>* interactive_qt, Vec_t camera){
+                            QuadTreeNode_t<Interactive_t>* interactive_qt, Position_t camera){
      Interactive_t* interactive = quad_tree_find_at(interactive_qt, src_coord.x, src_coord.y);
      if(!interactive) return;
 
@@ -664,14 +664,13 @@ void draw_solid_interactive(Coord_t src_coord, Coord_t dst_coord, TileMap_t* til
         (interactive->type == INTERACTIVE_TYPE_POPUP && interactive->popup.lift.ticks == 1)){
           // pass
      }else{
-          Vec_t draw_pos{(F32)(dst_coord.x) * TILE_SIZE, (F32)(dst_coord.y) * TILE_SIZE};
-          draw_pos += camera;
+          Vec_t draw_pos = pos_to_vec(coord_to_pos(dst_coord) + camera);
           draw_interactive(interactive, draw_pos, src_coord, tilemap, interactive_qt);
      }
 }
 
 void draw_world_row_solids(S16 y, S16 x_start, S16 x_end, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt,
-                           QuadTreeNode_t<Block_t>* block_qt, ObjectArray_t<Player_t>* players, Vec_t camera, GLuint player_texture,
+                           QuadTreeNode_t<Block_t>* block_qt, ObjectArray_t<Player_t>* players, Position_t camera, GLuint player_texture,
                            EntangleTints_t* entangle_tints){
      // solid layer
      for(S16 x = x_start; x <= x_end; x++){
@@ -695,7 +694,7 @@ void draw_world_row_solids(S16 y, S16 x_start, S16 x_end, TileMap_t* tilemap, Qu
           if(block->pos.z < 0) continue;
           auto draw_block_pos = block->pos;
           draw_block_pos.pixel.y += block->pos.z;
-          auto final_pos = pos_to_vec(draw_block_pos) + camera;
+          auto final_pos = pos_to_vec(draw_block_pos + camera);
           draw_block(block, final_pos, 0);
 
           if(block->entangle_index >= 0){
@@ -757,7 +756,7 @@ void draw_world_row_solids(S16 y, S16 x_start, S16 x_end, TileMap_t* tilemap, Qu
      }
 }
 
-void draw_world_row_arrows(S16 y, S16 x_start, S16 x_end, const ArrowArray_t* arrow_array, Vec_t camera){
+void draw_world_row_arrows(S16 y, S16 x_start, S16 x_end, const ArrowArray_t* arrow_array, Position_t camera){
      // draw arrows
      static Vec_t arrow_tip_offset[DIRECTION_COUNT] = {
           {0.0f,               9.0f * PIXEL_SIZE},
@@ -773,7 +772,7 @@ void draw_world_row_arrows(S16 y, S16 x_start, S16 x_end, const ArrowArray_t* ar
           if(coord.y != y) continue;
           if(coord.x < x_start || coord.x > x_end) continue;
 
-          Vec_t arrow_vec = pos_to_vec(arrow->pos) + camera;
+          Vec_t arrow_vec = pos_to_vec(arrow->pos + camera);
           arrow_vec.x -= arrow_tip_offset[arrow->face].x;
           arrow_vec.y -= arrow_tip_offset[arrow->face].y;
 
@@ -916,7 +915,7 @@ void draw_editor(Editor_t* editor, World_t* world, Camera_t* camera, Vec_t mouse
 
           for(S16 s = 0; s < stamp_array->count; s++){
                auto* stamp = stamp_array->elements + s;
-               Vec_t stamp_pos = coord_to_vec(mouse_coord + stamp->offset) + camera->world_offset;
+               Vec_t stamp_pos = pos_to_vec(coord_to_pos(mouse_coord + stamp->offset) + camera->offset);
                switch(stamp->type){
                default:
                     break;
@@ -1008,7 +1007,7 @@ void draw_editor(Editor_t* editor, World_t* world, Camera_t* camera, Vec_t mouse
 
           for(S32 g = 0; g < editor->selection.count; ++g){
                auto* stamp = editor->selection.elements + g;
-               Position_t stamp_pos = coord_to_pos(editor->selection_start + stamp->offset) + camera->world_offset;
+               Position_t stamp_pos = coord_to_pos(editor->selection_start + stamp->offset) + camera->offset;
                Vec_t stamp_vec = pos_to_vec(stamp_pos);
 
                switch(stamp->type){

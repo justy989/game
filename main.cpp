@@ -1361,6 +1361,40 @@ bool this_block_has_already_pushed_others(BlockMomentumPushes_t<128>* block_push
      return true;
 }
 
+void update_camera(Camera_t* camera, World_t* world){
+     if(world->players.count <= 0) return;
+     Coord_t player_coord = pos_to_coord(world->players.elements[0].pos);
+
+     S16 room_index = -1;
+     for(S16 i = 0; i < world->rooms.count; i++){
+          auto* room = world->rooms.elements + i;
+          if(coord_in_rect(player_coord, *room)){
+               room_index = i;
+               break;
+          }
+     }
+
+     if(room_index != world->current_room ||
+        world->recalc_room_camera){
+          world->recalc_room_camera = false;
+
+          if(room_index < 0){
+               camera->center_on_tilemap(&world->tilemap);
+          }else{
+               camera->center_on_room(world->rooms.elements + room_index);
+          }
+
+          world->room_transition = 0;
+          world->current_room = room_index;
+     }
+
+     if(world->room_transition < 1.0f){
+          world->room_transition += 0.01f;
+          if(world->room_transition > 1.0f) world->room_transition = 1.0f;
+          camera->move_towards_target(world->room_transition);
+     }
+}
+
 int main(int argc, char** argv){
      const char* load_map_filepath = nullptr;
      bool test = false;
@@ -1740,13 +1774,6 @@ int main(int argc, char** argv){
           visible_map_thumbnail_count = filter_thumbnails(&tag_checkboxes, &map_thumbnails);
      }
 
-     // TODO: remove this, it is just for getting things going
-     {
-          init(&world.rooms, 2);
-          world.rooms.elements[0] = Rect_t{1, 1, 5, 5};
-          world.rooms.elements[1] = Rect_t{3, 8, 8, 11};
-     }
-
      F32 dt = 0.0f;
 
      auto last_time = std::chrono::system_clock::now();
@@ -1907,7 +1934,7 @@ int main(int argc, char** argv){
                               }
 
                               destroy(&map_copy);
-                              camera.center_on_tilemap(&world.tilemap);
+                              world.recalc_room_camera = true;
                          }
                          break;
                     case SDL_SCANCODE_F6:
@@ -1927,7 +1954,7 @@ int main(int argc, char** argv){
                               }
 
                               destroy(&map_copy);
-                              camera.center_on_tilemap(&world.tilemap);
+                              world.recalc_room_camera = true;
                          }
                          break;
                     case SDL_SCANCODE_F7:
@@ -1953,7 +1980,7 @@ int main(int argc, char** argv){
                               }
 
                               destroy(&map_copy);
-                              camera.center_on_tilemap(&world.tilemap);
+                              world.recalc_room_camera = true;
                          }
                          break;
                     case SDL_SCANCODE_F8:
@@ -1972,7 +1999,7 @@ int main(int argc, char** argv){
                               }
 
                               destroy(&map_copy);
-                              camera.center_on_tilemap(&world.tilemap);
+                              world.recalc_room_camera = true;
                          }
                          break;
                     case SDL_SCANCODE_F12:
@@ -2659,7 +2686,7 @@ int main(int argc, char** argv){
                case SDL_MOUSEMOTION:
                     mouse_screen = Vec_t{((F32)(sdl_event.button.x) / (F32)(window_width)),
                                          1.0f - ((F32)(sdl_event.button.y) / (F32)(window_height))};
-                    mouse_world = vec_to_pos(camera.normalized_to_world(mouse_screen));
+                    mouse_world = camera.normalized_to_world(mouse_screen);
 
                     if(game_mode == GAME_MODE_EDITOR){
                          switch(editor.mode){
@@ -2668,7 +2695,7 @@ int main(int argc, char** argv){
                          case EDITOR_MODE_CREATE_SELECTION:
                          case EDITOR_MODE_ROOM_CREATION:
                               if(editor.selection_start.x >= 0 && editor.selection_start.y >= 0){
-                                   editor.selection_end = pos_to_coord(mouse_world + camera.bottom_left());
+                                   editor.selection_end = pos_to_coord(mouse_world + camera.offset);
                               }
                               break;
                          }
@@ -3036,7 +3063,6 @@ int main(int argc, char** argv){
                          quad_tree_free(world.block_qt);
                          world.block_qt = quad_tree_build(&world.blocks);
                          player_action.undo = false;
-                         camera.center_on_tilemap(&world.tilemap);
                     }
 
                     if(player->has_bow && player_action.shoot && player->bow_draw_time < PLAYER_BOW_DRAW_DELAY){
@@ -5168,6 +5194,8 @@ int main(int argc, char** argv){
 
           if((suite && !show_suite) || play_demo.seek_frame >= 0) continue;
 
+          update_camera(&camera, &world);
+
           // calculate entangle_tints
           {
                U32 tint_index = 0;
@@ -5245,7 +5273,7 @@ int main(int argc, char** argv){
                          Coord_t coord{x, y};
                          Interactive_t* interactive = quad_tree_find_at(world.interactive_qt, x, y);
                          if(interactive && interactive->type == INTERACTIVE_TYPE_PIT){
-                              auto draw_pos = Vec_t{(float)(x) * TILE_SIZE, (float)(y) * TILE_SIZE} + camera.world_offset;
+                              auto draw_pos = pos_to_vec(coord_to_pos(coord) + camera.offset);
                               draw_interactive(interactive, draw_pos, coord, &world.tilemap, world.interactive_qt);
                          }
                     }
@@ -5263,7 +5291,7 @@ int main(int argc, char** argv){
                          for(S16 x = min.x; x <= max.x; x++){
                               Interactive_t* interactive = quad_tree_find_at(world.interactive_qt, x, y);
                               if(interactive && interactive->type == INTERACTIVE_TYPE_PIT){
-                                   auto draw_pos = Vec_t{(float)(x) * TILE_SIZE, (float)(y) * TILE_SIZE} + camera.world_offset;
+                                   auto draw_pos = pos_to_vec(coord_to_pos(Coord_t{x, y}) + camera.offset);
                                    if(interactive->pit.iced){
                                         draw_pos.y -= (PIXEL_SIZE * HEIGHT_INTERVAL);
 
@@ -5286,7 +5314,7 @@ int main(int argc, char** argv){
                }
 
                for(S16 y = max.y; y >= min.y; y--){
-                    draw_world_row_flats(y, min.x, max.x, &world.tilemap, world.interactive_qt, camera.world_offset);
+                    draw_world_row_flats(y, min.x, max.x, &world.tilemap, world.interactive_qt, camera.offset);
 
                     // TODO: compress with logic in draw_world_row_solids()
                     auto search_rect = Rect_t{(S16)(min.x * TILE_SIZE_IN_PIXELS), (S16)(y * TILE_SIZE_IN_PIXELS),
@@ -5305,7 +5333,7 @@ int main(int argc, char** argv){
 
                          auto draw_block_pos = block->pos;
                          draw_block_pos.pixel.y += block->pos.z;
-                         draw_block(block, pos_to_vec(draw_block_pos) + camera.world_offset, 0);
+                         draw_block(block, pos_to_vec(draw_block_pos + camera.offset), 0);
                     }
                }
 
@@ -5323,7 +5351,7 @@ int main(int argc, char** argv){
 
                                         Coord_t portal_coord = portal_exits.directions[d].coords[i] + direction_opposite((Direction_t)(d));
 
-                                        draw_solid_interactive(portal_coord, coord, &world.tilemap, world.interactive_qt, camera.world_offset);
+                                        draw_solid_interactive(portal_coord, coord, &world.tilemap, world.interactive_qt, camera.offset);
 
                                         Rect_t coord_rect = rect_surrounding_coord(portal_coord);
                                         coord_rect.left -= HALF_TILE_SIZE_IN_PIXELS;
@@ -5339,7 +5367,7 @@ int main(int argc, char** argv){
                                         quad_tree_find_in(world.block_qt, coord_rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
                                         if(block_count){
                                              sort_blocks_by_descending_height(blocks, block_count);
-                                             draw_portal_blocks(blocks, block_count, portal_coord, coord, portal_rotations, camera.world_offset);
+                                             draw_portal_blocks(blocks, block_count, portal_coord, coord, portal_rotations, camera.offset);
                                         }
 
                                         glEnd();
@@ -5352,7 +5380,7 @@ int main(int argc, char** argv){
                                         player_region.right += 4;
                                         player_region.bottom -= 10;
                                         player_region.top += 4;
-                                        draw_portal_players(&world.players, player_region, portal_coord, coord, portal_rotations, camera.world_offset);
+                                        draw_portal_players(&world.players, player_region, portal_coord, coord, portal_rotations, camera.offset);
 
                                         glEnd();
                                         glBindTexture(GL_TEXTURE_2D, theme_texture);
@@ -5369,8 +5397,7 @@ int main(int argc, char** argv){
                          Coord_t coord {x, y};
                          Tile_t* tile = tilemap_get_tile(&world.tilemap, coord);
                          if(tile && tile->id >= 16){
-                              Vec_t tile_pos {(F32)(x - min.x) * TILE_SIZE + camera.world_offset.x,
-                                              (F32)(y - min.y) * TILE_SIZE + camera.world_offset.y};
+                              Vec_t tile_pos = pos_to_vec(coord_to_pos(Coord_t{(S16)(x - min.x), (S16)(y - min.y)}) + camera.offset);
                               draw_tile_id(tile->id, tile_pos);
                          }
                     }
@@ -5378,14 +5405,14 @@ int main(int argc, char** argv){
 
                for(S16 y = max.y; y >= min.y; y--){
                     draw_world_row_solids(y, min.x, max.x, &world.tilemap, world.interactive_qt, world.block_qt,
-                                          &world.players, camera.world_offset, player_texture, &entangle_tints);
+                                          &world.players, camera.offset, player_texture, &entangle_tints);
 
                     glEnd();
                     glBindTexture(GL_TEXTURE_2D, arrow_texture);
                     glBegin(GL_QUADS);
                     glColor3f(1.0f, 1.0f, 1.0f);
 
-                    draw_world_row_arrows(y, min.x, max.x, &world.arrows, camera.world_offset);
+                    draw_world_row_arrows(y, min.x, max.x, &world.arrows, camera.offset);
 
                     glEnd();
 

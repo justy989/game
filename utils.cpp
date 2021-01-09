@@ -409,11 +409,11 @@ S16 range_passes_solid_boundary(S16 a, S16 b, BlockCut_t cut, bool x, S16 altern
 }
 
 Pixel_t mouse_select_world_pixel(Vec_t mouse_screen, Camera_t* camera){
-     return vec_to_pixel(camera->normalized_to_world(mouse_screen) - camera->world_offset);
+     return camera->normalized_to_world(mouse_screen).pixel;
 }
 
 Coord_t mouse_select_world_coord(Vec_t mouse_screen, Camera_t* camera){
-     return vec_to_coord(camera->normalized_to_world(mouse_screen) - camera->world_offset);
+     return pos_to_coord(camera->normalized_to_world(mouse_screen));
 }
 
 Vec_t coord_to_screen_position(Coord_t coord){
@@ -634,4 +634,8 @@ Pixel_t get_corner_pixel_from_pos(Position_t pos, DirectionMask_t from_center){
           if(pos.decimal.x > FLT_EPSILON) result.x++;
      }
      return result;
+}
+
+F32 lerp(F32 a, F32 b, F32 t){
+     return a + (b - a) * t;
 }

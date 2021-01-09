@@ -70,3 +70,4 @@ F32 rotate_vec_counter_clockwise_to_see_if_negates(F32 value, bool x, S8 rotatio
 
 S16 get_boundary_from_coord(Coord_t coord, Direction_t direction);
 Pixel_t get_corner_pixel_from_pos(Position_t pos, DirectionMask_t from_center);
+F32 lerp(F32 a, F32 b, F32 t);

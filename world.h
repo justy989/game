@@ -26,6 +26,8 @@ struct World_t{
      S32 clone_instance = 0;
 
      S16 current_room = -1;
+     F32 room_transition = 0;
+     bool recalc_room_camera = false;
 };
 
 #define MAX_TELEPORT_POSITION_RESULTS 4

@@ -6,17 +6,19 @@
 #include "rect.h"
 
 struct Camera_t{
-     Position_t pos;
-     Position_t view_pos;
-     Vec_t world_offset;
-     Vec_t center_offset;
-
-     F32 view_dimension;
      Quad_t view;
+     Position_t offset;
 
-     Position_t bottom_left();
+     Quad_t initial_view;
+     Position_t initial_offset;
+
+     Quad_t target_view;
+     Position_t target_offset;
+
      void center_on_tilemap(TileMap_t* tilemap);
      void center_on_room(Rect_t* rect);
 
-     Vec_t normalized_to_world(Vec_t v);
+     Position_t normalized_to_world(Vec_t v);
+
+     void move_towards_target(F32 speed);
 };
