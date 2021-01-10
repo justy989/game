@@ -1002,7 +1002,7 @@ MovePlayerThroughWorldResult_t move_player_through_world(Position_t player_pos, 
      Direction_t collided_tile_dir = DIRECTION_COUNT;
      for(S16 y = min.y; y <= max.y; y++){
           for(S16 x = min.x; x <= max.x; x++){
-               if(world->tilemap.tiles[y][x].id){
+               if(tile_is_solid(world->tilemap.tiles[y] + x)){
                     Coord_t coord {x, y};
                     bool collide_with_tile = false;
                     Rect_t coord_rect = rect_surrounding_coord(coord);
