@@ -19,6 +19,11 @@
 #define THEME_FRAME_WIDTH 0.0625f
 #define THEME_FRAME_HEIGHT 0.03125f
 
+#define FLOOR_FRAMES_WIDE (S16)(16)
+#define FLOOR_FRAMES_TALL (S16)(16)
+#define FLOOR_FRAME_WIDTH 0.0625f
+#define FLOOR_FRAME_HEIGHT 0.0625f
+
 #define ARROW_FRAME_WIDTH 0.25f
 #define ARROW_FRAME_HEIGHT 0.0625f
 #define ARROW_FRAMES_TALL (S16)(16)
@@ -58,6 +63,7 @@ struct EntangleTints_t{
 };
 
 Vec_t theme_frame(S16 x, S16 y);
+Vec_t floor_or_solid_frame(S16 x, S16 y);
 Vec_t arrow_frame(S16 x, S16 y);
 Vec_t player_frame(S16 x, S16 y);
 
@@ -73,6 +79,8 @@ void draw_tile_flags(U16 flags, Vec_t tile_pos);
 void draw_interactive(Interactive_t* interactive, Vec_t pos_vec, Coord_t coord,
                       TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree);
 void draw_color_quad(Quad_t quad, F32 r, F32 g, F32 b, F32 a);
+void draw_floor(Vec_t pos, Tile_t* tile, U8 portal_rotations);
+void draw_flat_interactives(Vec_t pos, Interactive_t* interactive, U8 portal_rotations);
 void draw_flats(Vec_t pos, Tile_t* tile, Interactive_t* interactive, U8 portal_rotations);
 void draw_solids(Vec_t pos, Interactive_t* interactive, Block_t** blocks, S16 block_count,
                  ObjectArray_t<Player_t>* players, bool* draw_players,

@@ -3,11 +3,11 @@
 #include "types.h"
 #include "coord.h"
 
-#define TILE_ID_SOLID_START 16
+#define OLD_TILE_ID_SOLID_START 16
 
 enum TileFlag_t : U16{
      TILE_FLAG_ICED = 1,
-     TILE_FLAG_CHECKPOINT = 1 << 1,
+     TILE_FLAG_SOLID = 1 << 1,
      TILE_FLAG_RESET_IMMUNE = 1 << 2,
 
      TILE_FLAG_WIRE_STATE = 1 << 3,
@@ -36,6 +36,7 @@ struct Tile_t{
      U8 id;
      U8 light;
      U16 flags;
+     U8 rotation;
 };
 
 struct TileMap_t{

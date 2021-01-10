@@ -10,11 +10,116 @@
 
 #include <string.h>
 
+static void convert_deprecated_id_to_id_and_rotation(U8 deprecated_id, U8* new_id, U8* rotation){
+     switch(deprecated_id){
+     case 16:
+          *new_id = 0;
+          *rotation = 0;
+          break;
+     case 17:
+          *new_id = 1;
+          *rotation = 2;
+          break;
+     case 18:
+          *new_id = 0;
+          *rotation = 3;
+          break;
+     case 19:
+          *new_id = 1;
+          *rotation = 3;
+          break;
+     case 20:
+          *new_id = 2;
+          *rotation = 0;
+          break;
+     case 21:
+          *new_id = 3;
+          *rotation = 0;
+          break;
+     case 22:
+          *new_id = 4;
+          *rotation = 1;
+          break;
+     case 23:
+          *new_id = 5;
+          *rotation = 2;
+          break;
+     case 24:
+          *new_id = 5;
+          *rotation = 2;
+          break;
+     case 25:
+          *new_id = 4;
+          *rotation = 2;
+          break;
+     case 26:
+          *new_id = 3;
+          *rotation = 3;
+          break;
+     case 27:
+          *new_id = 2;
+          *rotation = 2;
+          break;
+     case 32:
+          *new_id = 1;
+          *rotation = 0;
+          break;
+     case 33:
+          *new_id = 0;
+          *rotation = 2;
+          break;
+     case 34:
+          *new_id = 1;
+          *rotation = 1;
+          break;
+     case 35:
+          *new_id = 0;
+          *rotation = 1;
+          break;
+     case 36:
+          *new_id = 4;
+          *rotation = 0;
+          break;
+     case 37:
+          *new_id = 5;
+          *rotation = 0;
+          break;
+     case 38:
+          *new_id = 2;
+          *rotation = 0;
+          break;
+     case 39:
+          *new_id = 3;
+          *rotation = 1;
+          break;
+     case 40:
+          *new_id = 3;
+          *rotation = 2;
+          break;
+     case 41:
+          *new_id = 2;
+          *rotation = 2;
+          break;
+     case 42:
+          *new_id = 5;
+          *rotation = 0;
+          break;
+     case 43:
+          *new_id = 4;
+          *rotation = 3;
+          break;
+     default:
+          new_id = 0;
+          rotation = 0;
+          break;
+     }
+}
+
 bool save_map_to_file(FILE* file, Coord_t player_start, const TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array,
                       ObjectArray_t<Interactive_t>* interactive_array, ObjectArray_t<Rect_t>* room_array, bool* tags, Raw_t* thumbnail){
      // alloc and convert map elements to map format
      S32 map_tile_count = (S32)(tilemap->width) * (S32)(tilemap->height);
-     MapTileV1_t* map_tiles = (MapTileV1_t*)(calloc((size_t)(map_tile_count), sizeof(*map_tiles)));
+     MapTileV2_t* map_tiles = (MapTileV2_t*)(calloc((size_t)(map_tile_count), sizeof(*map_tiles)));
      if(!map_tiles){
           LOG("%s(): failed to allocate %d tiles\n", __FUNCTION__, map_tile_count);
           return false;
@@ -38,6 +143,7 @@ bool save_map_to_file(FILE* file, Coord_t player_start, const TileMap_t* tilemap
           for(S32 x = 0; x < tilemap->width; x++){
                map_tiles[index].id = tilemap->tiles[y][x].id;
                map_tiles[index].flags = tilemap->tiles[y][x].flags;
+               map_tiles[index].rotation = tilemap->tiles[y][x].rotation;
                index++;
           }
      }
@@ -213,9 +319,16 @@ bool load_map_from_file_v6(FILE* file, Coord_t* player_start, TileMap_t* tilemap
      S32 index = 0;
      for(S32 y = 0; y < tilemap->height; y++){
           for(S32 x = 0; x < tilemap->width; x++){
-               tilemap->tiles[y][x].id = map_tiles[index].id;
-               tilemap->tiles[y][x].flags = map_tiles[index].flags;
-               tilemap->tiles[y][x].light = BASE_LIGHT;
+               auto* tile = tilemap->tiles[y] + x;
+               tile->flags = map_tiles[index].flags;
+               if(map_tiles[index].id >= OLD_TILE_ID_SOLID_START){
+                    tile->flags |= TILE_FLAG_SOLID;
+                    convert_deprecated_id_to_id_and_rotation(map_tiles[index].id, &tile->id, &tile->rotation);
+               }else{
+                    tile->id = map_tiles[index].id;
+                    tile->rotation = 0;
+               }
+               tile->light = BASE_LIGHT;
                index++;
           }
      }
@@ -352,9 +465,16 @@ bool load_map_from_file_v7(FILE* file, Coord_t* player_start, TileMap_t* tilemap
      S32 index = 0;
      for(S32 y = 0; y < tilemap->height; y++){
           for(S32 x = 0; x < tilemap->width; x++){
-               tilemap->tiles[y][x].id = map_tiles[index].id;
-               tilemap->tiles[y][x].flags = map_tiles[index].flags;
-               tilemap->tiles[y][x].light = BASE_LIGHT;
+               auto* tile = tilemap->tiles[y] + x;
+               tile->flags = map_tiles[index].flags;
+               if(map_tiles[index].id >= OLD_TILE_ID_SOLID_START){
+                    tile->flags |= TILE_FLAG_SOLID;
+                    convert_deprecated_id_to_id_and_rotation(map_tiles[index].id, &tile->id, &tile->rotation);
+               }else{
+                    tile->id = map_tiles[index].id;
+                    tile->rotation = 0;
+               }
+               tile->light = BASE_LIGHT;
                index++;
           }
      }
@@ -451,7 +571,7 @@ bool load_map_from_file_v8(FILE* file, Coord_t* player_start, TileMap_t* tilemap
 
      // alloc and convert map elements to map format
      S32 map_tile_count = (S32)(map_width) * (S32)(map_height);
-     MapTileV1_t* map_tiles = (MapTileV1_t*)(calloc((size_t)(map_tile_count), sizeof(*map_tiles)));
+     MapTileV2_t* map_tiles = (MapTileV2_t*)(calloc((size_t)(map_tile_count), sizeof(*map_tiles)));
      if(!map_tiles){
           LOG("%s(): failed to allocate %d tiles\n", __FUNCTION__, map_tile_count);
           return false;
@@ -502,6 +622,7 @@ bool load_map_from_file_v8(FILE* file, Coord_t* player_start, TileMap_t* tilemap
                tilemap->tiles[y][x].id = map_tiles[index].id;
                tilemap->tiles[y][x].flags = map_tiles[index].flags;
                tilemap->tiles[y][x].light = BASE_LIGHT;
+               tilemap->tiles[y][x].rotation = map_tiles[index].rotation;
                index++;
           }
      }

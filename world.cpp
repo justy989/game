@@ -2501,7 +2501,7 @@ void describe_coord(Coord_t coord, World_t* world){
           if(tile->flags){
                LOG(" flags:\n");
                if(tile->flags & TILE_FLAG_ICED) printf("  ICED\n");
-               if(tile->flags & TILE_FLAG_CHECKPOINT) printf("  CHECKPOINT\n");
+               if(tile->flags & TILE_FLAG_SOLID) printf("  SOLID\n");
                if(tile->flags & TILE_FLAG_RESET_IMMUNE) printf("  RESET_IMMUNE\n");
                if(tile->flags & TILE_FLAG_WIRE_STATE) printf("  WIRE_STATE\n");
                if(tile->flags & TILE_FLAG_WIRE_LEFT) printf("  WIRE_LEFT\n");

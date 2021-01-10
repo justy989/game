@@ -39,7 +39,7 @@ void destroy(TileMap_t* tilemap){
 }
 
 bool tile_is_solid(Tile_t* tile){
-     return tile->id >= TILE_ID_SOLID_START;
+     return tile->flags & TILE_FLAG_SOLID;
 }
 
 bool tile_is_iced(Tile_t* tile){

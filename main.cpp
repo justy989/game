@@ -1566,6 +1566,8 @@ int main(int argc, char** argv){
      SDL_Window* window = nullptr;
      SDL_GLContext opengl_context = nullptr;
      GLuint theme_texture = 0;
+     GLuint floor_texture = 0;
+     GLuint solids_texture = 0;
      GLuint player_texture = 0;
      GLuint arrow_texture = 0;
      GLuint text_texture = 0;
@@ -1606,6 +1608,10 @@ int main(int argc, char** argv){
 
           theme_texture = transparent_texture_from_file("content/theme.bmp");
           if(theme_texture == 0) return 1;
+          floor_texture = transparent_texture_from_file("content/base_floor.bmp");
+          if(floor_texture == 0) return 1;
+          solids_texture = transparent_texture_from_file("content/base_solids.bmp");
+          if(solids_texture == 0) return 1;
           player_texture = transparent_texture_from_file("content/player.bmp");
           if(player_texture == 0) return 1;
           arrow_texture = transparent_texture_from_file("content/arrow.bmp");
@@ -1803,29 +1809,7 @@ int main(int argc, char** argv){
      S16 hovered_map_thumbnail_index = 0;
      S16 visible_map_thumbnail_count = 0;
      ObjectArray_t<MapThumbnail_t> map_thumbnails;
-     init(&map_thumbnails, all_maps.count);
-
-     {
-          for(U32 m = 0; m < all_maps.count; m++){
-               auto* map_thumbnail = map_thumbnails.elements + m;
-               map_thumbnail->map_filepath = strdup(all_maps.entries[m].path);
-               map_thumbnail->map_number = all_maps.entries[m].map_number;
-               load_map_tags(map_thumbnail->map_filepath, map_thumbnail->tags);
-               Raw_t loaded_thumbnail {};
-               if(load_map_thumbnail(map_thumbnail->map_filepath, &loaded_thumbnail)){
-                    map_thumbnail->texture = transparent_texture_from_raw_bitmap(&loaded_thumbnail);
-                    free(loaded_thumbnail.bytes);
-               }else{
-                    map_thumbnail->texture = 0;
-               }
-               free(all_maps.entries[m].path);
-          }
-          free(all_maps.entries);
-
-          qsort(map_thumbnails.elements, map_thumbnails.count, sizeof(map_thumbnails.elements[0]), map_thumbnail_comparor);
-
-          visible_map_thumbnail_count = filter_thumbnails(&tag_checkboxes, &map_thumbnails);
-     }
+     memset(&map_thumbnails, 0, sizeof(map_thumbnails));
 
      world.room_transition = 1.0f;
      update_camera(&camera, &world, true);
@@ -1888,6 +1872,7 @@ int main(int argc, char** argv){
                               if(thumbnail_ptr){
                                    free(raw_thumbnail.bytes);
                               }
+                              world.recalc_room_camera = true;
                          }
                          clear_global_tags();
                     }
@@ -1910,6 +1895,7 @@ int main(int argc, char** argv){
                                    cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
                                    free(map_number_filepath);
                                    map_number_filepath = load_result.filepath;
+                                   world.recalc_room_camera = true;
 
                                    if(load_map_number_demo(&play_demo, map_number, &frame_count)){
                                         init(&world.arrows);
@@ -2060,6 +2046,28 @@ int main(int argc, char** argv){
                          break;
                     case SDL_SCANCODE_F12:
                          game_mode = GAME_MODE_LEVEL_SELECT;
+                         if(map_thumbnails.count == 0 && all_maps.count > 0){
+                              init(&map_thumbnails, all_maps.count);
+                              for(U32 m = 0; m < all_maps.count; m++){
+                                   auto* map_thumbnail = map_thumbnails.elements + m;
+                                   map_thumbnail->map_filepath = strdup(all_maps.entries[m].path);
+                                   map_thumbnail->map_number = all_maps.entries[m].map_number;
+                                   load_map_tags(map_thumbnail->map_filepath, map_thumbnail->tags);
+                                   Raw_t loaded_thumbnail {};
+                                   if(load_map_thumbnail(map_thumbnail->map_filepath, &loaded_thumbnail)){
+                                        map_thumbnail->texture = transparent_texture_from_raw_bitmap(&loaded_thumbnail);
+                                        free(loaded_thumbnail.bytes);
+                                   }else{
+                                        map_thumbnail->texture = 0;
+                                   }
+                                   free(all_maps.entries[m].path);
+                              }
+                              free(all_maps.entries);
+
+                              qsort(map_thumbnails.elements, map_thumbnails.count, sizeof(map_thumbnails.elements[0]), map_thumbnail_comparor);
+
+                              visible_map_thumbnail_count = filter_thumbnails(&tag_checkboxes, &map_thumbnails);
+                         }
                          break;
                     case SDL_SCANCODE_LEFT:
                     case SDL_SCANCODE_A:
@@ -2152,6 +2160,7 @@ int main(int argc, char** argv){
                                         return 1;
                                    }
                               }
+                              world.recalc_room_camera = true;
                          }else{
                               map_number++;
                          }
@@ -2173,6 +2182,7 @@ int main(int argc, char** argv){
                                         return 1;
                                    }
                               }
+                              world.recalc_room_camera = true;
                          }else{
                               map_number--;
                          }
@@ -5315,8 +5325,8 @@ int main(int argc, char** argv){
                {
                     glEnd();
 
-                    GLint save_texture;
-                    glGetIntegerv(GL_TEXTURE_BINDING_2D, &save_texture);
+                    // GLint save_texture;
+                    // glGetIntegerv(GL_TEXTURE_BINDING_2D, &save_texture);
                     glBindTexture(GL_TEXTURE_2D, 0);
 
                     // draw ice on pits
@@ -5341,11 +5351,54 @@ int main(int argc, char** argv){
                          }
                     }
 
-                    glBindTexture(GL_TEXTURE_2D, save_texture);
-                    glBegin(GL_QUADS);
-                    glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+                    // glBindTexture(GL_TEXTURE_2D, save_texture);
+                    // glBegin(GL_QUADS);
+                    // glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
                }
 
+
+               // draw our floor
+               glBindTexture(GL_TEXTURE_2D, floor_texture);
+               glBegin(GL_QUADS);
+               glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+
+               for(S16 y = max.y; y >= min.y; y--){
+                    for(S16 x = min.x; x <= max.x; x++){
+                         Interactive_t* interactive = quad_tree_find_at(world.interactive_qt, x, y);
+                         if(interactive && interactive->type == INTERACTIVE_TYPE_PIT) continue;
+
+                         Coord_t coord{x, y};
+                         Tile_t* tile = tilemap_get_tile(&world.tilemap, coord);
+                         if(tile->flags & TILE_FLAG_SOLID) continue;
+                         Position_t pos = coord_to_pos(coord) + camera.offset;
+                         draw_floor(pos_to_vec(pos), tile, 0);
+                    }
+               }
+               glEnd();
+
+               // draw our solids (walls)
+               glBindTexture(GL_TEXTURE_2D, solids_texture);
+               glBegin(GL_QUADS);
+               glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+               for(S16 y = max.y; y >= min.y; y--){
+                    for(S16 x = min.x; x <= max.x; x++){
+                         Interactive_t* interactive = quad_tree_find_at(world.interactive_qt, x, y);
+                         if(interactive && interactive->type == INTERACTIVE_TYPE_PIT) continue;
+
+                         Coord_t coord {x, y};
+                         Tile_t* tile = tilemap_get_tile(&world.tilemap, coord);
+                         if((tile->flags & TILE_FLAG_SOLID) == 0) continue;
+                         Position_t pos = coord_to_pos(coord) + camera.offset;
+                         draw_floor(pos_to_vec(pos), tile, 0);
+                    }
+               }
+               glEnd();
+
+               // draw our solids
+
+               glBindTexture(GL_TEXTURE_2D, theme_texture);
+
+#if 0
                for(S16 y = max.y; y >= min.y; y--){
                     draw_world_row_flats(y, min.x, max.x, &world.tilemap, world.interactive_qt, camera.offset);
 
@@ -5369,7 +5422,9 @@ int main(int argc, char** argv){
                          draw_block(block, pos_to_vec(draw_block_pos + camera.offset), 0);
                     }
                }
+#endif
 
+#if 0
                for(S16 y = max.y; y >= min.y; y--){
                     for(S16 x = min.x; x <= max.x; x++){
                          Coord_t coord {x, y};
@@ -5453,6 +5508,7 @@ int main(int argc, char** argv){
                     glBegin(GL_QUADS);
                     glColor3f(1.0f, 1.0f, 1.0f);
                }
+#endif
 
                glEnd();
 
@@ -5726,6 +5782,8 @@ int main(int argc, char** argv){
 
      if(!suite){
           glDeleteTextures(1, &theme_texture);
+          glDeleteTextures(1, &floor_texture);
+          glDeleteTextures(1, &solids_texture);
           glDeleteTextures(1, &player_texture);
           glDeleteTextures(1, &arrow_texture);
           glDeleteTextures(1, &text_texture);

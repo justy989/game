@@ -67,6 +67,11 @@ Vec_t theme_frame(S16 x, S16 y){
      return Vec_t{(F32)(x) * THEME_FRAME_WIDTH, (F32)(y) * THEME_FRAME_HEIGHT};
 }
 
+Vec_t floor_or_solid_frame(S16 x, S16 y){
+     y = (FLOOR_FRAMES_TALL - (S16)(1)) - y;
+     return Vec_t{(F32)(x) * FLOOR_FRAME_WIDTH, (F32)(y) * FLOOR_FRAME_HEIGHT};
+}
+
 Vec_t arrow_frame(S16 x, S16 y) {
      y = (ARROW_FRAMES_TALL - (S16)(1)) - y;
      return Vec_t{(F32)(x) * ARROW_FRAME_WIDTH, (F32)(y) * ARROW_FRAME_HEIGHT};
@@ -128,6 +133,65 @@ void draw_screen_texture(Vec_t pos, Vec_t tex, Vec_t dim, Vec_t tex_dim){
      glVertex2f(pos.x + dim.x, pos.y);
 }
 
+void draw_rotatable_screen_texture(Vec_t pos, Vec_t tex, Vec_t dim, Vec_t tex_dim,
+                                   U8 rotations){
+     Vec_t bottom_left;
+     Vec_t bottom_right;
+     Vec_t top_left;
+     Vec_t top_right;
+
+     F32 left = tex.x;
+     F32 right = tex.x + tex_dim.x;
+     F32 bottom = tex.y;
+     F32 top = tex.y + tex_dim.y;
+
+     switch(rotations % 4){
+     default:
+     case 0:
+          bottom_left = Vec_t{left, bottom};
+          bottom_right = Vec_t{right, bottom};
+          top_left = Vec_t{left, top};
+          top_right = Vec_t{right, top};
+          break;
+     case 1:
+          bottom_left = Vec_t{right, bottom};
+          bottom_right = Vec_t{right, top};
+          top_left = Vec_t{left, bottom};
+          top_right = Vec_t{left, top};
+          break;
+     case 2:
+          bottom_left = Vec_t{right, top};
+          bottom_right = Vec_t{left, top};
+          top_left = Vec_t{right, bottom};
+          top_right = Vec_t{left, bottom};
+          break;
+     case 3:
+          bottom_left = Vec_t{left, top};
+          bottom_right = Vec_t{left, bottom};
+          top_left = Vec_t{right, top};
+          top_right = Vec_t{right, bottom};
+          break;
+     }
+
+     F32 p_right = pos.x + dim.x;
+     F32 p_top = pos.y + dim.y;
+
+     glTexCoord2f(bottom_left.x, bottom_left.y);
+     glVertex2f(pos.x, pos.y);
+     glTexCoord2f(top_left.x, top_left.y);
+     glVertex2f(pos.x, p_top);
+     glTexCoord2f(top_right.x, top_right.y);
+     glVertex2f(p_right, p_top);
+     glTexCoord2f(bottom_right.x, bottom_right.y);
+     glVertex2f(p_right, pos.y);
+}
+
+void draw_floor_or_solid_frame(Vec_t pos, Vec_t tex, U8 rotations){
+     Vec_t dim {TILE_SIZE, TILE_SIZE};
+     Vec_t tex_dim {FLOOR_FRAME_WIDTH, FLOOR_FRAME_HEIGHT};
+     draw_rotatable_screen_texture(pos, tex, dim, tex_dim, rotations);
+}
+
 void draw_theme_frame(Vec_t pos, Vec_t tex){
      Vec_t dim {TILE_SIZE, TILE_SIZE};
      Vec_t tex_dim {THEME_FRAME_WIDTH, THEME_FRAME_HEIGHT};
@@ -148,10 +212,6 @@ void draw_tile_id(U8 id, Vec_t pos){
 
 void draw_tile_flags(U16 flags, Vec_t tile_pos){
      if(flags == 0) return;
-
-     if(flags & TILE_FLAG_CHECKPOINT){
-          draw_theme_frame(tile_pos, theme_frame(0, 21));
-     }
 
      if(flags & TILE_FLAG_RESET_IMMUNE){
           draw_theme_frame(tile_pos, theme_frame(1, 21));
@@ -548,6 +608,45 @@ Vec_t draw_player(Player_t* player, Position_t camera, Coord_t source_coord, Coo
      glVertex2f(pos_vec.x + HALF_TILE_SIZE, pos_vec.y - HALF_TILE_SIZE);
 
      return pos_vec;
+}
+
+void draw_floor(Vec_t pos, Tile_t* tile, U8 portal_rotations){
+     S16 frame_x = tile->id % FLOOR_FRAMES_WIDE;
+     S16 frame_y = tile->id / FLOOR_FRAMES_WIDE;
+     draw_floor_or_solid_frame(pos, floor_or_solid_frame(frame_x, frame_y), tile->rotation + portal_rotations);
+
+     U16 tile_flags = tile->flags;
+     for(U8 i = 0; i < portal_rotations; i++){
+          U16 new_flags = tile_flags & ~(TILE_FLAG_WIRE_LEFT | TILE_FLAG_WIRE_UP | TILE_FLAG_WIRE_RIGHT | TILE_FLAG_WIRE_DOWN);
+
+          if(tile_flags & TILE_FLAG_WIRE_LEFT) new_flags |= TILE_FLAG_WIRE_UP;
+          if(tile_flags & TILE_FLAG_WIRE_UP) new_flags |= TILE_FLAG_WIRE_RIGHT;
+          if(tile_flags & TILE_FLAG_WIRE_RIGHT) new_flags |= TILE_FLAG_WIRE_DOWN;
+          if(tile_flags & TILE_FLAG_WIRE_DOWN) new_flags |= TILE_FLAG_WIRE_LEFT;
+
+          tile_flags = new_flags;
+     }
+
+     draw_tile_flags(tile_flags, pos);
+}
+
+void draw_flat_interactives(Vec_t pos, Interactive_t* interactive, U8 portal_rotations){
+     // TODO: one day we'll use rotations
+     (void)(portal_rotations);
+     if(interactive){
+          if(interactive->type == INTERACTIVE_TYPE_PRESSURE_PLATE){
+               // if(!tile_is_iced(tile) && interactive->pressure_plate.iced_under){
+               //      draw_ice(pos);
+               // }
+
+               draw_interactive(interactive, pos, Coord_t{-1, -1}, nullptr, nullptr);
+          }else if(interactive->type == INTERACTIVE_TYPE_POPUP && interactive->popup.lift.ticks == 1){
+               draw_interactive(interactive, pos, Coord_t{-1, -1}, nullptr, nullptr);
+          }else if(interactive->type == INTERACTIVE_TYPE_LIGHT_DETECTOR ||
+                   interactive->type == INTERACTIVE_TYPE_ICE_DETECTOR){
+               draw_interactive(interactive, pos, Coord_t{-1, -1}, nullptr, nullptr);
+          }
+     }
 }
 
 void draw_flats(Vec_t pos, Tile_t* tile, Interactive_t* interactive, U8 portal_rotations){
@@ -982,7 +1081,7 @@ void draw_editor(Editor_t* editor, World_t* world, Camera_t* camera, Vec_t mouse
                     }
 
                     pos.x += (dimensions.x * TILE_SIZE);
-                    if(pos.x >= 1.0f){
+                    if((pos.x + TILE_SIZE) >= 1.0f){
                          pos.x = 0.0f;
                          pos.y += row_height * TILE_SIZE;
                          row_height = 1;

@@ -11,13 +11,19 @@
 
 // version 4 is just the addition of the thumbnail
 // version 7 adds the iced flag to the pit
-// version 8 adds rooms
+// version 8 adds rooms, also we changed TILE_FLAG_CHECKPOINT to TILE_FLAG_SOLID, and adds rotation to tiles
 #define MAP_VERSION 8
 
 #pragma pack(push, 1)
 struct MapTileV1_t{
      U8 id;
      U16 flags;
+};
+
+struct MapTileV2_t{
+     U8 id;
+     U16 flags;
+     U8 rotation;
 };
 
 struct MapBlockV1_t{
