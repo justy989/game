@@ -60,6 +60,22 @@ static void convert_deprecated_id_to_id_and_rotation(U8 deprecated_id, U8* new_i
           *new_id = 2;
           *rotation = 2;
           break;
+     case 28:
+          *new_id = 6;
+          *rotation = 0;
+          break;
+     case 29:
+          *new_id = 7;
+          *rotation = 0;
+          break;
+     case 30:
+          *new_id = 8;
+          *rotation = 1;
+          break;
+     case 31:
+          *new_id = 9;
+          *rotation = 2;
+          break;
      case 32:
           *new_id = 1;
           *rotation = 0;
@@ -106,6 +122,54 @@ static void convert_deprecated_id_to_id_and_rotation(U8 deprecated_id, U8* new_i
           break;
      case 43:
           *new_id = 4;
+          *rotation = 3;
+          break;
+     case 44:
+          *new_id = 8;
+          *rotation = 0;
+          break;
+     case 45:
+          *new_id = 9;
+          *rotation = 0;
+          break;
+     case 46:
+          *new_id = 6;
+          *rotation = 0;
+          break;
+     case 47:
+          *new_id = 7;
+          *rotation = 1;
+          break;
+     case 48:
+          *new_id = 9;
+          *rotation = 2;
+          break;
+     case 49:
+          *new_id = 8;
+          *rotation = 2;
+          break;
+     case 50:
+          *new_id = 7;
+          *rotation = 2;
+          break;
+     case 51:
+          *new_id = 6;
+          *rotation = 2;
+          break;
+     case 52:
+          *new_id = 7;
+          *rotation = 3;
+          break;
+     case 53:
+          *new_id = 6;
+          *rotation = 2;
+          break;
+     case 54:
+          *new_id = 9;
+          *rotation = 0;
+          break;
+     case 55:
+          *new_id = 8;
           *rotation = 3;
           break;
      default:
