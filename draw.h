@@ -105,7 +105,7 @@ void draw_selection(Coord_t selection_start, Coord_t selection_end, Camera_t* ca
 
 void draw_text(const char* message, Vec_t pos, Vec_t dim = Vec_t{TEXT_CHAR_WIDTH, TEXT_CHAR_HEIGHT}, F32 spacing = TEXT_CHAR_SPACING);
 void draw_editor(Editor_t* editor, World_t* world, Camera_t* camera, Vec_t mouse_screen,
-                 GLuint theme_texture, GLuint text_texture);
+                 GLuint theme_texture, GLuint floor_texture, GLuint solid_texture, GLuint text_texture);
 void draw_checkbox(Checkbox_t* checkbox, Vec_t scroll);
 
 Color3f_t rgb_to_color3f(BitmapPixel_t* p);

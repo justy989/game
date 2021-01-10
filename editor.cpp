@@ -13,79 +13,67 @@ bool init(Editor_t* editor){
 
      init(&editor->category_array, EDITOR_CATEGORY_COUNT);
 
-     auto* tile_category = editor->category_array.elements + EDITOR_CATEGORY_TILE_ID;
-     init(tile_category, 27);
-     for(S16 i = 0; i < 15; i++){
-          init(&tile_category->elements[i], 1);
-          tile_category->elements[i].elements[0].type = STAMP_TYPE_TILE_ID;
-          tile_category->elements[i].elements[0].tile_id = (U8)(i);
+     auto* tile_floor_category = editor->category_array.elements + EDITOR_CATEGORY_TILE_FLOOR;
+     init(tile_floor_category, 14);
+
+     for(S16 i = 0; i < 14; i++){
+          init(&tile_floor_category->elements[i], 1);
+          tile_floor_category->elements[i].elements[0].type = STAMP_TYPE_TILE_ID;
+          tile_floor_category->elements[i].elements[0].tile.id = i;
+          tile_floor_category->elements[i].elements[0].tile.rotation = 0;
+          tile_floor_category->elements[i].elements[0].tile.solid = false;
      }
 
-     auto* tile_id_array = tile_category->elements + 14;
+     auto* tile_solid_category = editor->category_array.elements + EDITOR_CATEGORY_TILE_SOLIDS;
+     init(tile_solid_category, 4);
 
-     tile_id_array++;
-     init(tile_id_array, 2);
-     tile_id_array->elements[0].type = STAMP_TYPE_TILE_ID;
-     tile_id_array->elements[0].tile_id = 32;
-     tile_id_array->elements[1].type = STAMP_TYPE_TILE_ID;
-     tile_id_array->elements[1].tile_id = 16;
-     tile_id_array->elements[1].offset = Coord_t{0, 1};
+     init(&tile_solid_category->elements[0], 2);
+     tile_solid_category->elements[0].elements[0].type = STAMP_TYPE_TILE_ID;
+     tile_solid_category->elements[0].elements[0].tile.id = 1;
+     tile_solid_category->elements[0].elements[0].tile.rotation = 0;
+     tile_solid_category->elements[0].elements[0].tile.solid = true;
+     tile_solid_category->elements[0].elements[0].offset = Coord_t{0, 0};
+     tile_solid_category->elements[0].elements[1].type = STAMP_TYPE_TILE_ID;
+     tile_solid_category->elements[0].elements[1].tile.id = 0;
+     tile_solid_category->elements[0].elements[1].tile.rotation = 0;
+     tile_solid_category->elements[0].elements[1].tile.solid = true;
+     tile_solid_category->elements[0].elements[1].offset = Coord_t{0, 1};
 
-     tile_id_array++;
-     init(tile_id_array, 2);
-     tile_id_array->elements[0].type = STAMP_TYPE_TILE_ID;
-     tile_id_array->elements[0].tile_id = 33;
-     tile_id_array->elements[1].type = STAMP_TYPE_TILE_ID;
-     tile_id_array->elements[1].tile_id = 17;
-     tile_id_array->elements[1].offset = Coord_t{0, 1};
+     init(&tile_solid_category->elements[1], 2);
+     tile_solid_category->elements[1].elements[0].type = STAMP_TYPE_TILE_ID;
+     tile_solid_category->elements[1].elements[0].tile.id = 0;
+     tile_solid_category->elements[1].elements[0].tile.rotation = 2;
+     tile_solid_category->elements[1].elements[0].tile.solid = true;
+     tile_solid_category->elements[1].elements[0].offset = Coord_t{0, 0};
+     tile_solid_category->elements[1].elements[1].type = STAMP_TYPE_TILE_ID;
+     tile_solid_category->elements[1].elements[1].tile.id = 1;
+     tile_solid_category->elements[1].elements[1].tile.rotation = 2;
+     tile_solid_category->elements[1].elements[1].tile.solid = true;
+     tile_solid_category->elements[1].elements[1].offset = Coord_t{0, 1};
 
-     tile_id_array++;
-     init(tile_id_array, 2);
-     tile_id_array->elements[0].type = STAMP_TYPE_TILE_ID;
-     tile_id_array->elements[0].tile_id = 18;
-     tile_id_array->elements[1].type = STAMP_TYPE_TILE_ID;
-     tile_id_array->elements[1].tile_id = 19;
-     tile_id_array->elements[1].offset = Coord_t{1, 0};
+     init(&tile_solid_category->elements[2], 2);
+     tile_solid_category->elements[2].elements[0].type = STAMP_TYPE_TILE_ID;
+     tile_solid_category->elements[2].elements[0].tile.id = 1;
+     tile_solid_category->elements[2].elements[0].tile.rotation = 1;
+     tile_solid_category->elements[2].elements[0].tile.solid = true;
+     tile_solid_category->elements[2].elements[0].offset = Coord_t{0, 0};
+     tile_solid_category->elements[2].elements[1].type = STAMP_TYPE_TILE_ID;
+     tile_solid_category->elements[2].elements[1].tile.id = 0;
+     tile_solid_category->elements[2].elements[1].tile.rotation = 1;
+     tile_solid_category->elements[2].elements[1].tile.solid = true;
+     tile_solid_category->elements[2].elements[1].offset = Coord_t{1, 0};
 
-     tile_id_array++;
-     init(tile_id_array, 2);
-     tile_id_array->elements[0].type = STAMP_TYPE_TILE_ID;
-     tile_id_array->elements[0].tile_id = 34;
-     tile_id_array->elements[1].type = STAMP_TYPE_TILE_ID;
-     tile_id_array->elements[1].tile_id = 35;
-     tile_id_array->elements[1].offset = Coord_t{1, 0};
-
-     for(S16 i = 0; i < 6; i++){
-          tile_id_array++;
-          init(tile_id_array, 4);
-          tile_id_array->elements[0].type = STAMP_TYPE_TILE_ID;
-          tile_id_array->elements[0].tile_id = (U8)(36 + (i * 2));
-          tile_id_array->elements[1].type = STAMP_TYPE_TILE_ID;
-          tile_id_array->elements[1].tile_id = (U8)(37 + (i * 2));
-          tile_id_array->elements[1].offset = Coord_t{1, 0};
-          tile_id_array->elements[2].type = STAMP_TYPE_TILE_ID;
-          tile_id_array->elements[2].tile_id = (U8)(20 + (i * 2));
-          tile_id_array->elements[2].offset = Coord_t{0, 1};
-          tile_id_array->elements[3].type = STAMP_TYPE_TILE_ID;
-          tile_id_array->elements[3].tile_id = (U8)(21 + (i * 2));
-          tile_id_array->elements[3].offset = Coord_t{1, 1};
-     }
-
-     for(S16 i = 0; i < 2; i++){
-          tile_id_array++;
-          init(tile_id_array, 4);
-          tile_id_array->elements[0].type = STAMP_TYPE_TILE_ID;
-          tile_id_array->elements[0].tile_id = (U8)(50 + i * 4);
-          tile_id_array->elements[1].type = STAMP_TYPE_TILE_ID;
-          tile_id_array->elements[1].tile_id = (U8)(51 + i * 4);
-          tile_id_array->elements[1].offset = Coord_t{1, 0};
-          tile_id_array->elements[2].type = STAMP_TYPE_TILE_ID;
-          tile_id_array->elements[2].tile_id = (U8)(48 + i * 4);
-          tile_id_array->elements[2].offset = Coord_t{0, 1};
-          tile_id_array->elements[3].type = STAMP_TYPE_TILE_ID;
-          tile_id_array->elements[3].tile_id = (U8)(49 + i * 4);
-          tile_id_array->elements[3].offset = Coord_t{1, 1};
-     }
+     init(&tile_solid_category->elements[3], 2);
+     tile_solid_category->elements[3].elements[0].type = STAMP_TYPE_TILE_ID;
+     tile_solid_category->elements[3].elements[0].tile.id = 0;
+     tile_solid_category->elements[3].elements[0].tile.rotation = 3;
+     tile_solid_category->elements[3].elements[0].tile.solid = true;
+     tile_solid_category->elements[3].elements[0].offset = Coord_t{0, 0};
+     tile_solid_category->elements[3].elements[1].type = STAMP_TYPE_TILE_ID;
+     tile_solid_category->elements[3].elements[1].tile.id = 1;
+     tile_solid_category->elements[3].elements[1].tile.rotation = 3;
+     tile_solid_category->elements[3].elements[1].tile.solid = true;
+     tile_solid_category->elements[3].elements[1].offset = Coord_t{1, 0};
 
      auto* tile_flags_category = editor->category_array.elements + EDITOR_CATEGORY_TILE_FLAGS;
      init(tile_flags_category, 34);
@@ -447,7 +435,13 @@ void apply_stamp(Stamp_t* stamp, Coord_t coord, TileMap_t* tilemap, ObjectArray_
      case STAMP_TYPE_TILE_ID:
      {
           Tile_t* tile = tilemap_get_tile(tilemap, coord);
-          if(tile) tile->id = stamp->tile_id;
+          if(tile){
+               tile->id = stamp->tile.id;
+               tile->rotation = stamp->tile.rotation;
+               if(stamp->tile.solid){
+                    tile->flags |= TILE_FLAG_SOLID;
+               }
+          }
      } break;
      case STAMP_TYPE_TILE_FLAGS:
      {

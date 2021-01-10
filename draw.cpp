@@ -573,7 +573,6 @@ void draw_floor(Vec_t pos, Tile_t* tile, U8 portal_rotations){
      S16 frame_x = tile->id % FLOOR_FRAMES_WIDE;
      S16 frame_y = tile->id / FLOOR_FRAMES_WIDE;
      draw_floor_or_solid_frame(pos, floor_or_solid_frame(frame_x, frame_y), tile->rotation + portal_rotations);
-
 }
 
 void draw_flats(Vec_t pos, Tile_t* tile, Interactive_t* interactive, U8 portal_rotations){
@@ -832,8 +831,32 @@ static Block_t block_from_stamp(Stamp_t* stamp){
      return block;
 }
 
+static void draw_tile_stamp(StampTile_t* stamp_tile, Vec_t pos, GLuint theme_texture, GLuint floor_texture,
+                            GLuint solid_texture){
+     Tile_t tile {};
+     tile.id = stamp_tile->id;
+     tile.rotation = stamp_tile->rotation;
+
+     glEnd();
+
+     if(stamp_tile->solid){
+          glBindTexture(GL_TEXTURE_2D, solid_texture);
+          glBegin(GL_QUADS);
+     }else{
+          glBindTexture(GL_TEXTURE_2D, floor_texture);
+          glBegin(GL_QUADS);
+     }
+
+     draw_floor(pos, &tile, 0);
+
+     glEnd();
+
+     glBindTexture(GL_TEXTURE_2D, theme_texture);
+     glBegin(GL_QUADS);
+}
+
 void draw_editor(Editor_t* editor, World_t* world, Camera_t* camera, Vec_t mouse_screen,
-                 GLuint theme_texture, GLuint text_texture){
+                 GLuint theme_texture, GLuint floor_texture, GLuint solid_texture, GLuint text_texture){
      switch(editor->mode){
      default:
           break;
@@ -860,7 +883,7 @@ void draw_editor(Editor_t* editor, World_t* world, Camera_t* camera, Vec_t mouse
                     default:
                          break;
                     case STAMP_TYPE_TILE_ID:
-                         draw_tile_id(stamp->tile_id, vec);
+                         draw_tile_stamp(&stamp->tile, vec, theme_texture, floor_texture, solid_texture);
                          break;
                     case STAMP_TYPE_TILE_FLAGS:
                          draw_tile_flags(stamp->tile_flags, vec);
@@ -905,7 +928,7 @@ void draw_editor(Editor_t* editor, World_t* world, Camera_t* camera, Vec_t mouse
                default:
                     break;
                case STAMP_TYPE_TILE_ID:
-                    draw_tile_id(stamp->tile_id, stamp_pos);
+                    draw_tile_stamp(&stamp->tile, stamp_pos, theme_texture, floor_texture, solid_texture);
                     break;
                case STAMP_TYPE_TILE_FLAGS:
                     draw_tile_flags(stamp->tile_flags, stamp_pos);
@@ -953,7 +976,7 @@ void draw_editor(Editor_t* editor, World_t* world, Camera_t* camera, Vec_t mouse
                          default:
                               break;
                          case STAMP_TYPE_TILE_ID:
-                              draw_tile_id(stamp->tile_id, stamp_vec);
+                              draw_tile_stamp(&stamp->tile, stamp_vec, theme_texture, floor_texture, solid_texture);
                               break;
                          case STAMP_TYPE_TILE_FLAGS:
                               draw_tile_flags(stamp->tile_flags, stamp_vec);
@@ -1009,7 +1032,7 @@ void draw_editor(Editor_t* editor, World_t* world, Camera_t* camera, Vec_t mouse
                default:
                     break;
                case STAMP_TYPE_TILE_ID:
-                    draw_tile_id(stamp->tile_id, stamp_vec);
+                    draw_tile_stamp(&stamp->tile, stamp_vec, theme_texture, floor_texture, solid_texture);
                     break;
                case STAMP_TYPE_TILE_FLAGS:
                     draw_tile_flags(stamp->tile_flags, stamp_vec);

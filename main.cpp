@@ -1408,7 +1408,8 @@ void add_editor_stamps_for_selection(Editor_t* editor, World_t* world){
                // tile id
                Tile_t* tile = tilemap_get_tile(&world->tilemap, coord);
                editor->selection.elements[stamp_index].type = STAMP_TYPE_TILE_ID;
-               editor->selection.elements[stamp_index].tile_id = tile->id;
+               editor->selection.elements[stamp_index].tile.id = tile->id;
+               editor->selection.elements[stamp_index].tile.rotation = 0;
                editor->selection.elements[stamp_index].offset = offset;
                stamp_index++;
 
@@ -5714,7 +5715,8 @@ int main(int argc, char** argv){
                }
 
                // editor
-               draw_editor(&editor, &world, &camera, mouse_screen, theme_texture, text_texture);
+               draw_editor(&editor, &world, &camera, mouse_screen, theme_texture, floor_texture, solids_texture,
+                           text_texture);
           }
 
           if(reset_timer >= 0.0f){

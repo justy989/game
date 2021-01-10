@@ -24,11 +24,17 @@ struct StampBlock_t{
      BlockCut_t cut;
 };
 
+struct StampTile_t{
+     U8 id;
+     U8 rotation;
+     bool solid;
+};
+
 struct Stamp_t{
      StampType_t type;
 
      union{
-          U8 tile_id;
+          StampTile_t tile;
           U16 tile_flags;
           StampBlock_t block;
           Interactive_t interactive;
@@ -48,7 +54,8 @@ enum EditorMode_t : U8{
 };
 
 enum EditorCategory_t : U8{
-     EDITOR_CATEGORY_TILE_ID,
+     EDITOR_CATEGORY_TILE_FLOOR,
+     EDITOR_CATEGORY_TILE_SOLIDS,
      EDITOR_CATEGORY_TILE_FLAGS,
      EDITOR_CATEGORY_BLOCK,
      EDITOR_CATEGORY_INTERACTIVE_LEVER,
