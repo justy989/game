@@ -5293,6 +5293,7 @@ int main(int argc, char** argv){
           }
 
           // begin drawing
+          // TODO: limit this based on camera
           Coord_t min = Coord_t{};
           Coord_t max = min + Coord_t{world.tilemap.width, world.tilemap.height};
           min = coord_clamp_zero_to_dim(min, world.tilemap.width - (S16)(1), world.tilemap.height - (S16)(1));
@@ -5325,8 +5326,6 @@ int main(int argc, char** argv){
                {
                     glEnd();
 
-                    // GLint save_texture;
-                    // glGetIntegerv(GL_TEXTURE_BINDING_2D, &save_texture);
                     glBindTexture(GL_TEXTURE_2D, 0);
 
                     // draw ice on pits
@@ -5350,12 +5349,7 @@ int main(int argc, char** argv){
                               }
                          }
                     }
-
-                    // glBindTexture(GL_TEXTURE_2D, save_texture);
-                    // glBegin(GL_QUADS);
-                    // glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
                }
-
 
                // draw our floor
                glBindTexture(GL_TEXTURE_2D, floor_texture);
@@ -5394,22 +5388,64 @@ int main(int argc, char** argv){
                }
                glEnd();
 
-               // draw our solids
-
+               // draw ice
                glBindTexture(GL_TEXTURE_2D, theme_texture);
-
-#if 0
+               glBegin(GL_QUADS);
+               draw_set_ice_color();
                for(S16 y = max.y; y >= min.y; y--){
-                    draw_world_row_flats(y, min.x, max.x, &world.tilemap, world.interactive_qt, camera.offset);
+                    for(S16 x = min.x; x <= max.x; x++){
+                         Coord_t coord {x, y};
+                         Interactive_t* interactive = quad_tree_find_at(world.interactive_qt, x, y);
+                         Tile_t* tile = tilemap_get_tile(&world.tilemap, coord);
+                         if(interactive && interactive->type == INTERACTIVE_TYPE_PRESSURE_PLATE &&
+                            interactive->pressure_plate.iced_under && !tile_is_iced(tile)){
+                              Position_t pos = coord_to_pos(coord) + camera.offset;
+                              draw_ice_tile(pos_to_vec(pos));
+                         }
+                    }
+               }
+               glEnd();
 
-                    // TODO: compress with logic in draw_world_row_solids()
-                    auto search_rect = Rect_t{(S16)(min.x * TILE_SIZE_IN_PIXELS), (S16)(y * TILE_SIZE_IN_PIXELS),
-                                              (S16)((max.x * TILE_SIZE_IN_PIXELS) + TILE_SIZE_IN_PIXELS),
-                                              (S16)((y * TILE_SIZE_IN_PIXELS) + TILE_SIZE_IN_PIXELS)};
+               // draw flats
+               glBegin(GL_QUADS);
+               glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+
+               Rect_t block_search_rect {};
+               block_search_rect.left = min.x * TILE_SIZE_IN_PIXELS;
+               block_search_rect.right = (max.x * TILE_SIZE_IN_PIXELS) + TILE_SIZE_IN_PIXELS;
+
+               for(S16 y = max.y; y >= min.y; y--){
+                    for(S16 x = min.x; x <= max.x; x++){
+                         Coord_t coord {x, y};
+                         Position_t pos = coord_to_pos(coord) + camera.offset;
+                         Vec_t draw_pos = pos_to_vec(pos);
+
+                         Interactive_t* interactive = quad_tree_find_at(world.interactive_qt, x, y);
+                         if(is_active_portal(interactive)){
+                              PortalExit_t portal_exits = find_portal_exits(coord, &world.tilemap, world.interactive_qt);
+
+                              for(S8 d = 0; d < DIRECTION_COUNT; d++){
+                                   for(S8 i = 0; i < portal_exits.directions[d].count; i++){
+                                        if(portal_exits.directions[d].coords[i] == coord) continue;
+                                        Coord_t portal_coord = portal_exits.directions[d].coords[i] + direction_opposite((Direction_t)(d));
+                                        Tile_t* portal_tile = tilemap_get_tile(&world.tilemap, portal_coord);
+                                        Interactive_t* portal_interactive = quad_tree_find_at(world.interactive_qt, portal_coord.x, portal_coord.y);
+                                        U8 portal_rotations = portal_rotations_between((Direction_t)(d), interactive->portal.face);
+                                        draw_flats(draw_pos, portal_tile, portal_interactive, portal_rotations);
+                                   }
+                              }
+                         }else{
+                              Tile_t* tile = tilemap_get_tile(&world.tilemap, coord);
+                              draw_flats(draw_pos, tile, interactive, 0);
+                         }
+                    }
+
+                    block_search_rect.bottom = y * TILE_SIZE_IN_PIXELS;
+                    block_search_rect.top = block_search_rect.bottom + TILE_SIZE_IN_PIXELS;
 
                     S16 block_count = 0;
                     Block_t* blocks[256]; // TODO: oh god i hope we don't need more than that?
-                    quad_tree_find_in(world.block_qt, search_rect, blocks, &block_count, 256);
+                    quad_tree_find_in(world.block_qt, block_search_rect, blocks, &block_count, 256);
 
                     sort_blocks_by_descending_height(blocks, block_count);
 
@@ -5422,9 +5458,26 @@ int main(int argc, char** argv){
                          draw_block(block, pos_to_vec(draw_block_pos + camera.offset), 0);
                     }
                }
-#endif
+               glEnd();
 
-#if 0
+               // draw ice
+               glBegin(GL_QUADS);
+               draw_set_ice_color();
+               for(S16 y = max.y; y >= min.y; y--){
+                    for(S16 x = min.x; x <= max.x; x++){
+                         Coord_t coord {x, y};
+                         Tile_t* tile = tilemap_get_tile(&world.tilemap, coord);
+
+                         if(tile && tile_is_iced(tile)){
+                              Position_t pos = coord_to_pos(coord) + camera.offset;
+                              draw_ice_tile(pos_to_vec(pos));
+                         }
+                    }
+               }
+               glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+               glEnd();
+
+               // draw rest of the interactives
                for(S16 y = max.y; y >= min.y; y--){
                     for(S16 x = min.x; x <= max.x; x++){
                          Coord_t coord {x, y};
@@ -5508,22 +5561,22 @@ int main(int argc, char** argv){
                     glBegin(GL_QUADS);
                     glColor3f(1.0f, 1.0f, 1.0f);
                }
-#endif
 
                glEnd();
 
-#if 0
+#if 1
                // light
                glBindTexture(GL_TEXTURE_2D, 0);
                glBegin(GL_QUADS);
                for(S16 y = min.y; y <= max.y; y++){
                     for(S16 x = min.x; x <= max.x; x++){
+                         Coord_t coord {x, y};
                          Tile_t* tile = world.tilemap.tiles[y] + x;
 
                          F32 light_value = (F32)(255 - tile->light) / 255.0f;
 
-                         Vec_t tile_pos {(F32)(x - min.x) * TILE_SIZE + camera.world_offset.x,
-                                         (F32)(y - min.y) * TILE_SIZE + camera.world_offset.y};
+                         Vec_t tile_pos = pos_to_vec(coord_to_pos(coord) + camera.offset);
+
                          glColor4f(0.0f, 0.0f, 0.0f, light_value);
                          glVertex2f(tile_pos.x, tile_pos.y);
                          glVertex2f(tile_pos.x, tile_pos.y + TILE_SIZE);

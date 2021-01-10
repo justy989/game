@@ -2497,7 +2497,7 @@ void describe_coord(Coord_t coord, World_t* world){
          coord_rect.right, coord_rect.top);
      auto* tile = tilemap_get_tile(&world->tilemap, coord);
      if(tile){
-          LOG("Tile: id: %u, light: %u\n", tile->id, tile->light);
+          LOG("Tile: id: %u, light: %u rot: %u\n", tile->id, tile->light, tile->rotation);
           if(tile->flags){
                LOG(" flags:\n");
                if(tile->flags & TILE_FLAG_ICED) printf("  ICED\n");

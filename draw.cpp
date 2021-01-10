@@ -10,6 +10,10 @@
 #include <ctype.h>
 #include <math.h>
 
+void draw_set_ice_color(){
+     glColor4f(1.0f, 1.0f, 1.0f, 0.45f);
+}
+
 void draw_color_quad(Quad_t quad, F32 r, F32 g, F32 b, F32 a){
      glBegin(GL_QUADS);
      glColor4f(r, g, b, a);
@@ -18,35 +22,6 @@ void draw_color_quad(Quad_t quad, F32 r, F32 g, F32 b, F32 a){
      glVertex2f(quad.right, quad.bottom);
      glVertex2f(quad.right, quad.top);
      glEnd();
-}
-
-static void draw_ice(Vec_t pos){
-     glEnd();
-
-     GLint save_texture;
-     glGetIntegerv(GL_TEXTURE_BINDING_2D, &save_texture);
-
-     Quad_t quad;
-     quad.left = pos.x;
-     quad.bottom = pos.y;
-     quad.right = pos.x + TILE_SIZE;
-     quad.top = pos.y + TILE_SIZE;
-
-     // get state ready for ice
-     glBindTexture(GL_TEXTURE_2D, 0);
-     draw_color_quad(quad, 196.0f / 255.0f, 217.0f / 255.0f, 1.0f, 0.45f);
-     // glColor4f(196.0f / 255.0f, 217.0f / 255.0f, 1.0f, 0.45f);
-     // glBegin(GL_QUADS);
-     // glVertex2f(pos.x, pos.y);
-     // glVertex2f(pos.x, pos.y + TILE_SIZE);
-     // glVertex2f(pos.x + TILE_SIZE, pos.y + TILE_SIZE);
-     // glVertex2f(pos.x + TILE_SIZE, pos.y);
-     // glEnd();
-
-     // reset state back to default
-     glBindTexture(GL_TEXTURE_2D, save_texture);
-     glBegin(GL_QUADS);
-     glColor3f(1.0f, 1.0f, 1.0f);
 }
 
 static void draw_opaque_quad(Quad_t quad, F32 opacity){
@@ -185,6 +160,11 @@ void draw_rotatable_screen_texture(Vec_t pos, Vec_t tex, Vec_t dim, Vec_t tex_di
      glTexCoord2f(bottom_right.x, bottom_right.y);
      glVertex2f(p_right, pos.y);
 }
+
+void draw_ice_tile(Vec_t pos){
+     draw_theme_frame(pos, theme_frame(0, 6));
+}
+
 
 void draw_floor_or_solid_frame(Vec_t pos, Vec_t tex, U8 rotations){
      Vec_t dim {TILE_SIZE, TILE_SIZE};
@@ -615,46 +595,11 @@ void draw_floor(Vec_t pos, Tile_t* tile, U8 portal_rotations){
      S16 frame_y = tile->id / FLOOR_FRAMES_WIDE;
      draw_floor_or_solid_frame(pos, floor_or_solid_frame(frame_x, frame_y), tile->rotation + portal_rotations);
 
-     U16 tile_flags = tile->flags;
-     for(U8 i = 0; i < portal_rotations; i++){
-          U16 new_flags = tile_flags & ~(TILE_FLAG_WIRE_LEFT | TILE_FLAG_WIRE_UP | TILE_FLAG_WIRE_RIGHT | TILE_FLAG_WIRE_DOWN);
-
-          if(tile_flags & TILE_FLAG_WIRE_LEFT) new_flags |= TILE_FLAG_WIRE_UP;
-          if(tile_flags & TILE_FLAG_WIRE_UP) new_flags |= TILE_FLAG_WIRE_RIGHT;
-          if(tile_flags & TILE_FLAG_WIRE_RIGHT) new_flags |= TILE_FLAG_WIRE_DOWN;
-          if(tile_flags & TILE_FLAG_WIRE_DOWN) new_flags |= TILE_FLAG_WIRE_LEFT;
-
-          tile_flags = new_flags;
-     }
-
-     draw_tile_flags(tile_flags, pos);
-}
-
-void draw_flat_interactives(Vec_t pos, Interactive_t* interactive, U8 portal_rotations){
-     // TODO: one day we'll use rotations
-     (void)(portal_rotations);
-     if(interactive){
-          if(interactive->type == INTERACTIVE_TYPE_PRESSURE_PLATE){
-               // if(!tile_is_iced(tile) && interactive->pressure_plate.iced_under){
-               //      draw_ice(pos);
-               // }
-
-               draw_interactive(interactive, pos, Coord_t{-1, -1}, nullptr, nullptr);
-          }else if(interactive->type == INTERACTIVE_TYPE_POPUP && interactive->popup.lift.ticks == 1){
-               draw_interactive(interactive, pos, Coord_t{-1, -1}, nullptr, nullptr);
-          }else if(interactive->type == INTERACTIVE_TYPE_LIGHT_DETECTOR ||
-                   interactive->type == INTERACTIVE_TYPE_ICE_DETECTOR){
-               draw_interactive(interactive, pos, Coord_t{-1, -1}, nullptr, nullptr);
-          }
-     }
 }
 
 void draw_flats(Vec_t pos, Tile_t* tile, Interactive_t* interactive, U8 portal_rotations){
-     if(interactive && interactive->type == INTERACTIVE_TYPE_PIT){
-          // don't draw tile if there is a pit
-     }else{
-          draw_tile_id(tile->id, pos);
-     }
+     // TODO: one day we'll use rotations
+     (void)(portal_rotations);
 
      U16 tile_flags = tile->flags;
      for(U8 i = 0; i < portal_rotations; i++){
@@ -670,13 +615,8 @@ void draw_flats(Vec_t pos, Tile_t* tile, Interactive_t* interactive, U8 portal_r
 
      draw_tile_flags(tile_flags, pos);
 
-     // draw flat interactives that could be covered by ice
      if(interactive){
           if(interactive->type == INTERACTIVE_TYPE_PRESSURE_PLATE){
-               if(!tile_is_iced(tile) && interactive->pressure_plate.iced_under){
-                    draw_ice(pos);
-               }
-
                draw_interactive(interactive, pos, Coord_t{-1, -1}, nullptr, nullptr);
           }else if(interactive->type == INTERACTIVE_TYPE_POPUP && interactive->popup.lift.ticks == 1){
                draw_interactive(interactive, pos, Coord_t{-1, -1}, nullptr, nullptr);
@@ -685,8 +625,6 @@ void draw_flats(Vec_t pos, Tile_t* tile, Interactive_t* interactive, U8 portal_r
                draw_interactive(interactive, pos, Coord_t{-1, -1}, nullptr, nullptr);
           }
      }
-
-     if(tile_is_iced(tile)) draw_ice(pos);
 }
 
 void draw_portal_blocks(Block_t** blocks, S16 block_count, Coord_t source_coord, Coord_t destination_coord, S8 portal_rotations, Position_t camera) {
@@ -717,37 +655,6 @@ void draw_portal_players(ObjectArray_t<Player_t>* players, Rect_t region, Coord_
           if(!pixel_in_rect(player->pos.pixel, region)) continue;
 
           draw_player(player, camera, source_coord, destination_coord, portal_rotations);
-     }
-}
-
-void draw_world_row_flats(S16 y, S16 x_start, S16 x_end, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt,
-                          Position_t camera){
-     auto draw_pos = pos_to_vec(coord_to_pos(Coord_t{x_start, y}) + camera);
-     auto save_draw_pos = draw_pos;
-
-     // flat layer
-     draw_pos = save_draw_pos;
-     for(S16 x = x_start; x <= x_end; x++){
-          auto tile = tilemap_get_tile(tilemap, Coord_t{x, y});
-          Interactive_t* interactive = quad_tree_find_at(interactive_qt, x, y);
-          if(is_active_portal(interactive)){
-               Coord_t coord {x, y};
-               PortalExit_t portal_exits = find_portal_exits(coord, tilemap, interactive_qt);
-
-               for(S8 d = 0; d < DIRECTION_COUNT; d++){
-                    for(S8 i = 0; i < portal_exits.directions[d].count; i++){
-                         if(portal_exits.directions[d].coords[i] == coord) continue;
-                         Coord_t portal_coord = portal_exits.directions[d].coords[i] + direction_opposite((Direction_t)(d));
-                         Tile_t* portal_tile = tilemap_get_tile(tilemap, portal_coord);
-                         Interactive_t* portal_interactive = quad_tree_find_at(interactive_qt, portal_coord.x, portal_coord.y);
-                         U8 portal_rotations = portal_rotations_between((Direction_t)(d), interactive->portal.face);
-                         draw_flats(draw_pos, portal_tile, portal_interactive, portal_rotations);
-                    }
-               }
-          }else{
-               draw_flats(draw_pos, tile, interactive, 0);
-          }
-          draw_pos.x += TILE_SIZE;
      }
 }
 
@@ -1032,6 +939,11 @@ void draw_editor(Editor_t* editor, World_t* world, Camera_t* camera, Vec_t mouse
                } break;
                case STAMP_TYPE_INTERACTIVE:
                {
+                    if(stamp->interactive.type == INTERACTIVE_TYPE_PRESSURE_PLATE && stamp->interactive.pressure_plate.iced_under){
+                         draw_set_ice_color();
+                         draw_ice_tile(stamp_pos);
+                         glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+                    }
                     draw_interactive(&stamp->interactive, stamp_pos, Coord_t{-1, -1}, &world->tilemap, world->interactive_qt);
                } break;
                }
@@ -1075,6 +987,11 @@ void draw_editor(Editor_t* editor, World_t* world, Camera_t* camera, Vec_t mouse
                          } break;
                          case STAMP_TYPE_INTERACTIVE:
                          {
+                              if(stamp->interactive.type == INTERACTIVE_TYPE_PRESSURE_PLATE && stamp->interactive.pressure_plate.iced_under){
+                                   draw_set_ice_color();
+                                   draw_ice_tile(stamp_vec);
+                                   glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+                              }
                               draw_interactive(&stamp->interactive, stamp_vec, Coord_t{-1, -1}, &world->tilemap, world->interactive_qt);
                          } break;
                          }
@@ -1118,7 +1035,10 @@ void draw_editor(Editor_t* editor, World_t* world, Camera_t* camera, Vec_t mouse
                case STAMP_TYPE_TILE_FLAGS:
                     draw_tile_flags(stamp->tile_flags, stamp_vec);
                     if(stamp->tile_flags & TILE_FLAG_ICED){
-                         draw_ice(stamp_vec);
+                         // TODO: to draw ice in the stamp we need to swap textures
+                         draw_set_ice_color();
+                         draw_ice_tile(stamp_vec);
+                         glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
                     }
                     break;
                case STAMP_TYPE_BLOCK:
@@ -1129,6 +1049,11 @@ void draw_editor(Editor_t* editor, World_t* world, Camera_t* camera, Vec_t mouse
                } break;
                case STAMP_TYPE_INTERACTIVE:
                {
+                    if(stamp->interactive.type == INTERACTIVE_TYPE_PRESSURE_PLATE && stamp->interactive.pressure_plate.iced_under){
+                         draw_set_ice_color();
+                         draw_ice_tile(stamp_vec);
+                         glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+                    }
                     draw_interactive(&stamp->interactive, stamp_vec, Coord_t{-1, -1}, &world->tilemap, world->interactive_qt);
                } break;
                }
