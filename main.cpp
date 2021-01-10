@@ -5370,24 +5370,6 @@ int main(int argc, char** argv){
                }
                glEnd();
 
-               // draw our solids (walls)
-               glBindTexture(GL_TEXTURE_2D, solids_texture);
-               glBegin(GL_QUADS);
-               glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
-               for(S16 y = max.y; y >= min.y; y--){
-                    for(S16 x = min.x; x <= max.x; x++){
-                         Interactive_t* interactive = quad_tree_find_at(world.interactive_qt, x, y);
-                         if(interactive && interactive->type == INTERACTIVE_TYPE_PIT) continue;
-
-                         Coord_t coord {x, y};
-                         Tile_t* tile = tilemap_get_tile(&world.tilemap, coord);
-                         if((tile->flags & TILE_FLAG_SOLID) == 0) continue;
-                         Position_t pos = coord_to_pos(coord) + camera.offset;
-                         draw_floor(pos_to_vec(pos), tile, 0);
-                    }
-               }
-               glEnd();
-
                // draw ice
                glBindTexture(GL_TEXTURE_2D, theme_texture);
                glBegin(GL_QUADS);
@@ -5474,10 +5456,11 @@ int main(int argc, char** argv){
                          }
                     }
                }
-               glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
                glEnd();
 
                // draw rest of the interactives
+               glBegin(GL_QUADS);
+               glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
                for(S16 y = max.y; y >= min.y; y--){
                     for(S16 x = min.x; x <= max.x; x++){
                          Coord_t coord {x, y};
@@ -5532,17 +5515,28 @@ int main(int argc, char** argv){
                          }
                     }
                }
+               glEnd();
 
+               // draw our solids (walls)
+               glBindTexture(GL_TEXTURE_2D, solids_texture);
+               glBegin(GL_QUADS);
+               glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
                for(S16 y = max.y; y >= min.y; y--){
                     for(S16 x = min.x; x <= max.x; x++){
+                         Interactive_t* interactive = quad_tree_find_at(world.interactive_qt, x, y);
+                         if(interactive && interactive->type == INTERACTIVE_TYPE_PIT) continue;
+
                          Coord_t coord {x, y};
                          Tile_t* tile = tilemap_get_tile(&world.tilemap, coord);
-                         if(tile && tile->id >= 16){
-                              Vec_t tile_pos = pos_to_vec(coord_to_pos(Coord_t{(S16)(x - min.x), (S16)(y - min.y)}) + camera.offset);
-                              draw_tile_id(tile->id, tile_pos);
-                         }
+                         if((tile->flags & TILE_FLAG_SOLID) == 0) continue;
+                         Position_t pos = coord_to_pos(coord) + camera.offset;
+                         draw_floor(pos_to_vec(pos), tile, 0);
                     }
                }
+               glEnd();
+
+               glBindTexture(GL_TEXTURE_2D, theme_texture);
+               glBegin(GL_QUADS);
 
                for(S16 y = max.y; y >= min.y; y--){
                     draw_world_row_solids(y, min.x, max.x, &world.tilemap, world.interactive_qt, world.block_qt,

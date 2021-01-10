@@ -378,29 +378,8 @@ void draw_interactive(Interactive_t* interactive, Vec_t pos_vec, Coord_t coord,
           }
 
           if(draw_wall){
-               S16 frame_x = 0;
+               S16 frame_x = (S16)(interactive->portal.face);
                S16 frame_y = 0;
-
-               switch(interactive->portal.face){
-               default:
-                    break;
-               case DIRECTION_LEFT:
-                    frame_x = 3;
-                    frame_y = 1;
-                    break;
-               case DIRECTION_UP:
-                    frame_x = 0;
-                    frame_y = 2;
-                    break;
-               case DIRECTION_RIGHT:
-                    frame_x = 2;
-                    frame_y = 2;
-                    break;
-               case DIRECTION_DOWN:
-                    frame_x = 1;
-                    frame_y = 1;
-                    break;
-               }
 
                draw_theme_frame(pos_vec, theme_frame(frame_x, frame_y));
           }
@@ -724,7 +703,7 @@ void draw_world_row_solids(S16 y, S16 x_start, S16 x_end, TileMap_t* tilemap, Qu
                     draw_double_theme_frame(final_pos, tex_vec);
 
                     // reset color
-                    glColor3f(1.0f, 1.0f, 1.0f);
+                    glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
                }
           }
      }
