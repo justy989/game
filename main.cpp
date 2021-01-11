@@ -1694,7 +1694,6 @@ int main(int argc, char** argv){
      PlayerAction_t player_action {};
 
      Vec_t mouse_screen = {}; // 0.0f to 1.0f
-     Position_t mouse_world = {};
      bool ctrl_down = false;
 
      S8 collision_attempts = 0;
@@ -2638,9 +2637,16 @@ int main(int argc, char** argv){
                                         break;
                                    }
 
-                                   editor.mode = EDITOR_MODE_ROOM_CREATION;
+                                   auto mouse_starting_coord = mouse_select_world_coord(mouse_screen, &camera);
+                                   if(mouse_starting_coord.x < 0 || mouse_starting_coord.y < 0 ||
+                                      mouse_starting_coord.x >= world.tilemap.width ||
+                                      mouse_starting_coord.y >= world.tilemap.height){
+                                        break;
+                                   }
+
                                    editor.selection_start = mouse_select_world_coord(mouse_screen, &camera);
                                    editor.selection_end = editor.selection_start;
+                                   editor.mode = EDITOR_MODE_ROOM_CREATION;
                               } break;
                               }
                               break;
@@ -2803,7 +2809,6 @@ int main(int argc, char** argv){
                case SDL_MOUSEMOTION:
                     mouse_screen = Vec_t{((F32)(sdl_event.button.x) / (F32)(window_width)),
                                          1.0f - ((F32)(sdl_event.button.y) / (F32)(window_height))};
-                    mouse_world = camera.normalized_to_world(mouse_screen);
 
                     if(game_mode == GAME_MODE_EDITOR){
                          switch(editor.mode){
@@ -2812,7 +2817,9 @@ int main(int argc, char** argv){
                          case EDITOR_MODE_CREATE_SELECTION:
                          case EDITOR_MODE_ROOM_CREATION:
                               if(editor.selection_start.x >= 0 && editor.selection_start.y >= 0){
-                                   editor.selection_end = pos_to_coord(mouse_world + camera.offset);
+                                   editor.selection_end = mouse_select_world_coord(mouse_screen, &camera);
+                                   CLAMP(editor.selection_end.x, 0, world.tilemap.width - 1);
+                                   CLAMP(editor.selection_end.y, 0, world.tilemap.height - 1);
                               }
                               break;
                          }
