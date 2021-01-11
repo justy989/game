@@ -1409,7 +1409,8 @@ void add_editor_stamps_for_selection(Editor_t* editor, World_t* world){
                Tile_t* tile = tilemap_get_tile(&world->tilemap, coord);
                editor->selection.elements[stamp_index].type = STAMP_TYPE_TILE_ID;
                editor->selection.elements[stamp_index].tile.id = tile->id;
-               editor->selection.elements[stamp_index].tile.rotation = 0;
+               editor->selection.elements[stamp_index].tile.solid = tile->flags & TILE_FLAG_SOLID;
+               editor->selection.elements[stamp_index].tile.rotation = tile->rotation;
                editor->selection.elements[stamp_index].offset = offset;
                stamp_index++;
 
@@ -2391,17 +2392,89 @@ int main(int argc, char** argv){
                          }
                          break;
                     case SDL_SCANCODE_R:
-                         if(game_mode == GAME_MODE_EDITOR &&
-                            editor.mode == EDITOR_MODE_CATEGORY_SELECT){
-                              auto coord = mouse_select_world_coord(mouse_screen, &camera);
-                              auto rect = rect_surrounding_coord(coord);
+                         if(game_mode == GAME_MODE_EDITOR){
+                              if(editor.mode == EDITOR_MODE_CATEGORY_SELECT){
+                                   auto coord = mouse_select_world_coord(mouse_screen, &camera);
+                                   auto rect = rect_surrounding_coord(coord);
 
-                              S16 block_count = 0;
-                              Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
-                              quad_tree_find_in(world.block_qt, rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
-                              for(S16 i = 0; i < block_count; i++){
-                                   blocks[i]->rotation += 1;
-                                   blocks[i]->rotation %= DIRECTION_COUNT;
+                                   S16 block_count = 0;
+                                   Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
+                                   quad_tree_find_in(world.block_qt, rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
+                                   for(S16 i = 0; i < block_count; i++){
+                                        blocks[i]->rotation += 1;
+                                        blocks[i]->rotation %= DIRECTION_COUNT;
+                                   }
+                              }else if(editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
+                                   // rotate selection !
+                                   Coord_t bottom_left_most {};
+                                   for(S16 i = 0; i < editor.selection.count; i++){
+                                        auto* stamp = editor.selection.elements + i;
+                                        auto save_x = stamp->offset.x;
+                                        stamp->offset.x = stamp->offset.y;
+                                        stamp->offset.y = -save_x;
+
+                                        // track the bottom left most coord
+                                        if(bottom_left_most.x >= stamp->offset.x){
+                                             bottom_left_most.x = stamp->offset.x;
+                                        }
+
+                                        if(bottom_left_most.y >= stamp->offset.y){
+                                             bottom_left_most.y = stamp->offset.y;
+                                        }
+
+                                        switch(stamp->type){
+                                        default:
+                                             break;
+                                        case STAMP_TYPE_TILE_ID:
+                                             // tile rotation for solids
+                                             if(stamp->tile.solid){
+                                                  stamp->tile.rotation++;
+                                                  stamp->tile.rotation %= 4;
+                                             }
+                                             break;
+                                        case STAMP_TYPE_TILE_FLAGS:
+                                        {
+                                             // tile wire rotation
+                                             auto wire_direction_mask = tile_existing_wires(stamp->tile_flags);
+                                             auto rotated_wire_direction_mask = direction_mask_rotate_clockwise(wire_direction_mask, 1);
+
+                                             stamp->tile_flags = tile_set_existing_wires(rotated_wire_direction_mask, stamp->tile_flags);
+
+                                             // TODO: not sure if this number is right, but I think so, it's mean to
+                                             // say, are there any wire clusters on this tile ? if so we need to rotate it
+                                             if(stamp->tile_flags >= 256){
+                                                  Direction_t cluster_direction = tile_flags_cluster_direction(stamp->tile_flags);
+                                                  auto rotated_cluster_direction = direction_rotate_clockwise(cluster_direction, 1);
+                                                  tile_flags_set_cluster_direction(&stamp->tile_flags, rotated_cluster_direction);
+                                             }
+                                        } break;
+                                        case STAMP_TYPE_BLOCK:
+                                             stamp->block.rotation++;
+                                             stamp->block.rotation %= 4;
+                                             break;
+                                        case STAMP_TYPE_INTERACTIVE:
+                                             switch(stamp->interactive.type){
+                                             default:
+                                                  break;
+                                             case INTERACTIVE_TYPE_PORTAL:
+                                                  stamp->interactive.portal.face = direction_rotate_clockwise(stamp->interactive.portal.face, 1);
+                                                  break;
+                                             case INTERACTIVE_TYPE_DOOR:
+                                                  stamp->interactive.door.face = direction_rotate_clockwise(stamp->interactive.door.face, 1);
+                                                  break;
+                                             case INTERACTIVE_TYPE_WIRE_CROSS:
+                                                  stamp->interactive.wire_cross.mask = direction_mask_rotate_clockwise(stamp->interactive.wire_cross.mask, 1);
+                                                  break;
+                                             }
+                                             break;
+                                        }
+                                   }
+
+                                   // update the offsets based on the tracked bottom left most, so that the selection effectively doesn't move
+                                   for(S16 i = 0; i < editor.selection.count; i++){
+                                        auto* stamp = editor.selection.elements + i;
+                                        stamp->offset -= bottom_left_most;
+                                   }
                               }
                          }else if(game_mode == GAME_MODE_PLAYING){
                               resetting = true;

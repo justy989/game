@@ -57,3 +57,5 @@ Direction_t tile_flags_cluster_direction(U16 flags);
 void tile_flags_set_cluster_direction(U16* flags, Direction_t dir);
 bool tile_flags_cluster_all_on(U16 flags);
 void tile_toggle_wire_activated(Tile_t* tile);
+DirectionMask_t tile_existing_wires(U16 flags);
+U16 tile_set_existing_wires(DirectionMask_t direction_mask, U16 current_flags);

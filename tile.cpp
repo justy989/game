@@ -142,3 +142,43 @@ void tile_toggle_wire_activated(Tile_t* tile){
           TOGGLE_BIT_FLAG(tile->flags, TILE_FLAG_WIRE_STATE);
      }
 }
+
+DirectionMask_t tile_existing_wires(U16 flags){
+     DirectionMask_t result = DIRECTION_MASK_NONE;
+     if(flags & TILE_FLAG_WIRE_LEFT){
+          result = direction_mask_add(result, DIRECTION_MASK_LEFT);
+     }
+     if(flags & TILE_FLAG_WIRE_UP){
+          result = direction_mask_add(result, DIRECTION_MASK_UP);
+     }
+     if(flags & TILE_FLAG_WIRE_RIGHT){
+          result = direction_mask_add(result, DIRECTION_MASK_RIGHT);
+     }
+     if(flags & TILE_FLAG_WIRE_DOWN){
+          result = direction_mask_add(result, DIRECTION_MASK_DOWN);
+     }
+     return result;
+}
+
+U16 tile_set_existing_wires(DirectionMask_t direction_mask, U16 current_flags){
+     U16 result = current_flags;
+     result &= ~(TILE_FLAG_WIRE_LEFT | TILE_FLAG_WIRE_UP | TILE_FLAG_WIRE_RIGHT | TILE_FLAG_WIRE_DOWN);
+
+     if(direction_mask & DIRECTION_MASK_LEFT){
+          result |= TILE_FLAG_WIRE_LEFT;
+     }
+
+     if(direction_mask & DIRECTION_MASK_UP){
+          result |= TILE_FLAG_WIRE_UP;
+     }
+
+     if(direction_mask & DIRECTION_MASK_RIGHT){
+          result |= TILE_FLAG_WIRE_RIGHT;
+     }
+
+     if(direction_mask & DIRECTION_MASK_DOWN){
+          result |= TILE_FLAG_WIRE_DOWN;
+     }
+
+     return result;
+}
