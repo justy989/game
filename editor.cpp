@@ -14,9 +14,9 @@ bool init(Editor_t* editor){
      init(&editor->category_array, EDITOR_CATEGORY_COUNT);
 
      auto* tile_floor_category = editor->category_array.elements + EDITOR_CATEGORY_TILE_FLOOR;
-     init(tile_floor_category, 14);
+     init(tile_floor_category, 15);
 
-     for(S16 i = 0; i < 14; i++){
+     for(S16 i = 0; i < 15; i++){
           init(&tile_floor_category->elements[i], 1);
           tile_floor_category->elements[i].elements[0].type = STAMP_TYPE_TILE_ID;
           tile_floor_category->elements[i].elements[0].tile.id = i;
@@ -603,6 +603,7 @@ void coord_clear(Coord_t coord, TileMap_t* tilemap, ObjectArray_t<Interactive_t>
      if(tile){
           tile->id = 0;
           tile->flags = 0;
+          tile->rotation = 0;
      }
 
      auto* interactive = quad_tree_interactive_find_at(interactive_quad_tree, coord);
