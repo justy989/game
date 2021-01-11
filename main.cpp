@@ -1379,19 +1379,21 @@ void update_camera(Camera_t* camera, World_t* world, bool init = false){
           world->recalc_room_camera = false;
 
           if(room_index < 0){
-               camera->center_on_tilemap(&world->tilemap);
+               camera->center_on_room(&world->editor_camera_bounds);
           }else{
                camera->center_on_room(world->rooms.elements + room_index);
+               world->editor_camera_bounds = camera->coords_in_target_view();
+               world_expand_editor_camera(world);
           }
 
-          world->room_transition = 0;
+          if(!init) world->camera_transition = 0;
           world->current_room = room_index;
      }
 
-     if(world->room_transition < 1.0f || init){
-          world->room_transition += 0.01f;
-          if(world->room_transition > 1.0f) world->room_transition = 1.0f;
-          camera->move_towards_target(world->room_transition);
+     if(world->camera_transition < 1.0f || init){
+          world->camera_transition += 0.01f;
+          if(world->camera_transition > 1.0f) world->camera_transition = 1.0f;
+          camera->move_towards_target(world->camera_transition);
      }
 }
 
@@ -1812,7 +1814,8 @@ int main(int argc, char** argv){
      ObjectArray_t<MapThumbnail_t> map_thumbnails;
      memset(&map_thumbnails, 0, sizeof(map_thumbnails));
 
-     world.room_transition = 1.0f;
+     world.editor_camera_bounds = Rect_t{0, 0, world.tilemap.width, world.tilemap.height};
+     world.camera_transition = 1.0f;
      update_camera(&camera, &world, true);
 
      F32 dt = 0.0f;
@@ -2142,9 +2145,22 @@ int main(int argc, char** argv){
                               }
                               free(map_number_filepath);
                               map_number_filepath = load_result.filepath;
+                              world.recalc_room_camera = true;
                          }
                          break;
                     }
+                    case SDL_SCANCODE_I:
+                         if(game_mode == GAME_MODE_EDITOR){
+                              world_shrink_editor_camera(&world);
+                              world.recalc_room_camera = true;
+                         }
+                         break;
+                    case SDL_SCANCODE_O:
+                         if(game_mode == GAME_MODE_EDITOR){
+                              world_expand_editor_camera(&world);
+                              world.recalc_room_camera = true;
+                         }
+                         break;
                     case SDL_SCANCODE_LEFTBRACKET:
                     {
                          map_number--;

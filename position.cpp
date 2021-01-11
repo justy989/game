@@ -37,6 +37,14 @@ void canonicalize(Position_t* position){
      }
 }
 
+void negate(Position_t* position){
+     position->pixel.x = -position->pixel.x;
+     position->pixel.y = -position->pixel.y;
+     position->decimal.x = -position->decimal.x;
+     position->decimal.y = -position->decimal.y;
+     canonicalize(position);
+}
+
 Position_t operator+(Position_t p, Vec_t v){
      p.decimal += v;
      canonicalize(&p);

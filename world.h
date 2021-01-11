@@ -26,8 +26,9 @@ struct World_t{
      S32 clone_instance = 0;
 
      S16 current_room = -1;
-     F32 room_transition = 0;
+     F32 camera_transition = 0;
      bool recalc_room_camera = false;
+     Rect_t editor_camera_bounds = {};
 };
 
 #define MAX_TELEPORT_POSITION_RESULTS 4
@@ -211,3 +212,6 @@ void set_against_blocks_coasting_from_player(Block_t* block, Direction_t directi
 bool find_and_update_connected_teleported_block(Block_t* block, Direction_t direction, World_t* world);
 
 PlayerInBlockRectResult_t player_in_block_rect(Player_t* player, TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt, QuadTreeNode_t<Block_t>* block_qt);
+
+void world_expand_editor_camera(World_t* world);
+void world_shrink_editor_camera(World_t* world);

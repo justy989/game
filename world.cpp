@@ -3172,3 +3172,23 @@ PlayerInBlockRectResult_t player_in_block_rect(Player_t* player, TileMap_t* tile
 
      return result;
 }
+
+void world_expand_editor_camera(World_t* world){
+     S16 quarter_width = (world->editor_camera_bounds.right - world->editor_camera_bounds.left) / 4;
+     S16 quarter_height = (world->editor_camera_bounds.top - world->editor_camera_bounds.bottom) / 4;
+
+     world->editor_camera_bounds.left -= quarter_width;
+     world->editor_camera_bounds.right += quarter_width;
+     world->editor_camera_bounds.bottom -= quarter_height;
+     world->editor_camera_bounds.top += quarter_height;
+}
+
+void world_shrink_editor_camera(World_t* world){
+     S16 eighth_width = (world->editor_camera_bounds.right - world->editor_camera_bounds.left) / 8;
+     S16 eighth_height = (world->editor_camera_bounds.top - world->editor_camera_bounds.bottom) / 8;
+
+     world->editor_camera_bounds.left += eighth_width;
+     world->editor_camera_bounds.right -= eighth_width;
+     world->editor_camera_bounds.bottom += eighth_height;
+     world->editor_camera_bounds.top -= eighth_height;
+}

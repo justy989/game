@@ -11,6 +11,7 @@ struct Position_t{
 
 Position_t pixel_pos(Pixel_t pixel);
 void canonicalize(Position_t* position);
+void negate(Position_t* position);
 Position_t operator+(Position_t p, Vec_t v);
 Position_t operator-(Position_t p, Vec_t v);
 Position_t operator+(Position_t p, Pixel_t i);

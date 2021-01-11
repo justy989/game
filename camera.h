@@ -23,4 +23,5 @@ struct Camera_t{
      void move_towards_target(F32 speed);
 
      Rect_t coords_in_view();
+     Rect_t coords_in_target_view();
 };

@@ -48,11 +48,7 @@ void Camera_t::center_on_room(Rect_t* rect){
 
 Position_t Camera_t::normalized_to_world(Vec_t v){
      Position_t bottom_left = offset;
-     bottom_left.pixel.x = -offset.pixel.x;
-     bottom_left.pixel.y = -offset.pixel.y;
-     bottom_left.decimal.x = -offset.decimal.x;
-     bottom_left.decimal.y = -offset.decimal.y;
-     canonicalize(&bottom_left);
+     negate(&bottom_left);
 
      Vec_t screen_world_dimensions{(view.right - view.left), (view.top - view.bottom)};
      Position_t top_right = bottom_left + screen_world_dimensions;
@@ -74,21 +70,22 @@ void Camera_t::move_towards_target(F32 t){
      }
 }
 
-Rect_t Camera_t::coords_in_view(){
-     F32 view_width = view.right - view.left;
-     F32 view_height = view.top - view.bottom;
+static Rect_t calc_coords_in_view(Position_t offset, Vec_t view_dimensions){
+     negate(&offset);
 
-     Position_t bottom_left = offset;
-     bottom_left.pixel.x = -bottom_left.pixel.x;
-     bottom_left.pixel.y = -bottom_left.pixel.y;
-     bottom_left.decimal.x = -bottom_left.decimal.x;
-     bottom_left.decimal.y = -bottom_left.decimal.y;
-     canonicalize(&bottom_left);
+     Position_t top_right = offset + Vec_t{view_dimensions.x, view_dimensions.y};
 
-     Position_t top_right = bottom_left + Vec_t{view_width, view_height};
-
-     Coord_t bottom_left_coord = pos_to_coord(bottom_left);
+     Coord_t bottom_left_coord = pos_to_coord(offset);
      Coord_t top_right_coord = pos_to_coord(top_right);
 
      return Rect_t{bottom_left_coord.x, bottom_left_coord.y, top_right_coord.x, top_right_coord.y};
+}
+
+Rect_t Camera_t::coords_in_view(){
+     return calc_coords_in_view(offset, Vec_t{view.right - view.left, view.top - view.bottom});
+}
+
+Rect_t Camera_t::coords_in_target_view(){
+     return calc_coords_in_view(target_offset, Vec_t{target_view.right - target_view.left,
+                                                     target_view.top - target_view.bottom});
 }
