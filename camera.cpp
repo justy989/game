@@ -73,3 +73,22 @@ void Camera_t::move_towards_target(F32 t){
           offset = interp_position(&initial_offset, &target_offset, t, t);
      }
 }
+
+Rect_t Camera_t::coords_in_view(){
+     F32 view_width = view.right - view.left;
+     F32 view_height = view.top - view.bottom;
+
+     Position_t bottom_left = offset;
+     bottom_left.pixel.x = -bottom_left.pixel.x;
+     bottom_left.pixel.y = -bottom_left.pixel.y;
+     bottom_left.decimal.x = -bottom_left.decimal.x;
+     bottom_left.decimal.y = -bottom_left.decimal.y;
+     canonicalize(&bottom_left);
+
+     Position_t top_right = bottom_left + Vec_t{view_width, view_height};
+
+     Coord_t bottom_left_coord = pos_to_coord(bottom_left);
+     Coord_t top_right_coord = pos_to_coord(top_right);
+
+     return Rect_t{bottom_left_coord.x, bottom_left_coord.y, top_right_coord.x, top_right_coord.y};
+}

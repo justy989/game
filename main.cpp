@@ -5374,9 +5374,9 @@ int main(int argc, char** argv){
           }
 
           // begin drawing
-          // TODO: limit this based on camera
-          Coord_t min = Coord_t{};
-          Coord_t max = min + Coord_t{world.tilemap.width, world.tilemap.height};
+          Rect_t coords_in_view = camera.coords_in_view();
+          Coord_t min = Coord_t{(S16)(coords_in_view.left), (S16)(coords_in_view.bottom)};
+          Coord_t max = Coord_t{(S16)(coords_in_view.right), (S16)(coords_in_view.top)};
           min = coord_clamp_zero_to_dim(min, world.tilemap.width - (S16)(1), world.tilemap.height - (S16)(1));
           max = coord_clamp_zero_to_dim(max, world.tilemap.width - (S16)(1), world.tilemap.height - (S16)(1));
 

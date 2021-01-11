@@ -21,4 +21,6 @@ struct Camera_t{
      Position_t normalized_to_world(Vec_t v);
 
      void move_towards_target(F32 speed);
+
+     Rect_t coords_in_view();
 };
