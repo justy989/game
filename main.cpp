@@ -90,6 +90,89 @@ Should we ice the under side of a block when it is in the air near an ice lit bl
 
 build the entangled pushes before the loop and then when invalidating, we need to invalidate the entangled pushes that we added
 
+Game Layout:
+
+Section 1: Basics
+- Blocks
+- Mechanicals
+- Entanglement
+
+Section 2: Elements
+- Fire
+- Ice
+- Blocks
+- Mechanicals
+- Entanglement
+
+BOW!
+
+Section 3: Portals
+- Portals
+- Bow
+- Fire
+- Ice
+- Blocks
+- Mechanicals
+- Entanglement
+
+Section 4: Bow
+- Bow
+- Fire
+- Ice
+- Blocks
+- Mechanicals
+- Entanglement
+
+Section 5: Player Entanglement
+- Portals
+- Bow
+- Fire
+- Ice
+- Blocks
+- Mechanicals
+- Entanglement
+
+Section 6: Rotate Entanglement
+- Entanglement
+- Portals
+- Bow
+- Fire
+- Ice
+- Blocks
+- Mechanicals
+
+Section 7: Many Entanglement
+- Entanglement
+- Portals
+- Bow
+- Fire
+- Ice
+- Blocks
+- Mechanicals
+
+Section 8: Many Entanglement
+- Everything (no holds bar, not specific focus, all the toughest puzzles, limit bow use)
+
+Section 9: Many Entanglement
+- Splitting
+- Momentum
+- Entanglement
+- Portals
+- Bow
+- Fire
+- Ice
+- Blocks
+- Mechanicals
+
+All 3D puzzles will be in secret areas of the sections they are relevant to.
+
+Progression Requirements:
+
+1 <- 2 <- 3 4 <- 5 6 7 <- 8 (end)
+                          ^
+                          |
+                          9
+
 */
 
 #include <iostream>
