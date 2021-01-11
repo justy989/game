@@ -2157,10 +2157,47 @@ int main(int argc, char** argv){
                          }
                          break;
                     case SDL_SCANCODE_LEFT:
+                         if(game_mode == GAME_MODE_EDITOR){
+                              if(editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
+                                   move_selection(&editor, DIRECTION_LEFT);
+                              }else{
+                                   world_move_editor_camera(&world, DIRECTION_LEFT);
+                                   world.recalc_room_camera = true;
+                              }
+                         }
+                         break;
+                    case SDL_SCANCODE_RIGHT:
+                         if(game_mode == GAME_MODE_EDITOR){
+                              if(editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
+                                   move_selection(&editor, DIRECTION_RIGHT);
+                              }else{
+                                   world_move_editor_camera(&world, DIRECTION_RIGHT);
+                                   world.recalc_room_camera = true;
+                              }
+                         }
+                         break;
+                    case SDL_SCANCODE_UP:
+                         if(game_mode == GAME_MODE_EDITOR){
+                              if(editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
+                                   move_selection(&editor, DIRECTION_UP);
+                              }else{
+                                   world_move_editor_camera(&world, DIRECTION_UP);
+                                   world.recalc_room_camera = true;
+                              }
+                         }
+                         break;
+                    case SDL_SCANCODE_DOWN:
+                         if(game_mode == GAME_MODE_EDITOR){
+                              if(editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
+                                   move_selection(&editor, DIRECTION_DOWN);
+                              }else{
+                                   world_move_editor_camera(&world, DIRECTION_DOWN);
+                                   world.recalc_room_camera = true;
+                              }
+                         }
+                         break;
                     case SDL_SCANCODE_A:
-                         if(game_mode == GAME_MODE_EDITOR && editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
-                              move_selection(&editor, DIRECTION_LEFT);
-                         }else if(play_demo.mode == DEMO_MODE_PLAY){
+                         if(play_demo.mode == DEMO_MODE_PLAY){
                               if(frame_count > 0 && play_demo.seek_frame < 0){
                                    play_demo.seek_frame = frame_count - 1;
 
@@ -2172,11 +2209,8 @@ int main(int argc, char** argv){
                                                     record_demo.mode, record_demo.file, frame_count);
                          }
                          break;
-                    case SDL_SCANCODE_RIGHT:
                     case SDL_SCANCODE_D:
-                         if(game_mode == GAME_MODE_EDITOR && editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
-                              move_selection(&editor, DIRECTION_RIGHT);
-                         }else if(play_demo.mode == DEMO_MODE_PLAY){
+                         if(play_demo.mode == DEMO_MODE_PLAY){
                               if(play_demo.seek_frame < 0){
                                    play_demo.seek_frame = frame_count + 1;
                               }
@@ -2185,20 +2219,14 @@ int main(int argc, char** argv){
                                                     record_demo.mode, record_demo.file, frame_count);
                          }
                          break;
-                    case SDL_SCANCODE_UP:
                     case SDL_SCANCODE_W:
-                         if(game_mode == GAME_MODE_EDITOR && editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
-                              move_selection(&editor, DIRECTION_UP);
-                         }else if(!resetting){
+                         if(!resetting){
                               player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_UP_START,
                                                     record_demo.mode, record_demo.file, frame_count);
                          }
                          break;
-                    case SDL_SCANCODE_DOWN:
                     case SDL_SCANCODE_S:
-                         if(game_mode == GAME_MODE_EDITOR && editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
-                              move_selection(&editor, DIRECTION_DOWN);
-                         }else if(!resetting){
+                         if(!resetting){
                               player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_DOWN_START,
                                                     record_demo.mode, record_demo.file, frame_count);
                          }
@@ -2835,6 +2863,11 @@ int main(int argc, char** argv){
                                         add_editor_stamps_for_selection(&editor, &temporary_world);
                                         game_mode = GAME_MODE_EDITOR;
                                         editor.mode = EDITOR_MODE_SELECTION_MANIPULATION;
+
+                                        auto coords_in_view = camera.coords_in_view();
+
+                                        editor.selection_start = Coord_t{coords_in_view.left, coords_in_view.bottom};
+                                        editor.selection_end = editor.selection_start;
 
                                         destroy(&temporary_world.tilemap);
                                         destroy(&temporary_world.interactives);

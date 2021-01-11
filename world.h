@@ -215,3 +215,4 @@ PlayerInBlockRectResult_t player_in_block_rect(Player_t* player, TileMap_t* tile
 
 void world_expand_editor_camera(World_t* world);
 void world_shrink_editor_camera(World_t* world);
+void world_move_editor_camera(World_t* world, Direction_t direction);

@@ -3192,3 +3192,29 @@ void world_shrink_editor_camera(World_t* world){
      world->editor_camera_bounds.bottom += eighth_height;
      world->editor_camera_bounds.top -= eighth_height;
 }
+
+void world_move_editor_camera(World_t* world, Direction_t direction){
+     S16 quarter_width = (world->editor_camera_bounds.right - world->editor_camera_bounds.left) / 4;
+     S16 quarter_height = (world->editor_camera_bounds.top - world->editor_camera_bounds.bottom) / 4;
+
+     switch(direction){
+     default:
+          break;
+     case DIRECTION_LEFT:
+          world->editor_camera_bounds.left -= quarter_width;
+          world->editor_camera_bounds.right -= quarter_width;
+          break;
+     case DIRECTION_RIGHT:
+          world->editor_camera_bounds.left += quarter_width;
+          world->editor_camera_bounds.right += quarter_width;
+          break;
+     case DIRECTION_DOWN:
+          world->editor_camera_bounds.bottom -= quarter_height;
+          world->editor_camera_bounds.top -= quarter_height;
+          break;
+     case DIRECTION_UP:
+          world->editor_camera_bounds.bottom += quarter_height;
+          world->editor_camera_bounds.top += quarter_height;
+          break;
+     }
+}
