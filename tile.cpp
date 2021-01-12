@@ -182,3 +182,67 @@ U16 tile_set_existing_wires(DirectionMask_t direction_mask, U16 current_flags){
 
      return result;
 }
+
+U8 tile_flip_solid_id_vertically_rotation(U8 id, U8 current_rotation){
+     switch(id){
+     default:
+          break;
+     case 0:
+     case 1:
+          if(current_rotation % 2 == 0){
+               return (current_rotation + 2) % DIRECTION_COUNT;
+          }
+          break;
+     case 2:
+     case 3:
+     case 4:
+     case 5:
+          if(current_rotation == 0){
+               return 1;
+          }
+          if(current_rotation == 1){
+               return 0;
+          }
+          if(current_rotation == 2){
+               return 3;
+          }
+          if(current_rotation == 3){
+               return 2;
+          }
+          break;
+     }
+
+     return current_rotation;
+}
+
+U8 tile_flip_solid_id_horizontally_rotation(U8 id, U8 current_rotation){
+     switch(id){
+     default:
+          break;
+     case 0:
+     case 1:
+          if(current_rotation % 2 == 1){
+               return (current_rotation + 2) % DIRECTION_COUNT;
+          }
+          break;
+     case 2:
+     case 3:
+     case 4:
+     case 5:
+          if(current_rotation == 0){
+               return 3;
+          }
+          if(current_rotation == 3){
+               return 0;
+          }
+          if(current_rotation == 2){
+               return 1;
+          }
+          if(current_rotation == 1){
+               return 2;
+          }
+          break;
+     }
+
+     return current_rotation;
+}

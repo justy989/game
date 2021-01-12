@@ -59,3 +59,6 @@ bool tile_flags_cluster_all_on(U16 flags);
 void tile_toggle_wire_activated(Tile_t* tile);
 DirectionMask_t tile_existing_wires(U16 flags);
 U16 tile_set_existing_wires(DirectionMask_t direction_mask, U16 current_flags);
+
+U8 tile_flip_solid_id_vertically_rotation(U8 id, U8 current_rotation);
+U8 tile_flip_solid_id_horizontally_rotation(U8 id, U8 current_rotation);

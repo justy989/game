@@ -155,3 +155,51 @@ void direction_mask_to_string(DirectionMask_t mask, char* buffer, U16 buffer_siz
         buffer_start += snprintf(buffer + buffer_start, buffer_size - buffer_start, "MASK_DOWN ");
     }
 }
+
+Direction_t direction_flip_vertically(Direction_t direction){
+     if(!direction_is_horizontal(direction)){
+          return direction_opposite(direction);
+     }
+     return direction;
+}
+
+DirectionMask_t direction_mask_flip_vertically(DirectionMask_t mask){
+     DirectionMask_t result = DIRECTION_MASK_NONE;
+     if(mask & DIRECTION_MASK_LEFT){
+         result = direction_mask_add(result, DIRECTION_MASK_LEFT);
+     }
+     if(mask & DIRECTION_MASK_RIGHT){
+         result = direction_mask_add(result, DIRECTION_MASK_RIGHT);
+     }
+     if(mask & DIRECTION_MASK_DOWN){
+         result = direction_mask_add(result, DIRECTION_MASK_UP);
+     }
+     if(mask & DIRECTION_MASK_UP){
+         result = direction_mask_add(result, DIRECTION_MASK_DOWN);
+     }
+     return result;
+}
+
+Direction_t direction_flip_horizontally(Direction_t direction){
+     if(direction_is_horizontal(direction)){
+          return direction_opposite(direction);
+     }
+     return direction;
+}
+
+DirectionMask_t direction_mask_flip_horizontally(DirectionMask_t mask){
+     DirectionMask_t result = DIRECTION_MASK_NONE;
+     if(mask & DIRECTION_MASK_LEFT){
+         result = direction_mask_add(result, DIRECTION_MASK_RIGHT);
+     }
+     if(mask & DIRECTION_MASK_RIGHT){
+         result = direction_mask_add(result, DIRECTION_MASK_LEFT);
+     }
+     if(mask & DIRECTION_MASK_DOWN){
+         result = direction_mask_add(result, DIRECTION_MASK_DOWN);
+     }
+     if(mask & DIRECTION_MASK_UP){
+         result = direction_mask_add(result, DIRECTION_MASK_UP);
+     }
+     return result;
+}

@@ -55,3 +55,7 @@ bool direction_is_horizontal(Direction_t dir);
 bool direction_is_positive(Direction_t dir);
 bool direction_horizontal_in_mask(DirectionMask_t mask);
 bool direction_vertical_in_mask(DirectionMask_t mask);
+Direction_t direction_flip_vertically(Direction_t direction);
+DirectionMask_t direction_mask_flip_vertically(DirectionMask_t direction);
+Direction_t direction_flip_horizontally(Direction_t direction);
+DirectionMask_t direction_mask_flip_horizontally(DirectionMask_t direction);

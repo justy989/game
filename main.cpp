@@ -2327,6 +2327,135 @@ int main(int argc, char** argv){
                          LOG("game dt scalar: %.1f\n", play_demo.dt_scalar);
                          break;
                     case SDL_SCANCODE_V:
+                         if(game_mode == GAME_MODE_EDITOR && editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
+                              // vertical flip selection !
+                              S16 highest_stamp_index = 0;
+                              for(S16 i = 0; i < editor.selection.count; i++){
+                                   auto* stamp = editor.selection.elements + i;
+                                   if(stamp->offset.y > highest_stamp_index){
+                                        highest_stamp_index = stamp->offset.y;
+                                   }
+                              }
+
+                              for(S16 i = 0; i < editor.selection.count; i++){
+                                   auto* stamp = editor.selection.elements + i;
+                                   stamp->offset.y = highest_stamp_index - stamp->offset.y;
+
+                                   switch(stamp->type){
+                                   default:
+                                        break;
+                                   case STAMP_TYPE_TILE_ID:
+                                        // tile rotation for solids
+                                        if(stamp->tile.solid){
+                                             stamp->tile.rotation = tile_flip_solid_id_vertically_rotation(stamp->tile.id, stamp->tile.rotation);
+                                        }
+                                        break;
+                                   case STAMP_TYPE_TILE_FLAGS:
+                                   {
+                                        // tile wire rotation
+                                        auto wire_direction_mask = tile_existing_wires(stamp->tile_flags);
+                                        auto flipped_wire_direction_mask = direction_mask_flip_vertically(wire_direction_mask);
+
+                                        stamp->tile_flags = tile_set_existing_wires(flipped_wire_direction_mask, stamp->tile_flags);
+
+                                        // TODO: not sure if this number is right, but I think so, it's mean to
+                                        // say, are there any wire clusters on this tile ? if so we need to rotate it
+                                        if(stamp->tile_flags >= 256){
+                                             Direction_t cluster_direction = tile_flags_cluster_direction(stamp->tile_flags);
+                                             auto rotated_cluster_direction = direction_flip_vertically(cluster_direction);
+                                             tile_flags_set_cluster_direction(&stamp->tile_flags, rotated_cluster_direction);
+                                        }
+                                   } break;
+                                   case STAMP_TYPE_BLOCK:
+                                        stamp->block.rotation++;
+                                        stamp->block.rotation %= 4;
+                                        break;
+                                   case STAMP_TYPE_INTERACTIVE:
+                                        switch(stamp->interactive.type){
+                                        default:
+                                             break;
+                                        case INTERACTIVE_TYPE_PORTAL:
+                                             stamp->interactive.portal.face = direction_flip_vertically(stamp->interactive.portal.face);
+                                             break;
+                                        case INTERACTIVE_TYPE_DOOR:
+                                             stamp->interactive.door.face = direction_flip_vertically(stamp->interactive.door.face);
+                                             break;
+                                        case INTERACTIVE_TYPE_WIRE_CROSS:
+                                             stamp->interactive.wire_cross.mask = direction_mask_flip_vertically(stamp->interactive.wire_cross.mask);
+                                             break;
+                                        }
+                                        break;
+                                   }
+                              }
+                         } break;
+                    case SDL_SCANCODE_H:
+                         if(game_mode == GAME_MODE_EDITOR && editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
+                              // horizontal flip selection !
+                              S16 highest_stamp_index = 0;
+                              for(S16 i = 0; i < editor.selection.count; i++){
+                                   auto* stamp = editor.selection.elements + i;
+                                   if(stamp->offset.x > highest_stamp_index){
+                                        highest_stamp_index = stamp->offset.x;
+                                   }
+                              }
+
+                              for(S16 i = 0; i < editor.selection.count; i++){
+                                   auto* stamp = editor.selection.elements + i;
+                                   stamp->offset.x = highest_stamp_index - stamp->offset.x;
+
+                                   switch(stamp->type){
+                                   default:
+                                        break;
+                                   case STAMP_TYPE_TILE_ID:
+                                        // tile rotation for solids
+                                        if(stamp->tile.solid){
+                                             stamp->tile.rotation = tile_flip_solid_id_horizontally_rotation(stamp->tile.id, stamp->tile.rotation);
+                                        }
+                                        break;
+                                   case STAMP_TYPE_TILE_FLAGS:
+                                   {
+                                        // tile wire rotation
+                                        auto wire_direction_mask = tile_existing_wires(stamp->tile_flags);
+                                        auto flipped_wire_direction_mask = direction_mask_flip_horizontally(wire_direction_mask);
+
+                                        stamp->tile_flags = tile_set_existing_wires(flipped_wire_direction_mask, stamp->tile_flags);
+
+                                        // TODO: not sure if this number is right, but I think so, it's mean to
+                                        // say, are there any wire clusters on this tile ? if so we need to rotate it
+                                        if(stamp->tile_flags >= 256){
+                                             Direction_t cluster_direction = tile_flags_cluster_direction(stamp->tile_flags);
+                                             auto rotated_cluster_direction = direction_flip_horizontally(cluster_direction);
+                                             tile_flags_set_cluster_direction(&stamp->tile_flags, rotated_cluster_direction);
+                                        }
+                                   } break;
+                                   case STAMP_TYPE_BLOCK:
+                                        stamp->block.rotation++;
+                                        stamp->block.rotation %= 4;
+                                        break;
+                                   case STAMP_TYPE_INTERACTIVE:
+                                        switch(stamp->interactive.type){
+                                        default:
+                                             break;
+                                        case INTERACTIVE_TYPE_PORTAL:
+                                             stamp->interactive.portal.face = direction_flip_horizontally(stamp->interactive.portal.face);
+                                             break;
+                                        case INTERACTIVE_TYPE_DOOR:
+                                             stamp->interactive.door.face = direction_flip_horizontally(stamp->interactive.door.face);
+                                             break;
+                                        case INTERACTIVE_TYPE_WIRE_CROSS:
+                                             stamp->interactive.wire_cross.mask = direction_mask_flip_horizontally(stamp->interactive.wire_cross.mask);
+                                             break;
+                                        }
+                                        break;
+                                   }
+                              }
+                         }else{
+                              Pixel_t pixel = mouse_select_world_pixel(mouse_screen, &camera) + HALF_TILE_SIZE_PIXEL;
+                              Coord_t coord = mouse_select_world_coord(mouse_screen, &camera);
+                              LOG("mouse pixel: %d, %d, Coord: %d, %d\n", pixel.x, pixel.y, coord.x, coord.y);
+                              describe_coord(coord, &world);
+                         } break;
+                    case SDL_SCANCODE_Z:
                          if(game_mode == GAME_MODE_EDITOR){
                               Raw_t* thumbnail_ptr = NULL;
                               glBindFramebuffer(GL_FRAMEBUFFER, thumbnail_framebuffer);
@@ -2616,14 +2745,6 @@ int main(int argc, char** argv){
                          player->pos.pixel = mouse_select_world_pixel(mouse_screen, &camera);
                          player->pos.decimal.x = 0;
                          player->pos.decimal.y = 0;
-                         break;
-                    }
-                    case SDL_SCANCODE_H:
-                    {
-                         Pixel_t pixel = mouse_select_world_pixel(mouse_screen, &camera) + HALF_TILE_SIZE_PIXEL;
-                         Coord_t coord = mouse_select_world_coord(mouse_screen, &camera);
-                         LOG("mouse pixel: %d, %d, Coord: %d, %d\n", pixel.x, pixel.y, coord.x, coord.y);
-                         describe_coord(coord, &world);
                     } break;
                     }
                     break;
