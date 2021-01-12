@@ -2654,52 +2654,52 @@ bool setup_default_room(World_t* world){
           top_wall_bottom->flags |= TILE_FLAG_SOLID;
      }
 
-     world->tilemap.tiles[0][0].id = 4;
+     world->tilemap.tiles[0][0].id = 3;
      world->tilemap.tiles[0][0].rotation = 0;
 
-     world->tilemap.tiles[0][1].id = 5;
-     world->tilemap.tiles[0][1].rotation = 0;
+     world->tilemap.tiles[0][1].id = 0;
+     world->tilemap.tiles[0][1].rotation = 2;
 
-     world->tilemap.tiles[1][0].id = 2;
-     world->tilemap.tiles[1][0].rotation = 0;
+     world->tilemap.tiles[1][0].id = 0;
+     world->tilemap.tiles[1][0].rotation = 3;
 
-     world->tilemap.tiles[1][1].id = 3;
+     world->tilemap.tiles[1][1].id = 2;
      world->tilemap.tiles[1][1].rotation = 0;
 
-     world->tilemap.tiles[0][15].id = 2;
-     world->tilemap.tiles[0][15].rotation = 3;
+     world->tilemap.tiles[0][15].id = 0;
+     world->tilemap.tiles[0][15].rotation = 2;
 
-     world->tilemap.tiles[0][16].id = 4;
+     world->tilemap.tiles[0][16].id = 3;
      world->tilemap.tiles[0][16].rotation = 3;
 
-     world->tilemap.tiles[1][15].id = 3;
+     world->tilemap.tiles[1][15].id = 2;
      world->tilemap.tiles[1][15].rotation = 3;
 
-     world->tilemap.tiles[1][16].id = 5;
-     world->tilemap.tiles[1][16].rotation = 3;
+     world->tilemap.tiles[1][16].id = 0;
+     world->tilemap.tiles[1][16].rotation = 1;
 
-     world->tilemap.tiles[15][0].id = 5;
-     world->tilemap.tiles[15][0].rotation = 1;
+     world->tilemap.tiles[15][0].id = 0;
+     world->tilemap.tiles[15][0].rotation = 3;
 
-     world->tilemap.tiles[15][1].id = 3;
+     world->tilemap.tiles[15][1].id = 2;
      world->tilemap.tiles[15][1].rotation = 1;
 
-     world->tilemap.tiles[16][0].id = 4;
+     world->tilemap.tiles[16][0].id = 3;
      world->tilemap.tiles[16][0].rotation = 1;
 
-     world->tilemap.tiles[16][1].id = 2;
-     world->tilemap.tiles[16][1].rotation = 1;
+     world->tilemap.tiles[16][1].id = 0;
+     world->tilemap.tiles[16][1].rotation = 0;
 
-     world->tilemap.tiles[15][15].id = 3;
+     world->tilemap.tiles[15][15].id = 2;
      world->tilemap.tiles[15][15].rotation = 2;
 
-     world->tilemap.tiles[15][16].id = 2;
-     world->tilemap.tiles[15][16].rotation = 2;
+     world->tilemap.tiles[15][16].id = 0;
+     world->tilemap.tiles[15][16].rotation = 1;
 
-     world->tilemap.tiles[16][15].id = 5;
-     world->tilemap.tiles[16][15].rotation = 2;
+     world->tilemap.tiles[16][15].id = 0;
+     world->tilemap.tiles[16][15].rotation = 0;
 
-     world->tilemap.tiles[16][16].id = 4;
+     world->tilemap.tiles[16][16].id = 3;
      world->tilemap.tiles[16][16].rotation = 2;
 
      if(!init(&world->interactives, 1)){
