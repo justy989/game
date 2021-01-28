@@ -1120,7 +1120,8 @@ void draw_checkbox(Checkbox_t* checkbox, Vec_t scroll){
     Vec_t pos = checkbox->pos + scroll;
     Vec_t dim {CHECKBOX_DIMENSION, CHECKBOX_DIMENSION};
     Vec_t tex = theme_frame(15, 15);
-    if(!checkbox->checked) tex.y += THEME_FRAME_HEIGHT * 0.5f;
+    if(checkbox->state == CHECKBOX_STATE_EMPTY) tex.y += THEME_FRAME_HEIGHT * 0.5f;
+    if(checkbox->state == CHECKBOX_STATE_DISABLED) tex.x += THEME_FRAME_WIDTH * 0.5f;
     Vec_t tex_dim {THEME_FRAME_WIDTH * 0.5f, THEME_FRAME_HEIGHT * 0.5f};
     draw_screen_texture(pos, tex, dim, tex_dim);
 }

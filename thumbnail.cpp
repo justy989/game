@@ -65,7 +65,7 @@ S16 filter_thumbnails(ObjectArray_t<Checkbox_t>* tag_checkboxes, ObjectArray_t<M
      bool none_checked = true;
      for(S16 c = 0; c < tag_checkboxes->count; c++){
           auto* checkbox = tag_checkboxes->elements + c + 1;
-          if(checkbox->checked){
+          if(checkbox->state == CHECKBOX_STATE_CHECKED){
                none_checked = false;
                break;
           }
@@ -88,7 +88,7 @@ S16 filter_thumbnails(ObjectArray_t<Checkbox_t>* tag_checkboxes, ObjectArray_t<M
           return map_thumbnails->count + THUMBNAILS_PER_ROW;
      }
 
-     bool exclusive = tag_checkboxes->elements[0].checked;
+     bool exclusive = tag_checkboxes->elements[0].state == CHECKBOX_STATE_CHECKED;
 
      S16 match_index = 1;
      for(S16 m = 0; m < map_thumbnails->count; m++){
@@ -100,8 +100,12 @@ S16 filter_thumbnails(ObjectArray_t<Checkbox_t>* tag_checkboxes, ObjectArray_t<M
                matches = true;
                for(S16 c = 0; c < TAG_COUNT; c++){
                     auto* checkbox = tag_checkboxes->elements + c + 1;
-                    if(checkbox->checked){
+                    if(checkbox->state == CHECKBOX_STATE_CHECKED){
                          if(!map_thumbnail->tags[c]){
+                              matches = false;
+                         }
+                    }else if(checkbox->state == CHECKBOX_STATE_DISABLED){
+                         if(map_thumbnail->tags[c]){
                               matches = false;
                               break;
                          }
@@ -110,9 +114,14 @@ S16 filter_thumbnails(ObjectArray_t<Checkbox_t>* tag_checkboxes, ObjectArray_t<M
           }else{
                for(S16 c = 0; c < TAG_COUNT; c++){
                     auto* checkbox = tag_checkboxes->elements + c + 1;
-                    if(checkbox->checked && map_thumbnail->tags[c]){
-                         matches = true;
-                         break;
+                    if(map_thumbnail->tags[c]){
+                         if(checkbox->state == CHECKBOX_STATE_CHECKED){
+                              matches = true;
+                         }else if(checkbox->state == CHECKBOX_STATE_DISABLED){
+                              // disabled overrides any matches
+                              matches = false;
+                              break;
+                         }
                     }
                }
           }

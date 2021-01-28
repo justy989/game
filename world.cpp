@@ -3218,3 +3218,8 @@ void world_move_editor_camera(World_t* world, Direction_t direction){
           break;
      }
 }
+
+void world_recalculate_camera_on_world_bounds(World_t* world){
+     world->recalc_room_camera = true;
+     world->editor_camera_bounds = Rect_t{0, 0, world->tilemap.width, world->tilemap.height};
+}

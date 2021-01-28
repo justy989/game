@@ -1959,7 +1959,7 @@ int main(int argc, char** argv){
                               if(thumbnail_ptr){
                                    free(raw_thumbnail.bytes);
                               }
-                              world.recalc_room_camera = true;
+                              world_recalculate_camera_on_world_bounds(&world);
                          }
                          clear_global_tags();
                     }
@@ -1982,7 +1982,7 @@ int main(int argc, char** argv){
                                    cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
                                    free(map_number_filepath);
                                    map_number_filepath = load_result.filepath;
-                                   world.recalc_room_camera = true;
+                                   world_recalculate_camera_on_world_bounds(&world);
 
                                    if(load_map_number_demo(&play_demo, map_number, &frame_count)){
                                         init(&world.arrows);
@@ -2063,7 +2063,7 @@ int main(int argc, char** argv){
                               }
 
                               destroy(&map_copy);
-                              world.recalc_room_camera = true;
+                              world_recalculate_camera_on_world_bounds(&world);
                          }
                          break;
                     case SDL_SCANCODE_F6:
@@ -2083,7 +2083,7 @@ int main(int argc, char** argv){
                               }
 
                               destroy(&map_copy);
-                              world.recalc_room_camera = true;
+                              world_recalculate_camera_on_world_bounds(&world);
                          }
                          break;
                     case SDL_SCANCODE_F7:
@@ -2109,7 +2109,7 @@ int main(int argc, char** argv){
                               }
 
                               destroy(&map_copy);
-                              world.recalc_room_camera = true;
+                              world_recalculate_camera_on_world_bounds(&world);
                          }
                          break;
                     case SDL_SCANCODE_F8:
@@ -2128,7 +2128,7 @@ int main(int argc, char** argv){
                               }
 
                               destroy(&map_copy);
-                              world.recalc_room_camera = true;
+                              world_recalculate_camera_on_world_bounds(&world);
                          }
                          break;
                     case SDL_SCANCODE_F12:
@@ -2256,7 +2256,7 @@ int main(int argc, char** argv){
                               }
                               free(map_number_filepath);
                               map_number_filepath = load_result.filepath;
-                              world.recalc_room_camera = true;
+                              world_recalculate_camera_on_world_bounds(&world);
                          }
                          break;
                     }
@@ -2288,7 +2288,7 @@ int main(int argc, char** argv){
                                         return 1;
                                    }
                               }
-                              world.recalc_room_camera = true;
+                              world_recalculate_camera_on_world_bounds(&world);
                          }else{
                               map_number++;
                          }
@@ -2310,7 +2310,7 @@ int main(int argc, char** argv){
                                         return 1;
                                    }
                               }
-                              world.recalc_room_camera = true;
+                              world_recalculate_camera_on_world_bounds(&world);
                          }else{
                               map_number--;
                          }
@@ -2755,7 +2755,6 @@ int main(int argc, char** argv){
                     case SDL_SCANCODE_ESCAPE:
                          quit = true;
                          break;
-                    case SDL_SCANCODE_LEFT:
                     case SDL_SCANCODE_A:
                          if(play_demo.mode == DEMO_MODE_PLAY) break;
                          if(resetting) break;
@@ -2763,7 +2762,6 @@ int main(int argc, char** argv){
                          player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_LEFT_STOP,
                                                record_demo.mode, record_demo.file, frame_count);
                          break;
-                    case SDL_SCANCODE_RIGHT:
                     case SDL_SCANCODE_D:
                          if(play_demo.mode == DEMO_MODE_PLAY) break;
                          if(resetting) break;
@@ -2771,7 +2769,6 @@ int main(int argc, char** argv){
                          player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_RIGHT_STOP,
                                                record_demo.mode, record_demo.file, frame_count);
                          break;
-                    case SDL_SCANCODE_UP:
                     case SDL_SCANCODE_W:
                          if(play_demo.mode == DEMO_MODE_PLAY) break;
                          if(resetting) break;
@@ -2779,7 +2776,6 @@ int main(int argc, char** argv){
                          player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_UP_STOP,
                                                record_demo.mode, record_demo.file, frame_count);
                          break;
-                    case SDL_SCANCODE_DOWN:
                     case SDL_SCANCODE_S:
                          if(play_demo.mode == DEMO_MODE_PLAY) break;
                          if(resetting) break;
@@ -2915,7 +2911,11 @@ int main(int argc, char** argv){
 
                                    Quad_t checkbox_quad = checkbox->get_area(checkbox_scroll);
                                    if(vec_in_quad(&checkbox_quad, mouse_screen)){
-                                        checkbox->checked = !checkbox->checked;
+                                        if(checkbox->state == CHECKBOX_STATE_EMPTY){
+                                             checkbox->state = CHECKBOX_STATE_CHECKED;
+                                        }else{
+                                             checkbox->state = CHECKBOX_STATE_EMPTY;
+                                        }
                                         visible_map_thumbnail_count = filter_thumbnails(&tag_checkboxes, &map_thumbnails);
                                         map_scroll.y = 0;
                                    }
@@ -2994,6 +2994,21 @@ int main(int argc, char** argv){
                                         destroy(&temporary_world.interactives);
                                         destroy(&temporary_world.blocks);
                                         destroy(&temporary_world.rooms);
+                                   }
+                              }
+
+                              for(S16 c = 0; c < tag_checkboxes.count; c++){
+                                   Checkbox_t* checkbox = tag_checkboxes.elements + c;
+
+                                   Quad_t checkbox_quad = checkbox->get_area(checkbox_scroll);
+                                   if(vec_in_quad(&checkbox_quad, mouse_screen)){
+                                        if(checkbox->state == CHECKBOX_STATE_EMPTY){
+                                             checkbox->state = CHECKBOX_STATE_DISABLED;
+                                        }else{
+                                             checkbox->state = CHECKBOX_STATE_EMPTY;
+                                        }
+                                        visible_map_thumbnail_count = filter_thumbnails(&tag_checkboxes, &map_thumbnails);
+                                        map_scroll.y = 0;
                                    }
                               }
                          }

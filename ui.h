@@ -15,9 +15,15 @@
 #define CHECKBOX_DIMENSION (8.0 * PIXEL_SIZE)
 #define THUMBNAIL_UI_DIMENSION (0.1375f)
 
+enum CheckBoxState_t{
+     CHECKBOX_STATE_EMPTY,
+     CHECKBOX_STATE_CHECKED,
+     CHECKBOX_STATE_DISABLED,
+};
+
 struct Checkbox_t{
     Vec_t pos;
-    bool checked = false;
+    CheckBoxState_t state;
 
     Quad_t get_area(Vec_t scroll){
         Vec_t final = pos + scroll;

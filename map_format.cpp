@@ -318,7 +318,8 @@ bool save_map(const char* filepath, Coord_t player_start, const TileMap_t* tilem
           return false;
      }
      bool success = save_map_to_file(f, player_start, tilemap, block_array, interactive_array, room_array, tags, thumbnail);
-     LOG("saved map %s\n", filepath);
+     LOG("saved map %s %s thumbnail and %stags\n", filepath, thumbnail == nullptr ? "without" : "with",
+         tags == nullptr ? "no " : "");
      fclose(f);
      return success;
 }
@@ -1095,6 +1096,7 @@ bool load_map_thumbnail(const char* filepath, Raw_t* thumbnail){
      S16 map_height;
      S16 interactive_count;
      S16 block_count;
+     S16 room_count;
      U64 thumbnail_size;
      Coord_t player_start;
 
@@ -1104,9 +1106,18 @@ bool load_map_thumbnail(const char* filepath, Raw_t* thumbnail){
      fread(&block_count, sizeof(block_count), 1, file);
      fread(&interactive_count, sizeof(interactive_count), 1, file);
 
-     fseek(file, sizeof(MapTileV1_t) * map_width * map_height, SEEK_CUR);
-     fseek(file, sizeof(MapBlockV3_t) * block_count, SEEK_CUR);
-     fseek(file, sizeof(MapInteractiveV1_t) * interactive_count, SEEK_CUR);
+     if(map_version <= 7){
+          fseek(file, sizeof(MapTileV1_t) * map_width * map_height, SEEK_CUR);
+          fseek(file, sizeof(MapBlockV3_t) * block_count, SEEK_CUR);
+          fseek(file, sizeof(MapInteractiveV1_t) * interactive_count, SEEK_CUR);
+     }else{
+          fread(&room_count, sizeof(room_count), 1, file);
+
+          fseek(file, sizeof(MapTileV2_t) * map_width * map_height, SEEK_CUR);
+          fseek(file, sizeof(MapBlockV3_t) * block_count, SEEK_CUR);
+          fseek(file, sizeof(MapInteractiveV3_t) * interactive_count, SEEK_CUR);
+          fseek(file, sizeof(Rect_t) * room_count, SEEK_CUR);
+     }
 
      fread(&thumbnail_size, sizeof(thumbnail_size), 1, file);
 
@@ -1114,7 +1125,7 @@ bool load_map_thumbnail(const char* filepath, Raw_t* thumbnail){
          thumbnail->byte_count = thumbnail_size;
          thumbnail->bytes = (U8*)(malloc(thumbnail_size));
          if(!thumbnail->bytes){
-             LOG("Failed to allocate memory for thumbnail\n");
+             LOG("Failed to allocate memory for thumbnail of size %lu in file: %s version %d\n", thumbnail_size, filepath, map_version);
              return false;
          }
          fread(thumbnail->bytes, thumbnail_size, 1, file);
@@ -1148,6 +1159,7 @@ bool load_map_tags(const char* filepath, bool* tags){
      S16 block_count;
      U64 thumbnail_size;
      U16 tag_count;
+     S16 room_count;
      Coord_t player_start;
 
      fread(&player_start, sizeof(player_start), 1, file);
@@ -1156,9 +1168,18 @@ bool load_map_tags(const char* filepath, bool* tags){
      fread(&block_count, sizeof(block_count), 1, file);
      fread(&interactive_count, sizeof(interactive_count), 1, file);
 
-     fseek(file, sizeof(MapTileV1_t) * map_width * map_height, SEEK_CUR);
-     fseek(file, sizeof(MapBlockV3_t) * block_count, SEEK_CUR);
-     fseek(file, sizeof(MapInteractiveV1_t) * interactive_count, SEEK_CUR);
+     if(map_version <= 7){
+          fseek(file, sizeof(MapTileV1_t) * map_width * map_height, SEEK_CUR);
+          fseek(file, sizeof(MapBlockV3_t) * block_count, SEEK_CUR);
+          fseek(file, sizeof(MapInteractiveV1_t) * interactive_count, SEEK_CUR);
+     }else{
+          fread(&room_count, sizeof(room_count), 1, file);
+
+          fseek(file, sizeof(MapTileV2_t) * map_width * map_height, SEEK_CUR);
+          fseek(file, sizeof(MapBlockV3_t) * block_count, SEEK_CUR);
+          fseek(file, sizeof(MapInteractiveV3_t) * interactive_count, SEEK_CUR);
+          fseek(file, sizeof(Rect_t) * room_count, SEEK_CUR);
+     }
 
      fread(&thumbnail_size, sizeof(thumbnail_size), 1, file);
      fseek(file, thumbnail_size, SEEK_CUR);
