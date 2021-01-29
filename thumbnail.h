@@ -8,6 +8,7 @@
 
 #define CHECKBOX_THUMBNAIL_SPLIT 0.45f
 #define THUMBNAILS_PER_ROW 4
+#define CHECKBOX_TAG_START_INDEX 2
 
 Raw_t create_thumbnail_bitmap();
 int map_thumbnail_comparor(const void* a, const void* b);

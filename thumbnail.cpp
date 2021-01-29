@@ -2,6 +2,8 @@
 #include "bitmap.h"
 #include "draw.h"
 
+#include <cstring>
+
 Raw_t create_thumbnail_bitmap(){
     Raw_t raw;
 
@@ -64,7 +66,7 @@ S16 filter_thumbnails(ObjectArray_t<Checkbox_t>* tag_checkboxes, ObjectArray_t<M
 
      bool none_checked = true;
      for(S16 c = 0; c < tag_checkboxes->count; c++){
-          auto* checkbox = tag_checkboxes->elements + c + 1;
+          auto* checkbox = tag_checkboxes->elements + c + CHECKBOX_TAG_START_INDEX;
           if(checkbox->state == CHECKBOX_STATE_CHECKED){
                none_checked = false;
                break;
@@ -89,38 +91,44 @@ S16 filter_thumbnails(ObjectArray_t<Checkbox_t>* tag_checkboxes, ObjectArray_t<M
      }
 
      bool exclusive = tag_checkboxes->elements[0].state == CHECKBOX_STATE_CHECKED;
+     bool include_test_maps = tag_checkboxes->elements[1].state == CHECKBOX_STATE_CHECKED;
 
      S16 match_index = 1;
      for(S16 m = 0; m < map_thumbnails->count; m++){
           auto* map_thumbnail = map_thumbnails->elements + m;
 
+          bool is_test_map = strstr(map_thumbnail->map_filepath, "_test.bm") != NULL;
           bool matches = false;
 
-          if(exclusive){
-               matches = true;
-               for(S16 c = 0; c < TAG_COUNT; c++){
-                    auto* checkbox = tag_checkboxes->elements + c + 1;
-                    if(checkbox->state == CHECKBOX_STATE_CHECKED){
-                         if(!map_thumbnail->tags[c]){
-                              matches = false;
-                         }
-                    }else if(checkbox->state == CHECKBOX_STATE_DISABLED){
-                         if(map_thumbnail->tags[c]){
-                              matches = false;
-                              break;
+          if(is_test_map && !include_test_maps){
+               // skip test maps
+          }else{
+               if(exclusive){
+                    matches = true;
+                    for(S16 c = 0; c < TAG_COUNT; c++){
+                         auto* checkbox = tag_checkboxes->elements + c + CHECKBOX_TAG_START_INDEX;
+                         if(checkbox->state == CHECKBOX_STATE_CHECKED){
+                              if(!map_thumbnail->tags[c]){
+                                   matches = false;
+                              }
+                         }else if(checkbox->state == CHECKBOX_STATE_DISABLED){
+                              if(map_thumbnail->tags[c]){
+                                   matches = false;
+                                   break;
+                              }
                          }
                     }
-               }
-          }else{
-               for(S16 c = 0; c < TAG_COUNT; c++){
-                    auto* checkbox = tag_checkboxes->elements + c + 1;
-                    if(map_thumbnail->tags[c]){
-                         if(checkbox->state == CHECKBOX_STATE_CHECKED){
-                              matches = true;
-                         }else if(checkbox->state == CHECKBOX_STATE_DISABLED){
-                              // disabled overrides any matches
-                              matches = false;
-                              break;
+               }else{
+                    for(S16 c = 0; c < TAG_COUNT; c++){
+                         auto* checkbox = tag_checkboxes->elements + c + CHECKBOX_TAG_START_INDEX;
+                         if(map_thumbnail->tags[c]){
+                              if(checkbox->state == CHECKBOX_STATE_CHECKED){
+                                   matches = true;
+                              }else if(checkbox->state == CHECKBOX_STATE_DISABLED){
+                                   // disabled overrides any matches
+                                   matches = false;
+                                   break;
+                              }
                          }
                     }
                }

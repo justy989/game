@@ -1880,7 +1880,7 @@ int main(int argc, char** argv){
      // init ui
      Vec_t checkbox_scroll {};
      ObjectArray_t<Checkbox_t> tag_checkboxes;
-     init(&tag_checkboxes, TAG_COUNT + 1);
+     init(&tag_checkboxes, TAG_COUNT + CHECKBOX_TAG_START_INDEX);
 
      for(S16 c = 0; c < tag_checkboxes.count; c++){
           Checkbox_t* checkbox = tag_checkboxes.elements + c;
@@ -5990,8 +5990,10 @@ int main(int argc, char** argv){
                               const char* text = NULL;
                               if(c == 0){
                                    text = "EXCLUSIVE";
+                              }else if(c == 1){
+                                   text = "TEST MAPS";
                               }else{
-                                   text = tag_to_string((Tag_t)(c - 1));
+                                   text = tag_to_string((Tag_t)(c - CHECKBOX_TAG_START_INDEX));
                               }
                               draw_text(text, text_pos, Vec_t{TEXT_CHAR_WIDTH * 0.5f, TEXT_CHAR_HEIGHT * 0.5f},
                                         TEXT_CHAR_SPACING * 0.5f);
