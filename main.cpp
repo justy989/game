@@ -2494,6 +2494,7 @@ int main(int argc, char** argv){
                                    blocks[i]->entangle_index = -1;
                               }
                          }
+                         break;
                     case SDL_SCANCODE_8:
                          if(game_mode == GAME_MODE_EDITOR && editor.mode == EDITOR_MODE_CATEGORY_SELECT){
                               auto coord = mouse_select_world_coord(mouse_screen, &camera);
