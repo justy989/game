@@ -1545,13 +1545,12 @@ void add_editor_stamps_for_selection(Editor_t* editor, World_t* world){
 }
 
 int main(int argc, char** argv){
-     const char* load_map_filepath = nullptr;
+     char* current_map_filepath = nullptr;
      bool test = false;
      bool suite = false;
      bool show_suite = false;
      bool fail_slow = false;
      bool update_tags = false;
-     char* map_number_filepath = NULL;
      S16 map_number = 0;
      S16 first_map_number = 0;
      S16 first_frame = 0;
@@ -1580,7 +1579,7 @@ int main(int argc, char** argv){
           }else if(strcmp(argv[i], "-load") == 0){
                int next = i + 1;
                if(next >= argc) continue;
-               load_map_filepath = argv[next];
+               current_map_filepath = strdup(argv[next]);
           }else if(strcmp(argv[i], "-test") == 0){
                test = true;
           }else if(strcmp(argv[i], "-suite") == 0){
@@ -1650,7 +1649,7 @@ int main(int argc, char** argv){
           return -1;
      }
 
-     if(test && !load_map_filepath && !suite){
+     if(test && !current_map_filepath && !suite){
           LOG("cannot test without specifying a map to load\n");
           return 1;
      }
@@ -1804,13 +1803,13 @@ int main(int argc, char** argv){
      ObjectArray_t<RestoreBlock_t> restore_blocks {};
      memset(&restore_blocks, 0, sizeof(restore_blocks));
 
-     if(load_map_filepath){
-          if(!load_map(load_map_filepath, &player_start, &world.tilemap, &world.blocks, &world.interactives,
+     if(current_map_filepath){
+          if(!load_map(current_map_filepath, &player_start, &world.tilemap, &world.blocks, &world.interactives,
                        &world.rooms)){
                return 1;
           }
 
-          load_map_tags(load_map_filepath, current_map_tags);
+          load_map_tags(current_map_filepath, current_map_tags);
 
           if(play_demo.mode == DEMO_MODE_PLAY){
                cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
@@ -1820,9 +1819,9 @@ int main(int argc, char** argv){
           if(!load_result.success){
                return 1;
           }
-          load_map_tags(load_result.filepath, current_map_tags);
+          current_map_filepath = strdup(load_result.filepath);
 
-          map_number_filepath = load_result.filepath;
+          load_map_tags(load_result.filepath, current_map_tags);
 
           cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
 
@@ -1836,9 +1835,8 @@ int main(int argc, char** argv){
                return 1;
           }
 
+          current_map_filepath = strdup(load_result.filepath);
           load_map_tags(load_result.filepath, current_map_tags);
-
-          map_number_filepath = load_result.filepath;
 
           if(play_demo.mode == DEMO_MODE_PLAY){
                cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
@@ -1951,16 +1949,16 @@ int main(int argc, char** argv){
                     if(update_tags){
                          World_t a_whole_new_world {};
                          bool* updated_tags = get_global_tags();
-                         if(load_map(map_number_filepath, &player_start, &a_whole_new_world.tilemap,
+                         if(load_map(current_map_filepath, &player_start, &a_whole_new_world.tilemap,
                                      &a_whole_new_world.blocks, &a_whole_new_world.interactives,
                                      &a_whole_new_world.rooms)){
                               Raw_t* thumbnail_ptr = NULL;
 
                               Raw_t raw_thumbnail {};
-                              if(load_map_thumbnail(map_number_filepath, &raw_thumbnail)){
+                              if(load_map_thumbnail(current_map_filepath, &raw_thumbnail)){
                                    thumbnail_ptr = &raw_thumbnail;
                               }
-                              save_map(map_number_filepath, player_start, &a_whole_new_world.tilemap,
+                              save_map(current_map_filepath, player_start, &a_whole_new_world.tilemap,
                                        &a_whole_new_world.blocks, &a_whole_new_world.interactives,
                                        &a_whole_new_world.rooms, updated_tags, thumbnail_ptr);
                               if(thumbnail_ptr){
@@ -1987,8 +1985,8 @@ int main(int argc, char** argv){
                               auto load_result = load_map_number_map(map_number, &world, &undo, &player_start, &player_action, &camera, current_map_tags);
                               if(load_result.success){
                                    cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
-                                   free(map_number_filepath);
-                                   map_number_filepath = load_result.filepath;
+                                   free(current_map_filepath);
+                                   current_map_filepath = strdup(load_result.filepath);
                                    world_recalculate_camera_on_world_bounds(&world);
 
                                    if(load_map_number_demo(&play_demo, map_number, &frame_count)){
@@ -2261,8 +2259,8 @@ int main(int argc, char** argv){
                               if(record_demo.mode == DEMO_MODE_PLAY){
                                    cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
                               }
-                              free(map_number_filepath);
-                              map_number_filepath = load_result.filepath;
+                              free(current_map_filepath);
+                              current_map_filepath = strdup(load_result.filepath);
                               world_recalculate_camera_on_world_bounds(&world);
                          }
                          break;
@@ -2284,8 +2282,8 @@ int main(int argc, char** argv){
                          map_number--;
                          auto load_result = load_map_number_map(map_number, &world, &undo, &player_start, &player_action, &camera, current_map_tags);
                          if(load_result.success){
-                              free(map_number_filepath);
-                              map_number_filepath = load_result.filepath;
+                              free(current_map_filepath);
+                              current_map_filepath = strdup(load_result.filepath);
                               if(record_demo.mode == DEMO_MODE_PLAY){
                                    cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
 
@@ -2306,8 +2304,8 @@ int main(int argc, char** argv){
                          map_number++;
                          auto load_result = load_map_number_map(map_number, &world, &undo, &player_start, &player_action, &camera, current_map_tags);
                          if(load_result.success){
-                              free(map_number_filepath);
-                              map_number_filepath = load_result.filepath;
+                              free(current_map_filepath);
+                              current_map_filepath = strdup(load_result.filepath);
                               if(play_demo.mode == DEMO_MODE_PLAY){
                                    cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
 
@@ -2739,8 +2737,6 @@ int main(int argc, char** argv){
                                         stamp->offset -= bottom_left_most;
                                    }
                               }
-                         }else if(game_mode == GAME_MODE_PLAYING){
-                              resetting = true;
                          }
                          break;
                     case SDL_SCANCODE_LCTRL:
@@ -5582,8 +5578,24 @@ int main(int argc, char** argv){
                          // TODO: maybe rather than relying on the file system, we can store the starting state in memory ?
                          auto load_result = load_map_number_map(map_number, &world, &undo, &player_start, &player_action, &camera, current_map_tags);
                          if(load_result.success){
-                              free(map_number_filepath);
-                              map_number_filepath = load_result.filepath;
+                              free(current_map_filepath);
+                              current_map_filepath = strdup(load_result.filepath);
+                         }
+
+                         // what room is the player in ?
+                         // TODO: compress with code in update_camera()
+                         Coord_t player_coord = pos_to_coord(world.players.elements[0].pos);
+                         S16 room_index = -1;
+                         for(S16 i = 0; i < world.rooms.count; i++){
+                              auto* room = world.rooms.elements + i;
+                              if(coord_in_rect(player_coord, *room)){
+                                   room_index = i;
+                                   break;
+                              }
+                         }
+
+                         if (room_index >= 0 && room_index < world.rooms.count) {
+
                          }
                     }
                }else{
@@ -6204,6 +6216,8 @@ int main(int argc, char** argv){
           SDL_DestroyWindow(window);
           SDL_Quit();
      }
+
+     free(current_map_filepath);
 
      Log_t::destroy();
      return 0;
