@@ -1616,7 +1616,7 @@ bool apply_push_horizontal(Block_t* block, Position_t pos, World_t* world, Direc
 
                if(lower_dim == HALF_TILE_SIZE_IN_PIXELS) accel_time *= SMALL_BLOCK_ACCEL_MULTIPLIER;
 
-               Position_t block_pos = block_get_position(block);
+               Position_t block_pos = block_get_final_position(block);
                Vec_t block_vel = block_get_vel(block);
 
                F32 half_distance_to_next_grid_center = calc_half_distance_to_next_grid_center(block_pos.pixel.x,
@@ -1723,7 +1723,7 @@ bool apply_push_vertical(Block_t* block, Position_t pos, World_t* world, Directi
 
                if(lower_dim == HALF_TILE_SIZE_IN_PIXELS) accel_time *= SMALL_BLOCK_ACCEL_MULTIPLIER;
 
-               Position_t block_pos = block_get_position(block);
+               Position_t block_pos = block_get_final_position(block);
                Vec_t block_vel = block_get_vel(block);
 
                F32 half_distance_to_next_grid_center = calc_half_distance_to_next_grid_center(block_pos.pixel.y,

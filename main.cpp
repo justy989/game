@@ -6,6 +6,13 @@ http://www.simonstalenhag.se/
 -Shane Hendrixson
 
 TODO:
+Before playtest:
+- Teaching the controls in the first few puzzles.
+- Reset inside rooms, also being able to mark rooms as un-resetable ?
+- Undo into a previous room warns the user first.
+- Make it more visually obvious when a block raises ?
+- A 2 way stairs interactive object that fades to black, loads a new level, and fades in from black to connect levels.
+
 Entanglement Puzzles:
 - entangle puzzle where there is a line of pressure plates against the wall with a line of popups on the other side that would
   trap an entangled block if it got to close, stopping the player from using walls to get blocks closer
@@ -2164,6 +2171,13 @@ int main(int argc, char** argv){
                                    world_move_editor_camera(&world, DIRECTION_LEFT);
                                    world.recalc_room_camera = true;
                               }
+                         } else if(play_demo.mode == DEMO_MODE_PLAY){
+                              if(frame_count > 0 && play_demo.seek_frame < 0){
+                                   play_demo.seek_frame = frame_count - 1;
+
+                                   restart_demo(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives,
+                                                &play_demo, &frame_count, &player_start, &player_action, &undo, &camera);
+                              }
                          }
                          break;
                     case SDL_SCANCODE_RIGHT:
@@ -2173,6 +2187,10 @@ int main(int argc, char** argv){
                               }else{
                                    world_move_editor_camera(&world, DIRECTION_RIGHT);
                                    world.recalc_room_camera = true;
+                              }
+                         } else if(play_demo.mode == DEMO_MODE_PLAY){
+                              if(play_demo.seek_frame < 0){
+                                   play_demo.seek_frame = frame_count + 1;
                               }
                          }
                          break;
@@ -2197,24 +2215,13 @@ int main(int argc, char** argv){
                          }
                          break;
                     case SDL_SCANCODE_A:
-                         if(play_demo.mode == DEMO_MODE_PLAY){
-                              if(frame_count > 0 && play_demo.seek_frame < 0){
-                                   play_demo.seek_frame = frame_count - 1;
-
-                                   restart_demo(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives,
-                                                &play_demo, &frame_count, &player_start, &player_action, &undo, &camera);
-                              }
-                         }else if(!resetting){
+                         if(!resetting){
                               player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_LEFT_START,
                                                     record_demo.mode, record_demo.file, frame_count);
                          }
                          break;
                     case SDL_SCANCODE_D:
-                         if(play_demo.mode == DEMO_MODE_PLAY){
-                              if(play_demo.seek_frame < 0){
-                                   play_demo.seek_frame = frame_count + 1;
-                              }
-                         }else if(!resetting){
+                         if(!resetting){
                               player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_RIGHT_START,
                                                     record_demo.mode, record_demo.file, frame_count);
                          }
