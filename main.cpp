@@ -8,7 +8,6 @@ http://www.simonstalenhag.se/
 TODO:
 Before playtest:
 - Teaching the controls in the first few puzzles.
-- Reset inside rooms, also being able to mark rooms as un-resetable ?
 - Undo into a previous room warns the user first.
 - Make it more visually obvious when a block raises ?
 - A 2 way stairs interactive object that fades to black, loads a new level, and fades in from black to connect levels.
@@ -6125,9 +6124,13 @@ int main(int argc, char** argv){
           }
 
           if(game_mode == GAME_MODE_EDITOR){
+               glMatrixMode(GL_PROJECTION);
+               glLoadIdentity();
+               glOrtho(camera.view.left, camera.view.right, camera.view.bottom, camera.view.top, 0.0, 1.0);
+               glBindTexture(GL_TEXTURE_2D, 0);
+
                // player start
                draw_selection(player_start, player_start, &camera, 0.0f, 1.0f, 1.0f);
-
                for(S16 i = 0; i < world.blocks.count; i++){
                     Block_t* block = world.blocks.elements + i;
                     if(block->entangle_index < 0) continue;
@@ -6148,7 +6151,27 @@ int main(int argc, char** argv){
                     draw_selection(centroid, centroid, &camera, 0.0f, 0.0f, 1.0f);
                }
 
+               // draw indicators only visible in editor
+               glBindTexture(GL_TEXTURE_2D, theme_texture);
+               glBegin(GL_QUADS);
+               glColor3f(1.0f, 1.0f, 1.0f);
+               for(S16 y = max.y; y >= min.y; y--){
+                    for(S16 x = min.x; x <= max.x; x++){
+                         Coord_t coord {x, y};
+                         Position_t pos = coord_to_pos(coord) + camera.offset;
+                         Vec_t draw_pos = pos_to_vec(pos);
+
+                         Interactive_t* interactive = quad_tree_find_at(world.interactive_qt, x, y);
+                         Tile_t* tile = tilemap_get_tile(&world.tilemap, coord);
+                         draw_editor_visible_map_indicators(draw_pos, tile, interactive);
+                    }
+               }
+               glEnd();
+
                // editor
+               glMatrixMode(GL_PROJECTION);
+               glLoadIdentity();
+               glOrtho(0.0f, 1.0f, 0.0f, 1.0f, 0.0, 1.0);
                draw_editor(&editor, &world, &camera, mouse_screen, theme_texture, floor_texture, solids_texture,
                            text_texture);
           }

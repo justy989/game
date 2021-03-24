@@ -75,9 +75,10 @@ void draw_screen_texture(Vec_t pos, Vec_t tex, Vec_t dim, Vec_t tex_dim);
 void draw_theme_frame(Vec_t tex_vec, Vec_t pos_vec);
 void draw_double_theme_frame(Vec_t tex_vec, Vec_t pos_vec);
 void draw_tile_id(U8 id, Vec_t pos);
-void draw_tile_flags(U16 flags, Vec_t tile_pos);
+void draw_tile_flags(U16 flags, Vec_t tile_pos, bool editor = false);
 void draw_interactive(Interactive_t* interactive, Vec_t pos_vec, Coord_t coord,
-                      TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree);
+                      TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_quad_tree,
+                      bool editor = false);
 void draw_color_quad(Quad_t quad, F32 r, F32 g, F32 b, F32 a);
 void draw_floor(Vec_t pos, Tile_t* tile, U8 portal_rotations);
 void draw_flats(Vec_t pos, Tile_t* tile, Interactive_t* interactive, U8 portal_rotations);
@@ -104,6 +105,7 @@ void draw_quad_filled(const Quad_t* quad, F32 red, F32 green, F32 blue);
 void draw_selection(Coord_t selection_start, Coord_t selection_end, Camera_t* camera, F32 red, F32 green, F32 blue);
 
 void draw_text(const char* message, Vec_t pos, Vec_t dim = Vec_t{TEXT_CHAR_WIDTH, TEXT_CHAR_HEIGHT}, F32 spacing = TEXT_CHAR_SPACING);
+void draw_editor_visible_map_indicators(Vec_t pos_vec, Tile_t* tile, Interactive_t* interactive);
 void draw_editor(Editor_t* editor, World_t* world, Camera_t* camera, Vec_t mouse_screen,
                  GLuint theme_texture, GLuint floor_texture, GLuint solid_texture, GLuint text_texture);
 void draw_checkbox(Checkbox_t* checkbox, Vec_t scroll);

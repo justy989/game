@@ -190,10 +190,10 @@ void draw_tile_id(U8 id, Vec_t pos){
      draw_theme_frame(pos, theme_frame(id_x, id_y));
 }
 
-void draw_tile_flags(U16 flags, Vec_t tile_pos){
+void draw_tile_flags(U16 flags, Vec_t tile_pos, bool editor){
      if(flags == 0) return;
 
-     if(flags & TILE_FLAG_RESET_IMMUNE){
+     if(editor && flags & TILE_FLAG_RESET_IMMUNE){
           draw_theme_frame(tile_pos, theme_frame(1, 21));
      }
 
@@ -306,7 +306,8 @@ void draw_block(Block_t* block, Vec_t pos_vec, U8 portal_rotations){
 }
 
 void draw_interactive(Interactive_t* interactive, Vec_t pos_vec, Coord_t coord,
-                      TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt){
+                      TileMap_t* tilemap, QuadTreeNode_t<Interactive_t>* interactive_qt,
+                      bool editor){
      Vec_t tex_vec = {};
      switch(interactive->type){
      default:
@@ -458,7 +459,7 @@ void draw_interactive(Interactive_t* interactive, Vec_t pos_vec, Coord_t coord,
           draw_theme_frame(pos_vec, theme_frame(1 + x, 30 + y));
      } break;
      case INTERACTIVE_TYPE_CHECKPOINT:
-          draw_theme_frame(pos_vec, theme_frame(0, 21));
+          if(editor) draw_theme_frame(pos_vec, theme_frame(0, 21));
           break;
      }
 }
@@ -498,16 +499,7 @@ void draw_selection(Coord_t selection_start, Coord_t selection_end, Camera_t* ca
 
      Quad_t selection_quad {start_vec.x, start_vec.y, end_vec.x + TILE_SIZE, end_vec.y + TILE_SIZE};
 
-     glMatrixMode(GL_PROJECTION);
-     glLoadIdentity();
-     glOrtho(camera->view.left, camera->view.right, camera->view.bottom, camera->view.top, 0.0, 1.0);
-
-     glBindTexture(GL_TEXTURE_2D, 0);
      draw_quad_wireframe(&selection_quad, red, green, blue);
-
-     glMatrixMode(GL_PROJECTION);
-     glLoadIdentity();
-     glOrtho(0.0f, 1.0f, 0.0f, 1.0f, 0.0, 1.0);
 }
 
 Vec_t draw_player(Player_t* player, Position_t camera, Coord_t source_coord, Coord_t destination_coord, S8 portal_rotations){
@@ -858,6 +850,16 @@ static void draw_tile_stamp(StampTile_t* stamp_tile, Vec_t pos, GLuint theme_tex
      glBegin(GL_QUADS);
 }
 
+void draw_editor_visible_map_indicators(Vec_t pos_vec, Tile_t* tile, Interactive_t* interactive){
+     if(tile->flags & TILE_FLAG_RESET_IMMUNE){
+          draw_theme_frame(pos_vec, theme_frame(1, 21));
+     }
+
+     if(interactive && interactive->type == INTERACTIVE_TYPE_CHECKPOINT){
+          draw_theme_frame(pos_vec, theme_frame(0, 21));
+     }
+}
+
 void draw_editor(Editor_t* editor, World_t* world, Camera_t* camera, Vec_t mouse_screen,
                  GLuint theme_texture, GLuint floor_texture, GLuint solid_texture, GLuint text_texture){
      switch(editor->mode){
@@ -889,7 +891,7 @@ void draw_editor(Editor_t* editor, World_t* world, Camera_t* camera, Vec_t mouse
                          draw_tile_stamp(&stamp->tile, vec, theme_texture, floor_texture, solid_texture);
                          break;
                     case STAMP_TYPE_TILE_FLAGS:
-                         draw_tile_flags(stamp->tile_flags, vec);
+                         draw_tile_flags(stamp->tile_flags, vec, true);
                          break;
                     case STAMP_TYPE_BLOCK:
                     {
@@ -899,7 +901,7 @@ void draw_editor(Editor_t* editor, World_t* world, Camera_t* camera, Vec_t mouse
                     } break;
                     case STAMP_TYPE_INTERACTIVE:
                     {
-                         draw_interactive(&stamp->interactive, vec, Coord_t{-1, -1}, &world->tilemap, world->interactive_qt);
+                         draw_interactive(&stamp->interactive, vec, Coord_t{-1, -1}, &world->tilemap, world->interactive_qt, true);
                     } break;
                     }
                }
@@ -934,7 +936,7 @@ void draw_editor(Editor_t* editor, World_t* world, Camera_t* camera, Vec_t mouse
                     draw_tile_stamp(&stamp->tile, stamp_pos, theme_texture, floor_texture, solid_texture);
                     break;
                case STAMP_TYPE_TILE_FLAGS:
-                    draw_tile_flags(stamp->tile_flags, stamp_pos);
+                    draw_tile_flags(stamp->tile_flags, stamp_pos, true);
                     break;
                case STAMP_TYPE_BLOCK:
                {
@@ -949,7 +951,7 @@ void draw_editor(Editor_t* editor, World_t* world, Camera_t* camera, Vec_t mouse
                          draw_ice_tile(stamp_pos);
                          glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
                     }
-                    draw_interactive(&stamp->interactive, stamp_pos, Coord_t{-1, -1}, &world->tilemap, world->interactive_qt);
+                    draw_interactive(&stamp->interactive, stamp_pos, Coord_t{-1, -1}, &world->tilemap, world->interactive_qt, true);
                } break;
                }
           }
@@ -982,7 +984,7 @@ void draw_editor(Editor_t* editor, World_t* world, Camera_t* camera, Vec_t mouse
                               draw_tile_stamp(&stamp->tile, stamp_vec, theme_texture, floor_texture, solid_texture);
                               break;
                          case STAMP_TYPE_TILE_FLAGS:
-                              draw_tile_flags(stamp->tile_flags, stamp_vec);
+                              draw_tile_flags(stamp->tile_flags, stamp_vec, true);
                               break;
                          case STAMP_TYPE_BLOCK:
                          {
@@ -997,7 +999,7 @@ void draw_editor(Editor_t* editor, World_t* world, Camera_t* camera, Vec_t mouse
                                    draw_ice_tile(stamp_vec);
                                    glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
                               }
-                              draw_interactive(&stamp->interactive, stamp_vec, Coord_t{-1, -1}, &world->tilemap, world->interactive_qt);
+                              draw_interactive(&stamp->interactive, stamp_vec, Coord_t{-1, -1}, &world->tilemap, world->interactive_qt, true);
                          } break;
                          }
                     }
@@ -1038,7 +1040,7 @@ void draw_editor(Editor_t* editor, World_t* world, Camera_t* camera, Vec_t mouse
                     draw_tile_stamp(&stamp->tile, stamp_vec, theme_texture, floor_texture, solid_texture);
                     break;
                case STAMP_TYPE_TILE_FLAGS:
-                    draw_tile_flags(stamp->tile_flags, stamp_vec);
+                    draw_tile_flags(stamp->tile_flags, stamp_vec, true);
                     if(stamp->tile_flags & TILE_FLAG_ICED){
                          // TODO: to draw ice in the stamp we need to swap textures
                          draw_set_ice_color();
@@ -1059,7 +1061,7 @@ void draw_editor(Editor_t* editor, World_t* world, Camera_t* camera, Vec_t mouse
                          draw_ice_tile(stamp_vec);
                          glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
                     }
-                    draw_interactive(&stamp->interactive, stamp_vec, Coord_t{-1, -1}, &world->tilemap, world->interactive_qt);
+                    draw_interactive(&stamp->interactive, stamp_vec, Coord_t{-1, -1}, &world->tilemap, world->interactive_qt, true);
                } break;
                }
           }
