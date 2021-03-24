@@ -5619,6 +5619,7 @@ int main(int argc, char** argv){
                                    }
                               }
 
+                              Coord_t checkpoint_coord{-1, -1};
                               for(S16 i = 0; i < temporary_world.interactives.count; i++){
                                    auto* temporary_interactive = temporary_world.interactives.elements + i;
                                    if(!coord_in_rect(temporary_interactive->coord, *room)) continue;
@@ -5626,6 +5627,10 @@ int main(int argc, char** argv){
                                    if(!resize(&world.interactives, world.interactives.count + 1)){
                                         LOG("resize() failed to resize interactives\n");
                                         return 1;
+                                   }
+
+                                   if(temporary_interactive->type == INTERACTIVE_TYPE_CHECKPOINT){
+                                        checkpoint_coord = temporary_interactive->coord;
                                    }
 
                                    world.interactives.elements[world.interactives.count - 1] = *temporary_interactive;
@@ -5642,7 +5647,12 @@ int main(int argc, char** argv){
                                         return 1;
                                    }
 
-                                   world.blocks.elements[world.blocks.count - 1] = *temporary_block;
+                                   auto* new_block = world.blocks.elements + (world.blocks.count - 1);
+                                   default_block(new_block);
+                                   new_block->pos = temporary_block->pos;
+                                   new_block->element = temporary_block->element;
+                                   new_block->rotation = temporary_block->rotation;
+                                   new_block->cut = temporary_block->cut;
                               }
 
                               // rebuild quad trees
@@ -5653,7 +5663,15 @@ int main(int argc, char** argv){
                               world.block_qt = quad_tree_build(&world.blocks);
 
                               // Move the player to the starting point
-
+                              {
+                                   destroy(&world.players);
+                                   init(&world.players, 1);
+                                   Player_t* player = world.players.elements;
+                                   *player = {};
+                                   if(checkpoint_coord.x >= 0){
+                                        player->pos = coord_to_pos_at_tile_center(checkpoint_coord);
+                                   }
+                              }
                          }
                     }
                }else{

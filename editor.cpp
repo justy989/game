@@ -551,6 +551,12 @@ bool init(Editor_t* editor){
           interactive_pit_category->elements[i].elements[0].interactive.pit.id = i;
      }
 
+     auto* interactive_reset_category = editor->category_array.elements + EDITOR_CATEGORY_INTERACTIVE_CHECKPOINT;
+     init(interactive_reset_category, 1);
+     init(interactive_reset_category->elements, 1);
+     interactive_reset_category->elements[0].elements[0].type = STAMP_TYPE_INTERACTIVE;
+     interactive_reset_category->elements[0].elements[0].interactive.type = INTERACTIVE_TYPE_CHECKPOINT;
+
      return true;
 }
 
@@ -658,14 +664,11 @@ void apply_stamp(Stamp_t* stamp, Coord_t coord, TileMap_t* tilemap, ObjectArray_
           // TODO: Check if block is in the way with the quad tree
 
           Block_t* block = block_array->elements + index;
-          *block = {};
+          default_block(block);
           block->pos = coord_to_pos(coord);
           block->pos.z = z;
-          block->vel = vec_zero();
-          block->accel = vec_zero();
           block->element = stamp->block.element;
           block->rotation = stamp->block.rotation;
-          block->entangle_index = -1;
           block->cut = stamp->block.cut;
      } break;
      case STAMP_TYPE_INTERACTIVE:

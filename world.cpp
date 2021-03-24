@@ -2571,8 +2571,8 @@ void describe_coord(Coord_t coord, World_t* world){
           case INTERACTIVE_TYPE_STAIRS:
                type_string = "STAIRS";
                break;
-          case INTERACTIVE_TYPE_PROMPT:
-               type_string = "PROMPT";
+          case INTERACTIVE_TYPE_CHECKPOINT:
+               type_string = "CHECKPOINT";
                break;
           case INTERACTIVE_TYPE_PIT:
                type_string = "PIT";

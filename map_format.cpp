@@ -254,7 +254,7 @@ bool save_map_to_file(FILE* file, Coord_t player_start, const TileMap_t* tilemap
                map_interactives[i].stairs.up = interactive_array->elements[i].stairs.up;
                map_interactives[i].stairs.face = interactive_array->elements[i].stairs.face;
                break;
-          case INTERACTIVE_TYPE_PROMPT:
+          case INTERACTIVE_TYPE_CHECKPOINT:
                break;
           case INTERACTIVE_TYPE_WIRE_CROSS:
                map_interactives[i].wire_cross.mask = interactive_array->elements[i].wire_cross.mask;
@@ -451,7 +451,7 @@ bool load_map_from_file_v4(FILE* file, Coord_t* player_start, TileMap_t* tilemap
                interactive->stairs.up = map_interactives[i].stairs.up;
                interactive->stairs.face = map_interactives[i].stairs.face;
                break;
-          case INTERACTIVE_TYPE_PROMPT:
+          case INTERACTIVE_TYPE_CHECKPOINT:
                break;
           case INTERACTIVE_TYPE_WIRE_CROSS:
                interactive->wire_cross.on = map_interactives[i].wire_cross.on;
@@ -597,7 +597,7 @@ bool load_map_from_file_v6(FILE* file, Coord_t* player_start, TileMap_t* tilemap
                interactive->stairs.up = map_interactives[i].stairs.up;
                interactive->stairs.face = map_interactives[i].stairs.face;
                break;
-          case INTERACTIVE_TYPE_PROMPT:
+          case INTERACTIVE_TYPE_CHECKPOINT:
                break;
           case INTERACTIVE_TYPE_WIRE_CROSS:
                interactive->wire_cross.on = map_interactives[i].wire_cross.on;
@@ -743,7 +743,7 @@ bool load_map_from_file_v7(FILE* file, Coord_t* player_start, TileMap_t* tilemap
                interactive->stairs.up = map_interactives[i].stairs.up;
                interactive->stairs.face = map_interactives[i].stairs.face;
                break;
-          case INTERACTIVE_TYPE_PROMPT:
+          case INTERACTIVE_TYPE_CHECKPOINT:
                break;
           case INTERACTIVE_TYPE_WIRE_CROSS:
                interactive->wire_cross.on = map_interactives[i].wire_cross.on;
@@ -891,7 +891,7 @@ bool load_map_from_file_v8(FILE* file, Coord_t* player_start, TileMap_t* tilemap
                interactive->stairs.up = map_interactives[i].stairs.up;
                interactive->stairs.face = map_interactives[i].stairs.face;
                break;
-          case INTERACTIVE_TYPE_PROMPT:
+          case INTERACTIVE_TYPE_CHECKPOINT:
                break;
           case INTERACTIVE_TYPE_WIRE_CROSS:
                interactive->wire_cross.on = map_interactives[i].wire_cross.on;
