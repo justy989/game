@@ -5602,20 +5602,15 @@ int main(int argc, char** argv){
                                    return 1;
                               }
 
-                              // Clear the blocks and interactives in the room
-                              for(S16 j = room->bottom; j <= room->top; j++){
-                                   for(S16 i = room->left; i <= room->right; i++){
-                                        Coord_t coord {i, j};
-                                        coord_clear(coord, &world.tilemap, &world.interactives, world.interactive_qt, &world.blocks);
-                                   }
-                              }
-
                               // Load the blocks, interactives, and tile flags from the temporary world
                               for(S16 j = room->bottom; j <= room->top; j++){
                                    for(S16 i = room->left; i <= room->right; i++){
                                         Coord_t coord {i, j};
                                         auto* tile = tilemap_get_tile(&temporary_world.tilemap, coord);
-                                        if(tile) world.tilemap.tiles[j][i] = *tile;
+                                        if(tile){
+                                             if(tile->flags & TILE_FLAG_RESET_IMMUNE) continue;
+                                             world.tilemap.tiles[j][i] = *tile;
+                                        }
                                    }
                               }
 
@@ -5624,35 +5619,28 @@ int main(int argc, char** argv){
                                    auto* temporary_interactive = temporary_world.interactives.elements + i;
                                    if(!coord_in_rect(temporary_interactive->coord, *room)) continue;
 
-                                   if(!resize(&world.interactives, world.interactives.count + 1)){
-                                        LOG("resize() failed to resize interactives\n");
-                                        return 1;
-                                   }
-
-                                   if(temporary_interactive->type == INTERACTIVE_TYPE_CHECKPOINT){
+                                   if (temporary_interactive->type == INTERACTIVE_TYPE_CHECKPOINT){
                                         checkpoint_coord = temporary_interactive->coord;
                                    }
 
-                                   world.interactives.elements[world.interactives.count - 1] = *temporary_interactive;
+                                   // skip updating interactives that are reset immune !
+                                   auto* tile = tilemap_get_tile(&temporary_world.tilemap, temporary_interactive->coord);
+                                   if(tile && tile->flags & TILE_FLAG_RESET_IMMUNE) continue;
+
+                                   world.interactives.elements[i] = *temporary_interactive;
                               }
 
-                              // TODO(jtardiff): Re-figure out entangled connections
+                              // TODO: if this assert fires, we need to handle case where we've cloned blocks then
+                              // tried to reset !
+                              assert(temporary_world.blocks.count == world.blocks.count);
                               for(S16 i = 0; i < temporary_world.blocks.count; i++){
                                    auto* temporary_block = temporary_world.blocks.elements + i;
                                    Coord_t block_coord = block_get_coord(temporary_block);
                                    if(!coord_in_rect(block_coord, *room)) continue;
 
-                                   if(!resize(&world.blocks, world.blocks.count + 1)){
-                                        LOG("resize() failed to resize interactives\n");
-                                        return 1;
-                                   }
-
-                                   auto* new_block = world.blocks.elements + (world.blocks.count - 1);
-                                   default_block(new_block);
-                                   new_block->pos = temporary_block->pos;
-                                   new_block->element = temporary_block->element;
-                                   new_block->rotation = temporary_block->rotation;
-                                   new_block->cut = temporary_block->cut;
+                                   auto* reset_block = world.blocks.elements + i;
+                                   default_block(reset_block);
+                                   *reset_block = *temporary_block;
                               }
 
                               // rebuild quad trees
