@@ -2998,6 +2998,9 @@ int main(int argc, char** argv){
                                         destroy(&temporary_world.interactives);
                                         destroy(&temporary_world.blocks);
                                         destroy(&temporary_world.rooms);
+
+                                        quad_tree_free(temporary_world.interactive_qt);
+                                        quad_tree_free(temporary_world.block_qt);
                                    }
                               }
 
@@ -5575,12 +5578,6 @@ int main(int argc, char** argv){
                     reset_timer += dt;
                     if(reset_timer >= RESET_TIME){
                          resetting = false;
-                         // TODO: maybe rather than relying on the file system, we can store the starting state in memory ?
-                         auto load_result = load_map_number_map(map_number, &world, &undo, &player_start, &player_action, &camera, current_map_tags);
-                         if(load_result.success){
-                              free(current_map_filepath);
-                              current_map_filepath = strdup(load_result.filepath);
-                         }
 
                          // what room is the player in ?
                          // TODO: compress with code in update_camera()
@@ -5595,6 +5592,67 @@ int main(int argc, char** argv){
                          }
 
                          if (room_index >= 0 && room_index < world.rooms.count) {
+                              auto* room = world.rooms.elements + room_index;
+
+                              // TODO: maybe rather than relying on the file system, we can store the starting state
+                              // in memory ? Or even just loading just the room.
+                              World_t temporary_world {};
+                              if(!load_map(current_map_filepath, &player_start, &temporary_world.tilemap, &temporary_world.blocks, &temporary_world.interactives,
+                                           &world.rooms)){
+                                   return 1;
+                              }
+
+                              // Clear the blocks and interactives in the room
+                              for(S16 j = room->bottom; j <= room->top; j++){
+                                   for(S16 i = room->left; i <= room->right; i++){
+                                        Coord_t coord {i, j};
+                                        coord_clear(coord, &world.tilemap, &world.interactives, world.interactive_qt, &world.blocks);
+                                   }
+                              }
+
+                              // Load the blocks, interactives, and tile flags from the temporary world
+                              for(S16 j = room->bottom; j <= room->top; j++){
+                                   for(S16 i = room->left; i <= room->right; i++){
+                                        Coord_t coord {i, j};
+                                        auto* tile = tilemap_get_tile(&temporary_world.tilemap, coord);
+                                        if(tile) world.tilemap.tiles[j][i] = *tile;
+                                   }
+                              }
+
+                              for(S16 i = 0; i < temporary_world.interactives.count; i++){
+                                   auto* temporary_interactive = temporary_world.interactives.elements + i;
+                                   if(!coord_in_rect(temporary_interactive->coord, *room)) continue;
+
+                                   if(!resize(&world.interactives, world.interactives.count + 1)){
+                                        LOG("resize() failed to resize interactives\n");
+                                        return 1;
+                                   }
+
+                                   world.interactives.elements[world.interactives.count - 1] = *temporary_interactive;
+                              }
+
+                              // TODO(jtardiff): Re-figure out entangled connections
+                              for(S16 i = 0; i < temporary_world.blocks.count; i++){
+                                   auto* temporary_block = temporary_world.blocks.elements + i;
+                                   Coord_t block_coord = block_get_coord(temporary_block);
+                                   if(!coord_in_rect(block_coord, *room)) continue;
+
+                                   if(!resize(&world.blocks, world.blocks.count + 1)){
+                                        LOG("resize() failed to resize interactives\n");
+                                        return 1;
+                                   }
+
+                                   world.blocks.elements[world.blocks.count - 1] = *temporary_block;
+                              }
+
+                              // rebuild quad trees
+                              quad_tree_free(world.interactive_qt);
+                              world.interactive_qt = quad_tree_build(&world.interactives);
+
+                              quad_tree_free(world.block_qt);
+                              world.block_qt = quad_tree_build(&world.blocks);
+
+                              // Move the player to the starting point
 
                          }
                     }
