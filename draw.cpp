@@ -502,6 +502,19 @@ void draw_selection(Coord_t selection_start, Coord_t selection_end, Camera_t* ca
      draw_quad_wireframe(&selection_quad, red, green, blue);
 }
 
+void draw_selection_in_editor(Coord_t selection_start, Coord_t selection_end, Camera_t* camera, F32 red, F32 green, F32 blue){
+     glMatrixMode(GL_PROJECTION);
+     glLoadIdentity();
+     glOrtho(camera->view.left, camera->view.right, camera->view.bottom, camera->view.top, 0.0, 1.0);
+     glBindTexture(GL_TEXTURE_2D, 0);
+
+     draw_selection(selection_start, selection_end, camera, red, green, blue);
+
+     glMatrixMode(GL_PROJECTION);
+     glLoadIdentity();
+     glOrtho(0.0f, 1.0f, 0.0f, 1.0f, 0.0, 1.0);
+}
+
 Vec_t draw_player(Player_t* player, Position_t camera, Coord_t source_coord, Coord_t destination_coord, S8 portal_rotations){
      Vec_t pos_vec = pos_to_vec(player->pos + camera);
      if(destination_coord.x >= 0){
@@ -1016,7 +1029,7 @@ void draw_editor(Editor_t* editor, World_t* world, Camera_t* camera, Vec_t mouse
           glEnd();
      } break;
      case EDITOR_MODE_CREATE_SELECTION:
-          draw_selection(editor->selection_start, editor->selection_end, camera, 1.0f, 0.0f, 0.0f);
+          draw_selection_in_editor(editor->selection_start, editor->selection_end, camera, 1.0f, 0.0f, 0.0f);
           break;
      case EDITOR_MODE_SELECTION_MANIPULATION:
      {
@@ -1067,24 +1080,21 @@ void draw_editor(Editor_t* editor, World_t* world, Camera_t* camera, Vec_t mouse
           }
           glEnd();
 
-          glLoadIdentity();
-          glOrtho(0.0f, 1.0f, 0.0f, 1.0f, 0.0, 1.0);
-
           Rect_t selection_bounds = editor_selection_bounds(editor);
           Coord_t min_coord {selection_bounds.left, selection_bounds.bottom};
           Coord_t max_coord {selection_bounds.right, selection_bounds.top};
-          draw_selection(min_coord, max_coord, camera, 1.0f, 0.0f, 0.0f);
+          draw_selection_in_editor(min_coord, max_coord, camera, 1.0f, 0.0f, 0.0f);
      } break;
      case EDITOR_MODE_ROOM_SELECTION:
      case EDITOR_MODE_ROOM_CREATION:
      {
           for(S16 i = 0; i < world->rooms.count; i++){
                auto* room = world->rooms.elements + i;
-               draw_selection(Coord_t{room->left, room->bottom}, Coord_t{room->right, room->top}, camera, 1.0f, 0.0f, 0.0f);
+               draw_selection_in_editor(Coord_t{room->left, room->bottom}, Coord_t{room->right, room->top}, camera, 1.0f, 0.0f, 0.0f);
           }
 
           if(editor->mode == EDITOR_MODE_ROOM_CREATION){
-               draw_selection(editor->selection_start, editor->selection_end, camera, 0.0f, 1.0f, 0.0f);
+               draw_selection_in_editor(editor->selection_start, editor->selection_end, camera, 0.0f, 1.0f, 0.0f);
           }
      } break;
      }
