@@ -11,6 +11,7 @@ Before playtest:
 - Undo into a previous room warns the user first.
 - Make it more visually obvious when a block raises ?
 - A 2 way stairs interactive object that fades to black, loads a new level, and fades in from black to connect levels.
+- Visually display unable to reset rooms
 
 Entanglement Puzzles:
 - entangle puzzle where there is a line of pressure plates against the wall with a line of popups on the other side that would
@@ -1450,10 +1451,8 @@ bool this_block_has_already_pushed_others(BlockMomentumPushes_t<128>* block_push
      return true;
 }
 
-void update_camera(Camera_t* camera, World_t* world, bool init = false){
-     if(world->players.count <= 0) return;
+S16 get_room_index_of_player(World_t* world){
      Coord_t player_coord = pos_to_coord(world->players.elements[0].pos);
-
      S16 room_index = -1;
      for(S16 i = 0; i < world->rooms.count; i++){
           auto* room = world->rooms.elements + i;
@@ -1462,7 +1461,13 @@ void update_camera(Camera_t* camera, World_t* world, bool init = false){
                break;
           }
      }
+     return room_index;
+}
 
+void update_camera(Camera_t* camera, World_t* world, bool init = false){
+     if(world->players.count <= 0) return;
+
+     S16 room_index = get_room_index_of_player(world);
      if(room_index != world->current_room ||
         world->recalc_room_camera){
           world->recalc_room_camera = false;
@@ -2648,7 +2653,19 @@ int main(int argc, char** argv){
                             editor.mode == EDITOR_MODE_CATEGORY_SELECT){
                               player_start = mouse_select_world_coord(mouse_screen, &camera);
                          }else if(game_mode == GAME_MODE_PLAYING){
-                              resetting = true;
+                              S16 room_index = get_room_index_of_player(&world);
+                              if(room_index >= 0 && room_index < world.rooms.count){
+                                   auto* room = world.rooms.elements + room_index;
+                                   for(S16 i = 0; i < world.interactives.count; i++){
+                                        auto* interactive = world.interactives.elements + i;
+                                        if(!coord_in_rect(interactive->coord, *room)) continue;
+
+                                        if (interactive->type == INTERACTIVE_TYPE_CHECKPOINT){
+                                             resetting = true;
+                                             break;
+                                        }
+                                   }
+                              }
                          }
                          break;
                     case SDL_SCANCODE_R:
@@ -4871,6 +4888,7 @@ int main(int argc, char** argv){
                                    resize(&world.players, 1);
                                    update_player_count = 1;
                               }else{
+                                   // TODO: How do we handle if they are in a room that can't reset ?
                                    resetting = true;
                               }
                          }
@@ -5580,84 +5598,80 @@ int main(int argc, char** argv){
 
                          // what room is the player in ?
                          // TODO: compress with code in update_camera()
-                         Coord_t player_coord = pos_to_coord(world.players.elements[0].pos);
-                         S16 room_index = -1;
-                         for(S16 i = 0; i < world.rooms.count; i++){
-                              auto* room = world.rooms.elements + i;
-                              if(coord_in_rect(player_coord, *room)){
-                                   room_index = i;
-                                   break;
-                              }
-                         }
-
+                         S16 room_index = get_room_index_of_player(&world);
                          if (room_index >= 0 && room_index < world.rooms.count) {
                               auto* room = world.rooms.elements + room_index;
 
-                              // TODO: maybe rather than relying on the file system, we can store the starting state
-                              // in memory ? Or even just loading just the room.
-                              World_t temporary_world {};
-                              if(!load_map(current_map_filepath, &player_start, &temporary_world.tilemap, &temporary_world.blocks, &temporary_world.interactives,
-                                           &world.rooms)){
-                                   return 1;
+                              Coord_t checkpoint_coord{-1, -1};
+                              for(S16 i = 0; i < world.interactives.count; i++){
+                                   auto* interactive = world.interactives.elements + i;
+                                   if(!coord_in_rect(interactive->coord, *room)) continue;
+
+                                   if (interactive->type == INTERACTIVE_TYPE_CHECKPOINT){
+                                        checkpoint_coord = interactive->coord;
+                                        break;
+                                   }
                               }
 
-                              // Load the blocks, interactives, and tile flags from the temporary world
-                              for(S16 j = room->bottom; j <= room->top; j++){
-                                   for(S16 i = room->left; i <= room->right; i++){
-                                        Coord_t coord {i, j};
-                                        auto* tile = tilemap_get_tile(&temporary_world.tilemap, coord);
-                                        if(tile){
-                                             if(tile->flags & TILE_FLAG_RESET_IMMUNE) continue;
-                                             world.tilemap.tiles[j][i] = *tile;
+                              // only reset if we found a checkpoint in this room
+                              if(checkpoint_coord.x >= 0){
+                                   // TODO: maybe rather than relying on the file system, we can store the starting state
+                                   // in memory ? Or even just loading just the room.
+                                   World_t temporary_world {};
+                                   if(!load_map(current_map_filepath, &player_start, &temporary_world.tilemap, &temporary_world.blocks, &temporary_world.interactives,
+                                                &world.rooms)){
+                                        return 1;
+                                   }
+
+                                   // Load the blocks, interactives, and tile flags from the temporary world
+                                   for(S16 j = room->bottom; j <= room->top; j++){
+                                        for(S16 i = room->left; i <= room->right; i++){
+                                             Coord_t coord {i, j};
+                                             auto* tile = tilemap_get_tile(&temporary_world.tilemap, coord);
+                                             if(tile){
+                                                  if(tile->flags & TILE_FLAG_RESET_IMMUNE) continue;
+                                                  world.tilemap.tiles[j][i] = *tile;
+                                             }
                                         }
                                    }
-                              }
 
-                              Coord_t checkpoint_coord{-1, -1};
-                              for(S16 i = 0; i < temporary_world.interactives.count; i++){
-                                   auto* temporary_interactive = temporary_world.interactives.elements + i;
-                                   if(!coord_in_rect(temporary_interactive->coord, *room)) continue;
+                                   for(S16 i = 0; i < temporary_world.interactives.count; i++){
+                                        auto* temporary_interactive = temporary_world.interactives.elements + i;
+                                        if(!coord_in_rect(temporary_interactive->coord, *room)) continue;
 
-                                   if (temporary_interactive->type == INTERACTIVE_TYPE_CHECKPOINT){
-                                        checkpoint_coord = temporary_interactive->coord;
+                                        // skip updating interactives that are reset immune !
+                                        auto* tile = tilemap_get_tile(&temporary_world.tilemap, temporary_interactive->coord);
+                                        if(tile && tile->flags & TILE_FLAG_RESET_IMMUNE) continue;
+
+                                        world.interactives.elements[i] = *temporary_interactive;
                                    }
 
-                                   // skip updating interactives that are reset immune !
-                                   auto* tile = tilemap_get_tile(&temporary_world.tilemap, temporary_interactive->coord);
-                                   if(tile && tile->flags & TILE_FLAG_RESET_IMMUNE) continue;
+                                   // TODO: if this assert fires, we need to handle case where we've cloned blocks then
+                                   // tried to reset !
+                                   assert(temporary_world.blocks.count == world.blocks.count);
+                                   for(S16 i = 0; i < temporary_world.blocks.count; i++){
+                                        auto* temporary_block = temporary_world.blocks.elements + i;
+                                        Coord_t block_coord = block_get_coord(temporary_block);
+                                        if(!coord_in_rect(block_coord, *room)) continue;
 
-                                   world.interactives.elements[i] = *temporary_interactive;
-                              }
+                                        auto* reset_block = world.blocks.elements + i;
+                                        default_block(reset_block);
+                                        *reset_block = *temporary_block;
+                                   }
 
-                              // TODO: if this assert fires, we need to handle case where we've cloned blocks then
-                              // tried to reset !
-                              assert(temporary_world.blocks.count == world.blocks.count);
-                              for(S16 i = 0; i < temporary_world.blocks.count; i++){
-                                   auto* temporary_block = temporary_world.blocks.elements + i;
-                                   Coord_t block_coord = block_get_coord(temporary_block);
-                                   if(!coord_in_rect(block_coord, *room)) continue;
+                                   // rebuild quad trees
+                                   quad_tree_free(world.interactive_qt);
+                                   world.interactive_qt = quad_tree_build(&world.interactives);
 
-                                   auto* reset_block = world.blocks.elements + i;
-                                   default_block(reset_block);
-                                   *reset_block = *temporary_block;
-                              }
+                                   quad_tree_free(world.block_qt);
+                                   world.block_qt = quad_tree_build(&world.blocks);
 
-                              // rebuild quad trees
-                              quad_tree_free(world.interactive_qt);
-                              world.interactive_qt = quad_tree_build(&world.interactives);
-
-                              quad_tree_free(world.block_qt);
-                              world.block_qt = quad_tree_build(&world.blocks);
-
-                              // Move the player to the starting point
-                              {
+                                   // Move the player to the starting point
                                    destroy(&world.players);
                                    init(&world.players, 1);
                                    Player_t* player = world.players.elements;
                                    *player = {};
-                                   if(checkpoint_coord.x >= 0){
-                                        player->pos = coord_to_pos_at_tile_center(checkpoint_coord);
-                                   }
+                                   player->pos = coord_to_pos_at_tile_center(checkpoint_coord);
                               }
                          }
                     }
