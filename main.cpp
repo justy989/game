@@ -1922,7 +1922,7 @@ int main(int argc, char** argv){
 
      world.editor_camera_bounds = Rect_t{0, 0, world.tilemap.width, world.tilemap.height};
      world.camera_transition = 1.0f;
-     update_camera(&camera, &world, true);
+     update_camera(&camera, &world, get_room_index_of_player(&world), true);
 
      F32 dt = 0.0f;
 
@@ -2034,6 +2034,10 @@ int main(int argc, char** argv){
 
           S16 current_room_index = get_room_index_of_player(&world);
           bool can_undo = (undo.history.current != undo.history.start);
+          bool will_undo_to_another_room = undo_revert_would_move_player_to_a_different_room(&undo,
+                                                                                             world.players.elements[0].pos,
+                                                                                             world.players.elements[0].face,
+                                                                                             &world.rooms);
           bool can_reset = player_can_reset(&world, current_room_index);
 
           SDL_Event sdl_event;
@@ -2497,7 +2501,7 @@ int main(int argc, char** argv){
                          }
                          break;
                     case SDL_SCANCODE_U:
-                         if(!resetting){
+                         if(!resetting && can_undo && !will_undo_to_another_room){
                               player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_UNDO,
                                                     record_demo.mode, record_demo.file, frame_count);
                          }
@@ -2664,6 +2668,10 @@ int main(int argc, char** argv){
                               destroy(&editor.selection);
                               shallow_copy(&editor.clipboard, &editor.selection);
                               editor.mode = EDITOR_MODE_SELECTION_MANIPULATION;
+                         }
+                         else if(game_mode == GAME_MODE_PLAYING && !resetting && can_undo && will_undo_to_another_room){
+                              player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_UNDO,
+                                                    record_demo.mode, record_demo.file, frame_count);
                          }
                          break;
                     case SDL_SCANCODE_M:
@@ -6238,14 +6246,29 @@ int main(int argc, char** argv){
                     Vec_t pos {0.01f, 0.96f};
                     Vec_t tex = theme_frame(12, 18);
                     tex.y += THEME_FRAME_HEIGHT * 0.5f;
-                    Vec_t dim = {TILE_SIZE, HALF_TILE_SIZE};
-                    // Adding .01f like an idiot because there is an additional pixel
-                    Vec_t tex_dim = {THEME_FRAME_WIDTH + 0.01f, THEME_FRAME_HEIGHT * 0.5f};
+                    Vec_t dim = {TILE_SIZE + PIXEL_SIZE, HALF_TILE_SIZE};
+                    Vec_t tex_dim = {THEME_FRAME_WIDTH + THEME_TEXEL_WIDTH, THEME_FRAME_HEIGHT * 0.5f};
 
-                    if(can_undo){
+                    if(can_undo && !will_undo_to_another_room){
                          glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
                     }else{
-                         glColor4f(1.0f, 1.0f, 1.0f, 0.3f);
+                         glColor4f(1.0f, 1.0f, 1.0f, 0.1f);
+                    }
+
+                    draw_screen_texture(pos, tex, dim, tex_dim);
+               }
+
+               {
+                    Vec_t pos {0.08f, 0.96f};
+                    Vec_t tex = theme_frame(14, 18);
+                    tex.y += THEME_FRAME_HEIGHT * 0.5f;
+                    Vec_t dim = {TILE_SIZE * 1.5f, HALF_TILE_SIZE};
+                    Vec_t tex_dim = {THEME_FRAME_WIDTH * 1.5f, THEME_FRAME_HEIGHT * 0.5f};
+
+                    if(can_undo && will_undo_to_another_room){
+                         glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+                    }else{
+                         glColor4f(1.0f, 1.0f, 1.0f, 0.1f);
                     }
 
                     draw_screen_texture(pos, tex, dim, tex_dim);
@@ -6255,13 +6278,12 @@ int main(int argc, char** argv){
                     Vec_t pos {0.935f, 0.96f};
                     Vec_t tex = theme_frame(12, 17);
                     Vec_t dim = {TILE_SIZE, HALF_TILE_SIZE};
-                    // Adding .01f like an idiot because there is an additional pixel
-                    Vec_t tex_dim = {THEME_FRAME_WIDTH + 0.01f, THEME_FRAME_HEIGHT * 0.5f};
+                    Vec_t tex_dim = {THEME_FRAME_WIDTH + THEME_TEXEL_WIDTH, THEME_FRAME_HEIGHT * 0.5f};
 
                     if(can_reset){
                          glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
                     }else{
-                         glColor4f(1.0f, 1.0f, 1.0f, 0.3f);
+                         glColor4f(1.0f, 1.0f, 1.0f, 0.1f);
                     }
 
                     draw_screen_texture(pos, tex, dim, tex_dim);

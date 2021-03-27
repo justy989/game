@@ -82,3 +82,5 @@ void undo_commit(Undo_t* undo, ObjectArray_t<Player_t>* players, TileMap_t* tile
                  ObjectArray_t<Interactive_t>* interactives, bool ignore_moving_stuff = false);
 void undo_revert(Undo_t* undo, ObjectArray_t<Player_t>* players, TileMap_t* tilemap, ObjectArray_t<Block_t>* blocks,
                  ObjectArray_t<Interactive_t>* interactives, bool has_bow);
+bool undo_revert_would_move_player_to_a_different_room(Undo_t* undo, Position_t player_pos, Direction_t player_face,
+                                                       ObjectArray_t<Rect_t>* rooms);

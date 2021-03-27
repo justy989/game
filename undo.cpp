@@ -1,6 +1,7 @@
 #include "undo.h"
 #include "log.h"
 #include "defines.h"
+#include "conversion.h"
 
 #include <assert.h>
 #include <string.h>
@@ -613,4 +614,98 @@ void undo_revert(Undo_t* undo, ObjectArray_t<Player_t>* players, TileMap_t* tile
 
      undo->history.current = ptr;
      undo_snapshot(undo, players, tilemap, blocks, interactives);
+}
+
+bool undo_revert_would_move_player_to_a_different_room(Undo_t* undo, Position_t player_pos, Direction_t player_face,
+                                                       ObjectArray_t<Rect_t>* rooms){
+     if(undo->history.current <= undo->history.start) return false;
+
+     auto player_coord = pos_to_coord(player_pos);
+     Rect_t* undo_player_room = nullptr;
+     Rect_t* current_player_room = nullptr;
+     for(S16 i = 0; i < rooms->count; i++){
+          auto* room = rooms->elements + i;
+          if(coord_in_rect(player_coord, *room)){
+               current_player_room = room;
+               break;
+          }
+     }
+
+     // If the player has not moved and is chaining undos, check the diff chain to see if we will end up in a different
+     // room.
+     if(player_pos.pixel == undo->players.elements[0].pixel &&
+        player_pos.z == undo->players.elements[0].z &&
+        player_face == undo->players.elements[0].face){
+          auto* ptr = (char*)(undo->history.current);
+          S32 diff_count = 0;
+          ptr -= sizeof(diff_count);
+          diff_count = *(S32*)(ptr);
+
+          for(S32 i = 0; i < diff_count; i++){
+               ptr -= sizeof(UndoDiffHeader_t);
+               auto* diff_header = (UndoDiffHeader_t*)(ptr);
+
+               switch(diff_header->type){
+               default:
+                    assert(!"memory probably corrupted, or new unsupported diff type");
+                    return false;
+               case UNDO_DIFF_TYPE_PLAYER:
+               {
+                    ptr -= sizeof(UndoPlayer_t);
+                    auto* player_entry = (UndoPlayer_t*)(ptr);
+                    auto undo_coord = pixel_to_coord(player_entry->pixel);
+
+                    for(S16 r = 0; r < rooms->count; r++){
+                         auto* room = rooms->elements + r;
+                         if(coord_in_rect(undo_coord, *room)){
+                              undo_player_room = room;
+                              break;
+                         }
+                    }
+                    break;
+               }
+               case UNDO_DIFF_TYPE_TILE_FLAGS:
+                    ptr -= sizeof(U16);
+                    break;
+               case UNDO_DIFF_TYPE_BLOCK:
+                    ptr -= sizeof(UndoBlock_t);
+                    break;
+               case UNDO_DIFF_TYPE_BLOCK_INSERT:
+                    ptr -= sizeof(UndoBlock_t);
+                    break;
+               case UNDO_DIFF_TYPE_BLOCK_REMOVE:
+                    break;
+               case UNDO_DIFF_TYPE_INTERACTIVE:
+                    ptr -= sizeof(Interactive_t);
+                    break;
+               case UNDO_DIFF_TYPE_INTERACTIVE_INSERT:
+                    ptr -= sizeof(Interactive_t);
+                    break;
+               case UNDO_DIFF_TYPE_INTERACTIVE_REMOVE:
+                    break;
+               case UNDO_DIFF_TYPE_PLAYER_INSERT:
+                    ptr -= sizeof(Player_t);
+                    break;
+               case UNDO_DIFF_TYPE_PLAYER_REMOVE:
+                    break;
+               case UNDO_DIFF_TYPE_MAP_RESIZE:
+                    ptr -= sizeof(UndoMapResize_t);
+                    break;
+               }
+          }
+
+          return current_player_room != undo_player_room;
+     }
+
+     // otherwise just check against the snapshot
+     auto undo_player_coord = pixel_to_coord(undo->players.elements[0].pixel);
+     for(S16 i = 0; i < rooms->count; i++){
+          auto* room = rooms->elements + i;
+          if(coord_in_rect(undo_player_coord, *room)){
+               undo_player_room = room;
+               break;
+          }
+     }
+
+     return undo_player_room != current_player_room;
 }
