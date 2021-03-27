@@ -26,6 +26,7 @@ struct World_t{
      S32 clone_instance = 0;
 
      S16 current_room = -1;
+     S16 previous_room = -1;
      F32 camera_transition = 0;
      bool recalc_room_camera = false;
      Rect_t editor_camera_bounds = {};

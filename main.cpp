@@ -9,7 +9,6 @@ TODO:
 Before playtest:
 - Teaching the controls in the first few puzzles.
 - Undo into a previous room warns the user first.
-- Make it more visually obvious when a block raises ?
 - A 2 way stairs interactive object that fades to black, loads a new level, and fades in from black to connect levels.
 
 Entanglement Puzzles:
@@ -1463,24 +1462,24 @@ S16 get_room_index_of_player(World_t* world){
      return room_index;
 }
 
-void update_camera(Camera_t* camera, World_t* world, bool init = false){
+void update_camera(Camera_t* camera, World_t* world, S16 current_room_index, bool init = false){
      if(world->players.count <= 0) return;
 
-     S16 room_index = get_room_index_of_player(world);
-     if(room_index != world->current_room ||
+     if(current_room_index != world->current_room ||
         world->recalc_room_camera){
           world->recalc_room_camera = false;
 
-          if(room_index < 0){
+          if(current_room_index < 0){
                camera->center_on_room(&world->editor_camera_bounds);
           }else{
-               camera->center_on_room(world->rooms.elements + room_index);
+               camera->center_on_room(world->rooms.elements + current_room_index);
                world->editor_camera_bounds = camera->coords_in_target_view();
                world_expand_editor_camera(world);
           }
 
           if(!init) world->camera_transition = 0;
-          world->current_room = room_index;
+          world->previous_room = world->current_room;
+          world->current_room = current_room_index;
      }
 
      if(world->camera_transition < 1.0f || init){
@@ -1547,10 +1546,9 @@ void add_editor_stamps_for_selection(Editor_t* editor, World_t* world){
      }
 }
 
-bool player_can_reset(World_t* world){
-     S16 room_index = get_room_index_of_player(world);
-     if(room_index >= 0 && room_index < world->rooms.count){
-          auto* room = world->rooms.elements + room_index;
+bool player_can_reset(World_t* world, S16 current_room_index){
+     if(current_room_index >= 0 && current_room_index < world->rooms.count){
+          auto* room = world->rooms.elements + current_room_index;
           for(S16 y = room->bottom; y <= room->top; y++){
                for(S16 x = room->left; x <= room->right; x++){
                     Coord_t coord {x, y};
@@ -2034,8 +2032,9 @@ int main(int argc, char** argv){
                }
           }
 
+          S16 current_room_index = get_room_index_of_player(&world);
           bool can_undo = (undo.history.current != undo.history.start);
-          bool can_reset = player_can_reset(&world);
+          bool can_reset = player_can_reset(&world, current_room_index);
 
           SDL_Event sdl_event;
           while(SDL_PollEvent(&sdl_event)){
@@ -5605,9 +5604,8 @@ int main(int argc, char** argv){
 
                          // what room is the player in ?
                          // TODO: compress with code in update_camera()
-                         S16 room_index = get_room_index_of_player(&world);
-                         if (room_index >= 0 && room_index < world.rooms.count) {
-                              auto* room = world.rooms.elements + room_index;
+                         if (current_room_index >= 0 && current_room_index < world.rooms.count) {
+                              auto* room = world.rooms.elements + current_room_index;
 
                               Coord_t checkpoint_coord{-1, -1};
                               for(S16 i = 0; i < world.interactives.count; i++){
@@ -5692,7 +5690,7 @@ int main(int argc, char** argv){
 
           if((suite && !show_suite) || play_demo.seek_frame >= 0) continue;
 
-          update_camera(&camera, &world);
+          update_camera(&camera, &world, current_room_index);
 
           // calculate entangle_tints
           {
@@ -6036,15 +6034,27 @@ int main(int argc, char** argv){
                glEnd();
 #endif
 
-               if(game_mode != GAME_MODE_EDITOR){
+               // fade in room we are walking into and fade out the room we are walking away from
+               if(game_mode != GAME_MODE_EDITOR && current_room_index >= 0){
                     glBegin(GL_QUADS);
-                    glColor4f(0.0f, 0.0f, 0.0f, 0.7f * world.camera_transition);
-                    int room_index = get_room_index_of_player(&world);
-                    auto* room = world.rooms.elements + room_index;
+                    const F32 darkness = 0.8f;
+                    auto* current_room = world.rooms.elements + current_room_index;
+                    Rect_t* previous_room = (world.previous_room >= 0) ? world.rooms.elements + world.previous_room : nullptr;
                     for(S16 y = min.y; y <= max.y; y++){
                          for(S16 x = min.x; x <= max.x; x++){
                               Coord_t coord{x, y};
-                              if(coord_in_rect(coord, *room)) continue;
+                              F32 alpha = 0;
+
+                              if(coord_in_rect(coord, *current_room)){
+                                   if(world.camera_transition == 1.0f) continue;
+                                   alpha = darkness * (1.0f - world.camera_transition);
+                              }else if(previous_room && coord_in_rect(coord, *previous_room)){
+                                   alpha = darkness * world.camera_transition;
+                              }else {
+                                   alpha = darkness;
+                              }
+
+                              glColor4f(0.0f, 0.0f, 0.0f, alpha);
 
                               Vec_t tile_pos = pos_to_vec(coord_to_pos(coord) + camera.offset);
                               glVertex2f(tile_pos.x, tile_pos.y);

@@ -243,7 +243,7 @@ void draw_tile_flags(U16 flags, Vec_t tile_pos, bool editor){
 }
 
 void draw_block(Block_t* block, Vec_t pos_vec, U8 portal_rotations){
-     static const F32 block_shadow_opacity = 0.3f;
+     static const F32 block_shadow_opacity = 0.4f;
 
      // draw a shadow below the block when we are on the bottom of the pit
      if(block->pos.z == -HEIGHT_INTERVAL){
