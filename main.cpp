@@ -11,7 +11,6 @@ Before playtest:
 - Undo into a previous room warns the user first.
 - Make it more visually obvious when a block raises ?
 - A 2 way stairs interactive object that fades to black, loads a new level, and fades in from black to connect levels.
-- Visually display unable to reset rooms
 
 Entanglement Puzzles:
 - entangle puzzle where there is a line of pressure plates against the wall with a line of popups on the other side that would
@@ -1548,6 +1547,23 @@ void add_editor_stamps_for_selection(Editor_t* editor, World_t* world){
      }
 }
 
+bool player_can_reset(World_t* world){
+     S16 room_index = get_room_index_of_player(world);
+     if(room_index >= 0 && room_index < world->rooms.count){
+          auto* room = world->rooms.elements + room_index;
+          for(S16 y = room->bottom; y <= room->top; y++){
+               for(S16 x = room->left; x <= room->right; x++){
+                    Coord_t coord {x, y};
+                    Interactive_t* interactive = quad_tree_interactive_find_at(world->interactive_qt, coord);
+                    if (interactive && interactive->type == INTERACTIVE_TYPE_CHECKPOINT){
+                         return true;
+                    }
+               }
+          }
+     }
+     return false;
+}
+
 int main(int argc, char** argv){
      char* current_map_filepath = nullptr;
      bool test = false;
@@ -2017,6 +2033,9 @@ int main(int argc, char** argv){
                     }
                }
           }
+
+          bool can_undo = (undo.history.current != undo.history.start);
+          bool can_reset = player_can_reset(&world);
 
           SDL_Event sdl_event;
           while(SDL_PollEvent(&sdl_event)){
@@ -2652,20 +2671,8 @@ int main(int argc, char** argv){
                          if(game_mode == GAME_MODE_EDITOR &&
                             editor.mode == EDITOR_MODE_CATEGORY_SELECT){
                               player_start = mouse_select_world_coord(mouse_screen, &camera);
-                         }else if(game_mode == GAME_MODE_PLAYING){
-                              S16 room_index = get_room_index_of_player(&world);
-                              if(room_index >= 0 && room_index < world.rooms.count){
-                                   auto* room = world.rooms.elements + room_index;
-                                   for(S16 i = 0; i < world.interactives.count; i++){
-                                        auto* interactive = world.interactives.elements + i;
-                                        if(!coord_in_rect(interactive->coord, *room)) continue;
-
-                                        if (interactive->type == INTERACTIVE_TYPE_CHECKPOINT){
-                                             resetting = true;
-                                             break;
-                                        }
-                                   }
-                              }
+                         }else if(game_mode == GAME_MODE_PLAYING && can_reset){
+                              resetting = true;
                          }
                          break;
                     case SDL_SCANCODE_R:
@@ -5623,6 +5630,8 @@ int main(int argc, char** argv){
                                         return 1;
                                    }
 
+                                   // TODO: remove any blocks not belonging to the current room
+
                                    // Load the blocks, interactives, and tile flags from the temporary world
                                    for(S16 j = room->bottom; j <= room->top; j++){
                                         for(S16 i = room->left; i <= room->right; i++){
@@ -6004,9 +6013,9 @@ int main(int argc, char** argv){
 
                glEnd();
 
+               glBindTexture(GL_TEXTURE_2D, 0);
 #if 1
                // light
-               glBindTexture(GL_TEXTURE_2D, 0);
                glBegin(GL_QUADS);
                for(S16 y = min.y; y <= max.y; y++){
                     for(S16 x = min.x; x <= max.x; x++){
@@ -6026,6 +6035,26 @@ int main(int argc, char** argv){
                }
                glEnd();
 #endif
+
+               if(game_mode != GAME_MODE_EDITOR){
+                    glBegin(GL_QUADS);
+                    glColor4f(0.0f, 0.0f, 0.0f, 0.7f * world.camera_transition);
+                    int room_index = get_room_index_of_player(&world);
+                    auto* room = world.rooms.elements + room_index;
+                    for(S16 y = min.y; y <= max.y; y++){
+                         for(S16 x = min.x; x <= max.x; x++){
+                              Coord_t coord{x, y};
+                              if(coord_in_rect(coord, *room)) continue;
+
+                              Vec_t tile_pos = pos_to_vec(coord_to_pos(coord) + camera.offset);
+                              glVertex2f(tile_pos.x, tile_pos.y);
+                              glVertex2f(tile_pos.x, tile_pos.y + TILE_SIZE);
+                              glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y + TILE_SIZE);
+                              glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y);
+                         }
+                    }
+                    glEnd();
+               }
 
                // before we draw the UI, lets write to the thumbnail buffer
                {
@@ -6135,9 +6164,7 @@ int main(int argc, char** argv){
 
                     glEnd();
                }
-          }
-
-          if(game_mode == GAME_MODE_EDITOR){
+          }else if(game_mode == GAME_MODE_EDITOR){
                glMatrixMode(GL_PROJECTION);
                glLoadIdentity();
                glOrtho(camera.view.left, camera.view.right, camera.view.bottom, camera.view.top, 0.0, 1.0);
@@ -6188,9 +6215,53 @@ int main(int argc, char** argv){
                glOrtho(0.0f, 1.0f, 0.0f, 1.0f, 0.0, 1.0);
                draw_editor(&editor, &world, &camera, mouse_screen, theme_texture, floor_texture, solids_texture,
                            text_texture);
+          }else if(game_mode == GAME_MODE_PLAYING){
+               glBindTexture(GL_TEXTURE_2D, theme_texture);
+
+               glMatrixMode(GL_PROJECTION);
+               glLoadIdentity();
+               glOrtho(0.0f, 1.0f, 0.0f, 1.0f, 0.0, 1.0);
+
+               glBegin(GL_QUADS);
+
+               {
+                    Vec_t pos {0.01f, 0.96f};
+                    Vec_t tex = theme_frame(12, 18);
+                    tex.y += THEME_FRAME_HEIGHT * 0.5f;
+                    Vec_t dim = {TILE_SIZE, HALF_TILE_SIZE};
+                    // Adding .01f like an idiot because there is an additional pixel
+                    Vec_t tex_dim = {THEME_FRAME_WIDTH + 0.01f, THEME_FRAME_HEIGHT * 0.5f};
+
+                    if(can_undo){
+                         glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+                    }else{
+                         glColor4f(1.0f, 1.0f, 1.0f, 0.3f);
+                    }
+
+                    draw_screen_texture(pos, tex, dim, tex_dim);
+               }
+
+               {
+                    Vec_t pos {0.935f, 0.96f};
+                    Vec_t tex = theme_frame(12, 17);
+                    Vec_t dim = {TILE_SIZE, HALF_TILE_SIZE};
+                    // Adding .01f like an idiot because there is an additional pixel
+                    Vec_t tex_dim = {THEME_FRAME_WIDTH + 0.01f, THEME_FRAME_HEIGHT * 0.5f};
+
+                    if(can_reset){
+                         glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+                    }else{
+                         glColor4f(1.0f, 1.0f, 1.0f, 0.3f);
+                    }
+
+                    draw_screen_texture(pos, tex, dim, tex_dim);
+               }
+
+               glEnd();
           }
 
           if(reset_timer >= 0.0f){
+               glBindTexture(GL_TEXTURE_2D, 0);
                glBegin(GL_QUADS);
                glColor4f(0.0f, 0.0f, 0.0f, reset_timer / RESET_TIME);
                glVertex2f(0, 0);
