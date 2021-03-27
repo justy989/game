@@ -6,13 +6,15 @@
 #include "block.h"
 #include "interactive.h"
 #include "raw.h"
+#include "exit.h"
 
 #include <stdio.h>
 
 // version 4 is just the addition of the thumbnail
 // version 7 adds the iced flag to the pit
 // version 8 adds rooms, also we changed TILE_FLAG_CHECKPOINT to TILE_FLAG_SOLID, and adds rotation to tiles
-#define MAP_VERSION 8
+// version 9 adds stairs that reference the exit and a list of exits for the map
+#define MAP_VERSION 9
 
 #pragma pack(push, 1)
 struct MapTileV1_t{
@@ -74,6 +76,17 @@ struct PitV2_t{
     bool iced;
 };
 
+struct StairsV1_t{
+     bool up;
+     Direction_t face;
+};
+
+struct StairsV2_t{
+     bool up;
+     Direction_t face;
+     U8 exit_index;
+};
+
 struct MapInteractiveV1_t{
      InteractiveType_t type;
      Coord_t coord;
@@ -82,7 +95,7 @@ struct MapInteractiveV1_t{
           PressurePlate_t pressure_plate;
           Detector_t detector;
           MapPopupV1_t popup;
-          Stairs_t stairs;
+          StairsV1_t stairs;
           MapDoorV1_t door; // up or down
           PortalV1_t portal;
           WireCross_t wire_cross;
@@ -97,7 +110,7 @@ struct MapInteractiveV2_t{
           PressurePlate_t pressure_plate;
           Detector_t detector;
           MapPopupV1_t popup;
-          Stairs_t stairs;
+          StairsV1_t stairs;
           MapDoorV1_t door;
           PortalV1_t portal;
           WireCross_t wire_cross;
@@ -113,7 +126,23 @@ struct MapInteractiveV3_t{
           PressurePlate_t pressure_plate;
           Detector_t detector;
           MapPopupV1_t popup;
-          Stairs_t stairs;
+          StairsV1_t stairs;
+          MapDoorV1_t door;
+          PortalV1_t portal;
+          WireCross_t wire_cross;
+          PitV2_t pit;
+     };
+};
+
+struct MapInteractiveV4_t{
+     InteractiveType_t type;
+     Coord_t coord;
+
+     union{
+          PressurePlate_t pressure_plate;
+          Detector_t detector;
+          MapPopupV1_t popup;
+          StairsV2_t stairs;
           MapDoorV1_t door;
           PortalV1_t portal;
           WireCross_t wire_cross;
@@ -123,16 +152,20 @@ struct MapInteractiveV3_t{
 #pragma pack(pop)
 
 bool save_map_to_file(FILE* file, Coord_t player_start, const TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array,
-                      ObjectArray_t<Interactive_t>* interactive_array, ObjectArray_t<Rect_t>* room_array, bool* tags, Raw_t* thumbnail);
+                      ObjectArray_t<Interactive_t>* interactive_array, ObjectArray_t<Rect_t>* room_array,
+                      ObjectArray_t<Exit_t>* exit_array, bool* tags, Raw_t* thumbnail);
 
 bool save_map(const char* filepath, Coord_t player_start, const TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array,
-              ObjectArray_t<Interactive_t>* interactive_array, ObjectArray_t<Rect_t>* room_array, bool* tags, Raw_t* thumbnail);
+              ObjectArray_t<Interactive_t>* interactive_array, ObjectArray_t<Rect_t>* room_array,
+              ObjectArray_t<Exit_t>* exit_array, bool* tags, Raw_t* thumbnail);
 
 bool load_map_from_file(FILE* file, Coord_t* player_start, TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array,
-                        ObjectArray_t<Interactive_t>* interactive_array, ObjectArray_t<Rect_t>* room_array, const char* filepath);
+                        ObjectArray_t<Interactive_t>* interactive_array, ObjectArray_t<Rect_t>* room_array,
+                        ObjectArray_t<Exit_t>* exit_array, const char* filepath);
 
 bool load_map(const char* filepath, Coord_t* player_start, TileMap_t* tilemap, ObjectArray_t<Block_t>* block_array,
-              ObjectArray_t<Interactive_t>* interactive_array, ObjectArray_t<Rect_t>* room_array);
+              ObjectArray_t<Interactive_t>* interactive_array, ObjectArray_t<Rect_t>* room_array,
+              ObjectArray_t<Exit_t>* exit_array);
 
 bool load_map_thumbnail(const char* filepath, Raw_t* thumbnail);
 bool load_map_tags(const char* filepath, bool* tags);

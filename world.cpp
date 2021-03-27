@@ -117,7 +117,7 @@ LogMapNumberResult_t load_map_number(S32 map_number, Coord_t* player_start, Worl
      if(!filepath[0]) return result;
 
      result.success = load_map(filepath, player_start, &world->tilemap, &world->blocks, &world->interactives,
-                               &world->rooms);
+                               &world->rooms, &world->exits);
      if(result.success) result.filepath = strdup(filepath);
      return result;
 }

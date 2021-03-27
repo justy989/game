@@ -50,6 +50,7 @@ struct Popup_t{
 struct Stairs_t{
      bool up;
      Direction_t face;
+     U8 exit_index;
 };
 
 struct Lever_t{

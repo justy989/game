@@ -9,6 +9,7 @@
 #include "undo.h"
 #include "raw.h"
 #include "camera.h"
+#include "exit.h"
 #include "static_object_array.h"
 
 struct World_t{
@@ -17,6 +18,7 @@ struct World_t{
      ObjectArray_t<Block_t> blocks = {};
      ObjectArray_t<Interactive_t> interactives = {};
      ObjectArray_t<Rect_t> rooms = {};
+     ObjectArray_t<Exit_t> exits = {};
      ArrowArray_t arrows = {};
 
      QuadTreeNode_t<Interactive_t>* interactive_qt = NULL;

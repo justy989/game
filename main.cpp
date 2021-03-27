@@ -8,7 +8,9 @@ http://www.simonstalenhag.se/
 TODO:
 Before playtest:
 - Teaching the controls in the first few puzzles.
-- Undo into a previous room warns the user first.
+- Show WASD In the first room.
+- Show E When the player can activate a lever.
+- Saving player progress on checkpoints.
 - A 2 way stairs interactive object that fades to black, loads a new level, and fades in from black to connect levels.
 
 Entanglement Puzzles:
@@ -1823,7 +1825,7 @@ int main(int argc, char** argv){
 
      if(current_map_filepath){
           if(!load_map(current_map_filepath, &player_start, &world.tilemap, &world.blocks, &world.interactives,
-                       &world.rooms)){
+                       &world.rooms, &world.exits)){
                return 1;
           }
 
@@ -1969,7 +1971,7 @@ int main(int argc, char** argv){
                          bool* updated_tags = get_global_tags();
                          if(load_map(current_map_filepath, &player_start, &a_whole_new_world.tilemap,
                                      &a_whole_new_world.blocks, &a_whole_new_world.interactives,
-                                     &a_whole_new_world.rooms)){
+                                     &a_whole_new_world.rooms, &a_whole_new_world.exits)){
                               Raw_t* thumbnail_ptr = NULL;
 
                               Raw_t raw_thumbnail {};
@@ -1978,7 +1980,7 @@ int main(int argc, char** argv){
                               }
                               save_map(current_map_filepath, player_start, &a_whole_new_world.tilemap,
                                        &a_whole_new_world.blocks, &a_whole_new_world.interactives,
-                                       &a_whole_new_world.rooms, updated_tags, thumbnail_ptr);
+                                       &a_whole_new_world.rooms, &a_whole_new_world.exits, updated_tags, thumbnail_ptr);
                               if(thumbnail_ptr){
                                    free(raw_thumbnail.bytes);
                               }
@@ -2305,6 +2307,7 @@ int main(int argc, char** argv){
                          break;
                     case SDL_SCANCODE_LEFTBRACKET:
                     {
+                         // TODO: handle suite in here.
                          map_number--;
                          auto load_result = load_map_number_map(map_number, &world, &undo, &player_start, &player_action, &camera, current_map_tags);
                          if(load_result.success){
@@ -2327,6 +2330,7 @@ int main(int argc, char** argv){
                     }
                     case SDL_SCANCODE_RIGHTBRACKET:
                     {
+                         // TODO: handle suite in here.
                          map_number++;
                          auto load_result = load_map_number_map(map_number, &world, &undo, &player_start, &player_action, &camera, current_map_tags);
                          if(load_result.success){
@@ -2496,7 +2500,7 @@ int main(int argc, char** argv){
                               char filepath[64];
                               snprintf(filepath, 64, "content/%03d.bm", map_number);
                               save_map(filepath, player_start, &world.tilemap, &world.blocks, &world.interactives,
-                                       &world.rooms, current_map_tags, thumbnail_ptr);
+                                       &world.rooms, &world.exits, current_map_tags, thumbnail_ptr);
                               if(thumbnail.bytes) free(thumbnail.bytes);
                          }
                          break;
@@ -2933,7 +2937,7 @@ int main(int argc, char** argv){
                                    clear_global_tags();
                                    if(load_map(map_thumbnails.elements[hovered_map_thumbnail_index].map_filepath,
                                                &player_start, &world.tilemap, &world.blocks, &world.interactives,
-                                               &world.rooms)){
+                                               &world.rooms, &world.exits)){
                                         load_map_tags(map_thumbnails.elements[hovered_map_thumbnail_index].map_filepath, current_map_tags);
                                         reset_map(player_start, &world, &undo, &camera);
                                         game_mode = GAME_MODE_PLAYING;
@@ -3008,7 +3012,7 @@ int main(int argc, char** argv){
                                    Coord_t temporary_player_start {};
                                    if(load_map(map_thumbnails.elements[hovered_map_thumbnail_index].map_filepath,
                                                &temporary_player_start, &temporary_world.tilemap, &temporary_world.blocks,
-                                               &temporary_world.interactives, &temporary_world.rooms)){
+                                               &temporary_world.interactives, &temporary_world.rooms, &temporary_world.exits)){
                                         temporary_world.interactive_qt = quad_tree_build(&temporary_world.interactives);
                                         temporary_world.block_qt = quad_tree_build(&temporary_world.blocks);
 
@@ -5632,7 +5636,7 @@ int main(int argc, char** argv){
                                    // in memory ? Or even just loading just the room.
                                    World_t temporary_world {};
                                    if(!load_map(current_map_filepath, &player_start, &temporary_world.tilemap, &temporary_world.blocks, &temporary_world.interactives,
-                                                &world.rooms)){
+                                                &world.rooms, &world.exits)){
                                         return 1;
                                    }
 
@@ -6374,7 +6378,7 @@ int main(int argc, char** argv){
 
           // save map and player position
           save_map_to_file(record_demo.file, player_start, &world.tilemap, &world.blocks, &world.interactives,
-                           &world.rooms, NULL, NULL);
+                           &world.rooms, &world.exits, NULL, NULL);
 
           switch(record_demo.version){
           default:
