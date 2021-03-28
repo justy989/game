@@ -5835,6 +5835,7 @@ int main(int argc, char** argv){
                                         Player_t* player = world.players.elements;
                                         *player = {};
                                         player->pos = coord_to_pos_at_tile_center(checkpoint_coord);
+                                        player->has_bow = PLAYER_HAS_BOW;
                                    }
                               }
                          }else if(fade_state == FADE_STATE_EXITTING){
