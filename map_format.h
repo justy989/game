@@ -62,6 +62,12 @@ struct MapDoorV1_t{
      Direction_t face;
 };
 
+struct MapDoorV2_t{
+     bool up;
+     Direction_t face;
+     U8 ticks;
+};
+
 struct PortalV1_t{
     Direction_t face;
     bool on;
@@ -143,7 +149,7 @@ struct MapInteractiveV4_t{
           Detector_t detector;
           MapPopupV1_t popup;
           StairsV2_t stairs;
-          MapDoorV1_t door;
+          MapDoorV2_t door;
           PortalV1_t portal;
           WireCross_t wire_cross;
           PitV2_t pit;

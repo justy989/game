@@ -889,7 +889,7 @@ bool load_map_from_file_v9(FILE* file, Coord_t* player_start, TileMap_t* tilemap
           return false;
      }
 
-     MapInteractiveV3_t* map_interactives = (MapInteractiveV3_t*)(calloc((size_t)(interactive_count), sizeof(*map_interactives)));
+     MapInteractiveV4_t* map_interactives = (MapInteractiveV4_t*)(calloc((size_t)(interactive_count), sizeof(*map_interactives)));
      if(!map_interactives){
           LOG("%s(): failed to allocate %d interactives\n", __FUNCTION__, interactive_count);
           return false;
@@ -981,7 +981,7 @@ bool load_map_from_file_v9(FILE* file, Coord_t* player_start, TileMap_t* tilemap
           case INTERACTIVE_TYPE_DOOR:
                interactive->door.lift.up = map_interactive->door.up;
                interactive->door.lift.timer = 0.0f;
-               interactive->door.lift.ticks = DOOR_MAX_HEIGHT;
+               interactive->door.lift.ticks = map_interactive->door.ticks;
                interactive->door.face = map_interactive->door.face;
                break;
           case INTERACTIVE_TYPE_PORTAL:
@@ -993,6 +993,7 @@ bool load_map_from_file_v9(FILE* file, Coord_t* player_start, TileMap_t* tilemap
                interactive->stairs.face = map_interactive->stairs.face;
                break;
           case INTERACTIVE_TYPE_CHECKPOINT:
+               interactive->checkpoint = false;
                break;
           case INTERACTIVE_TYPE_WIRE_CROSS:
                interactive->wire_cross.on = map_interactive->wire_cross.on;
@@ -1330,6 +1331,7 @@ void build_map_interactive_from_interactive(MapInteractiveV4_t* map_interactive,
      case INTERACTIVE_TYPE_DOOR:
           map_interactive->door.up = interactive->door.lift.up;
           map_interactive->door.face = interactive->door.face;
+          map_interactive->door.ticks = interactive->door.lift.ticks;
           break;
      case INTERACTIVE_TYPE_PORTAL:
           map_interactive->portal.face = interactive->portal.face;
@@ -1381,7 +1383,7 @@ void build_interactive_from_map_interactive(Interactive_t* interactive, const Ma
      case INTERACTIVE_TYPE_DOOR:
           interactive->door.lift.up = map_interactive->door.up;
           interactive->door.lift.timer = 0.0f;
-          interactive->door.lift.ticks = DOOR_MAX_HEIGHT;
+          interactive->door.lift.ticks = map_interactive->door.ticks;
           interactive->door.face = map_interactive->door.face;
           break;
      case INTERACTIVE_TYPE_PORTAL:

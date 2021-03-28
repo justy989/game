@@ -398,7 +398,7 @@ void block_add_vertical_momentum(Block_t* block, BlockMomentumType_t type, F32 m
      }
 }
 
-bool blocks_equal(Block_t* a, Block_t* b){
+bool block_equal(Block_t* a, Block_t* b){
      return (a->pos.pixel == b->pos.pixel &&
              a->pos.z == b->pos.z &&
              a->element == b->element &&

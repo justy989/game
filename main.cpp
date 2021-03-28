@@ -210,6 +210,7 @@ Progression Requirements:
 #include "utils.h"
 #include "tags.h"
 #include "thumbnail.h"
+#include "diff.h"
 
 #define CHECKBOX_START_OFFSET_X (4.0f * PIXEL_SIZE)
 #define CHECKBOX_START_OFFSET_Y (2.0f * PIXEL_SIZE)
@@ -1584,6 +1585,11 @@ void add_editor_stamps_for_selection(Editor_t* editor, World_t* world){
 bool player_can_reset(World_t* world, S16 current_room_index){
      if(current_room_index >= 0 && current_room_index < world->rooms.count){
           auto* room = world->rooms.elements + current_room_index;
+
+          if(!world_rect_has_changed(world, *room)){
+               return false;
+          }
+
           for(S16 y = room->bottom; y <= room->top; y++){
                for(S16 x = room->left; x <= room->right; x++){
                     Coord_t coord {x, y};
@@ -1593,9 +1599,37 @@ bool player_can_reset(World_t* world, S16 current_room_index){
                     }
                }
           }
+
      }
      return false;
 }
+
+void load_diff_save_file_if_present(const char* current_map_filepath, World_t* world, Coord_t* player_start){
+     auto* diff_filename = build_diff_filename_from_map_filename(current_map_filepath);
+
+     ObjectArray_t<DiffEntry_t> diffs{};
+     LOG("Loading save state: %s\n", diff_filename);
+     load_diffs_from_file(diff_filename, &diffs, player_start);
+     LOG("  loaded %d diffs with player at %d, %d\n", diffs.count, player_start->x, player_start->y);
+     apply_diff_to_world(world, &diffs);
+     destroy(&diffs);
+     free(diff_filename);
+}
+
+void save_diff_file(const char* current_map_filepath, World_t* world, bool exitting = false){
+     ObjectArray_t<DiffEntry_t> diffs{};
+     calculate_world_changes(world, &diffs);
+     auto* diff_filename = build_diff_filename_from_map_filename(current_map_filepath);
+     auto player_coord = pos_to_coord(world->players.elements[0].pos);
+     if(exitting){
+          player_coord -= world->players.elements[0].face;
+     }
+     LOG("saving state %s containing %d diffs, with player at %d, %d\n", diff_filename, diffs.count, player_coord.x, player_coord.y);
+     save_diffs_to_file(diff_filename, &diffs, player_coord);
+     destroy(&diffs);
+     free(diff_filename);
+}
+
 
 int main(int argc, char** argv){
      char* current_map_filepath = nullptr;
@@ -1604,6 +1638,7 @@ int main(int argc, char** argv){
      bool show_suite = false;
      bool fail_slow = false;
      bool update_tags = false;
+     bool saving = false;
      S16 map_number = 0;
      S16 first_map_number = 0;
      S16 first_frame = 0;
@@ -1674,11 +1709,14 @@ int main(int argc, char** argv){
                int next = i + 1;
                if(next >= argc) continue;
                window_y = atoi(argv[next]);
+          }else if(strcmp(argv[i], "-save") == 0){
+               saving = true;
           }else if(strcmp(argv[i], "-h") == 0){
                printf("%s [options]\n", argv[0]);
                printf("  -play   <demo filepath> replay a recorded demo file\n");
                printf("  -record <demo filepath> record a demo file\n");
                printf("  -load   <map filepath>  load a map\n");
+               printf("  -loadsaves              enables the saving/loading system.\n");
                printf("  -test                   validate the map state is correct after playing a demo\n");
                printf("  -suite                  run map/demo combos in succession validating map state after each headless\n");
                printf("  -updatetags             when running a test, at the end update the tags in the map file\n");
@@ -1867,6 +1905,11 @@ int main(int argc, char** argv){
 
           if(play_demo.mode == DEMO_MODE_PLAY){
                cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
+          }
+
+          if(saving){
+               world_cache_initial_shallow_world(&world);
+               load_diff_save_file_if_present(current_map_filepath, &world, &player_start);
           }
      }else if(suite){
           auto load_result = load_map_number(map_number, &player_start, &world);
@@ -5725,6 +5768,16 @@ int main(int argc, char** argv){
                                    break;
                               }
                          }
+                    }else if(interactive->type == INTERACTIVE_TYPE_CHECKPOINT && !interactive->checkpoint && saving){
+                         for(S16 p = 0; p < world.players.count; p++){
+                              if(world.players.elements[p].pos.z != 0) continue;
+                              Coord_t player_coord = pos_to_coord(world.players.elements[p].pos);
+                              if(interactive->coord == player_coord){
+                                   // trip the checkpoint
+                                   interactive->checkpoint = true;
+                                   save_diff_file(current_map_filepath, &world);
+                              }
+                         }
                     }
                }
 
@@ -5839,26 +5892,32 @@ int main(int argc, char** argv){
                               }
                          }else if(fade_state == FADE_STATE_EXITTING){
                               if(fade_to_exit_index >= 0 && fade_to_exit_index < world.exits.count){
+                                   if(saving){
+                                        save_diff_file(current_map_filepath, &world, true);
+                                   }
+
                                    auto* exit = world.exits.elements + fade_to_exit_index;
                                    S16 exit_destination_index = exit->destination_index;
 
                                    // build the path to the map to load
                                    // accounting for 'content/' and necessary null terminator for max path sizes
                                    const size_t buffer_size = EXIT_MAX_PATH_SIZE + 9;
-                                   char buffer[buffer_size];
-                                   snprintf(buffer, buffer_size, "content/%s", exit->path);
-                                   buffer[buffer_size - 1] = 0;
+                                   char map_to_load[buffer_size];
+                                   snprintf(map_to_load, buffer_size, "content/%s", exit->path);
+                                   map_to_load[buffer_size - 1] = 0;
                                    for(size_t i = 0; i < buffer_size; i++){
-                                        if(isalpha(buffer[i])){
-                                             buffer[i] = tolower(buffer[i]);
+                                        if(isalpha(map_to_load[i])){
+                                             map_to_load[i] = tolower(map_to_load[i]);
                                         }
                                    }
 
                                    // our exit pointer is invalid now !
-                                   if(!load_map(buffer, &player_start, &world.tilemap, &world.blocks, &world.interactives,
+                                   if(!load_map(map_to_load, &player_start, &world.tilemap, &world.blocks, &world.interactives,
                                                 &world.rooms, &world.exits)){
                                         // TODO: go back to the menu or something ? Maybe move the player back out of the stairs
                                    }else{
+                                        free(current_map_filepath);
+                                        current_map_filepath = strdup(map_to_load);
                                         for(S16 i = 0; i < world.interactives.count; i++){
                                              auto* interactive = world.interactives.elements + i;
                                              if(interactive->type == INTERACTIVE_TYPE_STAIRS){
@@ -5870,8 +5929,13 @@ int main(int argc, char** argv){
                                              }
                                         }
 
+                                        world_cache_initial_shallow_world(&world);
                                         reset_map(player_start, &world, &undo, &camera);
                                         update_camera(&camera, &world, get_room_index_of_player(&world), true);
+
+                                        if(saving){
+                                             load_diff_save_file_if_present(current_map_filepath, &world, &player_start);
+                                        }
                                    }
                               }
                          }
@@ -6551,6 +6615,10 @@ int main(int argc, char** argv){
           glBindFramebuffer(GL_FRAMEBUFFER, render_framebuffer);
 
           destroy(&entangle_tints.block_to_tint_index);
+     }
+
+     if(saving){
+          save_diff_file(current_map_filepath, &world);
      }
 
      if(play_demo.mode == DEMO_MODE_PLAY){

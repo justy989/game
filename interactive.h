@@ -97,6 +97,7 @@ struct Interactive_t{
           Portal_t portal;
           WireCross_t wire_cross;
           Pit_t pit;
+          bool checkpoint;
      };
 };
 

@@ -22,5 +22,12 @@ struct DiffEntry_t{
      };
 };
 
-void diff_worlds(World_t* world_a, World_t* world_b, ObjectArray_t<DiffEntry_t>* diff);
+void calculate_world_changes(World_t* world, ObjectArray_t<DiffEntry_t>* diff);
 void apply_diff_to_world(World_t* world, ObjectArray_t<DiffEntry_t>* diff);
+bool world_rect_has_changed(World_t* world, Rect_t rect);
+
+// need to free this !
+char* build_diff_filename_from_map_filename(const char* map_filename);
+
+bool save_diffs_to_file(const char* filepath, const ObjectArray_t<DiffEntry_t>* diff, Coord_t player_start);
+bool load_diffs_from_file(const char* filepath, ObjectArray_t<DiffEntry_t>* diff, Coord_t* player_start);

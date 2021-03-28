@@ -140,6 +140,13 @@ void reset_map(Coord_t player_start, World_t* world, Undo_t* undo, Camera_t* cam
      quad_tree_free(world->interactive_qt);
      world->interactive_qt = quad_tree_build(&world->interactives);
 
+     // if the player spawns on a checkpoint, already activate it because we don't want to generate a save file for
+     // just the change of activating the checkpoint
+     Interactive_t* interactive = quad_tree_interactive_find_at(world->interactive_qt, player_start);
+     if(interactive && interactive->type == INTERACTIVE_TYPE_CHECKPOINT){
+          interactive->checkpoint = true;
+     }
+
      quad_tree_free(world->block_qt);
      world->block_qt = quad_tree_build(&world->blocks);
 
@@ -3222,4 +3229,10 @@ void world_move_editor_camera(World_t* world, Direction_t direction){
 void world_recalculate_camera_on_world_bounds(World_t* world){
      world->recalc_room_camera = true;
      world->editor_camera_bounds = Rect_t{0, 0, world->tilemap.width, world->tilemap.height};
+}
+
+void world_cache_initial_shallow_world(World_t* world){
+     deep_copy(&world->tilemap, &world->initial_shallow_world.tilemap);
+     deep_copy(&world->interactives, &world->initial_shallow_world.interactives);
+     deep_copy(&world->blocks, &world->initial_shallow_world.blocks);
 }

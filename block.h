@@ -171,7 +171,7 @@ const char* block_corner_to_string(BlockCorner_t corner);
 void block_add_horizontal_momentum(Block_t* block, BlockMomentumType_t type, F32 momentum);
 void block_add_vertical_momentum(Block_t* block, BlockMomentumType_t type, F32 momentum);
 
-bool blocks_equal(Block_t* a, Block_t* b);
+bool block_equal(Block_t* a, Block_t* b);
 
 #define MAX_BLOCKS_IN_LIST 128
 

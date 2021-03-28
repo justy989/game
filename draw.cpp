@@ -460,7 +460,7 @@ void draw_interactive(Interactive_t* interactive, Vec_t pos_vec, Coord_t coord,
           draw_theme_frame(pos_vec, theme_frame(1 + x, 30 + y));
      } break;
      case INTERACTIVE_TYPE_CHECKPOINT:
-          if(editor) draw_theme_frame(pos_vec, theme_frame(0, 21));
+          if(editor) draw_theme_frame(pos_vec, theme_frame(0, interactive->checkpoint ? 22 : 21));
           break;
      case INTERACTIVE_TYPE_STAIRS:
           draw_theme_frame(pos_vec, theme_frame(interactive->stairs.face, interactive->stairs.up ? 23: 24));
@@ -875,7 +875,7 @@ void draw_editor_visible_map_indicators(Vec_t pos_vec, Tile_t* tile, Interactive
      }
 
      if(interactive && interactive->type == INTERACTIVE_TYPE_CHECKPOINT){
-          draw_theme_frame(pos_vec, theme_frame(0, 21));
+          draw_theme_frame(pos_vec, theme_frame(0, interactive->checkpoint ? 22 : 21));
      }
 }
 

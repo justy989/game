@@ -12,6 +12,12 @@
 #include "exit.h"
 #include "static_object_array.h"
 
+struct ShallowWorld_t{
+     TileMap_t tilemap = {};
+     ObjectArray_t<Interactive_t> interactives = {};
+     ObjectArray_t<Block_t> blocks = {};
+};
+
 struct World_t{
      TileMap_t tilemap = {};
      ObjectArray_t<Player_t> players = {};
@@ -20,6 +26,8 @@ struct World_t{
      ObjectArray_t<Rect_t> rooms = {};
      ObjectArray_t<Exit_t> exits = {};
      ArrowArray_t arrows = {};
+
+     ShallowWorld_t initial_shallow_world;
 
      QuadTreeNode_t<Interactive_t>* interactive_qt = NULL;
      QuadTreeNode_t<Block_t>* block_qt = NULL;
@@ -222,3 +230,5 @@ void world_expand_editor_camera(World_t* world);
 void world_shrink_editor_camera(World_t* world);
 void world_move_editor_camera(World_t* world, Direction_t direction);
 void world_recalculate_camera_on_world_bounds(World_t* world);
+
+void world_cache_initial_shallow_world(World_t* world);
