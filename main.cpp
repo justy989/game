@@ -11,7 +11,6 @@ Before playtest:
 - Show WASD In the first room.
 - Show E When the player can activate a lever.
 - Saving player progress on checkpoints.
-- A 2 way stairs interactive object that fades to black, loads a new level, and fades in from black to connect levels.
 
 Entanglement Puzzles:
 - entangle puzzle where there is a line of pressure plates against the wall with a line of popups on the other side that would

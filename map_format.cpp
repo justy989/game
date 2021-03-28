@@ -197,7 +197,7 @@ bool save_map_to_file(FILE* file, Coord_t player_start, const TileMap_t* tilemap
           return false;
      }
 
-     MapInteractiveV3_t* map_interactives = (MapInteractiveV3_t*)(calloc((size_t)(interactive_array->count), sizeof(*map_interactives)));
+     MapInteractiveV4_t* map_interactives = (MapInteractiveV4_t*)(calloc((size_t)(interactive_array->count), sizeof(*map_interactives)));
      if(!map_interactives){
           LOG("%s(): failed to allocate %d interactives\n", __FUNCTION__, interactive_array->count);
           return false;
@@ -216,57 +216,11 @@ bool save_map_to_file(FILE* file, Coord_t player_start, const TileMap_t* tilemap
 
      for(S16 i = 0; i < block_array->count; i++){
           Block_t* block = block_array->elements + i;
-          map_blocks[i].pixel = block->pos.pixel;
-          map_blocks[i].z = block->pos.z;
-          map_blocks[i].rotation = block->rotation;
-          map_blocks[i].element = block->element;
-          map_blocks[i].entangle_index = block->entangle_index;
-          map_blocks[i].cut = block->cut;
+          build_map_block_from_block(map_blocks + i, block);
      }
 
      for(S16 i = 0; i < interactive_array->count; i++){
-          map_interactives[i].coord = interactive_array->elements[i].coord;
-          map_interactives[i].type = interactive_array->elements[i].type;
-
-          switch(map_interactives[i].type){
-          default:
-          case INTERACTIVE_TYPE_LEVER:
-          case INTERACTIVE_TYPE_BOW:
-               break;
-          case INTERACTIVE_TYPE_PRESSURE_PLATE:
-               map_interactives[i].pressure_plate = interactive_array->elements[i].pressure_plate;
-               break;
-          case INTERACTIVE_TYPE_LIGHT_DETECTOR:
-          case INTERACTIVE_TYPE_ICE_DETECTOR:
-               map_interactives[i].detector = interactive_array->elements[i].detector;
-               break;
-          case INTERACTIVE_TYPE_POPUP:
-               map_interactives[i].popup.up = interactive_array->elements[i].popup.lift.up;
-               map_interactives[i].popup.iced = interactive_array->elements[i].popup.iced;
-               break;
-          case INTERACTIVE_TYPE_DOOR:
-               map_interactives[i].door.up = interactive_array->elements[i].door.lift.up;
-               map_interactives[i].door.face = interactive_array->elements[i].door.face;
-               break;
-          case INTERACTIVE_TYPE_PORTAL:
-               map_interactives[i].portal.face = interactive_array->elements[i].portal.face;
-               map_interactives[i].portal.on = interactive_array->elements[i].portal.on;
-               break;
-          case INTERACTIVE_TYPE_STAIRS:
-               map_interactives[i].stairs.up = interactive_array->elements[i].stairs.up;
-               map_interactives[i].stairs.face = interactive_array->elements[i].stairs.face;
-               break;
-          case INTERACTIVE_TYPE_CHECKPOINT:
-               break;
-          case INTERACTIVE_TYPE_WIRE_CROSS:
-               map_interactives[i].wire_cross.mask = interactive_array->elements[i].wire_cross.mask;
-               map_interactives[i].wire_cross.on = interactive_array->elements[i].wire_cross.on;
-               break;
-          case INTERACTIVE_TYPE_PIT:
-               map_interactives[i].pit.id = interactive_array->elements[i].pit.id;
-               map_interactives[i].pit.iced = interactive_array->elements[i].pit.iced;
-               break;
-          }
+          build_map_interactive_from_interactive(map_interactives + i, interactive_array->elements + i);
      }
 
      U8 map_version = MAP_VERSION;
@@ -412,12 +366,7 @@ bool load_map_from_file_v4(FILE* file, Coord_t* player_start, TileMap_t* tilemap
      for(S16 i = 0; i < block_count; i++){
           Block_t* block = block_array->elements + i;
           default_block(block);
-          block->pos.pixel = map_blocks[i].pixel;
-          block->pos.z = map_blocks[i].z;
-          block->rotation = map_blocks[i].rotation;
-          block->element = map_blocks[i].element;
-          block->entangle_index = map_blocks[i].entangle_index;
-          block->cut = map_blocks[i].cut;
+          build_block_from_map_block(block, map_blocks + i);
      }
 
      for(S16 i = 0; i < interactive_array->count; i++){
@@ -558,12 +507,7 @@ bool load_map_from_file_v6(FILE* file, Coord_t* player_start, TileMap_t* tilemap
      for(S16 i = 0; i < block_count; i++){
           Block_t* block = block_array->elements + i;
           default_block(block);
-          block->pos.pixel = map_blocks[i].pixel;
-          block->pos.z = map_blocks[i].z;
-          block->rotation = map_blocks[i].rotation;
-          block->element = map_blocks[i].element;
-          block->entangle_index = map_blocks[i].entangle_index;
-          block->cut = map_blocks[i].cut;
+          build_block_from_map_block(block, map_blocks + i);
      }
 
      for(S16 i = 0; i < interactive_array->count; i++){
@@ -704,12 +648,7 @@ bool load_map_from_file_v7(FILE* file, Coord_t* player_start, TileMap_t* tilemap
      for(S16 i = 0; i < block_count; i++){
           Block_t* block = block_array->elements + i;
           default_block(block);
-          block->pos.pixel = map_blocks[i].pixel;
-          block->pos.z = map_blocks[i].z;
-          block->rotation = map_blocks[i].rotation;
-          block->element = map_blocks[i].element;
-          block->entangle_index = map_blocks[i].entangle_index;
-          block->cut = map_blocks[i].cut;
+          build_block_from_map_block(block, map_blocks + i);
      }
 
      for(S16 i = 0; i < interactive_array->count; i++){
@@ -852,12 +791,7 @@ bool load_map_from_file_v8(FILE* file, Coord_t* player_start, TileMap_t* tilemap
      for(S16 i = 0; i < block_count; i++){
           Block_t* block = block_array->elements + i;
           default_block(block);
-          block->pos.pixel = map_blocks[i].pixel;
-          block->pos.z = map_blocks[i].z;
-          block->rotation = map_blocks[i].rotation;
-          block->element = map_blocks[i].element;
-          block->entangle_index = map_blocks[i].entangle_index;
-          block->cut = map_blocks[i].cut;
+          build_block_from_map_block(block, map_blocks + i);
      }
 
      for(S16 i = 0; i < interactive_array->count; i++){
@@ -1012,35 +946,32 @@ bool load_map_from_file_v9(FILE* file, Coord_t* player_start, TileMap_t* tilemap
      for(S16 i = 0; i < block_count; i++){
           Block_t* block = block_array->elements + i;
           default_block(block);
-          block->pos.pixel = map_blocks[i].pixel;
-          block->pos.z = map_blocks[i].z;
-          block->rotation = map_blocks[i].rotation;
-          block->element = map_blocks[i].element;
-          block->entangle_index = map_blocks[i].entangle_index;
-          block->cut = map_blocks[i].cut;
+          build_block_from_map_block(block, map_blocks + i);
      }
 
      for(S16 i = 0; i < interactive_array->count; i++){
-          Interactive_t* interactive = interactive_array->elements + i;
-          interactive->coord = map_interactives[i].coord;
-          interactive->type = map_interactives[i].type;
+          auto* interactive = interactive_array->elements + i;
+          auto* map_interactive = map_interactives + i;
 
-          switch(map_interactives[i].type){
+          interactive->coord = map_interactive->coord;
+          interactive->type = map_interactive->type;
+
+          switch(map_interactive->type){
           default:
           case INTERACTIVE_TYPE_LEVER:
           case INTERACTIVE_TYPE_BOW:
                break;
           case INTERACTIVE_TYPE_PRESSURE_PLATE:
-               interactive->pressure_plate = map_interactives[i].pressure_plate;
+               interactive->pressure_plate = map_interactive->pressure_plate;
                break;
           case INTERACTIVE_TYPE_LIGHT_DETECTOR:
           case INTERACTIVE_TYPE_ICE_DETECTOR:
-               interactive->detector = map_interactives[i].detector;
+               interactive->detector = map_interactive->detector;
                break;
           case INTERACTIVE_TYPE_POPUP:
-               interactive->popup.lift.up = map_interactives[i].popup.up;
+               interactive->popup.lift.up = map_interactive->popup.up;
                interactive->popup.lift.timer = 0.0f;
-               interactive->popup.iced = map_interactives[i].popup.iced;
+               interactive->popup.iced = map_interactive->popup.iced;
                if(interactive->popup.lift.up){
                     interactive->popup.lift.ticks = HEIGHT_INTERVAL + 1;
                }else{
@@ -1048,27 +979,27 @@ bool load_map_from_file_v9(FILE* file, Coord_t* player_start, TileMap_t* tilemap
                }
                break;
           case INTERACTIVE_TYPE_DOOR:
-               interactive->door.lift.up = map_interactives[i].door.up;
+               interactive->door.lift.up = map_interactive->door.up;
                interactive->door.lift.timer = 0.0f;
                interactive->door.lift.ticks = DOOR_MAX_HEIGHT;
-               interactive->door.face = map_interactives[i].door.face;
+               interactive->door.face = map_interactive->door.face;
                break;
           case INTERACTIVE_TYPE_PORTAL:
-               interactive->portal.face = map_interactives[i].portal.face;
-               interactive->portal.on = map_interactives[i].portal.on;
+               interactive->portal.face = map_interactive->portal.face;
+               interactive->portal.on = map_interactive->portal.on;
                break;
           case INTERACTIVE_TYPE_STAIRS:
-               interactive->stairs.up = map_interactives[i].stairs.up;
-               interactive->stairs.face = map_interactives[i].stairs.face;
+               interactive->stairs.up = map_interactive->stairs.up;
+               interactive->stairs.face = map_interactive->stairs.face;
                break;
           case INTERACTIVE_TYPE_CHECKPOINT:
                break;
           case INTERACTIVE_TYPE_WIRE_CROSS:
-               interactive->wire_cross.on = map_interactives[i].wire_cross.on;
-               interactive->wire_cross.mask = map_interactives[i].wire_cross.mask;
+               interactive->wire_cross.on = map_interactive->wire_cross.on;
+               interactive->wire_cross.mask = map_interactive->wire_cross.mask;
                break;
           case INTERACTIVE_TYPE_PIT:
-               interactive->pit.id = map_interactives[i].pit.id;
+               interactive->pit.id = map_interactive->pit.id;
                break;
           }
      }
@@ -1374,4 +1305,120 @@ bool load_map_tags(const char* filepath, bool* tags){
 
      fclose(file);
      return true;
+}
+
+void build_map_interactive_from_interactive(MapInteractiveV4_t* map_interactive, const Interactive_t* interactive){
+     map_interactive->coord = interactive->coord;
+     map_interactive->type = interactive->type;
+
+     switch(map_interactive->type){
+     default:
+     case INTERACTIVE_TYPE_LEVER:
+     case INTERACTIVE_TYPE_BOW:
+          break;
+     case INTERACTIVE_TYPE_PRESSURE_PLATE:
+          map_interactive->pressure_plate = interactive->pressure_plate;
+          break;
+     case INTERACTIVE_TYPE_LIGHT_DETECTOR:
+     case INTERACTIVE_TYPE_ICE_DETECTOR:
+          map_interactive->detector = interactive->detector;
+          break;
+     case INTERACTIVE_TYPE_POPUP:
+          map_interactive->popup.up = interactive->popup.lift.up;
+          map_interactive->popup.iced = interactive->popup.iced;
+          break;
+     case INTERACTIVE_TYPE_DOOR:
+          map_interactive->door.up = interactive->door.lift.up;
+          map_interactive->door.face = interactive->door.face;
+          break;
+     case INTERACTIVE_TYPE_PORTAL:
+          map_interactive->portal.face = interactive->portal.face;
+          map_interactive->portal.on = interactive->portal.on;
+          break;
+     case INTERACTIVE_TYPE_STAIRS:
+          map_interactive->stairs.up = interactive->stairs.up;
+          map_interactive->stairs.face = interactive->stairs.face;
+          break;
+     case INTERACTIVE_TYPE_CHECKPOINT:
+          break;
+     case INTERACTIVE_TYPE_WIRE_CROSS:
+          map_interactive->wire_cross.mask = interactive->wire_cross.mask;
+          map_interactive->wire_cross.on = interactive->wire_cross.on;
+          break;
+     case INTERACTIVE_TYPE_PIT:
+          map_interactive->pit.id = interactive->pit.id;
+          map_interactive->pit.iced = interactive->pit.iced;
+          break;
+     }
+}
+
+void build_interactive_from_map_interactive(Interactive_t* interactive, const MapInteractiveV4_t* map_interactive){
+     interactive->coord = map_interactive->coord;
+     interactive->type = map_interactive->type;
+
+     switch(map_interactive->type){
+     default:
+     case INTERACTIVE_TYPE_LEVER:
+     case INTERACTIVE_TYPE_BOW:
+          break;
+     case INTERACTIVE_TYPE_PRESSURE_PLATE:
+          interactive->pressure_plate = map_interactive->pressure_plate;
+          break;
+     case INTERACTIVE_TYPE_LIGHT_DETECTOR:
+     case INTERACTIVE_TYPE_ICE_DETECTOR:
+          interactive->detector = map_interactive->detector;
+          break;
+     case INTERACTIVE_TYPE_POPUP:
+          interactive->popup.lift.up = map_interactive->popup.up;
+          interactive->popup.lift.timer = 0.0f;
+          interactive->popup.iced = map_interactive->popup.iced;
+          if(interactive->popup.lift.up){
+               interactive->popup.lift.ticks = HEIGHT_INTERVAL + 1;
+          }else{
+               interactive->popup.lift.ticks = 1;
+          }
+          break;
+     case INTERACTIVE_TYPE_DOOR:
+          interactive->door.lift.up = map_interactive->door.up;
+          interactive->door.lift.timer = 0.0f;
+          interactive->door.lift.ticks = DOOR_MAX_HEIGHT;
+          interactive->door.face = map_interactive->door.face;
+          break;
+     case INTERACTIVE_TYPE_PORTAL:
+          interactive->portal.face = map_interactive->portal.face;
+          interactive->portal.on = map_interactive->portal.on;
+          break;
+     case INTERACTIVE_TYPE_STAIRS:
+          interactive->stairs.up = map_interactive->stairs.up;
+          interactive->stairs.face = map_interactive->stairs.face;
+          interactive->stairs.exit_index = map_interactive->stairs.exit_index;
+          break;
+     case INTERACTIVE_TYPE_CHECKPOINT:
+          break;
+     case INTERACTIVE_TYPE_WIRE_CROSS:
+          interactive->wire_cross.on = map_interactive->wire_cross.on;
+          interactive->wire_cross.mask = map_interactive->wire_cross.mask;
+          break;
+     case INTERACTIVE_TYPE_PIT:
+          interactive->pit.id = map_interactive->pit.id;
+          break;
+     }
+}
+
+void build_map_block_from_block(MapBlockV3_t* map_block, const Block_t* block){
+     map_block->pixel = block->pos.pixel;
+     map_block->z = block->pos.z;
+     map_block->rotation = block->rotation;
+     map_block->element = block->element;
+     map_block->entangle_index = block->entangle_index;
+     map_block->cut = block->cut;
+}
+
+void build_block_from_map_block(Block_t* block, const MapBlockV3_t* map_block){
+     block->pos.pixel = map_block->pixel;
+     block->pos.z = map_block->z;
+     block->rotation = map_block->rotation;
+     block->element = map_block->element;
+     block->entangle_index = map_block->entangle_index;
+     block->cut = map_block->cut;
 }

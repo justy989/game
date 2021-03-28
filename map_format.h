@@ -169,3 +169,9 @@ bool load_map(const char* filepath, Coord_t* player_start, TileMap_t* tilemap, O
 
 bool load_map_thumbnail(const char* filepath, Raw_t* thumbnail);
 bool load_map_tags(const char* filepath, bool* tags);
+
+void build_map_interactive_from_interactive(MapInteractiveV4_t* map_interactive, const Interactive_t* interactive);
+void build_interactive_from_map_interactive(Interactive_t* interactive, const MapInteractiveV4_t* map_interactive);
+
+void build_map_block_from_block(MapBlockV3_t* map_block, const Block_t* block);
+void build_block_from_map_block(Block_t* block, const MapBlockV3_t* map_block);
