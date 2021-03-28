@@ -51,6 +51,7 @@ enum EditorMode_t : U8{
      EDITOR_MODE_SELECTION_MANIPULATION,
      EDITOR_MODE_ROOM_SELECTION,
      EDITOR_MODE_ROOM_CREATION,
+     EDITOR_MODE_EXITS,
 };
 
 enum EditorCategory_t : U8{

@@ -1926,6 +1926,13 @@ int main(int argc, char** argv){
      world.camera_transition = 1.0f;
      update_camera(&camera, &world, get_room_index_of_player(&world), true);
 
+     // TODO: remove this
+     resize(&world.exits, 2);
+     snprintf((char*)(world.exits.elements[0].path), EXIT_MAX_PATH_SIZE, "FIRST_PATH");
+     world.exits.elements[0].destination_index = 3;
+     snprintf((char*)(world.exits.elements[1].path), EXIT_MAX_PATH_SIZE, "SECOND_PATH");
+     world.exits.elements[1].destination_index = 5;
+
      F32 dt = 0.0f;
 
      auto last_time = std::chrono::system_clock::now();
@@ -2068,6 +2075,11 @@ int main(int argc, char** argv){
                     case SDL_SCANCODE_F2:
                          if(game_mode == GAME_MODE_EDITOR){
                               editor.mode = EDITOR_MODE_ROOM_SELECTION;
+                         }
+                         break;
+                    case SDL_SCANCODE_F3:
+                         if(game_mode == GAME_MODE_EDITOR){
+                              editor.mode = EDITOR_MODE_EXITS;
                          }
                          break;
                     case SDL_SCANCODE_F4:
@@ -6152,7 +6164,7 @@ int main(int argc, char** argv){
                     if(hovered_map_thumbnail_path){
                          text_pos = Vec_t{CHECKBOX_THUMBNAIL_SPLIT, 2.0f * PIXEL_SIZE};
                          draw_text(hovered_map_thumbnail_path, text_pos, Vec_t{TEXT_CHAR_WIDTH * 0.5f, TEXT_CHAR_HEIGHT * 0.5f},
-                                        TEXT_CHAR_SPACING * 0.5f);
+                                   TEXT_CHAR_SPACING * 0.5f);
                     }
 
                     glEnd();

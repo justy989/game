@@ -9,6 +9,7 @@
 #include <float.h>
 #include <ctype.h>
 #include <math.h>
+#include <string.h>
 
 void draw_set_ice_color(){
      glColor4f(1.0f, 1.0f, 1.0f, 0.45f);
@@ -816,6 +817,8 @@ void draw_text(const char* message, Vec_t pos, Vec_t dim, F32 spacing)
                tex.x = 44.0f * TEXT_CHAR_TEX_WIDTH;
           }else if(c == '-'){
                tex.x = 45.0f * TEXT_CHAR_TEX_WIDTH;
+          }else if(c == '_'){
+               tex.x = 46.0f * TEXT_CHAR_TEX_WIDTH;
           }else{
                tex.x = 1.0f - TEXT_CHAR_TEX_WIDTH;
           }
@@ -1097,6 +1100,78 @@ void draw_editor(Editor_t* editor, World_t* world, Camera_t* camera, Vec_t mouse
                draw_selection_in_editor(editor->selection_start, editor->selection_end, camera, 0.0f, 1.0f, 0.0f);
           }
      } break;
+     case EDITOR_MODE_EXITS:
+     {
+          glBindTexture(GL_TEXTURE_2D, theme_texture);
+          glBegin(GL_QUADS);
+          glColor3f(1.0f, 1.0f, 1.0f);
+
+          Vec_t ui_dim = {TILE_SIZE, HALF_TILE_SIZE};
+          Vec_t ui_tex_dim = {THEME_FRAME_WIDTH, THEME_FRAME_HEIGHT * 0.5f};
+
+          for(S16 i = 0; i < world->exits.count; i++){
+               // ui to decrease an entry
+               {
+                    Vec_t tex = theme_frame(15, 16);
+                    auto quad = exit_ui_query(EXIT_UI_ENTRY_DECREASE_DESTINATION_INDEX, i, &world->exits);
+                    draw_screen_texture(Vec_t{quad.left, quad.bottom}, tex, ui_dim, ui_tex_dim);
+               }
+
+               // ui to decrease an entry
+               {
+                    Vec_t tex = theme_frame(15, 16);
+                    tex.y += THEME_FRAME_HEIGHT * 0.5f;
+                    auto quad = exit_ui_query(EXIT_UI_ENTRY_INCREASE_DESTINATION_INDEX, i, &world->exits);
+                    draw_screen_texture(Vec_t{quad.left, quad.bottom}, tex, ui_dim, ui_tex_dim);
+               }
+
+               // ui to remove an entry
+               {
+                    Vec_t tex = theme_frame(15, 16);
+                    auto quad = exit_ui_query(EXIT_UI_ENTRY_REMOVE, i, &world->exits);
+                    draw_screen_texture(Vec_t{quad.left, quad.bottom}, tex, ui_dim, ui_tex_dim);
+               }
+          }
+
+          // ui to add a new entry
+          {
+               Vec_t tex = theme_frame(15, 16);
+               tex.y += THEME_FRAME_HEIGHT * 0.5f;
+               auto quad = exit_ui_query(EXIT_UI_ENTRY_ADD, 0, &world->exits);
+               draw_screen_texture(Vec_t{quad.left, quad.bottom}, tex, ui_dim, ui_tex_dim);
+          }
+
+          glEnd();
+
+          // Text pass on top of everything
+          const size_t buffer_size = 64;
+          char buffer[buffer_size];
+          glBindTexture(GL_TEXTURE_2D, text_texture);
+          glBegin(GL_QUADS);
+          glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+
+          // Header
+          snprintf(buffer, buffer_size, "EXITS %d", world->exits.count);
+          auto header_quad = exit_ui_query(EXIT_UI_HEADER, 0, &world->exits);
+          draw_text(buffer, Vec_t{header_quad.left, header_quad.bottom});
+
+          // Exit entries
+          for(S16 i = 0; i < world->exits.count; i++){
+               // destination index
+               snprintf(buffer, buffer_size, "%d", world->exits.elements[i].destination_index);
+               auto dest_index_quad = exit_ui_query(EXIT_UI_ENTRY_DESTINATION_INDEX, i, &world->exits);
+               draw_text(buffer, Vec_t{dest_index_quad.left, dest_index_quad.bottom});
+
+               // path
+               strncpy(buffer, (char*)(world->exits.elements[i].path), buffer_size);
+               auto path_quad = exit_ui_query(EXIT_UI_ENTRY_PATH, i, &world->exits);
+               draw_text(buffer, Vec_t{path_quad.left, path_quad.bottom});
+          }
+
+          glEnd();
+
+          break;
+     }
      }
 
      if(editor->mode){
