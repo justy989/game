@@ -222,6 +222,12 @@ enum GameMode_t{
      GAME_MODE_LEVEL_SELECT,
 };
 
+enum ResetState_t{
+     RESET_STATE_NONE,
+     RESET_STATE_RESETTING_ROOM,
+     RESET_STATE_EXITTING, // exitting to a new map
+};
+
 enum StopOnBoundary_t{
     DO_NOT_STOP_ON_BOUNDARY,
     STOP_ON_BOUNDARY_TRACKING_START,
@@ -1799,7 +1805,7 @@ int main(int argc, char** argv){
 
      bool quit = false;
      bool seeked_with_mouse = false;
-     bool resetting = false;
+     ResetState_t reset_state = RESET_STATE_NONE;
      F32 reset_timer = 1.0f;
 
      PlayerAction_t player_action {};
@@ -2267,31 +2273,31 @@ int main(int argc, char** argv){
                               }
                               break;
                          case SDL_SCANCODE_A:
-                              if(!resetting){
+                              if(reset_state == RESET_STATE_NONE){
                                    player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_LEFT_START,
                                                          record_demo.mode, record_demo.file, frame_count);
                               }
                               break;
                          case SDL_SCANCODE_D:
-                              if(!resetting){
+                              if(reset_state == RESET_STATE_NONE){
                                    player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_RIGHT_START,
                                                          record_demo.mode, record_demo.file, frame_count);
                               }
                               break;
                          case SDL_SCANCODE_W:
-                              if(!resetting){
+                              if(reset_state == RESET_STATE_NONE){
                                    player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_UP_START,
                                                          record_demo.mode, record_demo.file, frame_count);
                               }
                               break;
                          case SDL_SCANCODE_S:
-                              if(!resetting){
+                              if(reset_state == RESET_STATE_NONE){
                                    player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_DOWN_START,
                                                          record_demo.mode, record_demo.file, frame_count);
                               }
                               break;
                          case SDL_SCANCODE_E:
-                              if(!resetting){
+                              if(reset_state == RESET_STATE_NONE){
                                    player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_ACTIVATE_START,
                                                          record_demo.mode, record_demo.file, frame_count);
                               }
@@ -2300,7 +2306,7 @@ int main(int argc, char** argv){
                               if(play_demo.mode == DEMO_MODE_PLAY){
                                    play_demo.paused = !play_demo.paused;
                               }else{
-                                   if(!resetting){
+                                   if(reset_state == RESET_STATE_NONE){
                                         player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_SHOOT_START,
                                                               record_demo.mode, record_demo.file, frame_count);
                                    }
@@ -2531,7 +2537,7 @@ int main(int argc, char** argv){
                               }
                               break;
                          case SDL_SCANCODE_U:
-                              if(!resetting && can_undo && !will_undo_to_another_room){
+                              if(reset_state == RESET_STATE_NONE && can_undo && !will_undo_to_another_room){
                                    player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_UNDO,
                                                          record_demo.mode, record_demo.file, frame_count);
                               }
@@ -2699,7 +2705,7 @@ int main(int argc, char** argv){
                                    shallow_copy(&editor.clipboard, &editor.selection);
                                    editor.mode = EDITOR_MODE_SELECTION_MANIPULATION;
                               }
-                              else if(game_mode == GAME_MODE_PLAYING && !resetting && can_undo && will_undo_to_another_room){
+                              else if(game_mode == GAME_MODE_PLAYING && reset_state == RESET_STATE_NONE && can_undo && will_undo_to_another_room){
                                    player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_UNDO,
                                                          record_demo.mode, record_demo.file, frame_count);
                               }
@@ -2709,7 +2715,7 @@ int main(int argc, char** argv){
                                  editor.mode == EDITOR_MODE_CATEGORY_SELECT){
                                    player_start = mouse_select_world_coord(mouse_screen, &camera);
                               }else if(game_mode == GAME_MODE_PLAYING && can_reset){
-                                   resetting = true;
+                                   reset_state = RESET_STATE_RESETTING_ROOM;
                               }
                               break;
                          case SDL_SCANCODE_R:
@@ -2822,42 +2828,42 @@ int main(int argc, char** argv){
                          break;
                     case SDL_SCANCODE_A:
                          if(play_demo.mode == DEMO_MODE_PLAY) break;
-                         if(resetting) break;
+                         if(reset_state != RESET_STATE_NONE) break;
 
                          player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_LEFT_STOP,
                                                record_demo.mode, record_demo.file, frame_count);
                          break;
                     case SDL_SCANCODE_D:
                          if(play_demo.mode == DEMO_MODE_PLAY) break;
-                         if(resetting) break;
+                         if(reset_state != RESET_STATE_NONE) break;
 
                          player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_RIGHT_STOP,
                                                record_demo.mode, record_demo.file, frame_count);
                          break;
                     case SDL_SCANCODE_W:
                          if(play_demo.mode == DEMO_MODE_PLAY) break;
-                         if(resetting) break;
+                         if(reset_state != RESET_STATE_NONE) break;
 
                          player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_UP_STOP,
                                                record_demo.mode, record_demo.file, frame_count);
                          break;
                     case SDL_SCANCODE_S:
                          if(play_demo.mode == DEMO_MODE_PLAY) break;
-                         if(resetting) break;
+                         if(reset_state != RESET_STATE_NONE) break;
 
                          player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_DOWN_STOP,
                                                record_demo.mode, record_demo.file, frame_count);
                          break;
                     case SDL_SCANCODE_E:
                          if(play_demo.mode == DEMO_MODE_PLAY) break;
-                         if(resetting) break;
+                         if(reset_state != RESET_STATE_NONE) break;
 
                          player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_ACTIVATE_STOP,
                                                record_demo.mode, record_demo.file, frame_count);
                          break;
                     case SDL_SCANCODE_SPACE:
                          if(play_demo.mode == DEMO_MODE_PLAY) break;
-                         if(resetting) break;
+                         if(reset_state != RESET_STATE_NONE) break;
 
                          player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_SHOOT_STOP,
                                                record_demo.mode, record_demo.file, frame_count);
@@ -4875,7 +4881,7 @@ int main(int argc, char** argv){
                                                                       player->teleport_pushing_block_rotation, &world);
 
                               if(move_result.collided) repeat_collision_pass = true;
-                              if(move_result.resetting) resetting = true;
+                              if(move_result.resetting) reset_state = RESET_STATE_RESETTING_ROOM;
                               player->teleport_pos_delta = move_result.pos_delta;
                               player->teleport_pushing_block = move_result.pushing_block;
                               player->teleport_pushing_block_dir = move_result.pushing_block_dir;
@@ -4887,7 +4893,7 @@ int main(int argc, char** argv){
                                                                       &world);
 
                               if(move_result.collided) repeat_collision_pass = true;
-                              if(move_result.resetting) resetting = true;
+                              if(move_result.resetting) reset_state = RESET_STATE_RESETTING_ROOM;
                               player->pos_delta = move_result.pos_delta;
                               player->pushing_block = move_result.pushing_block;
                               player->pushing_block_dir = move_result.pushing_block_dir;
@@ -4987,7 +4993,7 @@ int main(int argc, char** argv){
                                    update_player_count = 1;
                               }else{
                                    // TODO: How do we handle if they are in a room that can't reset ?
-                                   resetting = true;
+                                   reset_state = RESET_STATE_RESETTING_ROOM;
                               }
                          }
 
@@ -5689,90 +5695,93 @@ int main(int argc, char** argv){
                     update_light_and_ice_detectors(world.interactives.elements + i, &world);
                }
 
-               if(resetting){
+               if(reset_state != RESET_STATE_NONE){
                     reset_timer += dt;
                     if(reset_timer >= RESET_TIME){
-                         resetting = false;
+                         if(reset_state == RESET_STATE_RESETTING_ROOM){
+                              // what room is the player in ?
+                              // TODO: compress with code in update_camera()
+                              if (current_room_index >= 0 && current_room_index < world.rooms.count) {
+                                   auto* room = world.rooms.elements + current_room_index;
 
-                         // what room is the player in ?
-                         // TODO: compress with code in update_camera()
-                         if (current_room_index >= 0 && current_room_index < world.rooms.count) {
-                              auto* room = world.rooms.elements + current_room_index;
+                                   Coord_t checkpoint_coord{-1, -1};
+                                   for(S16 i = 0; i < world.interactives.count; i++){
+                                        auto* interactive = world.interactives.elements + i;
+                                        if(!coord_in_rect(interactive->coord, *room)) continue;
 
-                              Coord_t checkpoint_coord{-1, -1};
-                              for(S16 i = 0; i < world.interactives.count; i++){
-                                   auto* interactive = world.interactives.elements + i;
-                                   if(!coord_in_rect(interactive->coord, *room)) continue;
-
-                                   if (interactive->type == INTERACTIVE_TYPE_CHECKPOINT){
-                                        checkpoint_coord = interactive->coord;
-                                        break;
-                                   }
-                              }
-
-                              // only reset if we found a checkpoint in this room
-                              if(checkpoint_coord.x >= 0){
-                                   // TODO: maybe rather than relying on the file system, we can store the starting state
-                                   // in memory ? Or even just loading just the room.
-                                   World_t temporary_world {};
-                                   if(!load_map(current_map_filepath, &player_start, &temporary_world.tilemap, &temporary_world.blocks, &temporary_world.interactives,
-                                                &world.rooms, &world.exits)){
-                                        return 1;
-                                   }
-
-                                   // TODO: remove any blocks not belonging to the current room
-
-                                   // Load the blocks, interactives, and tile flags from the temporary world
-                                   for(S16 j = room->bottom; j <= room->top; j++){
-                                        for(S16 i = room->left; i <= room->right; i++){
-                                             Coord_t coord {i, j};
-                                             auto* tile = tilemap_get_tile(&temporary_world.tilemap, coord);
-                                             if(tile){
-                                                  if(tile->flags & TILE_FLAG_RESET_IMMUNE) continue;
-                                                  world.tilemap.tiles[j][i] = *tile;
-                                             }
+                                        if (interactive->type == INTERACTIVE_TYPE_CHECKPOINT){
+                                             checkpoint_coord = interactive->coord;
+                                             break;
                                         }
                                    }
 
-                                   for(S16 i = 0; i < temporary_world.interactives.count; i++){
-                                        auto* temporary_interactive = temporary_world.interactives.elements + i;
-                                        if(!coord_in_rect(temporary_interactive->coord, *room)) continue;
+                                   // only reset if we found a checkpoint in this room
+                                   if(checkpoint_coord.x >= 0){
+                                        // TODO: maybe rather than relying on the file system, we can store the starting state
+                                        // in memory ? Or even just loading just the room.
+                                        World_t temporary_world {};
+                                        if(!load_map(current_map_filepath, &player_start, &temporary_world.tilemap, &temporary_world.blocks, &temporary_world.interactives,
+                                                     &world.rooms, &world.exits)){
+                                             return 1;
+                                        }
 
-                                        // skip updating interactives that are reset immune !
-                                        auto* tile = tilemap_get_tile(&temporary_world.tilemap, temporary_interactive->coord);
-                                        if(tile && tile->flags & TILE_FLAG_RESET_IMMUNE) continue;
+                                        // TODO: remove any blocks not belonging to the current room
 
-                                        world.interactives.elements[i] = *temporary_interactive;
+                                        // Load the blocks, interactives, and tile flags from the temporary world
+                                        for(S16 j = room->bottom; j <= room->top; j++){
+                                             for(S16 i = room->left; i <= room->right; i++){
+                                                  Coord_t coord {i, j};
+                                                  auto* tile = tilemap_get_tile(&temporary_world.tilemap, coord);
+                                                  if(tile){
+                                                       if(tile->flags & TILE_FLAG_RESET_IMMUNE) continue;
+                                                       world.tilemap.tiles[j][i] = *tile;
+                                                  }
+                                             }
+                                        }
+
+                                        for(S16 i = 0; i < temporary_world.interactives.count; i++){
+                                             auto* temporary_interactive = temporary_world.interactives.elements + i;
+                                             if(!coord_in_rect(temporary_interactive->coord, *room)) continue;
+
+                                             // skip updating interactives that are reset immune !
+                                             auto* tile = tilemap_get_tile(&temporary_world.tilemap, temporary_interactive->coord);
+                                             if(tile && tile->flags & TILE_FLAG_RESET_IMMUNE) continue;
+
+                                             world.interactives.elements[i] = *temporary_interactive;
+                                        }
+
+                                        // TODO: if this assert fires, we need to handle case where we've cloned blocks then
+                                        // tried to reset !
+                                        assert(temporary_world.blocks.count == world.blocks.count);
+                                        for(S16 i = 0; i < temporary_world.blocks.count; i++){
+                                             auto* temporary_block = temporary_world.blocks.elements + i;
+                                             Coord_t block_coord = block_get_coord(temporary_block);
+                                             if(!coord_in_rect(block_coord, *room)) continue;
+
+                                             auto* reset_block = world.blocks.elements + i;
+                                             default_block(reset_block);
+                                             *reset_block = *temporary_block;
+                                        }
+
+                                        // rebuild quad trees
+                                        quad_tree_free(world.interactive_qt);
+                                        world.interactive_qt = quad_tree_build(&world.interactives);
+
+                                        quad_tree_free(world.block_qt);
+                                        world.block_qt = quad_tree_build(&world.blocks);
+
+                                        // Move the player to the starting point
+                                        destroy(&world.players);
+                                        init(&world.players, 1);
+                                        Player_t* player = world.players.elements;
+                                        *player = {};
+                                        player->pos = coord_to_pos_at_tile_center(checkpoint_coord);
                                    }
-
-                                   // TODO: if this assert fires, we need to handle case where we've cloned blocks then
-                                   // tried to reset !
-                                   assert(temporary_world.blocks.count == world.blocks.count);
-                                   for(S16 i = 0; i < temporary_world.blocks.count; i++){
-                                        auto* temporary_block = temporary_world.blocks.elements + i;
-                                        Coord_t block_coord = block_get_coord(temporary_block);
-                                        if(!coord_in_rect(block_coord, *room)) continue;
-
-                                        auto* reset_block = world.blocks.elements + i;
-                                        default_block(reset_block);
-                                        *reset_block = *temporary_block;
-                                   }
-
-                                   // rebuild quad trees
-                                   quad_tree_free(world.interactive_qt);
-                                   world.interactive_qt = quad_tree_build(&world.interactives);
-
-                                   quad_tree_free(world.block_qt);
-                                   world.block_qt = quad_tree_build(&world.blocks);
-
-                                   // Move the player to the starting point
-                                   destroy(&world.players);
-                                   init(&world.players, 1);
-                                   Player_t* player = world.players.elements;
-                                   *player = {};
-                                   player->pos = coord_to_pos_at_tile_center(checkpoint_coord);
                               }
+                         }else if(reset_state == RESET_STATE_EXITTING){
                          }
+
+                         reset_state = RESET_STATE_NONE;
                     }
                }else{
                     reset_timer -= dt;

@@ -462,6 +462,9 @@ void draw_interactive(Interactive_t* interactive, Vec_t pos_vec, Coord_t coord,
      case INTERACTIVE_TYPE_CHECKPOINT:
           if(editor) draw_theme_frame(pos_vec, theme_frame(0, 21));
           break;
+     case INTERACTIVE_TYPE_STAIRS:
+          draw_theme_frame(pos_vec, theme_frame(interactive->stairs.face, interactive->stairs.up ? 23: 24));
+          break;
      }
 }
 

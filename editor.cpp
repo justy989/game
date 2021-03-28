@@ -551,11 +551,26 @@ bool init(Editor_t* editor){
           interactive_pit_category->elements[i].elements[0].interactive.pit.id = i;
      }
 
-     auto* interactive_reset_category = editor->category_array.elements + EDITOR_CATEGORY_INTERACTIVE_CHECKPOINT;
-     init(interactive_reset_category, 1);
-     init(interactive_reset_category->elements, 1);
-     interactive_reset_category->elements[0].elements[0].type = STAMP_TYPE_INTERACTIVE;
-     interactive_reset_category->elements[0].elements[0].interactive.type = INTERACTIVE_TYPE_CHECKPOINT;
+     auto* interactive_checkpoint_category = editor->category_array.elements + EDITOR_CATEGORY_INTERACTIVE_CHECKPOINT;
+     init(interactive_checkpoint_category, 1);
+     init(interactive_checkpoint_category->elements, 1);
+     interactive_checkpoint_category->elements[0].elements[0].type = STAMP_TYPE_INTERACTIVE;
+     interactive_checkpoint_category->elements[0].elements[0].interactive.type = INTERACTIVE_TYPE_CHECKPOINT;
+
+     auto* interactive_stair_category = editor->category_array.elements + EDITOR_CATEGORY_INTERACTIVE_STAIRS;
+     init(interactive_stair_category, 8);
+     index = 0;
+     for(S8 i = 0; i < 2; i++){
+          for(S8 d = 0; d < DIRECTION_COUNT; d++){
+               init(interactive_stair_category->elements + index, 1);
+               interactive_stair_category->elements[index].elements[0].type = STAMP_TYPE_INTERACTIVE;
+               interactive_stair_category->elements[index].elements[0].interactive.type = INTERACTIVE_TYPE_STAIRS;
+               interactive_stair_category->elements[index].elements[0].interactive.stairs.up = i;
+               interactive_stair_category->elements[index].elements[0].interactive.stairs.face = static_cast<Direction_t>(d);
+               interactive_stair_category->elements[index].elements[0].interactive.stairs.exit_index = 0;
+               index++;
+          }
+     }
 
      return true;
 }
