@@ -1162,10 +1162,18 @@ void draw_editor(Editor_t* editor, World_t* world, Camera_t* camera, Vec_t mouse
                auto dest_index_quad = exit_ui_query(EXIT_UI_ENTRY_DESTINATION_INDEX, i, &world->exits);
                draw_text(buffer, Vec_t{dest_index_quad.left, dest_index_quad.bottom});
 
+               if(world->editting_exit_path == i){
+                    glColor4f(1.0f, 1.0f, 0.0f, 1.0f);
+               }
+
                // path
                strncpy(buffer, (char*)(world->exits.elements[i].path), buffer_size);
                auto path_quad = exit_ui_query(EXIT_UI_ENTRY_PATH, i, &world->exits);
                draw_text(buffer, Vec_t{path_quad.left, path_quad.bottom});
+
+               if(world->editting_exit_path == i){
+                    glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+               }
           }
 
           glEnd();

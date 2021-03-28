@@ -1926,13 +1926,6 @@ int main(int argc, char** argv){
      world.camera_transition = 1.0f;
      update_camera(&camera, &world, get_room_index_of_player(&world), true);
 
-     // TODO: remove this
-     resize(&world.exits, 2);
-     snprintf((char*)(world.exits.elements[0].path), EXIT_MAX_PATH_SIZE, "FIRST_PATH");
-     world.exits.elements[0].destination_index = 3;
-     snprintf((char*)(world.exits.elements[1].path), EXIT_MAX_PATH_SIZE, "SECOND_PATH");
-     world.exits.elements[1].destination_index = 5;
-
      F32 dt = 0.0f;
 
      auto last_time = std::chrono::system_clock::now();
@@ -2058,676 +2051,356 @@ int main(int argc, char** argv){
                     quit = true;
                     break;
                case SDL_KEYDOWN:
-                    switch(sdl_event.key.keysym.scancode){
-                    default:
-                         break;
-                    case SDL_SCANCODE_ESCAPE:
-                         quit = true;
-                         break;
-                    case SDL_SCANCODE_F1:
-                    {
-                         bool has_bow = !world.players.elements[0].has_bow;
-                         for(S16 i = 0; i < world.players.count; i++){
-                              world.players.elements[i].has_bow = has_bow;
-                         }
-                         break;
-                    }
-                    case SDL_SCANCODE_F2:
-                         if(game_mode == GAME_MODE_EDITOR){
-                              editor.mode = EDITOR_MODE_ROOM_SELECTION;
-                         }
-                         break;
-                    case SDL_SCANCODE_F3:
-                         if(game_mode == GAME_MODE_EDITOR){
-                              editor.mode = EDITOR_MODE_EXITS;
-                         }
-                         break;
-                    case SDL_SCANCODE_F4:
-                         game_mode = GAME_MODE_PLAYING;
-                         break;
-                    case SDL_SCANCODE_F5:
-                         if(game_mode == GAME_MODE_EDITOR){
-                              if(world.tilemap.width <= 1) break;
-                              undo_commit(&undo, &world.players, &world.tilemap, &world.blocks, &world.interactives);
+                    if(world.editting_exit_path >= 0){
+                         auto* exit = world.exits.elements + world.editting_exit_path;
+                         auto exit_path_len = strnlen((char*)(exit->path), EXIT_MAX_PATH_SIZE);
 
-                              TileMap_t map_copy = {};
-                              deep_copy(&world.tilemap, &map_copy);
-
-                              for(S16 i = 0; i < map_copy.height; i++){
-                                   Coord_t coord{(S16)(map_copy.width - 1), i};
-                                   coord_clear(coord, &world.tilemap, &world.interactives, world.interactive_qt, &world.blocks);
-                              }
-
-                              destroy(&world.tilemap);
-                              init(&world.tilemap, map_copy.width - 1, map_copy.height);
-
-                              for(S16 i = 0; i < world.tilemap.height; i++){
-                                   for(S16 j = 0; j < world.tilemap.width; j++){
-                                        world.tilemap.tiles[i][j] = map_copy.tiles[i][j];
-                                   }
-                              }
-
-                              destroy(&map_copy);
-                              world_recalculate_camera_on_world_bounds(&world);
-                         }
-                         break;
-                    case SDL_SCANCODE_F6:
-                         if(game_mode == GAME_MODE_EDITOR){
-                              undo_commit(&undo, &world.players, &world.tilemap, &world.blocks, &world.interactives);
-
-                              TileMap_t map_copy = {};
-                              deep_copy(&world.tilemap, &map_copy);
-
-                              destroy(&world.tilemap);
-                              init(&world.tilemap, map_copy.width + 1, map_copy.height);
-
-                              for(S16 i = 0; i < map_copy.height; i++){
-                                   for(S16 j = 0; j < map_copy.width; j++){
-                                        world.tilemap.tiles[i][j] = map_copy.tiles[i][j];
-                                   }
-                              }
-
-                              destroy(&map_copy);
-                              world_recalculate_camera_on_world_bounds(&world);
-                         }
-                         break;
-                    case SDL_SCANCODE_F7:
-                         if(game_mode == GAME_MODE_EDITOR){
-                              if(world.tilemap.height <= 1) break;
-                              undo_commit(&undo, &world.players, &world.tilemap, &world.blocks, &world.interactives);
-
-                              TileMap_t map_copy = {};
-                              deep_copy(&world.tilemap, &map_copy);
-
-                              for(S16 i = 0; i < map_copy.width; i++){
-                                   Coord_t coord{i, (S16)(map_copy.height - 1)};
-                                   coord_clear(coord, &world.tilemap, &world.interactives, world.interactive_qt, &world.blocks);
-                              }
-
-                              destroy(&world.tilemap);
-                              init(&world.tilemap, map_copy.width, map_copy.height - 1);
-
-                              for(S16 i = 0; i < world.tilemap.height; i++){
-                                   for(S16 j = 0; j < world.tilemap.width; j++){
-                                        world.tilemap.tiles[i][j] = map_copy.tiles[i][j];
-                                   }
-                              }
-
-                              destroy(&map_copy);
-                              world_recalculate_camera_on_world_bounds(&world);
-                         }
-                         break;
-                    case SDL_SCANCODE_F8:
-                         if(game_mode == GAME_MODE_EDITOR){
-                              undo_commit(&undo, &world.players, &world.tilemap, &world.blocks, &world.interactives);
-                              TileMap_t map_copy = {};
-                              deep_copy(&world.tilemap, &map_copy);
-
-                              destroy(&world.tilemap);
-                              init(&world.tilemap, map_copy.width, map_copy.height + 1);
-
-                              for(S16 i = 0; i < map_copy.height; i++){
-                                   for(S16 j = 0; j < map_copy.width; j++){
-                                        world.tilemap.tiles[i][j] = map_copy.tiles[i][j];
-                                   }
-                              }
-
-                              destroy(&map_copy);
-                              world_recalculate_camera_on_world_bounds(&world);
-                         }
-                         break;
-                    case SDL_SCANCODE_F12:
-                         game_mode = GAME_MODE_LEVEL_SELECT;
-                         if(map_thumbnails.count == 0 && all_maps.count > 0){
-                              init(&map_thumbnails, all_maps.count);
-                              for(U32 m = 0; m < all_maps.count; m++){
-                                   auto* map_thumbnail = map_thumbnails.elements + m;
-                                   map_thumbnail->map_filepath = strdup(all_maps.entries[m].path);
-                                   map_thumbnail->map_number = all_maps.entries[m].map_number;
-                                   load_map_tags(map_thumbnail->map_filepath, map_thumbnail->tags);
-                                   Raw_t loaded_thumbnail {};
-                                   if(load_map_thumbnail(map_thumbnail->map_filepath, &loaded_thumbnail)){
-                                        map_thumbnail->texture = transparent_texture_from_raw_bitmap(&loaded_thumbnail);
-                                        free(loaded_thumbnail.bytes);
+                         if(sdl_event.key.keysym.scancode == SDL_SCANCODE_BACKSPACE){
+                              if(exit_path_len == 0) break;
+                              exit->path[exit_path_len - 1] = 0;
+                         }else{
+                              const auto* key_name = SDL_GetKeyName(sdl_event.key.keysym.sym);
+                              auto key_name_len = strlen(key_name);
+                              if(key_name_len == 1 && isprint(key_name[0]) && exit_path_len < EXIT_MAX_PATH_SIZE){
+                                   if(key_name[0] == '-' && (sdl_event.key.keysym.mod & KMOD_SHIFT)){
+                                        exit->path[exit_path_len] = '_';
+                                        exit->path[exit_path_len + 1] = 0;
                                    }else{
-                                        map_thumbnail->texture = 0;
-                                   }
-                                   free(all_maps.entries[m].path);
-                              }
-                              free(all_maps.entries);
-
-                              qsort(map_thumbnails.elements, map_thumbnails.count, sizeof(map_thumbnails.elements[0]), map_thumbnail_comparor);
-
-                              visible_map_thumbnail_count = filter_thumbnails(&tag_checkboxes, &map_thumbnails);
-                         }
-                         break;
-                    case SDL_SCANCODE_LEFT:
-                         if(game_mode == GAME_MODE_EDITOR){
-                              if(editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
-                                   move_selection(&editor, DIRECTION_LEFT);
-                              }else{
-                                   world_move_editor_camera(&world, DIRECTION_LEFT);
-                                   world.recalc_room_camera = true;
-                              }
-                         } else if(play_demo.mode == DEMO_MODE_PLAY){
-                              if(frame_count > 0 && play_demo.seek_frame < 0){
-                                   play_demo.seek_frame = frame_count - 1;
-
-                                   restart_demo(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives,
-                                                &play_demo, &frame_count, &player_start, &player_action, &undo, &camera);
-                              }
-                         }
-                         break;
-                    case SDL_SCANCODE_RIGHT:
-                         if(game_mode == GAME_MODE_EDITOR){
-                              if(editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
-                                   move_selection(&editor, DIRECTION_RIGHT);
-                              }else{
-                                   world_move_editor_camera(&world, DIRECTION_RIGHT);
-                                   world.recalc_room_camera = true;
-                              }
-                         } else if(play_demo.mode == DEMO_MODE_PLAY){
-                              if(play_demo.seek_frame < 0){
-                                   play_demo.seek_frame = frame_count + 1;
-                              }
-                         }
-                         break;
-                    case SDL_SCANCODE_UP:
-                         if(game_mode == GAME_MODE_EDITOR){
-                              if(editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
-                                   move_selection(&editor, DIRECTION_UP);
-                              }else{
-                                   world_move_editor_camera(&world, DIRECTION_UP);
-                                   world.recalc_room_camera = true;
-                              }
-                         }
-                         break;
-                    case SDL_SCANCODE_DOWN:
-                         if(game_mode == GAME_MODE_EDITOR){
-                              if(editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
-                                   move_selection(&editor, DIRECTION_DOWN);
-                              }else{
-                                   world_move_editor_camera(&world, DIRECTION_DOWN);
-                                   world.recalc_room_camera = true;
-                              }
-                         }
-                         break;
-                    case SDL_SCANCODE_A:
-                         if(!resetting){
-                              player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_LEFT_START,
-                                                    record_demo.mode, record_demo.file, frame_count);
-                         }
-                         break;
-                    case SDL_SCANCODE_D:
-                         if(!resetting){
-                              player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_RIGHT_START,
-                                                    record_demo.mode, record_demo.file, frame_count);
-                         }
-                         break;
-                    case SDL_SCANCODE_W:
-                         if(!resetting){
-                              player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_UP_START,
-                                                    record_demo.mode, record_demo.file, frame_count);
-                         }
-                         break;
-                    case SDL_SCANCODE_S:
-                         if(!resetting){
-                              player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_DOWN_START,
-                                                    record_demo.mode, record_demo.file, frame_count);
-                         }
-                         break;
-                    case SDL_SCANCODE_E:
-                         if(!resetting){
-                              player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_ACTIVATE_START,
-                                                    record_demo.mode, record_demo.file, frame_count);
-                         }
-                         break;
-                    case SDL_SCANCODE_SPACE:
-                         if(play_demo.mode == DEMO_MODE_PLAY){
-                              play_demo.paused = !play_demo.paused;
-                         }else{
-                              if(!resetting){
-                                   player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_SHOOT_START,
-                                                         record_demo.mode, record_demo.file, frame_count);
-                              }
-                         }
-                         break;
-                    case SDL_SCANCODE_L:
-                    {
-                         auto load_result = load_map_number_map(map_number, &world, &undo, &player_start, &player_action, &camera, current_map_tags);
-                         if(load_result.success){
-                              if(record_demo.mode == DEMO_MODE_PLAY){
-                                   cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
-                              }
-                              free(current_map_filepath);
-                              current_map_filepath = strdup(load_result.filepath);
-                              world_recalculate_camera_on_world_bounds(&world);
-                         }
-                         break;
-                    }
-                    case SDL_SCANCODE_I:
-                         if(game_mode == GAME_MODE_EDITOR){
-                              world_shrink_editor_camera(&world);
-                              world.recalc_room_camera = true;
-                         }
-                         break;
-                    case SDL_SCANCODE_O:
-                         if(game_mode == GAME_MODE_EDITOR){
-                              world_expand_editor_camera(&world);
-                              world.recalc_room_camera = true;
-                         }
-                         break;
-                    case SDL_SCANCODE_LEFTBRACKET:
-                    {
-                         // TODO: handle suite in here.
-                         map_number--;
-                         auto load_result = load_map_number_map(map_number, &world, &undo, &player_start, &player_action, &camera, current_map_tags);
-                         if(load_result.success){
-                              free(current_map_filepath);
-                              current_map_filepath = strdup(load_result.filepath);
-                              if(record_demo.mode == DEMO_MODE_PLAY){
-                                   cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
-
-                                   if(load_map_number_demo(&play_demo, map_number, &frame_count)){
-                                        continue; // reset to the top of the loop
-                                   }else{
-                                        return 1;
-                                   }
-                              }
-                              world_recalculate_camera_on_world_bounds(&world);
-                         }else{
-                              map_number++;
-                         }
-                         break;
-                    }
-                    case SDL_SCANCODE_RIGHTBRACKET:
-                    {
-                         // TODO: handle suite in here.
-                         map_number++;
-                         auto load_result = load_map_number_map(map_number, &world, &undo, &player_start, &player_action, &camera, current_map_tags);
-                         if(load_result.success){
-                              free(current_map_filepath);
-                              current_map_filepath = strdup(load_result.filepath);
-                              if(play_demo.mode == DEMO_MODE_PLAY){
-                                   cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
-
-                                   if(load_map_number_demo(&play_demo, map_number, &frame_count)){
-                                        continue; // reset to the top of the loop
-                                   }else{
-                                        return 1;
-                                   }
-                              }
-                              world_recalculate_camera_on_world_bounds(&world);
-                         }else{
-                              map_number--;
-                         }
-                         break;
-                    }
-                    case SDL_SCANCODE_MINUS:
-                         if(play_demo.dt_scalar > 0.1f){
-                              play_demo.dt_scalar -= 0.1f;
-                              LOG("game dt scalar: %.1f\n", play_demo.dt_scalar);
-                         }
-                         break;
-                    case SDL_SCANCODE_EQUALS:
-                         play_demo.dt_scalar += 0.1f;
-                         LOG("game dt scalar: %.1f\n", play_demo.dt_scalar);
-                         break;
-                    case SDL_SCANCODE_V:
-                         if(game_mode == GAME_MODE_EDITOR && editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
-                              // vertical flip selection !
-                              S16 highest_stamp_index = 0;
-                              for(S16 i = 0; i < editor.selection.count; i++){
-                                   auto* stamp = editor.selection.elements + i;
-                                   if(stamp->offset.y > highest_stamp_index){
-                                        highest_stamp_index = stamp->offset.y;
-                                   }
-                              }
-
-                              for(S16 i = 0; i < editor.selection.count; i++){
-                                   auto* stamp = editor.selection.elements + i;
-                                   stamp->offset.y = highest_stamp_index - stamp->offset.y;
-
-                                   switch(stamp->type){
-                                   default:
-                                        break;
-                                   case STAMP_TYPE_TILE_ID:
-                                        // tile rotation for solids
-                                        if(stamp->tile.solid){
-                                             stamp->tile.rotation = tile_flip_solid_id_vertically_rotation(stamp->tile.id, stamp->tile.rotation);
-                                        }
-                                        break;
-                                   case STAMP_TYPE_TILE_FLAGS:
-                                   {
-                                        // tile wire rotation
-                                        auto wire_direction_mask = tile_existing_wires(stamp->tile_flags);
-                                        auto flipped_wire_direction_mask = direction_mask_flip_vertically(wire_direction_mask);
-
-                                        stamp->tile_flags = tile_set_existing_wires(flipped_wire_direction_mask, stamp->tile_flags);
-
-                                        // TODO: not sure if this number is right, but I think so, it's mean to
-                                        // say, are there any wire clusters on this tile ? if so we need to rotate it
-                                        if(stamp->tile_flags >= 256){
-                                             Direction_t cluster_direction = tile_flags_cluster_direction(stamp->tile_flags);
-                                             auto rotated_cluster_direction = direction_flip_vertically(cluster_direction);
-                                             tile_flags_set_cluster_direction(&stamp->tile_flags, rotated_cluster_direction);
-                                        }
-                                   } break;
-                                   case STAMP_TYPE_BLOCK:
-                                        stamp->block.rotation++;
-                                        stamp->block.rotation %= 4;
-                                        break;
-                                   case STAMP_TYPE_INTERACTIVE:
-                                        switch(stamp->interactive.type){
-                                        default:
-                                             break;
-                                        case INTERACTIVE_TYPE_PORTAL:
-                                             stamp->interactive.portal.face = direction_flip_vertically(stamp->interactive.portal.face);
-                                             break;
-                                        case INTERACTIVE_TYPE_DOOR:
-                                             stamp->interactive.door.face = direction_flip_vertically(stamp->interactive.door.face);
-                                             break;
-                                        case INTERACTIVE_TYPE_WIRE_CROSS:
-                                             stamp->interactive.wire_cross.mask = direction_mask_flip_vertically(stamp->interactive.wire_cross.mask);
-                                             break;
-                                        }
-                                        break;
-                                   }
-                              }
-                         } break;
-                    case SDL_SCANCODE_H:
-                         if(game_mode == GAME_MODE_EDITOR && editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
-                              // horizontal flip selection !
-                              S16 highest_stamp_index = 0;
-                              for(S16 i = 0; i < editor.selection.count; i++){
-                                   auto* stamp = editor.selection.elements + i;
-                                   if(stamp->offset.x > highest_stamp_index){
-                                        highest_stamp_index = stamp->offset.x;
-                                   }
-                              }
-
-                              for(S16 i = 0; i < editor.selection.count; i++){
-                                   auto* stamp = editor.selection.elements + i;
-                                   stamp->offset.x = highest_stamp_index - stamp->offset.x;
-
-                                   switch(stamp->type){
-                                   default:
-                                        break;
-                                   case STAMP_TYPE_TILE_ID:
-                                        // tile rotation for solids
-                                        if(stamp->tile.solid){
-                                             stamp->tile.rotation = tile_flip_solid_id_horizontally_rotation(stamp->tile.id, stamp->tile.rotation);
-                                        }
-                                        break;
-                                   case STAMP_TYPE_TILE_FLAGS:
-                                   {
-                                        // tile wire rotation
-                                        auto wire_direction_mask = tile_existing_wires(stamp->tile_flags);
-                                        auto flipped_wire_direction_mask = direction_mask_flip_horizontally(wire_direction_mask);
-
-                                        stamp->tile_flags = tile_set_existing_wires(flipped_wire_direction_mask, stamp->tile_flags);
-
-                                        // TODO: not sure if this number is right, but I think so, it's mean to
-                                        // say, are there any wire clusters on this tile ? if so we need to rotate it
-                                        if(stamp->tile_flags >= 256){
-                                             Direction_t cluster_direction = tile_flags_cluster_direction(stamp->tile_flags);
-                                             auto rotated_cluster_direction = direction_flip_horizontally(cluster_direction);
-                                             tile_flags_set_cluster_direction(&stamp->tile_flags, rotated_cluster_direction);
-                                        }
-                                   } break;
-                                   case STAMP_TYPE_BLOCK:
-                                        stamp->block.rotation++;
-                                        stamp->block.rotation %= 4;
-                                        break;
-                                   case STAMP_TYPE_INTERACTIVE:
-                                        switch(stamp->interactive.type){
-                                        default:
-                                             break;
-                                        case INTERACTIVE_TYPE_PORTAL:
-                                             stamp->interactive.portal.face = direction_flip_horizontally(stamp->interactive.portal.face);
-                                             break;
-                                        case INTERACTIVE_TYPE_DOOR:
-                                             stamp->interactive.door.face = direction_flip_horizontally(stamp->interactive.door.face);
-                                             break;
-                                        case INTERACTIVE_TYPE_WIRE_CROSS:
-                                             stamp->interactive.wire_cross.mask = direction_mask_flip_horizontally(stamp->interactive.wire_cross.mask);
-                                             break;
-                                        }
-                                        break;
-                                   }
-                              }
-                         }else{
-                              Pixel_t pixel = mouse_select_world_pixel(mouse_screen, &camera) + HALF_TILE_SIZE_PIXEL;
-                              Coord_t coord = mouse_select_world_coord(mouse_screen, &camera);
-                              LOG("mouse pixel: %d, %d, Coord: %d, %d\n", pixel.x, pixel.y, coord.x, coord.y);
-                              describe_coord(coord, &world);
-                         } break;
-                    case SDL_SCANCODE_Z:
-                         if(game_mode == GAME_MODE_EDITOR){
-                              Raw_t* thumbnail_ptr = NULL;
-                              glBindFramebuffer(GL_FRAMEBUFFER, thumbnail_framebuffer);
-                              Raw_t thumbnail = create_thumbnail_bitmap();
-                              if(thumbnail.bytes) thumbnail_ptr = &thumbnail;
-                              glBindFramebuffer(GL_FRAMEBUFFER, render_framebuffer);
-                              char filepath[64];
-                              snprintf(filepath, 64, "content/%03d.bm", map_number);
-                              save_map(filepath, player_start, &world.tilemap, &world.blocks, &world.interactives,
-                                       &world.rooms, &world.exits, current_map_tags, thumbnail_ptr);
-                              if(thumbnail.bytes) free(thumbnail.bytes);
-                         }
-                         break;
-                    case SDL_SCANCODE_U:
-                         if(!resetting && can_undo && !will_undo_to_another_room){
-                              player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_UNDO,
-                                                    record_demo.mode, record_demo.file, frame_count);
-                         }
-                         break;
-                    case SDL_SCANCODE_N:
-                         if(game_mode == GAME_MODE_EDITOR && editor.mode == EDITOR_MODE_CATEGORY_SELECT){
-                              Tile_t* tile = tilemap_get_tile(&world.tilemap, mouse_select_world_coord(mouse_screen, &camera));
-                              if(tile) tile_toggle_wire_activated(tile);
-                         }
-                         break;
-                    case SDL_SCANCODE_4:
-                         if(game_mode == GAME_MODE_EDITOR && editor.mode == EDITOR_MODE_CATEGORY_SELECT){
-                              auto coord = mouse_select_world_coord(mouse_screen, &camera);
-                              auto rect = rect_surrounding_coord(coord);
-
-                              S16 block_count = 0;
-                              Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
-                              quad_tree_find_in(world.block_qt, rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
-
-                              for(S16 i = 0; i < block_count; i++){
-                                   blocks[i]->entangle_index = -1;
-                              }
-                         }
-                         break;
-                    case SDL_SCANCODE_8:
-                         if(game_mode == GAME_MODE_EDITOR && editor.mode == EDITOR_MODE_CATEGORY_SELECT){
-                              auto coord = mouse_select_world_coord(mouse_screen, &camera);
-                              auto rect = rect_surrounding_coord(coord);
-
-                              S16 block_count = 0;
-                              Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
-                              quad_tree_find_in(world.block_qt, rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
-
-                              for(S16 i = 0; i < block_count; i++){
-                                   S16 block_index = get_block_index(&world, blocks[i]);
-                                   if(editor.entangle_indices.count > 1 && block_index == editor.entangle_indices.elements[0]){
-                                        LOG("applying entanglement\n");
-                                        for(S16 e = 0; e < editor.entangle_indices.count; e++){
-                                             S16 next_index = (e + 1) % editor.entangle_indices.count;
-                                             S16 entangle_index = editor.entangle_indices.elements[next_index];
-                                             Block_t* block = world.blocks.elements + editor.entangle_indices.elements[e];
-                                             LOG("  %d -> %d\n", editor.entangle_indices.elements[e], entangle_index);
-                                             block->entangle_index = entangle_index;
-                                        }
-                                        destroy(&editor.entangle_indices);
-                                        break;
-                                   }else{
-                                       S16 last_index = editor.entangle_indices.count;
-                                       resize(&editor.entangle_indices, editor.entangle_indices.count + 1);
-                                       editor.entangle_indices.elements[last_index] = block_index;
-                                       LOG("editor track entangle index %d\n", block_index);
+                                        exit->path[exit_path_len] = key_name[0];
+                                        exit->path[exit_path_len + 1] = 0;
                                    }
                               }
                          }
-                         break;
-                    case SDL_SCANCODE_2:
-                         if(game_mode == GAME_MODE_EDITOR && editor.mode == EDITOR_MODE_CATEGORY_SELECT){
-                              auto pixel = mouse_select_world_pixel(mouse_screen, &camera);
-
-                              // TODO: make this a function where you can pass in entangle_index
-                              S16 new_index = world.players.count;
-                              if(resize(&world.players, world.players.count + (S16)(1))){
-                                   Player_t* new_player = world.players.elements + new_index;
-                                   *new_player = world.players.elements[0];
-                                   new_player->pos = pixel_to_pos(pixel);
+                    }else{
+                         switch(sdl_event.key.keysym.scancode){
+                         default:
+                              break;
+                         case SDL_SCANCODE_ESCAPE:
+                              quit = true;
+                              break;
+                         case SDL_SCANCODE_F1:
+                         {
+                              bool has_bow = !world.players.elements[0].has_bow;
+                              for(S16 i = 0; i < world.players.count; i++){
+                                   world.players.elements[i].has_bow = has_bow;
                               }
+                              break;
                          }
-                         break;
-                    case SDL_SCANCODE_0:
-                         if(game_mode == GAME_MODE_EDITOR && editor.mode == EDITOR_MODE_CATEGORY_SELECT){
-                              auto coord = mouse_select_world_coord(mouse_screen, &camera);
-                              auto rect = rect_surrounding_coord(coord);
-
-                              S16 block_count = 0;
-                              Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
-                              quad_tree_find_in(world.block_qt, rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
-
-                              for(S16 i = 0; i < block_count; i++){
-                                   Block_t* block = blocks[i];
-                                   if(block->entangle_index >= 0){
-                                        S16 block_index = get_block_index(&world, block);
-                                        S16 current_index = block_index;
-                                        do
-                                        {
-                                             Block_t* current_block = world.blocks.elements + current_index;
-                                             current_index = current_block->entangle_index;
-                                             current_block->entangle_index = -1;
-                                        }while(current_index != block_index && current_index >= 0);
-                                   }
+                         case SDL_SCANCODE_F2:
+                              if(game_mode == GAME_MODE_EDITOR){
+                                   editor.mode = EDITOR_MODE_ROOM_SELECTION;
                               }
-
-                              destroy(&editor.entangle_indices);
-                         }
-                         break;
-                    // TODO: #ifdef DEBUG
-                    case SDL_SCANCODE_GRAVE:
-                         if(game_mode == GAME_MODE_PLAYING){
-                              game_mode = GAME_MODE_EDITOR;
-                              editor.mode = EDITOR_MODE_CATEGORY_SELECT;
-                         }else{
+                              break;
+                         case SDL_SCANCODE_F3:
+                              if(game_mode == GAME_MODE_EDITOR){
+                                   editor.mode = EDITOR_MODE_EXITS;
+                              }
+                              break;
+                         case SDL_SCANCODE_F4:
                               game_mode = GAME_MODE_PLAYING;
-                              editor.selection_start = {};
-                              editor.selection_end = {};
-                              destroy(&editor.entangle_indices);
-                         }
-                         break;
-                    case SDL_SCANCODE_TAB:
-                         if(game_mode == GAME_MODE_EDITOR){
-                              if(editor.mode == EDITOR_MODE_STAMP_SELECT){
-                                   editor.mode = EDITOR_MODE_STAMP_HIDE;
-                              }else{
-                                   editor.mode = EDITOR_MODE_STAMP_SELECT;
-                              }
-                         }
-                         break;
-                    case SDL_SCANCODE_RETURN:
-                         if(game_mode == GAME_MODE_EDITOR && editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
-                              undo_commit(&undo, &world.players, &world.tilemap, &world.blocks, &world.interactives);
+                              break;
+                         case SDL_SCANCODE_F5:
+                              if(game_mode == GAME_MODE_EDITOR){
+                                   if(world.tilemap.width <= 1) break;
+                                   undo_commit(&undo, &world.players, &world.tilemap, &world.blocks, &world.interactives);
 
-                              // clear coords below stamp
-                              Rect_t selection_bounds = editor_selection_bounds(&editor);
-                              for(S16 j = selection_bounds.bottom; j <= selection_bounds.top; j++){
-                                   for(S16 i = selection_bounds.left; i <= selection_bounds.right; i++){
-                                        Coord_t coord {i, j};
+                                   TileMap_t map_copy = {};
+                                   deep_copy(&world.tilemap, &map_copy);
+
+                                   for(S16 i = 0; i < map_copy.height; i++){
+                                        Coord_t coord{(S16)(map_copy.width - 1), i};
                                         coord_clear(coord, &world.tilemap, &world.interactives, world.interactive_qt, &world.blocks);
                                    }
-                              }
 
-                              for(int i = 0; i < editor.selection.count; i++){
-                                   Coord_t coord = editor.selection_start + editor.selection.elements[i].offset;
-                                   apply_stamp(editor.selection.elements + i, coord,
-                                               &world.tilemap, &world.blocks, &world.interactives, &world.interactive_qt, ctrl_down);
-                              }
+                                   destroy(&world.tilemap);
+                                   init(&world.tilemap, map_copy.width - 1, map_copy.height);
 
-                              quad_tree_free(world.block_qt);
-                              world.block_qt = quad_tree_build(&world.blocks);
-
-                              editor.mode = EDITOR_MODE_CATEGORY_SELECT;
-                         }
-                         break;
-                    case SDL_SCANCODE_T:
-                         if(game_mode == GAME_MODE_EDITOR && editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
-                              sort_selection(&editor);
-
-                              S16 height_offset = (S16)((editor.selection_end.y - editor.selection_start.y) - 1);
-
-                              // perform rotation on each offset
-                              for(S16 i = 0; i < editor.selection.count; i++){
-                                   auto* stamp = editor.selection.elements + i;
-                                   Coord_t rot {stamp->offset.y, (S16)(-stamp->offset.x + height_offset)};
-                                   stamp->offset = rot;
-                              }
-                         }
-                         break;
-                    case SDL_SCANCODE_X:
-                         if(game_mode == GAME_MODE_EDITOR && editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
-                              destroy(&editor.clipboard);
-                              shallow_copy(&editor.selection, &editor.clipboard);
-                              editor.mode = EDITOR_MODE_CATEGORY_SELECT;
-                         }
-                         break;
-                    case SDL_SCANCODE_P:
-                         if(game_mode == GAME_MODE_EDITOR && editor.mode == EDITOR_MODE_CATEGORY_SELECT && editor.clipboard.count){
-                              destroy(&editor.selection);
-                              shallow_copy(&editor.clipboard, &editor.selection);
-                              editor.mode = EDITOR_MODE_SELECTION_MANIPULATION;
-                         }
-                         else if(game_mode == GAME_MODE_PLAYING && !resetting && can_undo && will_undo_to_another_room){
-                              player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_UNDO,
-                                                    record_demo.mode, record_demo.file, frame_count);
-                         }
-                         break;
-                    case SDL_SCANCODE_M:
-                         if(game_mode == GAME_MODE_EDITOR &&
-                            editor.mode == EDITOR_MODE_CATEGORY_SELECT){
-                              player_start = mouse_select_world_coord(mouse_screen, &camera);
-                         }else if(game_mode == GAME_MODE_PLAYING && can_reset){
-                              resetting = true;
-                         }
-                         break;
-                    case SDL_SCANCODE_R:
-                         if(game_mode == GAME_MODE_EDITOR){
-                              if(editor.mode == EDITOR_MODE_CATEGORY_SELECT){
-                                   auto coord = mouse_select_world_coord(mouse_screen, &camera);
-                                   auto rect = rect_surrounding_coord(coord);
-
-                                   S16 block_count = 0;
-                                   Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
-                                   quad_tree_find_in(world.block_qt, rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
-                                   for(S16 i = 0; i < block_count; i++){
-                                        blocks[i]->rotation += 1;
-                                        blocks[i]->rotation %= DIRECTION_COUNT;
+                                   for(S16 i = 0; i < world.tilemap.height; i++){
+                                        for(S16 j = 0; j < world.tilemap.width; j++){
+                                             world.tilemap.tiles[i][j] = map_copy.tiles[i][j];
+                                        }
                                    }
-                              }else if(editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
-                                   // rotate selection !
-                                   Coord_t bottom_left_most {};
+
+                                   destroy(&map_copy);
+                                   world_recalculate_camera_on_world_bounds(&world);
+                              }
+                              break;
+                         case SDL_SCANCODE_F6:
+                              if(game_mode == GAME_MODE_EDITOR){
+                                   undo_commit(&undo, &world.players, &world.tilemap, &world.blocks, &world.interactives);
+
+                                   TileMap_t map_copy = {};
+                                   deep_copy(&world.tilemap, &map_copy);
+
+                                   destroy(&world.tilemap);
+                                   init(&world.tilemap, map_copy.width + 1, map_copy.height);
+
+                                   for(S16 i = 0; i < map_copy.height; i++){
+                                        for(S16 j = 0; j < map_copy.width; j++){
+                                             world.tilemap.tiles[i][j] = map_copy.tiles[i][j];
+                                        }
+                                   }
+
+                                   destroy(&map_copy);
+                                   world_recalculate_camera_on_world_bounds(&world);
+                              }
+                              break;
+                         case SDL_SCANCODE_F7:
+                              if(game_mode == GAME_MODE_EDITOR){
+                                   if(world.tilemap.height <= 1) break;
+                                   undo_commit(&undo, &world.players, &world.tilemap, &world.blocks, &world.interactives);
+
+                                   TileMap_t map_copy = {};
+                                   deep_copy(&world.tilemap, &map_copy);
+
+                                   for(S16 i = 0; i < map_copy.width; i++){
+                                        Coord_t coord{i, (S16)(map_copy.height - 1)};
+                                        coord_clear(coord, &world.tilemap, &world.interactives, world.interactive_qt, &world.blocks);
+                                   }
+
+                                   destroy(&world.tilemap);
+                                   init(&world.tilemap, map_copy.width, map_copy.height - 1);
+
+                                   for(S16 i = 0; i < world.tilemap.height; i++){
+                                        for(S16 j = 0; j < world.tilemap.width; j++){
+                                             world.tilemap.tiles[i][j] = map_copy.tiles[i][j];
+                                        }
+                                   }
+
+                                   destroy(&map_copy);
+                                   world_recalculate_camera_on_world_bounds(&world);
+                              }
+                              break;
+                         case SDL_SCANCODE_F8:
+                              if(game_mode == GAME_MODE_EDITOR){
+                                   undo_commit(&undo, &world.players, &world.tilemap, &world.blocks, &world.interactives);
+                                   TileMap_t map_copy = {};
+                                   deep_copy(&world.tilemap, &map_copy);
+
+                                   destroy(&world.tilemap);
+                                   init(&world.tilemap, map_copy.width, map_copy.height + 1);
+
+                                   for(S16 i = 0; i < map_copy.height; i++){
+                                        for(S16 j = 0; j < map_copy.width; j++){
+                                             world.tilemap.tiles[i][j] = map_copy.tiles[i][j];
+                                        }
+                                   }
+
+                                   destroy(&map_copy);
+                                   world_recalculate_camera_on_world_bounds(&world);
+                              }
+                              break;
+                         case SDL_SCANCODE_F12:
+                              game_mode = GAME_MODE_LEVEL_SELECT;
+                              if(map_thumbnails.count == 0 && all_maps.count > 0){
+                                   init(&map_thumbnails, all_maps.count);
+                                   for(U32 m = 0; m < all_maps.count; m++){
+                                        auto* map_thumbnail = map_thumbnails.elements + m;
+                                        map_thumbnail->map_filepath = strdup(all_maps.entries[m].path);
+                                        map_thumbnail->map_number = all_maps.entries[m].map_number;
+                                        load_map_tags(map_thumbnail->map_filepath, map_thumbnail->tags);
+                                        Raw_t loaded_thumbnail {};
+                                        if(load_map_thumbnail(map_thumbnail->map_filepath, &loaded_thumbnail)){
+                                             map_thumbnail->texture = transparent_texture_from_raw_bitmap(&loaded_thumbnail);
+                                             free(loaded_thumbnail.bytes);
+                                        }else{
+                                             map_thumbnail->texture = 0;
+                                        }
+                                        free(all_maps.entries[m].path);
+                                   }
+                                   free(all_maps.entries);
+
+                                   qsort(map_thumbnails.elements, map_thumbnails.count, sizeof(map_thumbnails.elements[0]), map_thumbnail_comparor);
+
+                                   visible_map_thumbnail_count = filter_thumbnails(&tag_checkboxes, &map_thumbnails);
+                              }
+                              break;
+                         case SDL_SCANCODE_LEFT:
+                              if(game_mode == GAME_MODE_EDITOR){
+                                   if(editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
+                                        move_selection(&editor, DIRECTION_LEFT);
+                                   }else{
+                                        world_move_editor_camera(&world, DIRECTION_LEFT);
+                                        world.recalc_room_camera = true;
+                                   }
+                              } else if(play_demo.mode == DEMO_MODE_PLAY){
+                                   if(frame_count > 0 && play_demo.seek_frame < 0){
+                                        play_demo.seek_frame = frame_count - 1;
+
+                                        restart_demo(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives,
+                                                     &play_demo, &frame_count, &player_start, &player_action, &undo, &camera);
+                                   }
+                              }
+                              break;
+                         case SDL_SCANCODE_RIGHT:
+                              if(game_mode == GAME_MODE_EDITOR){
+                                   if(editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
+                                        move_selection(&editor, DIRECTION_RIGHT);
+                                   }else{
+                                        world_move_editor_camera(&world, DIRECTION_RIGHT);
+                                        world.recalc_room_camera = true;
+                                   }
+                              } else if(play_demo.mode == DEMO_MODE_PLAY){
+                                   if(play_demo.seek_frame < 0){
+                                        play_demo.seek_frame = frame_count + 1;
+                                   }
+                              }
+                              break;
+                         case SDL_SCANCODE_UP:
+                              if(game_mode == GAME_MODE_EDITOR){
+                                   if(editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
+                                        move_selection(&editor, DIRECTION_UP);
+                                   }else{
+                                        world_move_editor_camera(&world, DIRECTION_UP);
+                                        world.recalc_room_camera = true;
+                                   }
+                              }
+                              break;
+                         case SDL_SCANCODE_DOWN:
+                              if(game_mode == GAME_MODE_EDITOR){
+                                   if(editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
+                                        move_selection(&editor, DIRECTION_DOWN);
+                                   }else{
+                                        world_move_editor_camera(&world, DIRECTION_DOWN);
+                                        world.recalc_room_camera = true;
+                                   }
+                              }
+                              break;
+                         case SDL_SCANCODE_A:
+                              if(!resetting){
+                                   player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_LEFT_START,
+                                                         record_demo.mode, record_demo.file, frame_count);
+                              }
+                              break;
+                         case SDL_SCANCODE_D:
+                              if(!resetting){
+                                   player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_RIGHT_START,
+                                                         record_demo.mode, record_demo.file, frame_count);
+                              }
+                              break;
+                         case SDL_SCANCODE_W:
+                              if(!resetting){
+                                   player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_UP_START,
+                                                         record_demo.mode, record_demo.file, frame_count);
+                              }
+                              break;
+                         case SDL_SCANCODE_S:
+                              if(!resetting){
+                                   player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_DOWN_START,
+                                                         record_demo.mode, record_demo.file, frame_count);
+                              }
+                              break;
+                         case SDL_SCANCODE_E:
+                              if(!resetting){
+                                   player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_ACTIVATE_START,
+                                                         record_demo.mode, record_demo.file, frame_count);
+                              }
+                              break;
+                         case SDL_SCANCODE_SPACE:
+                              if(play_demo.mode == DEMO_MODE_PLAY){
+                                   play_demo.paused = !play_demo.paused;
+                              }else{
+                                   if(!resetting){
+                                        player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_SHOOT_START,
+                                                              record_demo.mode, record_demo.file, frame_count);
+                                   }
+                              }
+                              break;
+                         case SDL_SCANCODE_L:
+                         {
+                              auto load_result = load_map_number_map(map_number, &world, &undo, &player_start, &player_action, &camera, current_map_tags);
+                              if(load_result.success){
+                                   if(record_demo.mode == DEMO_MODE_PLAY){
+                                        cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
+                                   }
+                                   free(current_map_filepath);
+                                   current_map_filepath = strdup(load_result.filepath);
+                                   world_recalculate_camera_on_world_bounds(&world);
+                              }
+                              break;
+                         }
+                         case SDL_SCANCODE_I:
+                              if(game_mode == GAME_MODE_EDITOR){
+                                   world_shrink_editor_camera(&world);
+                                   world.recalc_room_camera = true;
+                              }
+                              break;
+                         case SDL_SCANCODE_O:
+                              if(game_mode == GAME_MODE_EDITOR){
+                                   world_expand_editor_camera(&world);
+                                   world.recalc_room_camera = true;
+                              }
+                              break;
+                         case SDL_SCANCODE_LEFTBRACKET:
+                         {
+                              // TODO: handle suite in here.
+                              map_number--;
+                              auto load_result = load_map_number_map(map_number, &world, &undo, &player_start, &player_action, &camera, current_map_tags);
+                              if(load_result.success){
+                                   free(current_map_filepath);
+                                   current_map_filepath = strdup(load_result.filepath);
+                                   if(record_demo.mode == DEMO_MODE_PLAY){
+                                        cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
+
+                                        if(load_map_number_demo(&play_demo, map_number, &frame_count)){
+                                             continue; // reset to the top of the loop
+                                        }else{
+                                             return 1;
+                                        }
+                                   }
+                                   world_recalculate_camera_on_world_bounds(&world);
+                              }else{
+                                   map_number++;
+                              }
+                              break;
+                         }
+                         case SDL_SCANCODE_RIGHTBRACKET:
+                         {
+                              // TODO: handle suite in here.
+                              map_number++;
+                              auto load_result = load_map_number_map(map_number, &world, &undo, &player_start, &player_action, &camera, current_map_tags);
+                              if(load_result.success){
+                                   free(current_map_filepath);
+                                   current_map_filepath = strdup(load_result.filepath);
+                                   if(play_demo.mode == DEMO_MODE_PLAY){
+                                        cache_for_demo_seek(&world, &demo_starting_tilemap, &demo_starting_blocks, &demo_starting_interactives);
+
+                                        if(load_map_number_demo(&play_demo, map_number, &frame_count)){
+                                             continue; // reset to the top of the loop
+                                        }else{
+                                             return 1;
+                                        }
+                                   }
+                                   world_recalculate_camera_on_world_bounds(&world);
+                              }else{
+                                   map_number--;
+                              }
+                              break;
+                         }
+                         case SDL_SCANCODE_MINUS:
+                              if(play_demo.dt_scalar > 0.1f){
+                                   play_demo.dt_scalar -= 0.1f;
+                                   LOG("game dt scalar: %.1f\n", play_demo.dt_scalar);
+                              }
+                              break;
+                         case SDL_SCANCODE_EQUALS:
+                              play_demo.dt_scalar += 0.1f;
+                              LOG("game dt scalar: %.1f\n", play_demo.dt_scalar);
+                              break;
+                         case SDL_SCANCODE_V:
+                              if(game_mode == GAME_MODE_EDITOR && editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
+                                   // vertical flip selection !
+                                   S16 highest_stamp_index = 0;
                                    for(S16 i = 0; i < editor.selection.count; i++){
                                         auto* stamp = editor.selection.elements + i;
-                                        auto save_x = stamp->offset.x;
-                                        stamp->offset.x = stamp->offset.y;
-                                        stamp->offset.y = -save_x;
-
-                                        // track the bottom left most coord
-                                        if(bottom_left_most.x >= stamp->offset.x){
-                                             bottom_left_most.x = stamp->offset.x;
+                                        if(stamp->offset.y > highest_stamp_index){
+                                             highest_stamp_index = stamp->offset.y;
                                         }
+                                   }
 
-                                        if(bottom_left_most.y >= stamp->offset.y){
-                                             bottom_left_most.y = stamp->offset.y;
-                                        }
+                                   for(S16 i = 0; i < editor.selection.count; i++){
+                                        auto* stamp = editor.selection.elements + i;
+                                        stamp->offset.y = highest_stamp_index - stamp->offset.y;
 
                                         switch(stamp->type){
                                         default:
@@ -2735,23 +2408,22 @@ int main(int argc, char** argv){
                                         case STAMP_TYPE_TILE_ID:
                                              // tile rotation for solids
                                              if(stamp->tile.solid){
-                                                  stamp->tile.rotation++;
-                                                  stamp->tile.rotation %= 4;
+                                                  stamp->tile.rotation = tile_flip_solid_id_vertically_rotation(stamp->tile.id, stamp->tile.rotation);
                                              }
                                              break;
                                         case STAMP_TYPE_TILE_FLAGS:
                                         {
                                              // tile wire rotation
                                              auto wire_direction_mask = tile_existing_wires(stamp->tile_flags);
-                                             auto rotated_wire_direction_mask = direction_mask_rotate_clockwise(wire_direction_mask, 1);
+                                             auto flipped_wire_direction_mask = direction_mask_flip_vertically(wire_direction_mask);
 
-                                             stamp->tile_flags = tile_set_existing_wires(rotated_wire_direction_mask, stamp->tile_flags);
+                                             stamp->tile_flags = tile_set_existing_wires(flipped_wire_direction_mask, stamp->tile_flags);
 
                                              // TODO: not sure if this number is right, but I think so, it's mean to
                                              // say, are there any wire clusters on this tile ? if so we need to rotate it
                                              if(stamp->tile_flags >= 256){
                                                   Direction_t cluster_direction = tile_flags_cluster_direction(stamp->tile_flags);
-                                                  auto rotated_cluster_direction = direction_rotate_clockwise(cluster_direction, 1);
+                                                  auto rotated_cluster_direction = direction_flip_vertically(cluster_direction);
                                                   tile_flags_set_cluster_direction(&stamp->tile_flags, rotated_cluster_direction);
                                              }
                                         } break;
@@ -2764,38 +2436,381 @@ int main(int argc, char** argv){
                                              default:
                                                   break;
                                              case INTERACTIVE_TYPE_PORTAL:
-                                                  stamp->interactive.portal.face = direction_rotate_clockwise(stamp->interactive.portal.face, 1);
+                                                  stamp->interactive.portal.face = direction_flip_vertically(stamp->interactive.portal.face);
                                                   break;
                                              case INTERACTIVE_TYPE_DOOR:
-                                                  stamp->interactive.door.face = direction_rotate_clockwise(stamp->interactive.door.face, 1);
+                                                  stamp->interactive.door.face = direction_flip_vertically(stamp->interactive.door.face);
                                                   break;
                                              case INTERACTIVE_TYPE_WIRE_CROSS:
-                                                  stamp->interactive.wire_cross.mask = direction_mask_rotate_clockwise(stamp->interactive.wire_cross.mask, 1);
+                                                  stamp->interactive.wire_cross.mask = direction_mask_flip_vertically(stamp->interactive.wire_cross.mask);
                                                   break;
                                              }
                                              break;
                                         }
                                    }
-
-                                   // update the offsets based on the tracked bottom left most, so that the selection effectively doesn't move
+                              } break;
+                         case SDL_SCANCODE_H:
+                              if(game_mode == GAME_MODE_EDITOR && editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
+                                   // horizontal flip selection !
+                                   S16 highest_stamp_index = 0;
                                    for(S16 i = 0; i < editor.selection.count; i++){
                                         auto* stamp = editor.selection.elements + i;
-                                        stamp->offset -= bottom_left_most;
+                                        if(stamp->offset.x > highest_stamp_index){
+                                             highest_stamp_index = stamp->offset.x;
+                                        }
+                                   }
+
+                                   for(S16 i = 0; i < editor.selection.count; i++){
+                                        auto* stamp = editor.selection.elements + i;
+                                        stamp->offset.x = highest_stamp_index - stamp->offset.x;
+
+                                        switch(stamp->type){
+                                        default:
+                                             break;
+                                        case STAMP_TYPE_TILE_ID:
+                                             // tile rotation for solids
+                                             if(stamp->tile.solid){
+                                                  stamp->tile.rotation = tile_flip_solid_id_horizontally_rotation(stamp->tile.id, stamp->tile.rotation);
+                                             }
+                                             break;
+                                        case STAMP_TYPE_TILE_FLAGS:
+                                        {
+                                             // tile wire rotation
+                                             auto wire_direction_mask = tile_existing_wires(stamp->tile_flags);
+                                             auto flipped_wire_direction_mask = direction_mask_flip_horizontally(wire_direction_mask);
+
+                                             stamp->tile_flags = tile_set_existing_wires(flipped_wire_direction_mask, stamp->tile_flags);
+
+                                             // TODO: not sure if this number is right, but I think so, it's mean to
+                                             // say, are there any wire clusters on this tile ? if so we need to rotate it
+                                             if(stamp->tile_flags >= 256){
+                                                  Direction_t cluster_direction = tile_flags_cluster_direction(stamp->tile_flags);
+                                                  auto rotated_cluster_direction = direction_flip_horizontally(cluster_direction);
+                                                  tile_flags_set_cluster_direction(&stamp->tile_flags, rotated_cluster_direction);
+                                             }
+                                        } break;
+                                        case STAMP_TYPE_BLOCK:
+                                             stamp->block.rotation++;
+                                             stamp->block.rotation %= 4;
+                                             break;
+                                        case STAMP_TYPE_INTERACTIVE:
+                                             switch(stamp->interactive.type){
+                                             default:
+                                                  break;
+                                             case INTERACTIVE_TYPE_PORTAL:
+                                                  stamp->interactive.portal.face = direction_flip_horizontally(stamp->interactive.portal.face);
+                                                  break;
+                                             case INTERACTIVE_TYPE_DOOR:
+                                                  stamp->interactive.door.face = direction_flip_horizontally(stamp->interactive.door.face);
+                                                  break;
+                                             case INTERACTIVE_TYPE_WIRE_CROSS:
+                                                  stamp->interactive.wire_cross.mask = direction_mask_flip_horizontally(stamp->interactive.wire_cross.mask);
+                                                  break;
+                                             }
+                                             break;
+                                        }
+                                   }
+                              }else{
+                                   Pixel_t pixel = mouse_select_world_pixel(mouse_screen, &camera) + HALF_TILE_SIZE_PIXEL;
+                                   Coord_t coord = mouse_select_world_coord(mouse_screen, &camera);
+                                   LOG("mouse pixel: %d, %d, Coord: %d, %d\n", pixel.x, pixel.y, coord.x, coord.y);
+                                   describe_coord(coord, &world);
+                              } break;
+                         case SDL_SCANCODE_Z:
+                              if(game_mode == GAME_MODE_EDITOR){
+                                   Raw_t* thumbnail_ptr = NULL;
+                                   glBindFramebuffer(GL_FRAMEBUFFER, thumbnail_framebuffer);
+                                   Raw_t thumbnail = create_thumbnail_bitmap();
+                                   if(thumbnail.bytes) thumbnail_ptr = &thumbnail;
+                                   glBindFramebuffer(GL_FRAMEBUFFER, render_framebuffer);
+                                   char filepath[64];
+                                   snprintf(filepath, 64, "content/%03d.bm", map_number);
+                                   save_map(filepath, player_start, &world.tilemap, &world.blocks, &world.interactives,
+                                            &world.rooms, &world.exits, current_map_tags, thumbnail_ptr);
+                                   if(thumbnail.bytes) free(thumbnail.bytes);
+                              }
+                              break;
+                         case SDL_SCANCODE_U:
+                              if(!resetting && can_undo && !will_undo_to_another_room){
+                                   player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_UNDO,
+                                                         record_demo.mode, record_demo.file, frame_count);
+                              }
+                              break;
+                         case SDL_SCANCODE_N:
+                              if(game_mode == GAME_MODE_EDITOR && editor.mode == EDITOR_MODE_CATEGORY_SELECT){
+                                   Tile_t* tile = tilemap_get_tile(&world.tilemap, mouse_select_world_coord(mouse_screen, &camera));
+                                   if(tile) tile_toggle_wire_activated(tile);
+                              }
+                              break;
+                         case SDL_SCANCODE_4:
+                              if(game_mode == GAME_MODE_EDITOR && editor.mode == EDITOR_MODE_CATEGORY_SELECT){
+                                   auto coord = mouse_select_world_coord(mouse_screen, &camera);
+                                   auto rect = rect_surrounding_coord(coord);
+
+                                   S16 block_count = 0;
+                                   Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
+                                   quad_tree_find_in(world.block_qt, rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
+
+                                   for(S16 i = 0; i < block_count; i++){
+                                        blocks[i]->entangle_index = -1;
                                    }
                               }
+                              break;
+                         case SDL_SCANCODE_8:
+                              if(game_mode == GAME_MODE_EDITOR && editor.mode == EDITOR_MODE_CATEGORY_SELECT){
+                                   auto coord = mouse_select_world_coord(mouse_screen, &camera);
+                                   auto rect = rect_surrounding_coord(coord);
+
+                                   S16 block_count = 0;
+                                   Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
+                                   quad_tree_find_in(world.block_qt, rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
+
+                                   for(S16 i = 0; i < block_count; i++){
+                                        S16 block_index = get_block_index(&world, blocks[i]);
+                                        if(editor.entangle_indices.count > 1 && block_index == editor.entangle_indices.elements[0]){
+                                             LOG("applying entanglement\n");
+                                             for(S16 e = 0; e < editor.entangle_indices.count; e++){
+                                                  S16 next_index = (e + 1) % editor.entangle_indices.count;
+                                                  S16 entangle_index = editor.entangle_indices.elements[next_index];
+                                                  Block_t* block = world.blocks.elements + editor.entangle_indices.elements[e];
+                                                  LOG("  %d -> %d\n", editor.entangle_indices.elements[e], entangle_index);
+                                                  block->entangle_index = entangle_index;
+                                             }
+                                             destroy(&editor.entangle_indices);
+                                             break;
+                                        }else{
+                                            S16 last_index = editor.entangle_indices.count;
+                                            resize(&editor.entangle_indices, editor.entangle_indices.count + 1);
+                                            editor.entangle_indices.elements[last_index] = block_index;
+                                            LOG("editor track entangle index %d\n", block_index);
+                                        }
+                                   }
+                              }
+                              break;
+                         case SDL_SCANCODE_2:
+                              if(game_mode == GAME_MODE_EDITOR && editor.mode == EDITOR_MODE_CATEGORY_SELECT){
+                                   auto pixel = mouse_select_world_pixel(mouse_screen, &camera);
+
+                                   // TODO: make this a function where you can pass in entangle_index
+                                   S16 new_index = world.players.count;
+                                   if(resize(&world.players, world.players.count + (S16)(1))){
+                                        Player_t* new_player = world.players.elements + new_index;
+                                        *new_player = world.players.elements[0];
+                                        new_player->pos = pixel_to_pos(pixel);
+                                   }
+                              }
+                              break;
+                         case SDL_SCANCODE_0:
+                              if(game_mode == GAME_MODE_EDITOR && editor.mode == EDITOR_MODE_CATEGORY_SELECT){
+                                   auto coord = mouse_select_world_coord(mouse_screen, &camera);
+                                   auto rect = rect_surrounding_coord(coord);
+
+                                   S16 block_count = 0;
+                                   Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
+                                   quad_tree_find_in(world.block_qt, rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
+
+                                   for(S16 i = 0; i < block_count; i++){
+                                        Block_t* block = blocks[i];
+                                        if(block->entangle_index >= 0){
+                                             S16 block_index = get_block_index(&world, block);
+                                             S16 current_index = block_index;
+                                             do
+                                             {
+                                                  Block_t* current_block = world.blocks.elements + current_index;
+                                                  current_index = current_block->entangle_index;
+                                                  current_block->entangle_index = -1;
+                                             }while(current_index != block_index && current_index >= 0);
+                                        }
+                                   }
+
+                                   destroy(&editor.entangle_indices);
+                              }
+                              break;
+                         // TODO: #ifdef DEBUG
+                         case SDL_SCANCODE_GRAVE:
+                              if(game_mode == GAME_MODE_PLAYING){
+                                   game_mode = GAME_MODE_EDITOR;
+                                   editor.mode = EDITOR_MODE_CATEGORY_SELECT;
+                              }else{
+                                   game_mode = GAME_MODE_PLAYING;
+                                   editor.selection_start = {};
+                                   editor.selection_end = {};
+                                   destroy(&editor.entangle_indices);
+                              }
+                              break;
+                         case SDL_SCANCODE_TAB:
+                              if(game_mode == GAME_MODE_EDITOR){
+                                   if(editor.mode == EDITOR_MODE_STAMP_SELECT){
+                                        editor.mode = EDITOR_MODE_STAMP_HIDE;
+                                   }else{
+                                        editor.mode = EDITOR_MODE_STAMP_SELECT;
+                                   }
+                              }
+                              break;
+                         case SDL_SCANCODE_RETURN:
+                              if(game_mode == GAME_MODE_EDITOR && editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
+                                   undo_commit(&undo, &world.players, &world.tilemap, &world.blocks, &world.interactives);
+
+                                   // clear coords below stamp
+                                   Rect_t selection_bounds = editor_selection_bounds(&editor);
+                                   for(S16 j = selection_bounds.bottom; j <= selection_bounds.top; j++){
+                                        for(S16 i = selection_bounds.left; i <= selection_bounds.right; i++){
+                                             Coord_t coord {i, j};
+                                             coord_clear(coord, &world.tilemap, &world.interactives, world.interactive_qt, &world.blocks);
+                                        }
+                                   }
+
+                                   for(int i = 0; i < editor.selection.count; i++){
+                                        Coord_t coord = editor.selection_start + editor.selection.elements[i].offset;
+                                        apply_stamp(editor.selection.elements + i, coord,
+                                                    &world.tilemap, &world.blocks, &world.interactives, &world.interactive_qt, ctrl_down);
+                                   }
+
+                                   quad_tree_free(world.block_qt);
+                                   world.block_qt = quad_tree_build(&world.blocks);
+
+                                   editor.mode = EDITOR_MODE_CATEGORY_SELECT;
+                              }
+                              break;
+                         case SDL_SCANCODE_T:
+                              if(game_mode == GAME_MODE_EDITOR && editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
+                                   sort_selection(&editor);
+
+                                   S16 height_offset = (S16)((editor.selection_end.y - editor.selection_start.y) - 1);
+
+                                   // perform rotation on each offset
+                                   for(S16 i = 0; i < editor.selection.count; i++){
+                                        auto* stamp = editor.selection.elements + i;
+                                        Coord_t rot {stamp->offset.y, (S16)(-stamp->offset.x + height_offset)};
+                                        stamp->offset = rot;
+                                   }
+                              }
+                              break;
+                         case SDL_SCANCODE_X:
+                              if(game_mode == GAME_MODE_EDITOR && editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
+                                   destroy(&editor.clipboard);
+                                   shallow_copy(&editor.selection, &editor.clipboard);
+                                   editor.mode = EDITOR_MODE_CATEGORY_SELECT;
+                              }
+                              break;
+                         case SDL_SCANCODE_P:
+                              if(game_mode == GAME_MODE_EDITOR && editor.mode == EDITOR_MODE_CATEGORY_SELECT && editor.clipboard.count){
+                                   destroy(&editor.selection);
+                                   shallow_copy(&editor.clipboard, &editor.selection);
+                                   editor.mode = EDITOR_MODE_SELECTION_MANIPULATION;
+                              }
+                              else if(game_mode == GAME_MODE_PLAYING && !resetting && can_undo && will_undo_to_another_room){
+                                   player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_UNDO,
+                                                         record_demo.mode, record_demo.file, frame_count);
+                              }
+                              break;
+                         case SDL_SCANCODE_M:
+                              if(game_mode == GAME_MODE_EDITOR &&
+                                 editor.mode == EDITOR_MODE_CATEGORY_SELECT){
+                                   player_start = mouse_select_world_coord(mouse_screen, &camera);
+                              }else if(game_mode == GAME_MODE_PLAYING && can_reset){
+                                   resetting = true;
+                              }
+                              break;
+                         case SDL_SCANCODE_R:
+                              if(game_mode == GAME_MODE_EDITOR){
+                                   if(editor.mode == EDITOR_MODE_CATEGORY_SELECT){
+                                        auto coord = mouse_select_world_coord(mouse_screen, &camera);
+                                        auto rect = rect_surrounding_coord(coord);
+
+                                        S16 block_count = 0;
+                                        Block_t* blocks[BLOCK_QUAD_TREE_MAX_QUERY];
+                                        quad_tree_find_in(world.block_qt, rect, blocks, &block_count, BLOCK_QUAD_TREE_MAX_QUERY);
+                                        for(S16 i = 0; i < block_count; i++){
+                                             blocks[i]->rotation += 1;
+                                             blocks[i]->rotation %= DIRECTION_COUNT;
+                                        }
+                                   }else if(editor.mode == EDITOR_MODE_SELECTION_MANIPULATION){
+                                        // rotate selection !
+                                        Coord_t bottom_left_most {};
+                                        for(S16 i = 0; i < editor.selection.count; i++){
+                                             auto* stamp = editor.selection.elements + i;
+                                             auto save_x = stamp->offset.x;
+                                             stamp->offset.x = stamp->offset.y;
+                                             stamp->offset.y = -save_x;
+
+                                             // track the bottom left most coord
+                                             if(bottom_left_most.x >= stamp->offset.x){
+                                                  bottom_left_most.x = stamp->offset.x;
+                                             }
+
+                                             if(bottom_left_most.y >= stamp->offset.y){
+                                                  bottom_left_most.y = stamp->offset.y;
+                                             }
+
+                                             switch(stamp->type){
+                                             default:
+                                                  break;
+                                             case STAMP_TYPE_TILE_ID:
+                                                  // tile rotation for solids
+                                                  if(stamp->tile.solid){
+                                                       stamp->tile.rotation++;
+                                                       stamp->tile.rotation %= 4;
+                                                  }
+                                                  break;
+                                             case STAMP_TYPE_TILE_FLAGS:
+                                             {
+                                                  // tile wire rotation
+                                                  auto wire_direction_mask = tile_existing_wires(stamp->tile_flags);
+                                                  auto rotated_wire_direction_mask = direction_mask_rotate_clockwise(wire_direction_mask, 1);
+
+                                                  stamp->tile_flags = tile_set_existing_wires(rotated_wire_direction_mask, stamp->tile_flags);
+
+                                                  // TODO: not sure if this number is right, but I think so, it's mean to
+                                                  // say, are there any wire clusters on this tile ? if so we need to rotate it
+                                                  if(stamp->tile_flags >= 256){
+                                                       Direction_t cluster_direction = tile_flags_cluster_direction(stamp->tile_flags);
+                                                       auto rotated_cluster_direction = direction_rotate_clockwise(cluster_direction, 1);
+                                                       tile_flags_set_cluster_direction(&stamp->tile_flags, rotated_cluster_direction);
+                                                  }
+                                             } break;
+                                             case STAMP_TYPE_BLOCK:
+                                                  stamp->block.rotation++;
+                                                  stamp->block.rotation %= 4;
+                                                  break;
+                                             case STAMP_TYPE_INTERACTIVE:
+                                                  switch(stamp->interactive.type){
+                                                  default:
+                                                       break;
+                                                  case INTERACTIVE_TYPE_PORTAL:
+                                                       stamp->interactive.portal.face = direction_rotate_clockwise(stamp->interactive.portal.face, 1);
+                                                       break;
+                                                  case INTERACTIVE_TYPE_DOOR:
+                                                       stamp->interactive.door.face = direction_rotate_clockwise(stamp->interactive.door.face, 1);
+                                                       break;
+                                                  case INTERACTIVE_TYPE_WIRE_CROSS:
+                                                       stamp->interactive.wire_cross.mask = direction_mask_rotate_clockwise(stamp->interactive.wire_cross.mask, 1);
+                                                       break;
+                                                  }
+                                                  break;
+                                             }
+                                        }
+
+                                        // update the offsets based on the tracked bottom left most, so that the selection effectively doesn't move
+                                        for(S16 i = 0; i < editor.selection.count; i++){
+                                             auto* stamp = editor.selection.elements + i;
+                                             stamp->offset -= bottom_left_most;
+                                        }
+                                   }
+                              }
+                              break;
+                         case SDL_SCANCODE_LCTRL:
+                              ctrl_down = true;
+                              break;
+                         case SDL_SCANCODE_5:
+                         {
+                              reset_players(&world.players);
+                              Player_t* player = world.players.elements;
+                              player->pos.pixel = mouse_select_world_pixel(mouse_screen, &camera);
+                              player->pos.decimal.x = 0;
+                              player->pos.decimal.y = 0;
+                         } break;
                          }
-                         break;
-                    case SDL_SCANCODE_LCTRL:
-                         ctrl_down = true;
-                         break;
-                    case SDL_SCANCODE_5:
-                    {
-                         reset_players(&world.players);
-                         Player_t* player = world.players.elements;
-                         player->pos.pixel = mouse_select_world_pixel(mouse_screen, &camera);
-                         player->pos.decimal.x = 0;
-                         player->pos.decimal.y = 0;
-                    } break;
                     }
                     break;
                case SDL_KEYUP:
@@ -2944,6 +2959,11 @@ int main(int argc, char** argv){
                               } break;
                               case EDITOR_MODE_EXITS:
                               {
+                                   if(world.editting_exit_path >= 0){
+                                        world.editting_exit_path = -1;
+                                        break;
+                                   }
+
                                    auto entry_add_quad = exit_ui_query(EXIT_UI_ENTRY_ADD, 0, &world.exits);
                                    if(vec_in_quad(&entry_add_quad, mouse_screen)){
                                         if(resize(&world.exits, world.exits.count + 1)){
@@ -2956,7 +2976,7 @@ int main(int argc, char** argv){
                                    for(S16 i = 0; i < world.exits.count; i++){
                                         auto increase_destination_index_quad = exit_ui_query(EXIT_UI_ENTRY_INCREASE_DESTINATION_INDEX, i, &world.exits);
                                         auto decrease_destination_index_quad = exit_ui_query(EXIT_UI_ENTRY_DECREASE_DESTINATION_INDEX, i, &world.exits);
-                                        // auto path_quad = exit_ui_query(EXIT_UI_ENTRY_PATH, i, &world.exits);
+                                        auto path_quad = exit_ui_query(EXIT_UI_ENTRY_PATH, i, &world.exits);
                                         auto remove_quad = exit_ui_query(EXIT_UI_ENTRY_REMOVE, i, &world.exits);
 
                                         if(vec_in_quad(&increase_destination_index_quad, mouse_screen)){
@@ -2981,6 +3001,11 @@ int main(int argc, char** argv){
 
                                              // resize to remove the last entry
                                              resize(&world.exits, world.exits.count - 1);
+                                             break;
+                                        }
+
+                                        if(vec_in_quad(&path_quad, mouse_screen)){
+                                             world.editting_exit_path = i;
                                              break;
                                         }
                                    }

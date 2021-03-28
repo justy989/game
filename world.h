@@ -27,11 +27,13 @@ struct World_t{
      // TODO: do we still need this ?
      S32 clone_instance = 0;
 
+     // These aren't really the world, more like the game, but we put them here for convenience.
      S16 current_room = -1;
      S16 previous_room = -1;
      F32 camera_transition = 0;
      bool recalc_room_camera = false;
      Rect_t editor_camera_bounds = {};
+     S16 editting_exit_path = -1;
 };
 
 #define MAX_TELEPORT_POSITION_RESULTS 4
