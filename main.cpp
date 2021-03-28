@@ -222,10 +222,10 @@ enum GameMode_t{
      GAME_MODE_LEVEL_SELECT,
 };
 
-enum ResetState_t{
-     RESET_STATE_NONE,
-     RESET_STATE_RESETTING_ROOM,
-     RESET_STATE_EXITTING, // exitting to a new map
+enum FadeState_t{
+     FADE_STATE_NONE,
+     FADE_STATE_RESETTING_ROOM,
+     FADE_STATE_EXITTING, // exitting to a new map
 };
 
 enum StopOnBoundary_t{
@@ -319,6 +319,34 @@ void draw_input_on_hud(char c, Vec_t pos, bool down){
      if(down){
           glColor3f(1.0f, 1.0f, 1.0f);
           draw_text(text, pos);
+     }
+}
+
+void stop_player_action_movement(PlayerAction_t* player_action, ObjectArray_t<Player_t>* players, Demo_t* record_demo,
+                                 S64 frame_count){
+     for(S16 d = 0; d < DIRECTION_COUNT; d++){
+          if(player_action->move[d]){
+               PlayerActionType_t stop_action = PLAYER_ACTION_TYPE_MOVE_LEFT_STOP;
+               switch(d){
+               default:
+                    break;
+               case DIRECTION_LEFT:
+                    stop_action = PLAYER_ACTION_TYPE_MOVE_LEFT_STOP;
+                    break;
+               case DIRECTION_DOWN:
+                    stop_action = PLAYER_ACTION_TYPE_MOVE_DOWN_STOP;
+                    break;
+               case DIRECTION_RIGHT:
+                    stop_action = PLAYER_ACTION_TYPE_MOVE_RIGHT_STOP;
+                    break;
+               case DIRECTION_UP:
+                    stop_action = PLAYER_ACTION_TYPE_MOVE_UP_STOP;
+                    break;
+               }
+
+               player_action_perform(player_action, players, stop_action,
+                                     record_demo->mode, record_demo->file, frame_count);
+          }
      }
 }
 
@@ -1805,8 +1833,9 @@ int main(int argc, char** argv){
 
      bool quit = false;
      bool seeked_with_mouse = false;
-     ResetState_t reset_state = RESET_STATE_NONE;
-     F32 reset_timer = 1.0f;
+     FadeState_t fade_state = FADE_STATE_NONE;
+     F32 fade_timer = 1.0f;
+     S16 fade_to_exit_index = -1;
 
      PlayerAction_t player_action {};
 
@@ -2273,31 +2302,31 @@ int main(int argc, char** argv){
                               }
                               break;
                          case SDL_SCANCODE_A:
-                              if(reset_state == RESET_STATE_NONE){
+                              if(fade_state == FADE_STATE_NONE){
                                    player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_LEFT_START,
                                                          record_demo.mode, record_demo.file, frame_count);
                               }
                               break;
                          case SDL_SCANCODE_D:
-                              if(reset_state == RESET_STATE_NONE){
+                              if(fade_state == FADE_STATE_NONE){
                                    player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_RIGHT_START,
                                                          record_demo.mode, record_demo.file, frame_count);
                               }
                               break;
                          case SDL_SCANCODE_W:
-                              if(reset_state == RESET_STATE_NONE){
+                              if(fade_state == FADE_STATE_NONE){
                                    player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_UP_START,
                                                          record_demo.mode, record_demo.file, frame_count);
                               }
                               break;
                          case SDL_SCANCODE_S:
-                              if(reset_state == RESET_STATE_NONE){
+                              if(fade_state == FADE_STATE_NONE){
                                    player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_DOWN_START,
                                                          record_demo.mode, record_demo.file, frame_count);
                               }
                               break;
                          case SDL_SCANCODE_E:
-                              if(reset_state == RESET_STATE_NONE){
+                              if(fade_state == FADE_STATE_NONE){
                                    player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_ACTIVATE_START,
                                                          record_demo.mode, record_demo.file, frame_count);
                               }
@@ -2306,7 +2335,7 @@ int main(int argc, char** argv){
                               if(play_demo.mode == DEMO_MODE_PLAY){
                                    play_demo.paused = !play_demo.paused;
                               }else{
-                                   if(reset_state == RESET_STATE_NONE){
+                                   if(fade_state == FADE_STATE_NONE){
                                         player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_SHOOT_START,
                                                               record_demo.mode, record_demo.file, frame_count);
                                    }
@@ -2450,6 +2479,9 @@ int main(int argc, char** argv){
                                              case INTERACTIVE_TYPE_WIRE_CROSS:
                                                   stamp->interactive.wire_cross.mask = direction_mask_flip_vertically(stamp->interactive.wire_cross.mask);
                                                   break;
+                                             case INTERACTIVE_TYPE_STAIRS:
+                                                  stamp->interactive.stairs.face = direction_flip_vertically(stamp->interactive.stairs.face);
+                                                  break;
                                              }
                                              break;
                                         }
@@ -2512,6 +2544,9 @@ int main(int argc, char** argv){
                                              case INTERACTIVE_TYPE_WIRE_CROSS:
                                                   stamp->interactive.wire_cross.mask = direction_mask_flip_horizontally(stamp->interactive.wire_cross.mask);
                                                   break;
+                                             case INTERACTIVE_TYPE_STAIRS:
+                                                  stamp->interactive.stairs.face = direction_flip_horizontally(stamp->interactive.stairs.face);
+                                                  break;
                                              }
                                              break;
                                         }
@@ -2537,7 +2572,7 @@ int main(int argc, char** argv){
                               }
                               break;
                          case SDL_SCANCODE_U:
-                              if(reset_state == RESET_STATE_NONE && can_undo && !will_undo_to_another_room){
+                              if(fade_state == FADE_STATE_NONE && can_undo && !will_undo_to_another_room){
                                    player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_UNDO,
                                                          record_demo.mode, record_demo.file, frame_count);
                               }
@@ -2705,7 +2740,7 @@ int main(int argc, char** argv){
                                    shallow_copy(&editor.clipboard, &editor.selection);
                                    editor.mode = EDITOR_MODE_SELECTION_MANIPULATION;
                               }
-                              else if(game_mode == GAME_MODE_PLAYING && reset_state == RESET_STATE_NONE && can_undo && will_undo_to_another_room){
+                              else if(game_mode == GAME_MODE_PLAYING && fade_state == FADE_STATE_NONE && can_undo && will_undo_to_another_room){
                                    player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_UNDO,
                                                          record_demo.mode, record_demo.file, frame_count);
                               }
@@ -2715,7 +2750,8 @@ int main(int argc, char** argv){
                                  editor.mode == EDITOR_MODE_CATEGORY_SELECT){
                                    player_start = mouse_select_world_coord(mouse_screen, &camera);
                               }else if(game_mode == GAME_MODE_PLAYING && can_reset){
-                                   reset_state = RESET_STATE_RESETTING_ROOM;
+                                   fade_state = FADE_STATE_RESETTING_ROOM;
+                                   stop_player_action_movement(&player_action, &world.players, &record_demo, frame_count);
                               }
                               break;
                          case SDL_SCANCODE_R:
@@ -2792,6 +2828,9 @@ int main(int argc, char** argv){
                                                   case INTERACTIVE_TYPE_WIRE_CROSS:
                                                        stamp->interactive.wire_cross.mask = direction_mask_rotate_clockwise(stamp->interactive.wire_cross.mask, 1);
                                                        break;
+                                                  case INTERACTIVE_TYPE_STAIRS:
+                                                       stamp->interactive.stairs.face = direction_rotate_clockwise(stamp->interactive.stairs.face, 1);
+                                                       break;
                                                   }
                                                   break;
                                              }
@@ -2828,42 +2867,42 @@ int main(int argc, char** argv){
                          break;
                     case SDL_SCANCODE_A:
                          if(play_demo.mode == DEMO_MODE_PLAY) break;
-                         if(reset_state != RESET_STATE_NONE) break;
+                         if(fade_state != FADE_STATE_NONE) break;
 
                          player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_LEFT_STOP,
                                                record_demo.mode, record_demo.file, frame_count);
                          break;
                     case SDL_SCANCODE_D:
                          if(play_demo.mode == DEMO_MODE_PLAY) break;
-                         if(reset_state != RESET_STATE_NONE) break;
+                         if(fade_state != FADE_STATE_NONE) break;
 
                          player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_RIGHT_STOP,
                                                record_demo.mode, record_demo.file, frame_count);
                          break;
                     case SDL_SCANCODE_W:
                          if(play_demo.mode == DEMO_MODE_PLAY) break;
-                         if(reset_state != RESET_STATE_NONE) break;
+                         if(fade_state != FADE_STATE_NONE) break;
 
                          player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_UP_STOP,
                                                record_demo.mode, record_demo.file, frame_count);
                          break;
                     case SDL_SCANCODE_S:
                          if(play_demo.mode == DEMO_MODE_PLAY) break;
-                         if(reset_state != RESET_STATE_NONE) break;
+                         if(fade_state != FADE_STATE_NONE) break;
 
                          player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_MOVE_DOWN_STOP,
                                                record_demo.mode, record_demo.file, frame_count);
                          break;
                     case SDL_SCANCODE_E:
                          if(play_demo.mode == DEMO_MODE_PLAY) break;
-                         if(reset_state != RESET_STATE_NONE) break;
+                         if(fade_state != FADE_STATE_NONE) break;
 
                          player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_ACTIVATE_STOP,
                                                record_demo.mode, record_demo.file, frame_count);
                          break;
                     case SDL_SCANCODE_SPACE:
                          if(play_demo.mode == DEMO_MODE_PLAY) break;
-                         if(reset_state != RESET_STATE_NONE) break;
+                         if(fade_state != FADE_STATE_NONE) break;
 
                          player_action_perform(&player_action, &world.players, PLAYER_ACTION_TYPE_SHOOT_STOP,
                                                record_demo.mode, record_demo.file, frame_count);
@@ -4881,7 +4920,10 @@ int main(int argc, char** argv){
                                                                       player->teleport_pushing_block_rotation, &world);
 
                               if(move_result.collided) repeat_collision_pass = true;
-                              if(move_result.resetting) reset_state = RESET_STATE_RESETTING_ROOM;
+                              if(move_result.resetting){
+                                   fade_state = FADE_STATE_RESETTING_ROOM;
+                                   stop_player_action_movement(&player_action, &world.players, &record_demo, frame_count);
+                              }
                               player->teleport_pos_delta = move_result.pos_delta;
                               player->teleport_pushing_block = move_result.pushing_block;
                               player->teleport_pushing_block_dir = move_result.pushing_block_dir;
@@ -4893,7 +4935,10 @@ int main(int argc, char** argv){
                                                                       &world);
 
                               if(move_result.collided) repeat_collision_pass = true;
-                              if(move_result.resetting) reset_state = RESET_STATE_RESETTING_ROOM;
+                              if(move_result.resetting){
+                                   fade_state = FADE_STATE_RESETTING_ROOM;
+                                   stop_player_action_movement(&player_action, &world.players, &record_demo, frame_count);
+                              }
                               player->pos_delta = move_result.pos_delta;
                               player->pushing_block = move_result.pushing_block;
                               player->pushing_block_dir = move_result.pushing_block_dir;
@@ -4993,7 +5038,8 @@ int main(int argc, char** argv){
                                    update_player_count = 1;
                               }else{
                                    // TODO: How do we handle if they are in a room that can't reset ?
-                                   reset_state = RESET_STATE_RESETTING_ROOM;
+                                   fade_state = FADE_STATE_RESETTING_ROOM;
+                                   stop_player_action_movement(&player_action, &world.players, &record_demo, frame_count);
                               }
                          }
 
@@ -5612,7 +5658,7 @@ int main(int argc, char** argv){
                     destroy(&ordered_player_block_pushes);
                }
 
-               // update interactives
+               // update interactive pressure plates
                for(S16 i = 0; i < world.interactives.count; i++){
                     Interactive_t* interactive = world.interactives.elements + i;
                     if(interactive->type == INTERACTIVE_TYPE_PRESSURE_PLATE){
@@ -5667,6 +5713,19 @@ int main(int argc, char** argv){
                               activate(&world, interactive->coord);
                               interactive->pressure_plate.down = should_be_down;
                          }
+                    }else if(interactive->type == INTERACTIVE_TYPE_STAIRS){
+                         if(fade_state != FADE_STATE_NONE) continue;
+
+                         for(S16 p = 0; p < world.players.count; p++){
+                              if(world.players.elements[p].pos.z != 0) continue;
+                              Coord_t player_coord = pos_to_coord(world.players.elements[p].pos);
+                              if(interactive->coord == player_coord){
+                                   fade_state = FADE_STATE_EXITTING;
+                                   fade_to_exit_index = interactive->stairs.exit_index;
+                                   stop_player_action_movement(&player_action, &world.players, &record_demo, frame_count);
+                                   break;
+                              }
+                         }
                     }
                }
 
@@ -5695,10 +5754,10 @@ int main(int argc, char** argv){
                     update_light_and_ice_detectors(world.interactives.elements + i, &world);
                }
 
-               if(reset_state != RESET_STATE_NONE){
-                    reset_timer += dt;
-                    if(reset_timer >= RESET_TIME){
-                         if(reset_state == RESET_STATE_RESETTING_ROOM){
+               if(fade_state != FADE_STATE_NONE){
+                    fade_timer += dt;
+                    if(fade_timer >= FADE_TIME){
+                         if(fade_state == FADE_STATE_RESETTING_ROOM){
                               // what room is the player in ?
                               // TODO: compress with code in update_camera()
                               if (current_room_index >= 0 && current_room_index < world.rooms.count) {
@@ -5778,14 +5837,50 @@ int main(int argc, char** argv){
                                         player->pos = coord_to_pos_at_tile_center(checkpoint_coord);
                                    }
                               }
-                         }else if(reset_state == RESET_STATE_EXITTING){
+                         }else if(fade_state == FADE_STATE_EXITTING){
+                              if(fade_to_exit_index >= 0 && fade_to_exit_index < world.exits.count){
+                                   auto* exit = world.exits.elements + fade_to_exit_index;
+                                   S16 exit_destination_index = exit->destination_index;
+
+                                   // build the path to the map to load
+                                   // accounting for 'content/' and necessary null terminator for max path sizes
+                                   const size_t buffer_size = EXIT_MAX_PATH_SIZE + 9;
+                                   char buffer[buffer_size];
+                                   snprintf(buffer, buffer_size, "content/%s", exit->path);
+                                   buffer[buffer_size - 1] = 0;
+                                   for(size_t i = 0; i < buffer_size; i++){
+                                        if(isalpha(buffer[i])){
+                                             buffer[i] = tolower(buffer[i]);
+                                        }
+                                   }
+
+                                   // our exit pointer is invalid now !
+                                   if(!load_map(buffer, &player_start, &world.tilemap, &world.blocks, &world.interactives,
+                                                &world.rooms, &world.exits)){
+                                        // TODO: go back to the menu or something ? Maybe move the player back out of the stairs
+                                   }else{
+                                        for(S16 i = 0; i < world.interactives.count; i++){
+                                             auto* interactive = world.interactives.elements + i;
+                                             if(interactive->type == INTERACTIVE_TYPE_STAIRS){
+                                                  if(interactive->stairs.exit_index == exit_destination_index){
+                                                       player_start = interactive->coord + interactive->stairs.face;
+                                                       world.players.elements[0].face = interactive->stairs.face;
+                                                       break;
+                                                  }
+                                             }
+                                        }
+
+                                        reset_map(player_start, &world, &undo, &camera);
+                                        update_camera(&camera, &world, get_room_index_of_player(&world), true);
+                                   }
+                              }
                          }
 
-                         reset_state = RESET_STATE_NONE;
+                         fade_state = FADE_STATE_NONE;
                     }
                }else{
-                    reset_timer -= dt;
-                    if(reset_timer <= 0) reset_timer = 0;
+                    fade_timer -= dt;
+                    if(fade_timer <= 0) fade_timer = 0;
                }
           }
 
@@ -6385,10 +6480,10 @@ int main(int argc, char** argv){
                glEnd();
           }
 
-          if(reset_timer >= 0.0f){
+          if(fade_timer >= 0.0f){
                glBindTexture(GL_TEXTURE_2D, 0);
                glBegin(GL_QUADS);
-               glColor4f(0.0f, 0.0f, 0.0f, reset_timer / RESET_TIME);
+               glColor4f(0.0f, 0.0f, 0.0f, fade_timer / FADE_TIME);
                glVertex2f(0, 0);
                glVertex2f(0, 1);
                glVertex2f(1, 1);
