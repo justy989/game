@@ -2942,6 +2942,49 @@ int main(int argc, char** argv){
                                    editor.selection_end = editor.selection_start;
                                    editor.mode = EDITOR_MODE_ROOM_CREATION;
                               } break;
+                              case EDITOR_MODE_EXITS:
+                              {
+                                   auto entry_add_quad = exit_ui_query(EXIT_UI_ENTRY_ADD, 0, &world.exits);
+                                   if(vec_in_quad(&entry_add_quad, mouse_screen)){
+                                        if(resize(&world.exits, world.exits.count + 1)){
+                                             auto* new_exit = world.exits.elements + (world.exits.count - 1);
+                                             snprintf((char*)(new_exit->path), EXIT_MAX_PATH_SIZE, "NEW");
+                                             new_exit->destination_index = 0;
+                                        }
+                                   }
+
+                                   for(S16 i = 0; i < world.exits.count; i++){
+                                        auto increase_destination_index_quad = exit_ui_query(EXIT_UI_ENTRY_INCREASE_DESTINATION_INDEX, i, &world.exits);
+                                        auto decrease_destination_index_quad = exit_ui_query(EXIT_UI_ENTRY_DECREASE_DESTINATION_INDEX, i, &world.exits);
+                                        // auto path_quad = exit_ui_query(EXIT_UI_ENTRY_PATH, i, &world.exits);
+                                        auto remove_quad = exit_ui_query(EXIT_UI_ENTRY_REMOVE, i, &world.exits);
+
+                                        if(vec_in_quad(&increase_destination_index_quad, mouse_screen)){
+                                             if(world.exits.elements[i].destination_index != 255){
+                                                  world.exits.elements[i].destination_index++;
+                                             }
+                                             break;
+                                        }
+
+                                        if(vec_in_quad(&decrease_destination_index_quad, mouse_screen)){
+                                             if(world.exits.elements[i].destination_index != 0){
+                                                  world.exits.elements[i].destination_index--;
+                                             }
+                                             break;
+                                        }
+
+                                        if(vec_in_quad(&remove_quad, mouse_screen)){
+                                             // shift all entries after this one down one to overwrite this one
+                                             for(S16 j = i + 1; j < world.exits.count; j++){
+                                                  world.exits.elements[j - 1] = world.exits.elements[j];
+                                             }
+
+                                             // resize to remove the last entry
+                                             resize(&world.exits, world.exits.count - 1);
+                                             break;
+                                        }
+                                   }
+                              } break;
                               }
                               break;
                          case GAME_MODE_LEVEL_SELECT:
