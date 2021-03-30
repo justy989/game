@@ -2452,7 +2452,7 @@ bool reset_players(ObjectArray_t<Player_t>* players){
      bool success = init(players, 1);
      if(success){
           *players->elements = Player_t{};
-          players->elements[0].has_bow = true;
+          players->elements[0].has_bow = PLAYER_HAS_BOW;
      }
      return success;
 }

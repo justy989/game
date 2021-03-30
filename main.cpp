@@ -1716,7 +1716,7 @@ int main(int argc, char** argv){
                printf("  -play   <demo filepath> replay a recorded demo file\n");
                printf("  -record <demo filepath> record a demo file\n");
                printf("  -load   <map filepath>  load a map\n");
-               printf("  -loadsaves              enables the saving/loading system.\n");
+               printf("  -save                   enables the saving/loading system.\n");
                printf("  -test                   validate the map state is correct after playing a demo\n");
                printf("  -suite                  run map/demo combos in succession validating map state after each headless\n");
                printf("  -updatetags             when running a test, at the end update the tags in the map file\n");
