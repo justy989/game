@@ -1204,6 +1204,7 @@ bool load_map_thumbnail(const char* filepath, Raw_t* thumbnail){
      S16 interactive_count;
      S16 block_count;
      S16 room_count;
+     S16 exit_count;
      U64 thumbnail_size;
      Coord_t player_start;
 
@@ -1217,13 +1218,28 @@ bool load_map_thumbnail(const char* filepath, Raw_t* thumbnail){
           fseek(file, sizeof(MapTileV1_t) * map_width * map_height, SEEK_CUR);
           fseek(file, sizeof(MapBlockV3_t) * block_count, SEEK_CUR);
           fseek(file, sizeof(MapInteractiveV1_t) * interactive_count, SEEK_CUR);
-     }else{
+     }else if(map_version == 8){
           fread(&room_count, sizeof(room_count), 1, file);
 
           fseek(file, sizeof(MapTileV2_t) * map_width * map_height, SEEK_CUR);
           fseek(file, sizeof(MapBlockV3_t) * block_count, SEEK_CUR);
           fseek(file, sizeof(MapInteractiveV3_t) * interactive_count, SEEK_CUR);
           fseek(file, sizeof(Rect_t) * room_count, SEEK_CUR);
+     }else if(map_version == 9){
+          fread(&room_count, sizeof(room_count), 1, file);
+          fread(&exit_count, sizeof(exit_count), 1, file);
+
+          fseek(file, sizeof(MapTileV2_t) * map_width * map_height, SEEK_CUR);
+          fseek(file, sizeof(MapBlockV3_t) * block_count, SEEK_CUR);
+          fseek(file, sizeof(MapInteractiveV4_t) * interactive_count, SEEK_CUR);
+          fseek(file, sizeof(Rect_t) * room_count, SEEK_CUR);
+
+          ObjectArray_t<Exit_t> exits{};
+          init(&exits, exit_count);
+          for(S16 i = 0; i < exit_count; i++){
+               read_exit(file, exits.elements + i);
+          }
+          destroy(&exits);
      }
 
      fread(&thumbnail_size, sizeof(thumbnail_size), 1, file);
@@ -1267,6 +1283,7 @@ bool load_map_tags(const char* filepath, bool* tags){
      U64 thumbnail_size;
      U16 tag_count;
      S16 room_count;
+     S16 exit_count;
      Coord_t player_start;
 
      fread(&player_start, sizeof(player_start), 1, file);
@@ -1279,13 +1296,28 @@ bool load_map_tags(const char* filepath, bool* tags){
           fseek(file, sizeof(MapTileV1_t) * map_width * map_height, SEEK_CUR);
           fseek(file, sizeof(MapBlockV3_t) * block_count, SEEK_CUR);
           fseek(file, sizeof(MapInteractiveV1_t) * interactive_count, SEEK_CUR);
-     }else{
+     }else if(map_version == 8){
           fread(&room_count, sizeof(room_count), 1, file);
 
           fseek(file, sizeof(MapTileV2_t) * map_width * map_height, SEEK_CUR);
           fseek(file, sizeof(MapBlockV3_t) * block_count, SEEK_CUR);
           fseek(file, sizeof(MapInteractiveV3_t) * interactive_count, SEEK_CUR);
           fseek(file, sizeof(Rect_t) * room_count, SEEK_CUR);
+     }else if(map_version == 9){
+          fread(&room_count, sizeof(room_count), 1, file);
+          fread(&exit_count, sizeof(exit_count), 1, file);
+
+          fseek(file, sizeof(MapTileV2_t) * map_width * map_height, SEEK_CUR);
+          fseek(file, sizeof(MapBlockV3_t) * block_count, SEEK_CUR);
+          fseek(file, sizeof(MapInteractiveV4_t) * interactive_count, SEEK_CUR);
+          fseek(file, sizeof(Rect_t) * room_count, SEEK_CUR);
+
+          ObjectArray_t<Exit_t> exits{};
+          init(&exits, exit_count);
+          for(S16 i = 0; i < exit_count; i++){
+               read_exit(file, exits.elements + i);
+          }
+          destroy(&exits);
      }
 
      fread(&thumbnail_size, sizeof(thumbnail_size), 1, file);

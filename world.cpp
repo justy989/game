@@ -1454,7 +1454,8 @@ void update_light_and_ice_detectors(Interactive_t* interactive, World_t* world){
           Block_t* block = nullptr;
           for(S16 b = 0; b < block_count; b++){
                // blocks on the coordinate and on the ground block light
-               if(block_get_coord(blocks[b]) == interactive->coord && blocks[b]->pos.z == 0){
+               if(block_get_coord(blocks[b]) == interactive->coord &&
+                  blocks[b]->pos.z >= 0 && blocks[b]->pos.z <= HEIGHT_INTERVAL){
                     block = blocks[b];
                     break;
                }

@@ -31,6 +31,7 @@ static void draw_opaque_quad(Quad_t quad, F32 opacity){
      GLint save_texture;
      glGetIntegerv(GL_TEXTURE_BINDING_2D, &save_texture);
 
+     glBindTexture(GL_TEXTURE_2D, 0);
      draw_color_quad(quad, 0.0f, 0.0f, 0.0f, opacity);
 
      glBindTexture(GL_TEXTURE_2D, save_texture);
@@ -244,7 +245,7 @@ void draw_tile_flags(U16 flags, Vec_t tile_pos, bool editor){
 }
 
 void draw_block(Block_t* block, Vec_t pos_vec, U8 portal_rotations){
-     static const F32 block_shadow_opacity = 0.4f;
+     static const F32 block_shadow_opacity = 0.5f;
 
      // draw a shadow below the block when we are on the bottom of the pit
      if(block->pos.z == -HEIGHT_INTERVAL){
