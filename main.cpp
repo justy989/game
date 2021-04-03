@@ -1630,6 +1630,12 @@ void save_diff_file(const char* current_map_filepath, World_t* world, bool exitt
      free(diff_filename);
 }
 
+bool can_player_activate(Player_t* player, QuadTreeNode_t<Interactive_t>* interactive_qt){
+     Coord_t coord = pos_to_coord(player->pos) + player->face;
+     Interactive_t* interactive = quad_tree_interactive_find_at(interactive_qt, coord);
+     if(interactive && interactive->type == INTERACTIVE_TYPE_LEVER) return true;
+     return false;
+}
 
 int main(int argc, char** argv){
      char* current_map_filepath = nullptr;
@@ -3650,7 +3656,9 @@ int main(int argc, char** argv){
                          player->accel.y += PLAYER_ACCEL;
                     }
 
-                    if(player_action.activate && !player_action.last_activate){
+                    player->can_activate = can_player_activate(player, world.interactive_qt);
+
+                    if(player_action.activate && !player_action.last_activate && player->can_activate){
                          undo_commit(&undo, &world.players, &world.tilemap, &world.blocks, &world.interactives);
                          activate(&world, pos_to_coord(player->pos) + player->face);
                     }

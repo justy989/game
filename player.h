@@ -64,6 +64,7 @@ struct Player_t : public Motion_t {
      bool        successfully_moved = false;
      bool        held_up = false;
      CarriedPosDelta_t carried_pos_delta;
+     bool        can_activate = false;
 };
 
 // rough estimate since player is 3.5 pixels radius
