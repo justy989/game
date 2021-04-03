@@ -6549,6 +6549,31 @@ int main(int argc, char** argv){
                     draw_screen_texture(pos, tex, dim, tex_dim);
                }
 
+               bool any_player_can_activate = false;
+               for(S16 i = 0; i < world.players.count; i++){
+                    auto* player = world.players.elements + i;
+                    if(player->can_activate){
+                         any_player_can_activate = true;
+                         break;
+                    }
+               }
+
+               {
+                    Vec_t pos {0.18f, 0.96f};
+                    Vec_t tex = theme_frame(12, 17);
+                    tex.y += THEME_FRAME_HEIGHT * 0.5f;
+                    Vec_t dim = {HALF_TILE_SIZE + PIXEL_SIZE, HALF_TILE_SIZE};
+                    Vec_t tex_dim = {THEME_FRAME_WIDTH * 0.5f + THEME_TEXEL_WIDTH, THEME_FRAME_HEIGHT * 0.5f};
+
+                    if(any_player_can_activate){
+                         glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+                    }else{
+                         glColor4f(1.0f, 1.0f, 1.0f, 0.1f);
+                    }
+
+                    draw_screen_texture(pos, tex, dim, tex_dim);
+               }
+
                glEnd();
           }
 
