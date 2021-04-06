@@ -1521,7 +1521,6 @@ BlockPushResult_t block_push(Block_t* block, Direction_t direction, World_t* wor
 static float calc_half_distance_to_next_grid_center(S16 pixel, F32 decimal, S16 block_len, bool positive){
      // if the position is not grid aligned
      if(pixel % block_len != 0 || decimal != 0){
-
           // find the next grid center
           S16 next_grid_center_pixel = (pixel - (pixel % block_len));
           if(positive) next_grid_center_pixel += block_len;
@@ -1626,6 +1625,12 @@ bool apply_push_horizontal(Block_t* block, Position_t pos, World_t* world, Direc
 
                Position_t block_pos = block_get_final_position(block);
                Vec_t block_vel = block_get_vel(block);
+
+               // If the block is idling, and it still has some pos_delta moving it past the closest pixel, just move it to the closest pixel
+               if(block->horizontal_move.state == MOVE_STATE_IDLING && block->pos_delta.x != 0) {
+                    block_pos.pixel.x = closest_pixel(block_pos.pixel.x, block_pos.decimal.x);
+                    block_pos.decimal.x = 0;
+               }
 
                F32 half_distance_to_next_grid_center = calc_half_distance_to_next_grid_center(block_pos.pixel.x,
                                                                                               block_pos.decimal.x,
@@ -1733,6 +1738,12 @@ bool apply_push_vertical(Block_t* block, Position_t pos, World_t* world, Directi
 
                Position_t block_pos = block_get_final_position(block);
                Vec_t block_vel = block_get_vel(block);
+
+               // If the block is idling, and it still has some pos_delta moving it past the closest pixel, just move it to the closest pixel
+               if(block->vertical_move.state == MOVE_STATE_IDLING && block->pos_delta.y != 0) {
+                    block_pos.pixel.y = closest_pixel(block_pos.pixel.y, block_pos.decimal.y);
+                    block_pos.decimal.y = 0;
+               }
 
                F32 half_distance_to_next_grid_center = calc_half_distance_to_next_grid_center(block_pos.pixel.y,
                                                                                               block_pos.decimal.y,
