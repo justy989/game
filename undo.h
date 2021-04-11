@@ -8,6 +8,7 @@
 
 struct UndoBlock_t{
      Pixel_t pixel;
+     Vec_t decimal;
      S8 z;
      Element_t element;
      Vec_t accel;

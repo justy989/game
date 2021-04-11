@@ -10,10 +10,6 @@ Before playtest:
 - Teaching the controls in the first few puzzles.
 - Show WASD In the first room.
 
-Notes:
-- make reset fade inout time quicker
-
-
 Entanglement Puzzles:
 - entangle puzzle where there is a line of pressure plates against the wall with a line of popups on the other side that would
   trap an entangled block if it got to close, stopping the player from using walls to get blocks closer

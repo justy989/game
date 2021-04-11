@@ -166,6 +166,7 @@ void undo_snapshot(Undo_t* undo, ObjectArray_t<Player_t>* players, TileMap_t* ti
           UndoBlock_t* undo_block = undo->blocks.elements + i;
           Block_t* block = blocks->elements + i;
           undo_block->pixel = block->pos.pixel;
+          undo_block->decimal = block->pos.decimal;
           undo_block->z = block->pos.z;
           undo_block->element = block->element;
           undo_block->accel = block->accel;
@@ -319,6 +320,7 @@ void undo_commit(Undo_t* undo, ObjectArray_t<Player_t>* players, TileMap_t* tile
                     Block_t* block = blocks->elements + i;
 
                     if(last_block->pixel == block->pos.pixel &&
+                       last_block->decimal == block->pos.decimal &&
                        last_block->z == block->pos.z &&
                        last_block->element == block->element &&
                        last_block->entangle_index == block->entangle_index &&
@@ -350,6 +352,7 @@ void undo_commit(Undo_t* undo, ObjectArray_t<Player_t>* players, TileMap_t* tile
           Block_t* block = blocks->elements + i;
 
           if(undo_block->pixel != block->pos.pixel ||
+             undo_block->decimal != block->pos.decimal ||
              undo_block->z != block->pos.z ||
              undo_block->element != block->element ||
              undo_block->entangle_index != block->entangle_index ||
@@ -497,7 +500,7 @@ void undo_revert(Undo_t* undo, ObjectArray_t<Player_t>* players, TileMap_t* tile
                Block_t* block = blocks->elements + diff_header->index;
                *block = {};
                block->pos.pixel = block_entry->pixel;
-               block->pos.decimal = vec_zero();
+               block->pos.decimal = block_entry->decimal;
                block->pos.z = block_entry->z;
                block->element = block_entry->element;
                block->accel = block_entry->accel;
