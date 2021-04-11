@@ -47,7 +47,8 @@
 
 #define LIGHT_DETECTOR_THRESHOLD 212
 
-#define FADE_TIME 2.0f
+#define FADE_RESET_TIME 0.5f
+#define FADE_FLOOR_TIME 2.0f
 
 #define UNDO_MEMORY (4 * 1024 * 1024)
 

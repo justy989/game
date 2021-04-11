@@ -9,8 +9,10 @@ TODO:
 Before playtest:
 - Teaching the controls in the first few puzzles.
 - Show WASD In the first room.
-- Show E When the player can activate a lever.
-- Saving player progress on checkpoints.
+
+Notes:
+- make reset fade inout time quicker
+
 
 Entanglement Puzzles:
 - entangle puzzle where there is a line of pressure plates against the wall with a line of popups on the other side that would
@@ -1878,6 +1880,7 @@ int main(int argc, char** argv){
      bool seeked_with_mouse = false;
      FadeState_t fade_state = FADE_STATE_NONE;
      F32 fade_timer = 1.0f;
+     F32 fade_time = FADE_FLOOR_TIME;
      S16 fade_to_exit_index = -1;
 
      PlayerAction_t player_action {};
@@ -2799,6 +2802,7 @@ int main(int argc, char** argv){
                                    player_start = mouse_select_world_coord(mouse_screen, &camera);
                               }else if(game_mode == GAME_MODE_PLAYING && can_reset){
                                    fade_state = FADE_STATE_RESETTING_ROOM;
+                                   fade_time = FADE_RESET_TIME;
                                    stop_player_action_movement(&player_action, &world.players, &record_demo, frame_count);
                               }
                               break;
@@ -4972,6 +4976,7 @@ int main(int argc, char** argv){
                               if(move_result.collided) repeat_collision_pass = true;
                               if(move_result.resetting){
                                    fade_state = FADE_STATE_RESETTING_ROOM;
+                                   fade_time = FADE_RESET_TIME;
                                    stop_player_action_movement(&player_action, &world.players, &record_demo, frame_count);
                               }
                               player->teleport_pos_delta = move_result.pos_delta;
@@ -4987,6 +4992,7 @@ int main(int argc, char** argv){
                               if(move_result.collided) repeat_collision_pass = true;
                               if(move_result.resetting){
                                    fade_state = FADE_STATE_RESETTING_ROOM;
+                                   fade_time = FADE_RESET_TIME;
                                    stop_player_action_movement(&player_action, &world.players, &record_demo, frame_count);
                               }
                               player->pos_delta = move_result.pos_delta;
@@ -5089,6 +5095,7 @@ int main(int argc, char** argv){
                               }else{
                                    // TODO: How do we handle if they are in a room that can't reset ?
                                    fade_state = FADE_STATE_RESETTING_ROOM;
+                                   fade_time = FADE_RESET_TIME;
                                    stop_player_action_movement(&player_action, &world.players, &record_demo, frame_count);
                               }
                          }
@@ -5771,6 +5778,7 @@ int main(int argc, char** argv){
                               Coord_t player_coord = pos_to_coord(world.players.elements[p].pos);
                               if(interactive->coord == player_coord){
                                    fade_state = FADE_STATE_EXITTING;
+                                   fade_time = FADE_FLOOR_TIME;
                                    fade_to_exit_index = interactive->stairs.exit_index;
                                    stop_player_action_movement(&player_action, &world.players, &record_demo, frame_count);
                                    break;
@@ -5816,7 +5824,7 @@ int main(int argc, char** argv){
 
                if(fade_state != FADE_STATE_NONE){
                     fade_timer += dt;
-                    if(fade_timer >= FADE_TIME){
+                    if(fade_timer >= fade_time){
                          if(fade_state == FADE_STATE_RESETTING_ROOM){
                               // what room is the player in ?
                               // TODO: compress with code in update_camera()
@@ -6580,7 +6588,7 @@ int main(int argc, char** argv){
           if(fade_timer >= 0.0f){
                glBindTexture(GL_TEXTURE_2D, 0);
                glBegin(GL_QUADS);
-               glColor4f(0.0f, 0.0f, 0.0f, fade_timer / FADE_TIME);
+               glColor4f(0.0f, 0.0f, 0.0f, fade_timer / fade_time);
                glVertex2f(0, 0);
                glVertex2f(0, 1);
                glVertex2f(1, 1);
