@@ -6284,19 +6284,41 @@ int main(int argc, char** argv){
                glEnd();
 
                glBindTexture(GL_TEXTURE_2D, 0);
+
+
 #if 1
+               // darken everything pass
+               {
+                    glMatrixMode(GL_PROJECTION);
+                    glLoadIdentity();
+                    glOrtho(0.0f, 1.0f, 0.0f, 1.0f, 0.0, 1.0);
+                    glBegin(GL_QUADS);
+                    glColor4f(0.0f, 0.0f, 0.0f, 0.425f);
+                    glVertex2f(0, 0);
+                    glVertex2f(0, 1);
+                    glVertex2f(1, 1);
+                    glVertex2f(1, 0);
+                    glEnd();
+               }
+
+               glMatrixMode(GL_PROJECTION);
+               glLoadIdentity();
+               glOrtho(camera.view.left, camera.view.right, camera.view.bottom, camera.view.top, 0.0, 1.0);
+
                // light
+               const S16 light_range = (256 - BASE_LIGHT);
                glBegin(GL_QUADS);
                for(S16 y = min.y; y <= max.y; y++){
                     for(S16 x = min.x; x <= max.x; x++){
                          Coord_t coord {x, y};
                          Tile_t* tile = world.tilemap.tiles[y] + x;
 
-                         F32 light_value = (F32)(255 - tile->light) / 255.0f;
+                         F32 light_value = (F32)(light_range - (256 - tile->light)) / (F32)(light_range);
+                         if(light_value <= 0) continue;
 
                          Vec_t tile_pos = pos_to_vec(coord_to_pos(coord) + camera.offset);
 
-                         glColor4f(0.0f, 0.0f, 0.0f, light_value);
+                         glColor4f(1.0f, 0.8f, 0.375f, light_value * 0.1f);
                          glVertex2f(tile_pos.x, tile_pos.y);
                          glVertex2f(tile_pos.x, tile_pos.y + TILE_SIZE);
                          glVertex2f(tile_pos.x + TILE_SIZE, tile_pos.y + TILE_SIZE);
