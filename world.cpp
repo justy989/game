@@ -1343,6 +1343,7 @@ static void impact_ice(Coord_t center, S8 height, S16 radius, World_t* world, bo
                                    case INTERACTIVE_TYPE_PRESSURE_PLATE:
                                    case INTERACTIVE_TYPE_ICE_DETECTOR:
                                    case INTERACTIVE_TYPE_LIGHT_DETECTOR:
+                                   case INTERACTIVE_TYPE_CHECKPOINT:
                                         if(height <= MELT_SPREAD_HEIGHT){
                                              if(spread_the_ice){
                                                   add_global_tag(TAG_SPREAD_ICE);
