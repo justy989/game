@@ -2590,6 +2590,8 @@ void describe_coord(Coord_t coord, World_t* world){
                break;
           case INTERACTIVE_TYPE_STAIRS:
                type_string = "STAIRS";
+               snprintf(info_string, info_string_len, "up: %d, dir: %s, exit: %d",
+                        interactive->stairs.up, direction_to_string(interactive->stairs.face), interactive->stairs.exit_index);
                break;
           case INTERACTIVE_TYPE_CHECKPOINT:
                type_string = "CHECKPOINT";
