@@ -2459,6 +2459,24 @@ int main(int argc, char** argv){
                               }
                               break;
                          }
+                         case SDL_SCANCODE_PERIOD:
+                              if(game_mode == GAME_MODE_EDITOR){
+                                   auto mouse_coord = mouse_select_world_coord(mouse_screen, &camera);
+                                   auto* interactive = quad_tree_interactive_find_at(world.interactive_qt, mouse_coord);
+                                   if(interactive && interactive->type == INTERACTIVE_TYPE_STAIRS){
+                                        interactive->stairs.exit_index++;
+                                   }
+                              }
+                              break;
+                         case SDL_SCANCODE_COMMA:
+                              if(game_mode == GAME_MODE_EDITOR){
+                                   auto mouse_coord = mouse_select_world_coord(mouse_screen, &camera);
+                                   auto* interactive = quad_tree_interactive_find_at(world.interactive_qt, mouse_coord);
+                                   if(interactive && interactive->type == INTERACTIVE_TYPE_STAIRS && interactive->stairs.exit_index > 0){
+                                        interactive->stairs.exit_index--;
+                                   }
+                              }
+                              break;
                          case SDL_SCANCODE_MINUS:
                               if(play_demo.dt_scalar > 0.1f){
                                    play_demo.dt_scalar -= 0.1f;

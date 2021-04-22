@@ -991,6 +991,7 @@ bool load_map_from_file_v9(FILE* file, Coord_t* player_start, TileMap_t* tilemap
           case INTERACTIVE_TYPE_STAIRS:
                interactive->stairs.up = map_interactive->stairs.up;
                interactive->stairs.face = map_interactive->stairs.face;
+               interactive->stairs.exit_index = map_interactive->stairs.exit_index;
                break;
           case INTERACTIVE_TYPE_CHECKPOINT:
                interactive->checkpoint = false;
@@ -1372,6 +1373,7 @@ void build_map_interactive_from_interactive(MapInteractiveV4_t* map_interactive,
      case INTERACTIVE_TYPE_STAIRS:
           map_interactive->stairs.up = interactive->stairs.up;
           map_interactive->stairs.face = interactive->stairs.face;
+          map_interactive->stairs.exit_index = interactive->stairs.exit_index;
           break;
      case INTERACTIVE_TYPE_CHECKPOINT:
           break;
