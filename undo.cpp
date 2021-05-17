@@ -445,10 +445,11 @@ void undo_commit(Undo_t* undo, ObjectArray_t<Player_t>* players, TileMap_t* tile
      if(diff_count){
           auto* count_entry = (S32*)(undo->history.current);
           *count_entry = diff_count;
-          undo->history.current = (char*)(undo->history.current) + sizeof(S32);
+          undo->history.current = (char*)(undo->history.current) + sizeof(diff_count);
           ASSERT_BELOW_HISTORY_SIZE((&undo->history));
 
           undo_snapshot(undo, players, tilemap, blocks, interactives);
+          undo->snapshot_from_revert = false;
      }
 }
 
@@ -617,6 +618,7 @@ void undo_revert(Undo_t* undo, ObjectArray_t<Player_t>* players, TileMap_t* tile
 
      undo->history.current = ptr;
      undo_snapshot(undo, players, tilemap, blocks, interactives);
+     undo->snapshot_from_revert = true;
 }
 
 bool undo_revert_would_move_player_to_a_different_room(Undo_t* undo, Position_t player_pos, Direction_t player_face,
@@ -636,7 +638,8 @@ bool undo_revert_would_move_player_to_a_different_room(Undo_t* undo, Position_t 
 
      // If the player has not moved and is chaining undos, check the diff chain to see if we will end up in a different
      // room.
-     if(player_pos.pixel == undo->players.elements[0].pixel &&
+     if(undo->snapshot_from_revert &&
+        player_pos.pixel == undo->players.elements[0].pixel &&
         player_pos.z == undo->players.elements[0].z &&
         player_face == undo->players.elements[0].face){
           auto* ptr = (char*)(undo->history.current);
@@ -648,6 +651,7 @@ bool undo_revert_would_move_player_to_a_different_room(Undo_t* undo, Position_t 
                ptr -= sizeof(UndoDiffHeader_t);
                auto* diff_header = (UndoDiffHeader_t*)(ptr);
 
+               // TODO: compress the code that advances the pointer by size
                switch(diff_header->type){
                default:
                     assert(!"memory probably corrupted, or new unsupported diff type");
@@ -656,13 +660,15 @@ bool undo_revert_would_move_player_to_a_different_room(Undo_t* undo, Position_t 
                {
                     ptr -= sizeof(UndoPlayer_t);
                     auto* player_entry = (UndoPlayer_t*)(ptr);
-                    auto undo_coord = pixel_to_coord(player_entry->pixel);
+                    if (diff_header->index == 0) {
+                         auto undo_coord = pixel_to_coord(player_entry->pixel);
 
-                    for(S16 r = 0; r < rooms->count; r++){
-                         auto* room = rooms->elements + r;
-                         if(coord_in_rect(undo_coord, *room)){
-                              undo_player_room = room;
-                              break;
+                         for(S16 r = 0; r < rooms->count; r++){
+                              auto* room = rooms->elements + r;
+                              if(coord_in_rect(undo_coord, *room)){
+                                   undo_player_room = room;
+                                   break;
+                              }
                          }
                     }
                     break;

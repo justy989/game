@@ -12,6 +12,8 @@ void operator-=(Vec_t& a, Vec_t b){a.x -= b.x; a.y -= b.y;}
 Vec_t operator*(Vec_t a, F32 s){return Vec_t{a.x * s, a.y * s};}
 void operator*=(Vec_t& a, F32 s){a.x *= s; a.y *= s;}
 
+Vec_t vec_negate(Vec_t a){return Vec_t{-a.x, -a.y};}
+
 float vec_dot(Vec_t a, Vec_t b){return a.x * b.x + a.y * b.y;}
 
 F32 vec_magnitude(Vec_t v){return (F32)(sqrt((v.x * v.x) + (v.y * v.y)));}

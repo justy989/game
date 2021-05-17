@@ -2499,7 +2499,7 @@ void describe_block(World_t* world, Block_t* block){
 
 void describe_player(World_t* world, Player_t* player){
      S16 index = player - world->players.elements;
-     LOG("Player %d: pixel: %d, %d, %d, decimal %f, %f, face: %s push_block: %d, push_block_dir: %s, push_block_rot: %d push_time: %f\n", index,
+     LOG("Player %d: pixel: %d, %d, %d, decimal %.10f, %.10f, face: %s push_block: %d, push_block_dir: %s, push_block_rot: %d push_time: %f\n", index,
          player->pos.pixel.x, player->pos.pixel.y, player->pos.z, player->pos.decimal.x, player->pos.decimal.y,
          direction_to_string(player->face), player->pushing_block, direction_to_string(player->pushing_block_dir), player->pushing_block_rotation,
          player->push_time);

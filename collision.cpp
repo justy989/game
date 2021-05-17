@@ -5,6 +5,8 @@
 #include "player.h"
 #include "utils.h"
 
+#include <cfloat>
+
 Vec_t collide_circle_with_line(Vec_t circle_center, F32 circle_radius, Vec_t a, Vec_t b, bool* collided){
      // move data we care about to the origin
      Vec_t c = circle_center - a;

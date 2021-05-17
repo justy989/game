@@ -16,6 +16,7 @@ void operator-=(Vec_t& a, Vec_t b);
 Vec_t operator*(Vec_t a, F32 s);
 void operator*=(Vec_t& a, F32 s);
 
+Vec_t vec_negate(Vec_t a);
 float vec_dot(Vec_t a, Vec_t b);
 
 F32 vec_magnitude(Vec_t v);

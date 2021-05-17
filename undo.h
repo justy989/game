@@ -68,6 +68,8 @@ struct Undo_t{
      ObjectArray_t<UndoPlayer_t> players;
 
      UndoHistory_t history;
+
+     bool snapshot_from_revert = false;
 };
 
 bool init(UndoHistory_t* undo_history, U32 history_size);
