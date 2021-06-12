@@ -3,6 +3,11 @@
 #include "pixel.h"
 #include "vec.h"
 
+struct PositionLength_t {
+     S16 integer;
+     F32 decimal;
+};
+
 struct Position_t{
      Pixel_t pixel;
      Vec_t decimal;
@@ -23,12 +28,20 @@ Position_t operator-(Position_t a, Position_t b);
 void operator+=(Position_t& a, Position_t b);
 void operator-=(Position_t& a, Position_t b);
 bool operator==(Position_t a, Position_t b);
+bool operator!=(Position_t a, Position_t b);
 Position_t operator*(Position_t p, float scale);
 F32 pos_x_unit(Position_t p);
 F32 pos_y_unit(Position_t p);
 F32 distance_between(Position_t a, Position_t b);
+Position_t position_zero();
 
 bool position_x_less_than(Position_t a, Position_t b);
 bool position_x_greater_than(Position_t a, Position_t b);
 bool position_y_less_than(Position_t a, Position_t b);
 bool position_y_greater_than(Position_t a, Position_t b);
+
+PositionLength_t position_length(Position_t p);
+PositionLength_t position_length(F32 p);
+F32 position_length_length(PositionLength_t l);
+bool operator<(PositionLength_t a, PositionLength_t b);
+bool operator>(PositionLength_t a, PositionLength_t b);

@@ -137,6 +137,43 @@ F32 distance_between(Position_t a, Position_t b){
      return sqrt((x_diff * x_diff) + (y_diff * y_diff));
 }
 
+static void position_decanonicalize_negatives(Positon_t* p) {
+     // decanonicalize negative numbers, so that lengths work
+     if (p->pixel.x < 0) {
+          p->pixel.x++;
+          p->decimal.x = PIXEL_SIZE - p->decimal.x;
+     }
+     if (p->pixel.y < 0) {
+          p->pixel.y++;
+          p->decimal.y = PIXEL_SIZE - p->decimal.x;
+     }
+}
+
+PositionLength_t position_length(Position_t p){
+     position_decanonicalize_negatives(&p);
+     // do everything in F64 before finally converting to F32 at the end to maximize precision during calculations
+     F64 c_squared = sqrt((F64)(p.pixel.x * p.pixel.x) + (F64)(p.pixel.y * p.pixel.y));
+     S16 integer_length = (S16)(c_squared);
+     F64 decimal_length = fmod(c_squared, 1.0) * PIXEL_SIZE;
+     decimal_length += sqrt((F64)(p.decimal.x * p.decimal.x) + (F64)(p.decimal.y * p.decimal.y));
+     if (decimal_length >= PIXEL_SIZE) {
+          F64 pixels = floor(decimal_length / PIXEL_SIZE);
+          integer_length += (S16)(pixels);
+          decimal_length = fmod(decimal_length, PIXEL_SIZE);
+     }
+     return PositionLength_t{integer_length, (F32)(decimal_length)};
+}
+
+PositionLength_t position_length(F32 p){
+     S16 integer = floor(p / PIXEL_SIZE);
+     F64 decimal = fmod(p, PIXEL_SIZE);
+     return PositionLength_t{integer, (F32)(decimal)};
+}
+
+F32 position_length_length(PositionLength_t l){
+     return (l.integer * PIXEL_SIZE) + l.decimal;
+}
+
 bool position_x_less_than(Position_t a, Position_t b){
      if(a.pixel.x < b.pixel.x) return true;
      if(a.pixel.x == b.pixel.x){
@@ -171,4 +208,34 @@ bool position_y_greater_than(Position_t a, Position_t b){
 
 bool operator==(Position_t a, Position_t b){
      return a.pixel == b.pixel && a.decimal == b.decimal && a.z == b.z;
+}
+
+bool operator!=(Position_t a, Position_t b){
+     return a.pixel != b.pixel && a.decimal != b.decimal && a.z != b.z;
+}
+
+Position_t position_zero() {
+     return Position_t{Pixel_t{0, 0}, Vec_t{0, 0}, 0};
+}
+
+bool operator>(PositionLength_t a, PositionLength_t b){
+     if(a.integer > b.integer){
+          return true;
+     }else if(a.integer == b.integer){
+          if(a.decimal > b.decimal){
+               return true;
+          }
+     }
+     return false;
+}
+
+bool operator<(PositionLength_t a, PositionLength_t b){
+     if(a.integer < b.integer){
+          return true;
+     }else if(a.integer == b.integer){
+          if(a.decimal < b.decimal){
+               return true;
+          }
+     }
+     return false;
 }
